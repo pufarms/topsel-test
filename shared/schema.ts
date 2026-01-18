@@ -3,12 +3,16 @@ import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core"
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const userTiers = ["준회원", "start회원", "driving회원", "top회원"] as const;
+export type UserTier = typeof userTiers[number];
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
   role: text("role").notNull().default("seller"),
+  tier: text("tier").notNull().default("준회원"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

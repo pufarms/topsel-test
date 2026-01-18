@@ -1,15 +1,16 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Package, LogOut, Loader2, Download, Users, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import type { User, Order } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { userTiers, type User, type Order } from "@shared/schema";
 
 interface OrderWithUser extends Order {
   user?: { name: string; email: string };
@@ -28,6 +29,19 @@ export default function Admin() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery<OrderWithUser[]>({
     queryKey: ["/api/admin/orders"],
     enabled: !!user && user.role === "admin",
+  });
+
+  const updateTierMutation = useMutation({
+    mutationFn: async ({ userId, tier }: { userId: string; tier: string }) => {
+      await apiRequest("PATCH", `/api/admin/users/${userId}/tier`, { tier });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "등급 변경", description: "회원 등급이 변경되었습니다." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "오류", description: "등급 변경에 실패했습니다." });
+    },
   });
 
   if (authLoading) {
@@ -197,6 +211,7 @@ export default function Admin() {
                           <TableHead>이메일</TableHead>
                           <TableHead>이름</TableHead>
                           <TableHead>역할</TableHead>
+                          <TableHead>등급</TableHead>
                           <TableHead>가입일</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -212,6 +227,24 @@ export default function Admin() {
                               >
                                 {u.role === "admin" ? "관리자" : "셀러"}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={u.tier}
+                                onValueChange={(value) => updateTierMutation.mutate({ userId: u.id, tier: value })}
+                                disabled={updateTierMutation.isPending}
+                              >
+                                <SelectTrigger className="w-32" data-testid={`select-tier-${u.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {userTiers.map((tier) => (
+                                    <SelectItem key={tier} value={tier} data-testid={`option-tier-${tier}`}>
+                                      {tier}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </TableCell>
                             <TableCell>{formatDate(u.createdAt)}</TableCell>
                           </TableRow>

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, seedAdminUser } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, userTiers } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 
@@ -157,6 +157,30 @@ export async function registerRoutes(
 
     const orders = await storage.getAllOrders();
     return res.json(orders);
+  });
+
+  app.patch("/api/admin/users/:id/tier", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const currentUser = await storage.getUser(req.session.userId);
+    if (!currentUser || currentUser.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const { tier } = req.body;
+    if (!tier || !userTiers.includes(tier)) {
+      return res.status(400).json({ message: "유효하지 않은 등급입니다" });
+    }
+
+    const updatedUser = await storage.updateUserTier(req.params.id, tier);
+    if (!updatedUser) {
+      return res.status(404).json({ message: "사용자를 찾을 수 없습니다" });
+    }
+
+    const { password, ...userWithoutPassword } = updatedUser;
+    return res.json(userWithoutPassword);
   });
 
   return httpServer;
