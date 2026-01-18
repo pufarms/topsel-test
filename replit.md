@@ -1,0 +1,74 @@
+# Order Management System
+
+## Overview
+
+A Korean-language order management system (주문관리 시스템) designed for sellers to submit orders and administrators to manage all orders and users. The application features role-based authentication with separate dashboards for sellers and admins, order entry forms, order history tables, and user management capabilities.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter (lightweight router alternative to React Router)
+- **State Management**: TanStack React Query for server state, React Context for auth state
+- **UI Components**: shadcn/ui component library built on Radix UI primitives
+- **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode support)
+- **Form Handling**: React Hook Form with Zod validation via @hookform/resolvers
+- **Build Tool**: Vite with custom configuration for path aliases (@/, @shared/, @assets/)
+
+### Backend Architecture
+- **Framework**: Express 5 running on Node.js with TypeScript
+- **HTTP Server**: Node's native HTTP server wrapping Express
+- **Session Management**: express-session with memorystore for development (consider connect-pg-simple for production)
+- **API Design**: RESTful JSON API endpoints under /api prefix
+- **Authentication**: Session-based auth with SHA256 password hashing (stored in sessions)
+
+### Data Layer
+- **ORM**: Drizzle ORM with PostgreSQL dialect
+- **Schema Location**: shared/schema.ts (shared between client and server)
+- **Validation**: Zod schemas generated from Drizzle schemas via drizzle-zod
+- **Database Connection**: node-postgres (pg) pool
+
+### Database Schema
+Two main tables:
+1. **users**: id (UUID), email (unique), password (hashed), name, role (seller/admin), createdAt
+2. **orders**: id (UUID), userId (FK), productName, quantity, price, recipientName, recipientPhone, recipientAddress, createdAt
+
+### Authentication Flow
+- Session-based authentication stored server-side
+- `/api/auth/me` - Check current session
+- `/api/auth/login` - Create session
+- `/api/auth/logout` - Destroy session
+- `/api/auth/register` - Create user and session
+- Role-based access control: "seller" (default) and "admin" roles
+
+### Build System
+- Development: tsx for TypeScript execution with Vite dev server
+- Production: esbuild bundles server code, Vite builds client to dist/public
+- Script: script/build.ts handles full production build
+
+## External Dependencies
+
+### Database
+- **PostgreSQL**: Primary database, connection via DATABASE_URL environment variable
+- **Drizzle Kit**: Database migrations stored in /migrations directory
+
+### UI Framework Dependencies
+- **Radix UI**: Full suite of accessible primitive components
+- **Lucide React**: Icon library
+- **embla-carousel-react**: Carousel component
+- **vaul**: Drawer component
+- **cmdk**: Command palette component
+- **react-day-picker**: Calendar/date picker
+- **recharts**: Charting library (via shadcn chart component)
+
+### Session Storage
+- **memorystore**: In-memory session store for development
+- **connect-pg-simple**: Available for PostgreSQL session storage in production
+
+### Environment Variables Required
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Secret key for session encryption (optional, has default)
