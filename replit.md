@@ -8,6 +8,13 @@ A Korean-language order management system (주문관리 시스템) designed for 
 
 Preferred communication style: Simple, everyday language.
 
+### 필수 디자인 요구사항 (모든 페이지 적용)
+1. **반응형 웹 디자인 (필수!)**: 모든 페이지에 모바일/태블릿/데스크톱 반응형 레이아웃 적용
+   - 테이블: 데스크톱은 테이블, 모바일/태블릿은 카드 레이아웃
+   - 그리드: `grid-cols-1 sm:grid-cols-2` 등 반응형 그리드
+   - 텍스트: `text-xl md:text-2xl` 등 반응형 크기
+2. **Pretendard 한글 폰트 (필수!)**: 모든 페이지에 Pretendard 폰트 적용 유지
+
 ## System Architecture
 
 ### Frontend Architecture
