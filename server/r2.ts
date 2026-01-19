@@ -1,11 +1,21 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
+if (!process.env.R2_ENDPOINT) {
+  console.warn("R2_ENDPOINT not configured - R2 storage will not work");
+}
+if (!process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
+  console.warn("R2 credentials not configured - R2 storage will not work");
+}
+if (!process.env.R2_PUBLIC_URL) {
+  console.warn("R2_PUBLIC_URL not configured - image URLs may be broken");
+}
+
 const s3Client = new S3Client({
   region: "auto",
-  endpoint: process.env.R2_ENDPOINT,
+  endpoint: process.env.R2_ENDPOINT || "",
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
   },
 });
 

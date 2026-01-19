@@ -49,7 +49,7 @@ export default function ImagePicker({ value, onChange, children }: ImagePickerPr
           <div className="flex items-center justify-between gap-4">
             <DialogTitle>이미지 선택</DialogTitle>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-32" data-testid="picker-select-category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
