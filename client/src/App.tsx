@@ -15,6 +15,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminOrders from "@/pages/admin/orders";
 import AdminGallery from "@/pages/admin/gallery";
 import AdminManagement from "@/pages/admin/admins";
+import PartnerManagement from "@/pages/admin/partners";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -63,7 +64,7 @@ function Router() {
         <AdminRoute><AdminManagement /></AdminRoute>
       </Route>
       <Route path="/admin/partners">
-        <AdminRoute><PlaceholderPage title="협력업체 관리" description="협력업체 계정을 관리합니다" /></AdminRoute>
+        <AdminRoute><PartnerManagement /></AdminRoute>
       </Route>
       <Route path="/admin/orders">
         <AdminRoute><AdminOrders /></AdminRoute>
