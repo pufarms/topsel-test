@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -505,6 +505,206 @@ export async function registerRoutes(
     }
 
     return res.json({ message: "삭제 완료" });
+  });
+
+  // Partner routes
+  app.get("/api/admin/partners", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const partners = await storage.getAllPartners();
+    const partnersWithProductCount = await Promise.all(
+      partners.map(async (partner) => {
+        const productCount = await storage.getPartnerProductCount(partner.id);
+        const { password, ...partnerWithoutPassword } = partner;
+        return { ...partnerWithoutPassword, productCount };
+      })
+    );
+    return res.json(partnersWithProductCount);
+  });
+
+  app.get("/api/admin/partners/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const partner = await storage.getPartner(req.params.id);
+    if (!partner) {
+      return res.status(404).json({ message: "협력업체를 찾을 수 없습니다" });
+    }
+
+    const partnerProducts = await storage.getPartnerProducts(partner.id);
+    const { password, ...partnerWithoutPassword } = partner;
+    return res.json({ ...partnerWithoutPassword, products: partnerProducts });
+  });
+
+  app.get("/api/auth/check-partner-username/:username", async (req, res) => {
+    const existing = await storage.getPartnerByUsername(req.params.username);
+    return res.json({ available: !existing });
+  });
+
+  app.post("/api/admin/partners", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    try {
+      const data = partnerFormSchema.extend({
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+        productIds: z.array(z.string()).optional(),
+      }).parse(req.body);
+
+      const existing = await storage.getPartnerByUsername(data.username);
+      if (existing) {
+        return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+
+      const partner = await storage.createPartner({
+        username: data.username,
+        password: data.password,
+        companyName: data.companyName,
+        businessNumber: data.businessNumber,
+        representative: data.representative,
+        address: data.address,
+        phone1: data.phone1,
+        phone2: data.phone2 || undefined,
+        shippingCompany: data.shippingCompany || undefined,
+        status: data.status,
+      });
+
+      if (data.productIds && data.productIds.length > 0) {
+        await storage.setPartnerProducts(partner.id, data.productIds);
+      }
+
+      const { password, ...partnerWithoutPassword } = partner;
+      return res.status(201).json(partnerWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/admin/partners/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const targetPartner = await storage.getPartner(req.params.id);
+    if (!targetPartner) {
+      return res.status(404).json({ message: "협력업체를 찾을 수 없습니다" });
+    }
+
+    try {
+      const updateSchema = partnerFormSchema.partial().omit({ username: true }).extend({
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다").optional().or(z.literal("")),
+        productIds: z.array(z.string()).optional(),
+      });
+      const data = updateSchema.parse(req.body);
+
+      const updateData: any = {};
+      if (data.companyName) updateData.companyName = data.companyName;
+      if (data.businessNumber) updateData.businessNumber = data.businessNumber;
+      if (data.representative) updateData.representative = data.representative;
+      if (data.address) updateData.address = data.address;
+      if (data.phone1) updateData.phone1 = data.phone1;
+      if (data.phone2 !== undefined) updateData.phone2 = data.phone2;
+      if (data.shippingCompany !== undefined) updateData.shippingCompany = data.shippingCompany;
+      if (data.status) updateData.status = data.status;
+      if (data.password && data.password.length >= 6) updateData.password = data.password;
+
+      const updatedPartner = await storage.updatePartner(req.params.id, updateData);
+
+      if (data.productIds !== undefined) {
+        await storage.setPartnerProducts(req.params.id, data.productIds);
+      }
+
+      if (!updatedPartner) {
+        return res.status(404).json({ message: "협력업체를 찾을 수 없습니다" });
+      }
+
+      const { password, ...partnerWithoutPassword } = updatedPartner;
+      return res.json(partnerWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/partners/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const deleted = await storage.deletePartner(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "협력업체를 찾을 수 없습니다" });
+    }
+
+    return res.json({ message: "삭제되었습니다" });
+  });
+
+  // Product routes
+  app.get("/api/admin/products", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const products = await storage.getAllProducts();
+    return res.json(products);
+  });
+
+  app.get("/api/admin/products/search", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const query = req.query.q as string || "";
+    const products = await storage.searchProducts(query);
+    return res.json(products);
+  });
+
+  app.get("/api/admin/shipping-companies", async (req, res) => {
+    return res.json(shippingCompanies);
   });
 
   return httpServer;

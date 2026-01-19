@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, users, orders, images, imageSubcategories } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -172,6 +172,123 @@ export class DatabaseStorage implements IStorage {
   async deleteSubcategory(id: string): Promise<boolean> {
     const result = await db.delete(imageSubcategories).where(eq(imageSubcategories.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Product methods
+  async getAllProducts(): Promise<Product[]> {
+    return db.select().from(products).orderBy(products.productCode);
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async searchProducts(query: string): Promise<Product[]> {
+    return db.select().from(products).where(
+      or(
+        ilike(products.productCode, `%${query}%`),
+        ilike(products.productName, `%${query}%`)
+      )
+    ).orderBy(products.productCode);
+  }
+
+  async createProduct(data: InsertProduct): Promise<Product> {
+    const [product] = await db.insert(products).values(data).returning();
+    return product;
+  }
+
+  async getProductByCode(code: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.productCode, code));
+    return product;
+  }
+
+  // Partner methods
+  async getAllPartners(): Promise<Partner[]> {
+    return db.select().from(partners).orderBy(desc(partners.createdAt));
+  }
+
+  async getPartner(id: string): Promise<Partner | undefined> {
+    const [partner] = await db.select().from(partners).where(eq(partners.id, id));
+    return partner;
+  }
+
+  async getPartnerByUsername(username: string): Promise<Partner | undefined> {
+    const [partner] = await db.select().from(partners).where(eq(partners.username, username));
+    return partner;
+  }
+
+  async createPartner(data: { username: string; password: string; companyName: string; businessNumber: string; representative: string; address: string; phone1: string; phone2?: string; shippingCompany?: string; status?: string }): Promise<Partner> {
+    const [partner] = await db.insert(partners).values({
+      username: data.username,
+      password: hashPassword(data.password),
+      companyName: data.companyName,
+      businessNumber: data.businessNumber,
+      representative: data.representative,
+      address: data.address,
+      phone1: data.phone1,
+      phone2: data.phone2 || null,
+      shippingCompany: data.shippingCompany || null,
+      status: data.status || "활성",
+    }).returning();
+    return partner;
+  }
+
+  async updatePartner(id: string, data: Partial<{ password: string; companyName: string; businessNumber: string; representative: string; address: string; phone1: string; phone2: string; shippingCompany: string; status: string }>): Promise<Partner | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    if (data.password) {
+      updateData.password = hashPassword(data.password);
+    }
+    const [partner] = await db.update(partners).set(updateData).where(eq(partners.id, id)).returning();
+    return partner;
+  }
+
+  async deletePartner(id: string): Promise<boolean> {
+    // Delete related partner products first
+    await db.delete(partnerProducts).where(eq(partnerProducts.partnerId, id));
+    const result = await db.delete(partners).where(eq(partners.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Partner Product methods
+  async getPartnerProducts(partnerId: string): Promise<(PartnerProduct & { product: Product })[]> {
+    const pProducts = await db.select().from(partnerProducts).where(eq(partnerProducts.partnerId, partnerId));
+    const productIds = pProducts.map(pp => pp.productId);
+    if (productIds.length === 0) return [];
+    
+    const prods = await db.select().from(products).where(inArray(products.id, productIds));
+    return pProducts.map(pp => ({
+      ...pp,
+      product: prods.find(p => p.id === pp.productId)!,
+    })).filter(pp => pp.product);
+  }
+
+  async addPartnerProduct(partnerId: string, productId: string): Promise<PartnerProduct> {
+    const [pp] = await db.insert(partnerProducts).values({ partnerId, productId }).returning();
+    return pp;
+  }
+
+  async removePartnerProduct(partnerId: string, productId: string): Promise<boolean> {
+    const result = await db.delete(partnerProducts).where(
+      and(eq(partnerProducts.partnerId, partnerId), eq(partnerProducts.productId, productId))
+    ).returning();
+    return result.length > 0;
+  }
+
+  async setPartnerProducts(partnerId: string, productIds: string[]): Promise<void> {
+    // Remove all existing
+    await db.delete(partnerProducts).where(eq(partnerProducts.partnerId, partnerId));
+    // Add new ones
+    if (productIds.length > 0) {
+      await db.insert(partnerProducts).values(
+        productIds.map(productId => ({ partnerId, productId }))
+      );
+    }
+  }
+
+  async getPartnerProductCount(partnerId: string): Promise<number> {
+    const result = await db.select().from(partnerProducts).where(eq(partnerProducts.partnerId, partnerId));
+    return result.length;
   }
 }
 
