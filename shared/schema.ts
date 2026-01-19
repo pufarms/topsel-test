@@ -146,3 +146,87 @@ export const insertImageSchema = createInsertSchema(images).omit({
 
 export type InsertImage = z.infer<typeof insertImageSchema>;
 export type Image = typeof images.$inferSelect;
+
+// 택배사 목록
+export const shippingCompanies = ["CJ대한통운", "한진택배", "롯데택배", "우체국택배", "로젠택배", "기타"] as const;
+export type ShippingCompany = typeof shippingCompanies[number];
+
+// 협력업체 상태
+export const partnerStatuses = ["활성", "비활성"] as const;
+export type PartnerStatus = typeof partnerStatuses[number];
+
+// 상품 테이블
+export const products = pgTable("products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  category: text("category"),
+  price: integer("price").notNull().default(0),
+  status: text("status").notNull().default("활성"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+// 협력업체 테이블
+export const partners = pgTable("partners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  companyName: text("company_name").notNull(),
+  businessNumber: text("business_number").notNull(),
+  representative: text("representative").notNull(),
+  address: text("address").notNull(),
+  phone1: text("phone1").notNull(),
+  phone2: text("phone2"),
+  shippingCompany: text("shipping_company"),
+  status: text("status").notNull().default("활성"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPartnerSchema = createInsertSchema(partners).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const partnerFormSchema = z.object({
+  username: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
+  password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다").optional().or(z.literal("")),
+  companyName: z.string().min(1, "업체명을 입력해주세요"),
+  businessNumber: z.string().regex(/^\d{3}-\d{2}-\d{5}$/, "사업자번호 형식: 000-00-00000"),
+  representative: z.string().min(1, "대표자명을 입력해주세요"),
+  address: z.string().min(1, "주소를 입력해주세요"),
+  phone1: z.string().min(1, "연락처-1을 입력해주세요"),
+  phone2: z.string().optional().or(z.literal("")),
+  shippingCompany: z.string().optional().or(z.literal("")),
+  status: z.enum(partnerStatuses),
+});
+
+export type InsertPartner = z.infer<typeof insertPartnerSchema>;
+export type Partner = typeof partners.$inferSelect;
+
+// 협력업체-상품 연결 테이블
+export const partnerProducts = pgTable("partner_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").notNull().references(() => partners.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPartnerProductSchema = createInsertSchema(partnerProducts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPartnerProduct = z.infer<typeof insertPartnerProductSchema>;
+export type PartnerProduct = typeof partnerProducts.$inferSelect;
