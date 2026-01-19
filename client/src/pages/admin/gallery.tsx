@@ -271,11 +271,7 @@ export default function AdminGallery() {
                   </SelectContent>
                 </Select>
               )}
-            </div>
-            
-            <div className="flex-1" />
-            
-            <label>
+              <label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -301,6 +297,7 @@ export default function AdminGallery() {
                 </span>
               </Button>
             </label>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b">
