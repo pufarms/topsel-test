@@ -223,6 +223,10 @@ export async function registerRoutes(
       return res.status(400).json({ message: "유효하지 않은 카테고리입니다" });
     }
 
+    const subcategory = req.body.subcategory || null;
+    const width = req.body.width ? parseInt(req.body.width) : null;
+    const height = req.body.height ? parseInt(req.body.height) : null;
+
     try {
       const { storagePath, publicUrl } = await uploadImage(
         req.file.buffer,
@@ -236,8 +240,11 @@ export async function registerRoutes(
         storagePath,
         publicUrl,
         category,
+        subcategory,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
+        width,
+        height,
         uploadedBy: req.session.userId,
       });
 
@@ -271,6 +278,92 @@ export async function registerRoutes(
       console.error("Image delete error:", error);
       return res.status(500).json({ message: "이미지 삭제 실패" });
     }
+  });
+
+  app.get("/api/admin/subcategories", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const category = req.query.category as string;
+    const subcategories = category 
+      ? await storage.getSubcategoriesByCategory(category)
+      : await storage.getAllSubcategories();
+    return res.json(subcategories);
+  });
+
+  app.post("/api/admin/subcategories", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const { name, category } = req.body;
+    if (!name || !category) {
+      return res.status(400).json({ message: "이름과 카테고리가 필요합니다" });
+    }
+
+    if (!imageCategories.includes(category)) {
+      return res.status(400).json({ message: "유효하지 않은 카테고리입니다" });
+    }
+
+    try {
+      const subcategory = await storage.createSubcategory({ name, category });
+      return res.json(subcategory);
+    } catch (error) {
+      console.error("Subcategory create error:", error);
+      return res.status(500).json({ message: "세부 카테고리 생성 실패" });
+    }
+  });
+
+  app.patch("/api/admin/subcategories/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "이름이 필요합니다" });
+    }
+
+    const subcategory = await storage.updateSubcategory(req.params.id, name);
+    if (!subcategory) {
+      return res.status(404).json({ message: "세부 카테고리를 찾을 수 없습니다" });
+    }
+
+    return res.json(subcategory);
+  });
+
+  app.delete("/api/admin/subcategories/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const deleted = await storage.deleteSubcategory(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "세부 카테고리를 찾을 수 없습니다" });
+    }
+
+    return res.json({ message: "삭제 완료" });
   });
 
   return httpServer;

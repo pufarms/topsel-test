@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, users, orders, images } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, users, orders, images, imageSubcategories } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -102,6 +102,38 @@ export class DatabaseStorage implements IStorage {
   async deleteImage(id: string): Promise<boolean> {
     const result = await db.delete(images).where(eq(images.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getAllSubcategories(): Promise<ImageSubcategory[]> {
+    return db.select().from(imageSubcategories).orderBy(imageSubcategories.category, imageSubcategories.name);
+  }
+
+  async getSubcategoriesByCategory(category: string): Promise<ImageSubcategory[]> {
+    return db.select().from(imageSubcategories).where(eq(imageSubcategories.category, category)).orderBy(imageSubcategories.name);
+  }
+
+  async createSubcategory(data: InsertSubcategory): Promise<ImageSubcategory> {
+    const [subcategory] = await db.insert(imageSubcategories).values(data).returning();
+    return subcategory;
+  }
+
+  async updateSubcategory(id: string, name: string): Promise<ImageSubcategory | undefined> {
+    const [subcategory] = await db.update(imageSubcategories).set({ name }).where(eq(imageSubcategories.id, id)).returning();
+    return subcategory;
+  }
+
+  async deleteSubcategory(id: string): Promise<boolean> {
+    const result = await db.delete(imageSubcategories).where(eq(imageSubcategories.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getImagesByCategoryAndSubcategory(category: string, subcategory?: string): Promise<Image[]> {
+    if (subcategory) {
+      return db.select().from(images)
+        .where(eq(images.category, category))
+        .orderBy(desc(images.uploadedAt));
+    }
+    return db.select().from(images).where(eq(images.category, category)).orderBy(desc(images.uploadedAt));
   }
 }
 
