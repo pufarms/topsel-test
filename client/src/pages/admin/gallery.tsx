@@ -259,12 +259,12 @@ export default function AdminGallery() {
                 </SelectContent>
               </Select>
               {uploadCategorySubcategories.length > 0 && (
-                <Select value={uploadSubcategory} onValueChange={setUploadSubcategory}>
+                <Select value={uploadSubcategory || "__none__"} onValueChange={(v) => setUploadSubcategory(v === "__none__" ? "" : v)}>
                   <SelectTrigger className="w-32" data-testid="select-upload-subcategory">
                     <SelectValue placeholder="세부 카테고리" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">없음</SelectItem>
+                    <SelectItem value="__none__">없음</SelectItem>
                     {uploadCategorySubcategories.map((sub) => (
                       <SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>
                     ))}

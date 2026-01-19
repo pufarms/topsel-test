@@ -33,9 +33,11 @@ Preferred communication style: Simple, everyday language.
 - **Database Connection**: node-postgres (pg) pool
 
 ### Database Schema
-Two main tables:
-1. **users**: id (UUID), email (unique), password (hashed), name, role (seller/admin), createdAt
+Main tables:
+1. **users**: id (UUID), email (unique), password (hashed), name, role (seller/admin), tier, createdAt
 2. **orders**: id (UUID), userId (FK), productName, quantity, price, recipientName, recipientPhone, recipientAddress, createdAt
+3. **images**: id (UUID), filename, storagePath, publicUrl, category, subcategory, fileSize, mimeType, width, height, uploadedAt, uploadedBy (FK)
+4. **image_subcategories**: id (UUID), name, category, createdAt
 
 ### Authentication Flow
 - Session-based authentication stored server-side
@@ -69,6 +71,14 @@ Two main tables:
 - **memorystore**: In-memory session store for development
 - **connect-pg-simple**: Available for PostgreSQL session storage in production
 
+### Image Storage
+- **Cloudflare R2**: S3-compatible object storage for images
+- **R2 Public URL**: https://pub-ecc7de5cc4bd40e3965936a44b6.r2.dev
+- **Image Categories**: 배너, 상품, 아이콘, 기타 (with customizable subcategories)
+- **Features**: Drag-and-drop upload, auto-dimension detection, 2-level category filtering
+
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string
 - `SESSION_SECRET`: Secret key for session encryption (optional, has default)
+- `R2_ACCESS_KEY_ID`: Cloudflare R2 access key
+- `R2_SECRET_ACCESS_KEY`: Cloudflare R2 secret key
