@@ -40,3 +40,10 @@ waitForPort = 5000
 
 [agent]
 integrations = ["github:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+R2_ENDPOINT = "https://ef78235592b7fbbfbf70a7e4a0e71b2c.r2.cloudflarestorage.com"
+R2_BUCKET_NAME = "topsel-images"
+R2_PUBLIC_URL = "https://pub-ef78235592b7fbbfbf70a7e4a0e71b2c.r2.dev"
