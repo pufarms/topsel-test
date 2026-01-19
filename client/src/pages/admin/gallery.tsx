@@ -373,9 +373,9 @@ export default function AdminGallery() {
                     <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col">
                       <div className="flex-1 overflow-hidden">
                         <p className="text-white text-[10px] truncate mb-1">{image.filename}</p>
-                        {(image.width && image.height) && (
-                          <p className="text-white/80 text-[10px]">{image.width}×{image.height}</p>
-                        )}
+                        <p className="text-white/80 text-[10px]">
+                          {(image.width && image.height) ? `${image.width} × ${image.height} px` : "크기 정보 없음"}
+                        </p>
                         <p className="text-white/60 text-[10px]">{formatFileSize(image.fileSize)}</p>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
@@ -438,11 +438,11 @@ export default function AdminGallery() {
                   <p className="font-medium">{formatFileSize(selectedImage.fileSize)}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">크기:</span>
+                  <span className="text-muted-foreground">원본 크기:</span>
                   <p className="font-medium">
                     {selectedImage.width && selectedImage.height 
-                      ? `${selectedImage.width} × ${selectedImage.height}px` 
-                      : "-"
+                      ? `${selectedImage.width} × ${selectedImage.height} px` 
+                      : "정보 없음"
                     }
                   </p>
                 </div>
