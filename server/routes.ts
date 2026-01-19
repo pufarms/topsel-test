@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage, seedAdminUser } from "./storage";
+import { storage } from "./storage";
 import session from "express-session";
 import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions } from "@shared/schema";
 import { z } from "zod";
@@ -20,8 +20,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await seedAdminUser();
-  
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "order-management-secret-key",

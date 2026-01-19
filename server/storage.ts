@@ -176,21 +176,3 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
-
-export async function seedAdminUser() {
-  const adminUsername = "superadmin";
-  const existingAdmin = await storage.getUserByUsername(adminUsername);
-  
-  if (!existingAdmin) {
-    const [adminUser] = await db.insert(users).values({
-      username: adminUsername,
-      password: hashPassword("admin123!"),
-      name: "최고관리자",
-      role: "SUPER_ADMIN",
-      permissions: [],
-    }).returning();
-    console.log("Super admin user created: superadmin / admin123!");
-    return adminUser;
-  }
-  return existingAdmin;
-}
