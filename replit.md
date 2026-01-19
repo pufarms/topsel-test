@@ -16,6 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack React Query for server state, React Context for auth state
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode support)
+- **Font**: Pretendard (Korean optimized font) imported via CDN
+- **Responsive Design**: Mobile-first approach with breakpoints (sm:640px, md:768px, lg:1024px, xl:1280px)
 - **Form Handling**: React Hook Form with Zod validation via @hookform/resolvers
 - **Build Tool**: Vite with custom configuration for path aliases (@/, @shared/, @assets/)
 
@@ -34,18 +36,27 @@ Preferred communication style: Simple, everyday language.
 
 ### Database Schema
 Main tables:
-1. **users**: id (UUID), email (unique), password (hashed), name, role (seller/admin), tier, createdAt
+1. **users**: id (UUID), username (unique), email, password (hashed), name, role (SUPER_ADMIN/ADMIN/seller), tier, permissions (JSON), createdAt, lastLoginAt
 2. **orders**: id (UUID), userId (FK), productName, quantity, price, recipientName, recipientPhone, recipientAddress, createdAt
 3. **images**: id (UUID), filename, storagePath, publicUrl, category, subcategory, fileSize, mimeType, width, height, uploadedAt, uploadedBy (FK)
 4. **image_subcategories**: id (UUID), name, category, createdAt
+5. **partners**: id (UUID), username, password, companyName, businessNumber, representative, address, phone1, phone2, shippingCompany, status, createdAt, updatedAt
+6. **products**: id (UUID), productCode (unique), productName, category, price, status
+7. **partner_products**: id (UUID), partnerId (FK), productId (FK) - Many-to-many relationship
 
 ### Authentication Flow
 - Session-based authentication stored server-side
 - `/api/auth/me` - Check current session
-- `/api/auth/login` - Create session
+- `/api/auth/login` - Create session (username-based)
 - `/api/auth/logout` - Destroy session
 - `/api/auth/register` - Create user and session
-- Role-based access control: "seller" (default) and "admin" roles
+- Role-based access control: SUPER_ADMIN (최고관리자), ADMIN (관리자), seller (셀러)
+- Single SUPER_ADMIN account: kgong5026
+
+### Admin Sidebar Responsive Behavior
+- **Mobile (< 768px)**: Sidebar hidden, hamburger menu toggles overlay
+- **Tablet (768px - 1024px)**: Sidebar collapsed (icons only with tooltips)
+- **Desktop (> 1024px)**: Sidebar fully expanded with labels
 
 ### Build System
 - Development: tsx for TypeScript execution with Vite dev server

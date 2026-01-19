@@ -229,9 +229,9 @@ export default function AdminGallery() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-2xl font-bold">이미지 갤러리</h1>
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-xl md:text-2xl font-bold">이미지 갤러리</h1>
         <Button
           variant="outline"
           size="sm"
@@ -239,7 +239,8 @@ export default function AdminGallery() {
           data-testid="button-manage-subcategories"
         >
           <Settings2 className="h-4 w-4 mr-2" />
-          세부 카테고리 관리
+          <span className="hidden sm:inline">세부 카테고리 관리</span>
+          <span className="sm:hidden">관리</span>
         </Button>
       </div>
 

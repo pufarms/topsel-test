@@ -25,9 +25,9 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">대시보드</h1>
+      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">대시보드</h1>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">총 회원 수</CardTitle>

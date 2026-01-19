@@ -71,11 +71,12 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <h1 className="text-2xl font-bold">사용자 관리</h1>
-        <Button onClick={handleExportExcel} data-testid="button-export-excel">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold">사용자 관리</h1>
+        <Button onClick={handleExportExcel} size="sm" data-testid="button-export-excel">
           <Download className="h-4 w-4 mr-2" />
-          엑셀 내보내기
+          <span className="hidden sm:inline">엑셀 내보내기</span>
+          <span className="sm:hidden">내보내기</span>
         </Button>
       </div>
 
@@ -90,28 +91,67 @@ export default function AdminUsers() {
               등록된 사용자가 없습니다
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>이메일</TableHead>
-                    <TableHead>이름</TableHead>
-                    <TableHead>등급</TableHead>
-                    <TableHead>가입일</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sellers.map((user) => (
-                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이메일</TableHead>
+                      <TableHead>이름</TableHead>
+                      <TableHead>등급</TableHead>
+                      <TableHead>가입일</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sellers.map((user) => (
+                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.tier}
+                            onValueChange={(value) => updateTierMutation.mutate({ userId: user.id, tier: value })}
+                            disabled={updateTierMutation.isPending}
+                          >
+                            <SelectTrigger className="w-32" data-testid={`select-tier-${user.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {userTiers.map((tier) => (
+                                <SelectItem key={tier} value={tier}>
+                                  {tier}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>{formatDate(user.createdAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {sellers.map((user) => (
+                  <Card key={user.id} className="p-4" data-testid={`card-user-${user.id}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold">{user.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">등급</span>
                         <Select
                           value={user.tier}
                           onValueChange={(value) => updateTierMutation.mutate({ userId: user.id, tier: value })}
                           disabled={updateTierMutation.isPending}
                         >
-                          <SelectTrigger className="w-32" data-testid={`select-tier-${user.id}`}>
+                          <SelectTrigger className="w-28" data-testid={`select-tier-mobile-${user.id}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -122,13 +162,16 @@ export default function AdminUsers() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </TableCell>
-                      <TableCell>{formatDate(user.createdAt)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">가입일</span>
+                        <span>{formatDate(user.createdAt)}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   CollapsibleTrigger 
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   LayoutDashboard, 
   Users, 
@@ -26,7 +27,8 @@ import {
   Image as ImageIcon,
   UserCog,
   Building2,
-  User
+  User,
+  ChevronLeft
 } from "lucide-react";
 
 interface MenuItem {
@@ -66,11 +68,34 @@ const menuItems: MenuItem[] = [
   },
 ];
 
+type SidebarMode = "full" | "collapsed" | "hidden";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const { user, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [openMenus, setOpenMenus] = useState<string[]>(["members", "settings"]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 768) {
+        setSidebarMode("hidden");
+        setMobileOpen(false);
+      } else if (width < 1024) {
+        setSidebarMode("collapsed");
+        setMobileOpen(false);
+      } else {
+        setSidebarMode("full");
+        setMobileOpen(false);
+      }
+    };
+    
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -85,29 +110,163 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   };
 
+  const toggleSidebar = () => {
+    if (sidebarMode === "hidden") {
+      setMobileOpen(!mobileOpen);
+    } else {
+      setSidebarMode(sidebarMode === "full" ? "collapsed" : "full");
+    }
+  };
+
   const isActive = (path?: string) => path === location;
   const isChildActive = (children?: { path: string }[]) => 
     children?.some(child => child.path === location);
+  
+  const isCollapsed = sidebarMode === "collapsed";
+  const sidebarWidth = isCollapsed ? "w-16" : "w-64";
+
+  const renderMenuItem = (item: MenuItem) => {
+    if (isCollapsed) {
+      if (item.children) {
+        return (
+          <Tooltip key={item.id}>
+            <TooltipTrigger asChild>
+              <div
+                className={`flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
+                  isChildActive(item.children)
+                    ? "bg-primary text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+                data-testid={`menu-${item.id}`}
+              >
+                {item.icon}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="flex flex-col gap-1">
+              <span className="font-medium">{item.label}</span>
+              {item.children.map((child) => (
+                <Link key={child.id} href={child.path}>
+                  <span
+                    className={`block text-sm cursor-pointer ${
+                      isActive(child.path) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {child.label}
+                  </span>
+                </Link>
+              ))}
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+      return (
+        <Tooltip key={item.id}>
+          <TooltipTrigger asChild>
+            <Link href={item.path!}>
+              <div
+                className={`flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
+                  isActive(item.path)
+                    ? "bg-primary text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+                data-testid={`menu-${item.id}`}
+              >
+                {item.icon}
+              </div>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (item.children) {
+      return (
+        <Collapsible 
+          key={item.id}
+          open={openMenus.includes(item.id)} 
+          onOpenChange={() => toggleMenu(item.id)}
+          defaultOpen={true}
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                isChildActive(item.children)
+                  ? "bg-primary text-white"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
+              data-testid={`menu-${item.id}`}
+            >
+              <div className="flex items-center gap-3">
+                {item.icon}
+                <span>{item.label}</span>
+              </div>
+              {openMenus.includes(item.id) ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent forceMount className={`pl-8 mt-1 space-y-1 ${openMenus.includes(item.id) ? "" : "hidden"}`}>
+            {item.children.map((child) => (
+              <Link key={child.id} href={child.path} onClick={() => setMobileOpen(false)}>
+                <span
+                  className={`block px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
+                    isActive(child.path)
+                      ? "bg-primary/20 text-primary"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  }`}
+                  data-testid={`menu-${child.id}`}
+                >
+                  {child.label}
+                </span>
+              </Link>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      );
+    }
+
+    return (
+      <Link key={item.id} href={item.path!} onClick={() => setMobileOpen(false)}>
+        <span
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${
+            isActive(item.path)
+              ? "bg-primary text-white"
+              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+          }`}
+          data-testid={`menu-${item.id}`}
+        >
+          {item.icon}
+          <span>{item.label}</span>
+        </span>
+      </Link>
+    );
+  };
+
+  const mainPadding = sidebarMode === "full" ? "lg:pl-64" : sidebarMode === "collapsed" ? "md:pl-16" : "";
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="fixed top-0 left-0 right-0 h-14 bg-slate-800 border-b border-slate-700 z-50 flex items-center justify-between px-4">
-        <div className="flex items-center gap-4">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-slate-800 border-b border-slate-700 z-50 flex items-center justify-between px-3 md:px-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <Button
             variant="ghost"
             size="icon"
-            className="text-white hover:bg-slate-700 lg:hidden"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-white hover:bg-slate-700"
+            onClick={toggleSidebar}
             data-testid="button-toggle-sidebar"
           >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
           <Link href="/admin">
-            <span className="text-xl font-bold text-white cursor-pointer">탑셀러 관리자</span>
+            <span className="text-lg md:text-xl font-bold text-white cursor-pointer">탑셀러 관리자</span>
           </Link>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-300">{user?.name}님</span>
+        <div className="flex items-center gap-2 md:gap-4">
+          <span className="text-xs md:text-sm text-slate-300 hidden sm:block">{user?.name}님</span>
           <Button
             variant="ghost"
             size="sm"
@@ -115,98 +274,69 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onClick={handleLogout}
             data-testid="button-logout"
           >
-            <LogOut className="h-4 w-4 mr-2" />
-            로그아웃
+            <LogOut className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">로그아웃</span>
           </Button>
         </div>
       </header>
 
-      <aside 
-        className={`fixed top-14 left-0 bottom-0 w-64 bg-slate-900 border-r border-slate-800 transition-transform z-40 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
-      >
-        <ScrollArea className="h-full py-4">
-          <nav className="px-3 space-y-1">
-            {menuItems.map((item) => (
-              <div key={item.id}>
-                {item.children ? (
-                  <Collapsible 
-                    open={openMenus.includes(item.id)} 
-                    onOpenChange={() => toggleMenu(item.id)}
-                    defaultOpen={true}
-                  >
-                    <CollapsibleTrigger asChild>
-                      <button
-                        type="button"
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                          isChildActive(item.children)
-                            ? "bg-primary text-white"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                        }`}
-                        data-testid={`menu-${item.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          {item.icon}
-                          <span>{item.label}</span>
-                        </div>
-                        {openMenus.includes(item.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent forceMount className={`pl-8 mt-1 space-y-1 ${openMenus.includes(item.id) ? "" : "hidden"}`}>
-                      {item.children.map((child) => (
-                        <Link key={child.id} href={child.path}>
-                          <span
-                            className={`block px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
-                              isActive(child.path)
-                                ? "bg-primary/20 text-primary"
-                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                            }`}
-                            data-testid={`menu-${child.id}`}
-                          >
-                            {child.label}
-                          </span>
-                        </Link>
-                      ))}
-                    </CollapsibleContent>
-                  </Collapsible>
-                ) : (
-                  <Link href={item.path!}>
-                    <span
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${
-                        isActive(item.path)
-                          ? "bg-primary text-white"
-                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                      }`}
-                      data-testid={`menu-${item.id}`}
-                    >
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </span>
-                  </Link>
-                )}
-              </div>
-            ))}
-          </nav>
-        </ScrollArea>
-      </aside>
+      {/* Desktop/Tablet Sidebar */}
+      {sidebarMode !== "hidden" && (
+        <aside 
+          className={`fixed top-14 left-0 bottom-0 ${sidebarWidth} bg-slate-900 border-r border-slate-800 transition-all z-40 hidden md:block`}
+        >
+          <ScrollArea className="h-full py-4">
+            <nav className={`${isCollapsed ? "px-2" : "px-3"} space-y-1`}>
+              {menuItems.map(renderMenuItem)}
+            </nav>
+          </ScrollArea>
+          {!isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -right-3 top-6 h-6 w-6 rounded-full bg-slate-700 text-white hover:bg-slate-600 hidden lg:flex"
+              onClick={() => setSidebarMode("collapsed")}
+              data-testid="button-collapse-sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute -right-3 top-6 h-6 w-6 rounded-full bg-slate-700 text-white hover:bg-slate-600"
+              onClick={() => setSidebarMode("full")}
+              data-testid="button-expand-sidebar"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </aside>
+      )}
 
-      <main className={`pt-14 transition-all ${sidebarOpen ? "lg:pl-64" : ""} lg:pl-64`}>
-        <div className="p-6">
+      {/* Mobile Sidebar Overlay */}
+      {mobileOpen && sidebarMode === "hidden" && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="fixed top-14 left-0 bottom-0 w-64 bg-slate-900 border-r border-slate-800 z-40 md:hidden">
+            <ScrollArea className="h-full py-4">
+              <nav className="px-3 space-y-1">
+                {menuItems.map(renderMenuItem)}
+              </nav>
+            </ScrollArea>
+          </aside>
+        </>
+      )}
+
+      <main className={`pt-14 transition-all ${mainPadding}`}>
+        <div className="p-3 md:p-6">
           {children}
         </div>
       </main>
-
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }

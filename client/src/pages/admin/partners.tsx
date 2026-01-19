@@ -283,7 +283,7 @@ export default function PartnerManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-2xl font-bold">협력업체 관리</h1>
+        <h1 className="text-xl md:text-2xl font-bold">협력업체 관리</h1>
         <Button onClick={openCreateDialog} data-testid="button-add-partner">
           <Plus className="h-4 w-4 mr-2" />
           협력업체 등록
@@ -431,59 +431,117 @@ export default function PartnerManagement() {
                   검색 결과가 없습니다
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>업체명</TableHead>
-                        <TableHead>대표자명</TableHead>
-                        <TableHead>사업자번호</TableHead>
-                        <TableHead>연락처</TableHead>
-                        <TableHead>택배사</TableHead>
-                        <TableHead>취급품목</TableHead>
-                        <TableHead>상태</TableHead>
-                        <TableHead className="w-20">관리</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredPartners.map((partner) => (
-                        <TableRow key={partner.id} data-testid={`row-partner-${partner.id}`}>
-                          <TableCell className="font-medium">{partner.companyName}</TableCell>
-                          <TableCell>{partner.representative}</TableCell>
-                          <TableCell>{partner.businessNumber}</TableCell>
-                          <TableCell>{partner.phone1}</TableCell>
-                          <TableCell>{partner.shippingCompany || "-"}</TableCell>
-                          <TableCell>{partner.productCount}개</TableCell>
-                          <TableCell>
-                            <Badge variant={partner.status === "활성" ? "default" : "secondary"}>
-                              {partner.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openEditDialog(partner.id)}
-                                data-testid={`button-edit-${partner.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeletePartnerId(partner.id)}
-                                data-testid={`button-delete-${partner.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>업체명</TableHead>
+                          <TableHead>대표자명</TableHead>
+                          <TableHead>사업자번호</TableHead>
+                          <TableHead>연락처</TableHead>
+                          <TableHead>택배사</TableHead>
+                          <TableHead>취급품목</TableHead>
+                          <TableHead>상태</TableHead>
+                          <TableHead className="w-20">관리</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPartners.map((partner) => (
+                          <TableRow key={partner.id} data-testid={`row-partner-${partner.id}`}>
+                            <TableCell className="font-medium">{partner.companyName}</TableCell>
+                            <TableCell>{partner.representative}</TableCell>
+                            <TableCell>{partner.businessNumber}</TableCell>
+                            <TableCell>{partner.phone1}</TableCell>
+                            <TableCell>{partner.shippingCompany || "-"}</TableCell>
+                            <TableCell>{partner.productCount}개</TableCell>
+                            <TableCell>
+                              <Badge variant={partner.status === "활성" ? "default" : "secondary"}>
+                                {partner.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openEditDialog(partner.id)}
+                                  data-testid={`button-edit-${partner.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setDeletePartnerId(partner.id)}
+                                  data-testid={`button-delete-${partner.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile/Tablet Cards */}
+                  <div className="lg:hidden space-y-3">
+                    {filteredPartners.map((partner) => (
+                      <Card key={partner.id} className="p-4" data-testid={`card-partner-${partner.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold">{partner.companyName}</span>
+                              <Badge variant={partner.status === "활성" ? "default" : "secondary"} className="text-xs">
+                                {partner.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{partner.representative}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openEditDialog(partner.id)}
+                              data-testid={`button-edit-mobile-${partner.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeletePartnerId(partner.id)}
+                              data-testid={`button-delete-mobile-${partner.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">사업자번호</span>
+                            <p className="font-medium">{partner.businessNumber}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">연락처</span>
+                            <p className="font-medium">{partner.phone1}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">택배사</span>
+                            <p className="font-medium">{partner.shippingCompany || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">취급품목</span>
+                            <p className="font-medium">{partner.productCount}개</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -500,7 +558,7 @@ export default function PartnerManagement() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="username"
@@ -593,7 +651,7 @@ export default function PartnerManagement() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="representative"
@@ -646,7 +704,7 @@ export default function PartnerManagement() {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="phone1"

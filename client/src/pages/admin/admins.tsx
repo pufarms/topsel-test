@@ -220,7 +220,7 @@ export default function AdminManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-2xl font-bold">관리자 관리</h1>
+        <h1 className="text-xl md:text-2xl font-bold">관리자 관리</h1>
         {isSuperAdmin && (
           <Button onClick={openCreateDialog} data-testid="button-add-admin">
             <Plus className="h-4 w-4 mr-2" />
@@ -355,59 +355,113 @@ export default function AdminManagement() {
                   검색 결과가 없습니다
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>아이디</TableHead>
-                        <TableHead>이름</TableHead>
-                        <TableHead>등급</TableHead>
-                        <TableHead>연락처</TableHead>
-                        <TableHead>최근 로그인</TableHead>
-                        {isSuperAdmin && <TableHead className="w-20">관리</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAdmins.map((admin) => (
-                        <TableRow key={admin.id} data-testid={`row-admin-${admin.id}`}>
-                          <TableCell className="font-medium">{admin.username}</TableCell>
-                          <TableCell>{admin.name}</TableCell>
-                          <TableCell>
-                            <Badge variant={admin.role === "SUPER_ADMIN" ? "default" : "secondary"}>
-                              {admin.role === "SUPER_ADMIN" ? "최고관리자" : "관리자"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{admin.phone || "-"}</TableCell>
-                          <TableCell>{formatDate(admin.lastLoginAt)}</TableCell>
-                          {isSuperAdmin && (
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>아이디</TableHead>
+                          <TableHead>이름</TableHead>
+                          <TableHead>등급</TableHead>
+                          <TableHead>연락처</TableHead>
+                          <TableHead>최근 로그인</TableHead>
+                          {isSuperAdmin && <TableHead className="w-20">관리</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAdmins.map((admin) => (
+                          <TableRow key={admin.id} data-testid={`row-admin-${admin.id}`}>
+                            <TableCell className="font-medium">{admin.username}</TableCell>
+                            <TableCell>{admin.name}</TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => openEditDialog(admin)}
-                                  data-testid={`button-edit-${admin.id}`}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                {admin.role !== "SUPER_ADMIN" && (
+                              <Badge variant={admin.role === "SUPER_ADMIN" ? "default" : "secondary"}>
+                                {admin.role === "SUPER_ADMIN" ? "최고관리자" : "관리자"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{admin.phone || "-"}</TableCell>
+                            <TableCell>{formatDate(admin.lastLoginAt)}</TableCell>
+                            {isSuperAdmin && (
+                              <TableCell>
+                                <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => setDeleteAdminId(admin.id)}
-                                    data-testid={`button-delete-${admin.id}`}
+                                    onClick={() => openEditDialog(admin)}
+                                    data-testid={`button-edit-${admin.id}`}
                                   >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                    <Pencil className="h-4 w-4" />
                                   </Button>
-                                )}
-                              </div>
-                            </TableCell>
+                                  {admin.role !== "SUPER_ADMIN" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setDeleteAdminId(admin.id)}
+                                      data-testid={`button-delete-${admin.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Cards */}
+                  <div className="md:hidden space-y-3">
+                    {filteredAdmins.map((admin) => (
+                      <Card key={admin.id} className="p-4" data-testid={`card-admin-${admin.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold">{admin.name}</span>
+                              <Badge variant={admin.role === "SUPER_ADMIN" ? "default" : "secondary"} className="text-xs">
+                                {admin.role === "SUPER_ADMIN" ? "최고관리자" : "관리자"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">@{admin.username}</p>
+                          </div>
+                          {isSuperAdmin && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => openEditDialog(admin)}
+                                data-testid={`button-edit-mobile-${admin.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {admin.role !== "SUPER_ADMIN" && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setDeleteAdminId(admin.id)}
+                                  data-testid={`button-delete-mobile-${admin.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
                           )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                        </div>
+                        <div className="mt-3 text-sm space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">연락처</span>
+                            <span>{admin.phone || "-"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">최근 로그인</span>
+                            <span>{formatDate(admin.lastLoginAt)}</span>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
