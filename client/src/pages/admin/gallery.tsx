@@ -5,10 +5,49 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Upload, Trash2, Copy, ImageIcon, X } from "lucide-react";
+import { Loader2, Upload, Trash2, Copy, ImageIcon, X, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { imageCategories, type Image } from "@shared/schema";
+
+function ImageThumbnail({ 
+  src, 
+  alt, 
+  className 
+}: { 
+  src: string; 
+  alt: string; 
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  if (error) {
+    return (
+      <div className={`flex flex-col items-center justify-center bg-muted text-muted-foreground ${className}`}>
+        <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
+        <span className="text-xs text-center px-2">로드 실패</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {loading && (
+        <div className={`flex items-center justify-center bg-muted ${className}`}>
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${loading ? 'hidden' : ''}`}
+        onLoad={() => setLoading(false)}
+        onError={() => { setError(true); setLoading(false); }}
+      />
+    </>
+  );
+}
 
 export default function AdminGallery() {
   const { toast } = useToast();
@@ -212,7 +251,7 @@ export default function AdminGallery() {
                     onClick={() => setSelectedImage(image)}
                     data-testid={`image-${image.id}`}
                   >
-                    <img
+                    <ImageThumbnail
                       src={image.publicUrl}
                       alt={image.filename}
                       className="w-full h-full object-cover"
@@ -253,7 +292,7 @@ export default function AdminGallery() {
           </DialogHeader>
           {selectedImage && (
             <div className="space-y-4">
-              <img
+              <ImageThumbnail
                 src={selectedImage.publicUrl}
                 alt={selectedImage.filename}
                 className="w-full max-h-80 object-contain rounded-lg bg-muted"
