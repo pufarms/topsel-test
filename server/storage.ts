@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, users, orders, images, imageSubcategories } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { createHash } from "crypto";
 
@@ -10,14 +10,18 @@ function hashPassword(password: string): string {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(data: { username: string; password: string; name: string; phone?: string; email?: string; role?: string; permissions?: string[] }): Promise<User>;
+  updateUser(id: string, data: Partial<{ password: string; name: string; phone: string; email: string; role: string; permissions: string[] }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   getAllUsers(): Promise<User[]>;
-  validatePassword(email: string, password: string): Promise<User | null>;
+  getAdminUsers(): Promise<User[]>;
+  validatePassword(username: string, password: string): Promise<User | null>;
+  updateLastLogin(userId: string): Promise<void>;
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   
   getOrdersByUserId(userId: string): Promise<Order[]>;
-  getAllOrders(): Promise<(Order & { user?: { name: string; email: string } })[]>;
+  getAllOrders(): Promise<(Order & { user?: { name: string; username: string } })[]>;
   createOrder(userId: string, order: InsertOrder): Promise<Order>;
 
   createImage(insertImage: InsertImage): Promise<Image>;
@@ -39,32 +43,61 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
     return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(data: { username: string; password: string; name: string; phone?: string; email?: string; role?: string; permissions?: string[] }): Promise<User> {
     const [user] = await db.insert(users).values({
-      ...insertUser,
-      password: hashPassword(insertUser.password),
+      username: data.username,
+      password: hashPassword(data.password),
+      name: data.name,
+      phone: data.phone || null,
+      email: data.email || null,
+      role: data.role || "ADMIN",
+      permissions: data.permissions || [],
     }).returning();
     return user;
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return db.select().from(users);
+  async updateUser(id: string, data: Partial<{ password: string; name: string; phone: string; email: string; role: string; permissions: string[] }>): Promise<User | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    if (data.password) {
+      updateData.password = hashPassword(data.password);
+    }
+    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    return user;
   }
 
-  async validatePassword(email: string, password: string): Promise<User | null> {
-    const user = await this.getUserByEmail(email);
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getAdminUsers(): Promise<User[]> {
+    return db.select().from(users).where(
+      or(eq(users.role, "SUPER_ADMIN"), eq(users.role, "ADMIN"))
+    ).orderBy(desc(users.createdAt));
+  }
+
+  async validatePassword(username: string, password: string): Promise<User | null> {
+    const user = await this.getUserByUsername(username);
     if (!user) return null;
     if (user.password !== hashPassword(password)) return null;
     return user;
   }
 
+  async updateLastLogin(userId: string): Promise<void> {
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));
+  }
+
   async updateUserTier(userId: string, tier: string): Promise<User | undefined> {
-    const [user] = await db.update(users).set({ tier }).where(eq(users.id, userId)).returning();
+    const [user] = await db.update(users).set({ tier, updatedAt: new Date() }).where(eq(users.id, userId)).returning();
     return user;
   }
 
@@ -72,7 +105,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(orders).where(eq(orders.userId, userId));
   }
 
-  async getAllOrders(): Promise<(Order & { user?: { name: string; email: string } })[]> {
+  async getAllOrders(): Promise<(Order & { user?: { name: string; username: string } })[]> {
     const allOrders = await db.select().from(orders);
     const allUsers = await db.select().from(users);
     
@@ -80,7 +113,7 @@ export class DatabaseStorage implements IStorage {
       const user = allUsers.find(u => u.id === order.userId);
       return {
         ...order,
-        user: user ? { name: user.name, email: user.email } : undefined,
+        user: user ? { name: user.name, username: user.username } : undefined,
       };
     });
   }
@@ -143,17 +176,18 @@ export class DatabaseStorage implements IStorage {
 export const storage = new DatabaseStorage();
 
 export async function seedAdminUser() {
-  const adminEmail = "admin@admin.com";
-  const existingAdmin = await storage.getUserByEmail(adminEmail);
+  const adminUsername = "superadmin";
+  const existingAdmin = await storage.getUserByUsername(adminUsername);
   
   if (!existingAdmin) {
     const [adminUser] = await db.insert(users).values({
-      email: adminEmail,
-      password: hashPassword("admin123"),
-      name: "관리자",
-      role: "admin",
+      username: adminUsername,
+      password: hashPassword("admin123!"),
+      name: "최고관리자",
+      role: "SUPER_ADMIN",
+      permissions: [],
     }).returning();
-    console.log("Admin user created: admin@admin.com / admin123");
+    console.log("Super admin user created: superadmin / admin123!");
     return adminUser;
   }
   return existingAdmin;

@@ -14,6 +14,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminOrders from "@/pages/admin/orders";
 import AdminGallery from "@/pages/admin/gallery";
+import AdminManagement from "@/pages/admin/admins";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -35,7 +36,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  if (user.role !== "admin") {
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  if (!isAdmin) {
     navigate("/dashboard");
     return null;
   }
@@ -58,7 +60,7 @@ function Router() {
         <AdminRoute><AdminUsers /></AdminRoute>
       </Route>
       <Route path="/admin/admins">
-        <AdminRoute><PlaceholderPage title="관리자 관리" description="관리자 계정을 관리합니다" /></AdminRoute>
+        <AdminRoute><AdminManagement /></AdminRoute>
       </Route>
       <Route path="/admin/partners">
         <AdminRoute><PlaceholderPage title="협력업체 관리" description="협력업체 계정을 관리합니다" /></AdminRoute>

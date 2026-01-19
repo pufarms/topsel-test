@@ -23,21 +23,24 @@ export default function Register() {
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
       name: "",
+      phone: "",
+      email: "",
     },
   });
 
   if (user) {
-    navigate(user.role === "admin" ? "/admin" : "/dashboard");
+    const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+    navigate(isAdmin ? "/admin" : "/dashboard");
     return null;
   }
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
     try {
-      await register(data.email, data.password, data.name);
+      await register(data.username, data.password, data.name, data.phone, data.email);
       toast({ title: "회원가입 성공", description: "환영합니다!" });
     } catch (error: any) {
       toast({
@@ -74,6 +77,41 @@ export default function Register() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>아이디</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="아이디 (4자 이상)" 
+                          data-testid="input-username"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>비밀번호</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="비밀번호 (6자 이상)" 
+                          data-testid="input-password"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
@@ -91,15 +129,14 @@ export default function Register() {
                 />
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>이메일</FormLabel>
+                      <FormLabel>연락처 (선택)</FormLabel>
                       <FormControl>
                         <Input 
-                          type="email" 
-                          placeholder="example@email.com" 
-                          data-testid="input-email"
+                          placeholder="010-0000-0000" 
+                          data-testid="input-phone"
                           {...field} 
                         />
                       </FormControl>
@@ -109,15 +146,15 @@ export default function Register() {
                 />
                 <FormField
                   control={form.control}
-                  name="password"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>비밀번호</FormLabel>
+                      <FormLabel>이메일 (선택)</FormLabel>
                       <FormControl>
                         <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          data-testid="input-password"
+                          type="email" 
+                          placeholder="example@email.com" 
+                          data-testid="input-email"
                           {...field} 
                         />
                       </FormControl>

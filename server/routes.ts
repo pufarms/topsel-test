@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, seedAdminUser } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, userTiers, imageCategories } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -57,9 +57,9 @@ export async function registerRoutes(
     try {
       const data = registerSchema.parse(req.body);
       
-      const existingUser = await storage.getUserByEmail(data.email);
+      const existingUser = await storage.getUserByUsername(data.username);
       if (existingUser) {
-        return res.status(400).json({ message: "이미 등록된 이메일입니다" });
+        return res.status(400).json({ message: "이미 등록된 아이디입니다" });
       }
 
       const user = await storage.createUser(data);
@@ -75,15 +75,21 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/auth/check-username/:username", async (req, res) => {
+    const existingUser = await storage.getUserByUsername(req.params.username);
+    return res.json({ available: !existingUser });
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
       
-      const user = await storage.validatePassword(data.email, data.password);
+      const user = await storage.validatePassword(data.username, data.password);
       if (!user) {
-        return res.status(401).json({ message: "이메일 또는 비밀번호가 올바르지 않습니다" });
+        return res.status(401).json({ message: "아이디 또는 비밀번호가 올바르지 않습니다" });
       }
 
+      await storage.updateLastLogin(user.id);
       req.session.userId = user.id;
 
       const { password, ...userWithoutPassword } = user;
@@ -132,13 +138,16 @@ export async function registerRoutes(
     }
   });
 
+  const isAdmin = (role: string) => role === "SUPER_ADMIN" || role === "ADMIN";
+  const isSuperAdmin = (role: string) => role === "SUPER_ADMIN";
+
   app.get("/api/admin/users", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -147,13 +156,147 @@ export async function registerRoutes(
     return res.json(usersWithoutPasswords);
   });
 
+  app.get("/api/admin/admins", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const admins = await storage.getAdminUsers();
+    const adminsWithoutPasswords = admins.map(({ password, ...u }) => u);
+    return res.json(adminsWithoutPasswords);
+  });
+
+  app.post("/api/admin/admins", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const currentUser = await storage.getUser(req.session.userId);
+    if (!currentUser || !isSuperAdmin(currentUser.role)) {
+      return res.status(403).json({ message: "최고관리자만 관리자를 등록할 수 있습니다" });
+    }
+
+    try {
+      const data = insertAdminSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByUsername(data.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "이미 등록된 아이디입니다" });
+      }
+
+      const newAdmin = await storage.createUser({
+        username: data.username,
+        password: data.password,
+        name: data.name,
+        phone: data.phone,
+        email: data.email,
+        role: data.role,
+        permissions: data.role === "SUPER_ADMIN" ? [] : (data.permissions || []),
+      });
+
+      const { password, ...adminWithoutPassword } = newAdmin;
+      return res.json(adminWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/admin/admins/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const currentUser = await storage.getUser(req.session.userId);
+    if (!currentUser || !isSuperAdmin(currentUser.role)) {
+      return res.status(403).json({ message: "최고관리자만 관리자를 수정할 수 있습니다" });
+    }
+
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "관리자를 찾을 수 없습니다" });
+    }
+
+    if (targetUser.role === "SUPER_ADMIN" && targetUser.id !== currentUser.id) {
+      return res.status(403).json({ message: "다른 최고관리자는 수정할 수 없습니다" });
+    }
+
+    try {
+      const data = updateAdminSchema.parse(req.body);
+      const updateData: any = {};
+      
+      if (data.name) updateData.name = data.name;
+      if (data.phone !== undefined) updateData.phone = data.phone;
+      if (data.email !== undefined) updateData.email = data.email;
+      if (data.role && targetUser.role !== "SUPER_ADMIN") updateData.role = data.role;
+      if (data.permissions !== undefined) updateData.permissions = data.permissions;
+      if (data.password && data.password.length >= 6) updateData.password = data.password;
+
+      const updatedAdmin = await storage.updateUser(req.params.id, updateData);
+      if (!updatedAdmin) {
+        return res.status(404).json({ message: "관리자를 찾을 수 없습니다" });
+      }
+
+      const { password, ...adminWithoutPassword } = updatedAdmin;
+      return res.json(adminWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/admins/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const currentUser = await storage.getUser(req.session.userId);
+    if (!currentUser || !isSuperAdmin(currentUser.role)) {
+      return res.status(403).json({ message: "최고관리자만 관리자를 삭제할 수 있습니다" });
+    }
+
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "관리자를 찾을 수 없습니다" });
+    }
+
+    if (targetUser.role === "SUPER_ADMIN") {
+      return res.status(403).json({ message: "최고관리자는 삭제할 수 없습니다" });
+    }
+
+    await storage.deleteUser(req.params.id);
+    return res.json({ message: "삭제되었습니다" });
+  });
+
+  app.get("/api/admin/permissions", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    return res.json(menuPermissions);
+  });
+
   app.get("/api/admin/orders", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -167,7 +310,7 @@ export async function registerRoutes(
     }
 
     const currentUser = await storage.getUser(req.session.userId);
-    if (!currentUser || currentUser.role !== "admin") {
+    if (!currentUser || !isAdmin(currentUser.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -193,7 +336,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -210,7 +353,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -261,7 +404,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -286,7 +429,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -303,7 +446,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -331,7 +474,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
@@ -354,7 +497,7 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") {
+    if (!user || !isAdmin(user.role)) {
       return res.status(403).json({ message: "Admin access required" });
     }
 

@@ -13,8 +13,10 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { userTiers, type User, type Order } from "@shared/schema";
 
 interface OrderWithUser extends Order {
-  user?: { name: string; email: string };
+  user?: { name: string; username: string };
 }
+
+const isAdminRole = (role: string) => role === "SUPER_ADMIN" || role === "ADMIN";
 
 export default function Admin() {
   const [, navigate] = useLocation();
@@ -23,12 +25,12 @@ export default function Admin() {
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-    enabled: !!user && user.role === "admin",
+    enabled: !!user && isAdminRole(user.role),
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<OrderWithUser[]>({
     queryKey: ["/api/admin/orders"],
-    enabled: !!user && user.role === "admin",
+    enabled: !!user && isAdminRole(user.role),
   });
 
   const updateTierMutation = useMutation({
@@ -57,7 +59,7 @@ export default function Admin() {
     return null;
   }
 
-  if (user.role !== "admin") {
+  if (!isAdminRole(user.role)) {
     navigate("/dashboard");
     return null;
   }
@@ -208,7 +210,7 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>이메일</TableHead>
+                          <TableHead>아이디</TableHead>
                           <TableHead>이름</TableHead>
                           <TableHead>역할</TableHead>
                           <TableHead>등급</TableHead>
@@ -218,14 +220,14 @@ export default function Admin() {
                       <TableBody>
                         {users.map((u) => (
                           <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                            <TableCell>{u.email}</TableCell>
+                            <TableCell>{u.username}</TableCell>
                             <TableCell className="font-medium">{u.name}</TableCell>
                             <TableCell>
                               <Badge 
-                                variant={u.role === "admin" ? "default" : "secondary"}
+                                variant={isAdminRole(u.role) ? "default" : "secondary"}
                                 className="text-xs"
                               >
-                                {u.role === "admin" ? "관리자" : "셀러"}
+                                {u.role === "SUPER_ADMIN" ? "최고관리자" : u.role === "ADMIN" ? "관리자" : u.role}
                               </Badge>
                             </TableCell>
                             <TableCell>

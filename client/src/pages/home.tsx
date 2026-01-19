@@ -18,7 +18,7 @@ export default function Home() {
           <nav className="flex items-center gap-3">
             {user ? (
               <>
-                {user.role === "admin" ? (
+                {(user.role === "SUPER_ADMIN" || user.role === "ADMIN") ? (
                   <Link href="/admin">
                     <Button data-testid="link-admin">관리자 페이지</Button>
                   </Link>
