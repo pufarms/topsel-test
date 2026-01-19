@@ -66,14 +66,32 @@ export type Order = typeof orders.$inferSelect;
 export const imageCategories = ["배너", "상품", "아이콘", "기타"] as const;
 export type ImageCategory = typeof imageCategories[number];
 
+export const imageSubcategories = pgTable("image_subcategories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSubcategorySchema = createInsertSchema(imageSubcategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSubcategory = z.infer<typeof insertSubcategorySchema>;
+export type ImageSubcategory = typeof imageSubcategories.$inferSelect;
+
 export const images = pgTable("images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   filename: text("filename").notNull(),
   storagePath: text("storage_path").notNull(),
   publicUrl: text("public_url").notNull(),
   category: text("category").notNull().default("기타"),
+  subcategory: text("subcategory"),
   fileSize: integer("file_size").notNull(),
   mimeType: text("mime_type").notNull(),
+  width: integer("width"),
+  height: integer("height"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
   uploadedBy: varchar("uploaded_by").references(() => users.id),
 });
