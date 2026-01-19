@@ -62,3 +62,26 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export const imageCategories = ["배너", "상품", "아이콘", "기타"] as const;
+export type ImageCategory = typeof imageCategories[number];
+
+export const images = pgTable("images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename").notNull(),
+  storagePath: text("storage_path").notNull(),
+  publicUrl: text("public_url").notNull(),
+  category: text("category").notNull().default("기타"),
+  fileSize: integer("file_size").notNull(),
+  mimeType: text("mime_type").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+});
+
+export const insertImageSchema = createInsertSchema(images).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertImage = z.infer<typeof insertImageSchema>;
+export type Image = typeof images.$inferSelect;

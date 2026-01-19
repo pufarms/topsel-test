@@ -2,9 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, seedAdminUser } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, userTiers } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, userTiers, imageCategories } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
+import multer from "multer";
+import { uploadImage, deleteImage } from "./r2";
 
 declare module "express-session" {
   interface SessionData {
@@ -181,6 +183,94 @@ export async function registerRoutes(
 
     const { password, ...userWithoutPassword } = updatedUser;
     return res.json(userWithoutPassword);
+  });
+
+  const upload = multer({ storage: multer.memoryStorage() });
+
+  app.get("/api/admin/images", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const category = req.query.category as string;
+    const images = category 
+      ? await storage.getImagesByCategory(category)
+      : await storage.getAllImages();
+    return res.json(images);
+  });
+
+  app.post("/api/admin/images", upload.single("file"), async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "파일이 필요합니다" });
+    }
+
+    const category = req.body.category || "기타";
+    if (!imageCategories.includes(category)) {
+      return res.status(400).json({ message: "유효하지 않은 카테고리입니다" });
+    }
+
+    try {
+      const { storagePath, publicUrl } = await uploadImage(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        category
+      );
+
+      const image = await storage.createImage({
+        filename: req.file.originalname,
+        storagePath,
+        publicUrl,
+        category,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        uploadedBy: req.session.userId,
+      });
+
+      return res.json(image);
+    } catch (error) {
+      console.error("Image upload error:", error);
+      return res.status(500).json({ message: "이미지 업로드 실패" });
+    }
+  });
+
+  app.delete("/api/admin/images/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const image = await storage.getImage(req.params.id);
+    if (!image) {
+      return res.status(404).json({ message: "이미지를 찾을 수 없습니다" });
+    }
+
+    try {
+      await deleteImage(image.storagePath);
+      await storage.deleteImage(req.params.id);
+      return res.json({ message: "삭제 완료" });
+    } catch (error) {
+      console.error("Image delete error:", error);
+      return res.status(500).json({ message: "이미지 삭제 실패" });
+    }
   });
 
   return httpServer;

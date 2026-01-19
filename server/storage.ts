@@ -1,6 +1,6 @@
-import { type User, type InsertUser, type Order, type InsertOrder, users, orders } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, users, orders, images } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { createHash } from "crypto";
 
@@ -79,6 +79,29 @@ export class DatabaseStorage implements IStorage {
       userId,
     }).returning();
     return order;
+  }
+
+  async createImage(insertImage: InsertImage): Promise<Image> {
+    const [image] = await db.insert(images).values(insertImage).returning();
+    return image;
+  }
+
+  async getAllImages(): Promise<Image[]> {
+    return db.select().from(images).orderBy(desc(images.uploadedAt));
+  }
+
+  async getImagesByCategory(category: string): Promise<Image[]> {
+    return db.select().from(images).where(eq(images.category, category)).orderBy(desc(images.uploadedAt));
+  }
+
+  async getImage(id: string): Promise<Image | undefined> {
+    const [image] = await db.select().from(images).where(eq(images.id, id));
+    return image;
+  }
+
+  async deleteImage(id: string): Promise<boolean> {
+    const result = await db.delete(images).where(eq(images.id, id)).returning();
+    return result.length > 0;
   }
 }
 
