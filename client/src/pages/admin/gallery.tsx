@@ -316,7 +316,7 @@ export default function AdminGallery() {
                 ))}
               </SelectContent>
             </Select>
-            {categorySubcategories.length > 0 && (
+            {selectedCategory !== "all" && categorySubcategories.length > 0 && (
               <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
                 <SelectTrigger className="w-32" data-testid="select-filter-subcategory">
                   <SelectValue />
@@ -380,25 +380,23 @@ export default function AdminGallery() {
                       </div>
                       <div className="flex items-center gap-1 mt-1">
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="secondary"
-                          className="h-7 w-7"
                           onClick={(e) => { e.stopPropagation(); copyUrl(image.publicUrl); }}
                           data-testid={`button-copy-${image.id}`}
                         >
                           <Copy className="h-3 w-3" />
                         </Button>
                         <Button
-                          size="icon"
+                          size="sm"
                           variant="destructive"
-                          className="h-7 w-7"
                           onClick={(e) => { e.stopPropagation(); setDeleteImageId(image.id); }}
                           data-testid={`button-delete-${image.id}`}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
                         <div className="flex-1" />
-                        <Badge variant="secondary" className="text-[9px] h-5">
+                        <Badge variant="secondary" className="text-[9px]">
                           {image.category}
                         </Badge>
                       </div>
@@ -554,18 +552,16 @@ export default function AdminGallery() {
                         <Badge 
                           key={sub.id} 
                           variant="secondary"
-                          className="gap-1 pr-1"
+                          className="gap-1"
                         >
                           {sub.name}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
+                          <span
+                            className="ml-1 cursor-pointer opacity-60 hover:opacity-100"
                             onClick={() => deleteSubcategoryMutation.mutate(sub.id)}
                             data-testid={`button-delete-subcategory-${sub.id}`}
                           >
                             <X className="h-3 w-3" />
-                          </Button>
+                          </span>
                         </Badge>
                       ))}
                     </div>

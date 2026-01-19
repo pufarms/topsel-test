@@ -19,6 +19,18 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<Order[]>;
   getAllOrders(): Promise<(Order & { user?: { name: string; email: string } })[]>;
   createOrder(userId: string, order: InsertOrder): Promise<Order>;
+
+  createImage(insertImage: InsertImage): Promise<Image>;
+  getAllImages(): Promise<Image[]>;
+  getImagesByCategory(category: string): Promise<Image[]>;
+  getImage(id: string): Promise<Image | undefined>;
+  deleteImage(id: string): Promise<boolean>;
+
+  getAllSubcategories(): Promise<ImageSubcategory[]>;
+  getSubcategoriesByCategory(category: string): Promise<ImageSubcategory[]>;
+  createSubcategory(data: InsertSubcategory): Promise<ImageSubcategory>;
+  updateSubcategory(id: string, name: string): Promise<ImageSubcategory | undefined>;
+  deleteSubcategory(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -125,15 +137,6 @@ export class DatabaseStorage implements IStorage {
   async deleteSubcategory(id: string): Promise<boolean> {
     const result = await db.delete(imageSubcategories).where(eq(imageSubcategories.id, id)).returning();
     return result.length > 0;
-  }
-
-  async getImagesByCategoryAndSubcategory(category: string, subcategory?: string): Promise<Image[]> {
-    if (subcategory) {
-      return db.select().from(images)
-        .where(eq(images.category, category))
-        .orderBy(desc(images.uploadedAt));
-    }
-    return db.select().from(images).where(eq(images.category, category)).orderBy(desc(images.uploadedAt));
   }
 }
 
