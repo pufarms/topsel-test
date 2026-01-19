@@ -1,23 +1,26 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Upload, Trash2, Copy, ImageIcon, X, AlertCircle } from "lucide-react";
+import { Loader2, Upload, Trash2, Copy, ImageIcon, Plus, X, AlertCircle, Settings2, FolderPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { imageCategories, type Image } from "@shared/schema";
+import { imageCategories, type Image, type ImageSubcategory } from "@shared/schema";
 
 function ImageThumbnail({ 
   src, 
   alt, 
-  className 
+  className,
+  onLoad 
 }: { 
   src: string; 
   alt: string; 
   className?: string;
+  onLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
 }) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -25,8 +28,8 @@ function ImageThumbnail({
   if (error) {
     return (
       <div className={`flex flex-col items-center justify-center bg-muted text-muted-foreground ${className}`}>
-        <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
-        <span className="text-xs text-center px-2">로드 실패</span>
+        <AlertCircle className="h-6 w-6 mb-1 opacity-50" />
+        <span className="text-xs">로드 실패</span>
       </div>
     );
   }
@@ -35,14 +38,17 @@ function ImageThumbnail({
     <>
       {loading && (
         <div className={`flex items-center justify-center bg-muted ${className}`}>
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       )}
       <img
         src={src}
         alt={alt}
         className={`${className} ${loading ? 'hidden' : ''}`}
-        onLoad={() => setLoading(false)}
+        onLoad={(e) => {
+          setLoading(false);
+          onLoad?.(e);
+        }}
         onError={() => { setError(true); setLoading(false); }}
       />
     </>
@@ -51,11 +57,18 @@ function ImageThumbnail({
 
 export default function AdminGallery() {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
   const [uploadCategory, setUploadCategory] = useState<string>("기타");
+  const [uploadSubcategory, setUploadSubcategory] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [showSubcategoryManager, setShowSubcategoryManager] = useState(false);
+  const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  const [newSubcategoryCategory, setNewSubcategoryCategory] = useState<string>("배너");
 
   const { data: images = [], isLoading } = useQuery<Image[]>({
     queryKey: ["/api/admin/images", selectedCategory === "all" ? "" : selectedCategory],
@@ -69,11 +82,51 @@ export default function AdminGallery() {
     },
   });
 
+  const { data: subcategories = [] } = useQuery<ImageSubcategory[]>({
+    queryKey: ["/api/admin/subcategories"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/subcategories", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch subcategories");
+      return res.json();
+    },
+  });
+
+  const filteredImages = images.filter(img => {
+    if (selectedSubcategory !== "all" && img.subcategory !== selectedSubcategory) {
+      return false;
+    }
+    return true;
+  });
+
+  const categorySubcategories = subcategories.filter(s => 
+    selectedCategory === "all" || s.category === selectedCategory
+  );
+  
+  const uploadCategorySubcategories = subcategories.filter(s => s.category === uploadCategory);
+
+  const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => resolve({ width: 0, height: 0 });
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      const dims = await getImageDimensions(file);
       const formData = new FormData();
       formData.append("file", file);
       formData.append("category", uploadCategory);
+      if (uploadSubcategory) {
+        formData.append("subcategory", uploadSubcategory);
+      }
+      formData.append("width", dims.width.toString());
+      formData.append("height", dims.height.toString());
       
       const res = await fetch("/api/admin/images", {
         method: "POST",
@@ -107,6 +160,31 @@ export default function AdminGallery() {
     },
   });
 
+  const createSubcategoryMutation = useMutation({
+    mutationFn: async (data: { name: string; category: string }) => {
+      const res = await apiRequest("POST", "/api/admin/subcategories", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/subcategories"] });
+      setNewSubcategoryName("");
+      toast({ title: "생성 완료", description: "세부 카테고리가 추가되었습니다." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "생성 실패" });
+    },
+  });
+
+  const deleteSubcategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/subcategories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/subcategories"] });
+      toast({ title: "삭제 완료" });
+    },
+  });
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -126,6 +204,9 @@ export default function AdminGallery() {
         uploadMutation.mutate(file);
       }
     });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const copyUrl = (url: string) => {
@@ -144,26 +225,31 @@ export default function AdminGallery() {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">이미지 갤러리</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="text-2xl font-bold">이미지 갤러리</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowSubcategoryManager(true)}
+          data-testid="button-manage-subcategories"
+        >
+          <Settings2 className="h-4 w-4 mr-2" />
+          세부 카테고리 관리
+        </Button>
+      </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>이미지 업로드</CardTitle>
-            <CardDescription>드래그 앤 드롭 또는 파일 선택</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">카테고리</label>
-              <Select value={uploadCategory} onValueChange={setUploadCategory}>
-                <SelectTrigger data-testid="select-upload-category">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium whitespace-nowrap">업로드 카테고리:</span>
+              <Select value={uploadCategory} onValueChange={(v) => { setUploadCategory(v); setUploadSubcategory(""); }}>
+                <SelectTrigger className="w-28" data-testid="select-upload-category">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,82 +258,110 @@ export default function AdminGallery() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging 
-                  ? "border-primary bg-primary/10" 
-                  : "border-muted-foreground/25 hover:border-primary/50"
-              }`}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              data-testid="dropzone"
-            >
-              {uploadMutation.isPending ? (
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              ) : (
-                <>
-                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    이미지를 드래그하거나
-                  </p>
-                  <label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      data-testid="input-file"
-                    />
-                    <Button variant="outline" size="sm" asChild>
-                      <span className="cursor-pointer">파일 선택</span>
-                    </Button>
-                  </label>
-                </>
+              {uploadCategorySubcategories.length > 0 && (
+                <Select value={uploadSubcategory} onValueChange={setUploadSubcategory}>
+                  <SelectTrigger className="w-32" data-testid="select-upload-subcategory">
+                    <SelectValue placeholder="세부 카테고리" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">없음</SelectItem>
+                    {uploadCategorySubcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="flex-1" />
+            
+            <label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+                data-testid="input-file"
+              />
+              <Button 
+                variant="default" 
+                size="sm" 
+                asChild
+                disabled={uploadMutation.isPending}
+              >
+                <span className="cursor-pointer">
+                  {uploadMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  파일 업로드
+                </span>
+              </Button>
+            </label>
+          </div>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <CardTitle>이미지 목록</CardTitle>
-                <CardDescription>업로드된 이미지를 관리합니다</CardDescription>
-              </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-32" data-testid="select-filter-category">
+          <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b">
+            <span className="text-sm font-medium">필터:</span>
+            <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); setSelectedSubcategory("all"); }}>
+              <SelectTrigger className="w-28" data-testid="select-filter-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                {imageCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {categorySubcategories.length > 0 && (
+              <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                <SelectTrigger className="w-32" data-testid="select-filter-subcategory">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체</SelectItem>
-                  {imageCategories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  {categorySubcategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.name}>{sub.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
+            )}
+            <div className="flex-1" />
+            <span className="text-sm text-muted-foreground">
+              {filteredImages.length}개 이미지
+            </span>
+          </div>
+
+          <div
+            className={`min-h-[300px] rounded-lg transition-colors ${
+              isDragging 
+                ? "bg-primary/10 border-2 border-dashed border-primary" 
+                : ""
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            data-testid="dropzone"
+          >
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : images.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>업로드된 이미지가 없습니다</p>
+            ) : filteredImages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <ImageIcon className="h-16 w-16 mb-4 opacity-30" />
+                <p className="text-lg mb-2">이미지를 드래그하여 업로드</p>
+                <p className="text-sm">또는 위의 '파일 업로드' 버튼 클릭</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {images.map((image) => (
+              <div className="flex flex-wrap gap-3">
+                {filteredImages.map((image) => (
                   <div
                     key={image.id}
-                    className="group relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer"
+                    className="group relative w-[140px] h-[140px] rounded-md overflow-hidden border bg-muted cursor-pointer flex-shrink-0"
                     onClick={() => setSelectedImage(image)}
                     data-testid={`image-${image.id}`}
                   >
@@ -256,34 +370,46 @@ export default function AdminGallery() {
                       alt={image.filename}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        onClick={(e) => { e.stopPropagation(); copyUrl(image.publicUrl); }}
-                        data-testid={`button-copy-${image.id}`}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        onClick={(e) => { e.stopPropagation(); setDeleteImageId(image.id); }}
-                        data-testid={`button-delete-${image.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col">
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-white text-[10px] truncate mb-1">{image.filename}</p>
+                        {(image.width && image.height) && (
+                          <p className="text-white/80 text-[10px]">{image.width}×{image.height}</p>
+                        )}
+                        <p className="text-white/60 text-[10px]">{formatFileSize(image.fileSize)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); copyUrl(image.publicUrl); }}
+                          data-testid={`button-copy-${image.id}`}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); setDeleteImageId(image.id); }}
+                          data-testid={`button-delete-${image.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        <div className="flex-1" />
+                        <Badge variant="secondary" className="text-[9px] h-5">
+                          {image.category}
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge className="absolute bottom-2 left-2 text-xs" variant="secondary">
-                      {image.category}
-                    </Badge>
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-2xl">
@@ -304,11 +430,23 @@ export default function AdminGallery() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">카테고리:</span>
-                  <p className="font-medium">{selectedImage.category}</p>
+                  <p className="font-medium">
+                    {selectedImage.category}
+                    {selectedImage.subcategory && ` / ${selectedImage.subcategory}`}
+                  </p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">파일 크기:</span>
                   <p className="font-medium">{formatFileSize(selectedImage.fileSize)}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">크기:</span>
+                  <p className="font-medium">
+                    {selectedImage.width && selectedImage.height 
+                      ? `${selectedImage.width} × ${selectedImage.height}px` 
+                      : "-"
+                    }
+                  </p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">업로드 날짜:</span>
@@ -352,6 +490,95 @@ export default function AdminGallery() {
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "삭제"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSubcategoryManager} onOpenChange={setShowSubcategoryManager}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>세부 카테고리 관리</DialogTitle>
+            <DialogDescription>
+              메인 카테고리별 세부 카테고리를 추가하거나 삭제합니다.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Select value={newSubcategoryCategory} onValueChange={setNewSubcategoryCategory}>
+                <SelectTrigger className="w-28" data-testid="select-new-subcategory-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="세부 카테고리 이름"
+                value={newSubcategoryName}
+                onChange={(e) => setNewSubcategoryName(e.target.value)}
+                className="flex-1"
+                data-testid="input-new-subcategory-name"
+              />
+              <Button
+                size="icon"
+                onClick={() => {
+                  if (newSubcategoryName.trim()) {
+                    createSubcategoryMutation.mutate({
+                      name: newSubcategoryName.trim(),
+                      category: newSubcategoryCategory,
+                    });
+                  }
+                }}
+                disabled={!newSubcategoryName.trim() || createSubcategoryMutation.isPending}
+                data-testid="button-add-subcategory"
+              >
+                {createSubcategoryMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {imageCategories.map((cat) => {
+                const catSubs = subcategories.filter(s => s.category === cat);
+                if (catSubs.length === 0) return null;
+                return (
+                  <div key={cat} className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">{cat}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {catSubs.map((sub) => (
+                        <Badge 
+                          key={sub.id} 
+                          variant="secondary"
+                          className="gap-1 pr-1"
+                        >
+                          {sub.name}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={() => deleteSubcategoryMutation.mutate(sub.id)}
+                            data-testid={`button-delete-subcategory-${sub.id}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {subcategories.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  등록된 세부 카테고리가 없습니다
+                </p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
