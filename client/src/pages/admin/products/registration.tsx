@@ -391,8 +391,8 @@ export default function ProductRegistrationPage() {
       return;
     }
     
-    if (!p.startPrice && !p.drivingPrice && !p.topPrice) {
-      toast({ variant: "destructive", title: "오류", description: "공급가(Start/Driving/Top) 중 최소 1개는 입력해야 합니다" });
+    if (!p.startPrice || !p.drivingPrice || !p.topPrice) {
+      toast({ variant: "destructive", title: "오류", description: "공급가(Start/Driving/Top) 3개 모두 입력해야 합니다" });
       return;
     }
     
