@@ -52,7 +52,18 @@ const menuItems: MenuItem[] = [
     ]
   },
   { id: "orders", label: "주문관리", icon: <ShoppingCart className="h-5 w-5" />, path: "/admin/orders" },
-  { id: "products", label: "상품관리", icon: <Package className="h-5 w-5" />, path: "/admin/products" },
+  { 
+    id: "products", 
+    label: "상품관리", 
+    icon: <Package className="h-5 w-5" />,
+    children: [
+      { id: "categories", label: "카테고리 관리", path: "/admin/products/categories" },
+      { id: "product-registration", label: "상품등록 (공급가 계산)", path: "/admin/products/registration" },
+      { id: "next-week-products", label: "차주 예상공급가 상품", path: "/admin/products/next-week" },
+      { id: "current-products", label: "현재 공급가 상품", path: "/admin/products/current" },
+      { id: "suspended-products", label: "공급 중지 상품", path: "/admin/products/suspended" },
+    ]
+  },
   { id: "settlements", label: "정산관리", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
@@ -75,7 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
-  const [openMenus, setOpenMenus] = useState<string[]>(["members", "settings"]);
+  const [openMenus, setOpenMenus] = useState<string[]>(["members", "products", "settings"]);
 
   useEffect(() => {
     const handleResize = () => {

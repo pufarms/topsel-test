@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -35,6 +35,60 @@ export interface IStorage {
   createSubcategory(data: InsertSubcategory): Promise<ImageSubcategory>;
   updateSubcategory(id: string, name: string): Promise<ImageSubcategory | undefined>;
   deleteSubcategory(id: string): Promise<boolean>;
+
+  // Partner methods
+  getAllPartners(): Promise<Partner[]>;
+  getPartner(id: string): Promise<Partner | undefined>;
+  createPartner(data: InsertPartner): Promise<Partner>;
+  updatePartner(id: string, data: Partial<InsertPartner>): Promise<Partner | undefined>;
+  deletePartner(id: string): Promise<boolean>;
+
+  // Product methods
+  getAllProducts(): Promise<Product[]>;
+  getProduct(id: string): Promise<Product | undefined>;
+  createProduct(data: InsertProduct): Promise<Product>;
+  updateProduct(id: string, data: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<boolean>;
+
+  // Partner Product methods
+  getPartnerProducts(partnerId: string): Promise<(PartnerProduct & { product: Product })[]>;
+  addPartnerProduct(partnerId: string, productId: string): Promise<PartnerProduct>;
+  removePartnerProduct(partnerId: string, productId: string): Promise<boolean>;
+  updatePartnerProducts(partnerId: string, productIds: string[]): Promise<void>;
+
+  // Member methods
+  getAllMembers(): Promise<Member[]>;
+  getMember(id: string): Promise<Member | undefined>;
+  getMemberByUsername(username: string): Promise<Member | undefined>;
+  createMember(data: InsertMember): Promise<Member>;
+  updateMember(id: string, data: Partial<InsertMember>): Promise<Member | undefined>;
+  deleteMember(id: string): Promise<boolean>;
+  bulkUpdateMembers(ids: string[], data: Partial<InsertMember>): Promise<Member[]>;
+  getMemberLogs(memberId: string): Promise<(MemberLog & { changedByUser?: { name: string } })[]>;
+  createMemberLog(data: InsertMemberLog): Promise<MemberLog>;
+
+  // Category methods
+  getAllCategories(): Promise<Category[]>;
+  getCategoriesByLevel(level: string): Promise<Category[]>;
+  getCategoriesByParent(parentId: string): Promise<Category[]>;
+  getCategory(id: string): Promise<Category | undefined>;
+  createCategory(data: InsertCategory): Promise<Category>;
+  updateCategory(id: string, data: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(id: string): Promise<boolean>;
+  hasChildCategories(id: string): Promise<boolean>;
+  getProductCountByCategory(categoryName: string, level: string): Promise<number>;
+
+  // Product Registration methods
+  getAllProductRegistrations(status?: string): Promise<ProductRegistration[]>;
+  getProductRegistration(id: string): Promise<ProductRegistration | undefined>;
+  getProductRegistrationByCode(code: string): Promise<ProductRegistration | undefined>;
+  createProductRegistration(data: any): Promise<ProductRegistration>;
+  updateProductRegistration(id: string, data: any): Promise<ProductRegistration | undefined>;
+  bulkUpdateProductRegistrations(ids: string[], data: any): Promise<ProductRegistration[]>;
+  deleteProductRegistration(id: string): Promise<boolean>;
+  bulkDeleteProductRegistrations(ids: string[]): Promise<number>;
+  suspendProductRegistrations(ids: string[], reason: string): Promise<number>;
+  resumeProductRegistrations(ids: string[]): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -440,6 +494,183 @@ export class DatabaseStorage implements IStorage {
   async createMemberLog(data: InsertMemberLog): Promise<MemberLog> {
     const [log] = await db.insert(memberLogs).values(data).returning();
     return log;
+  }
+
+  // Category methods
+  async getAllCategories(): Promise<Category[]> {
+    return db.select().from(categories).orderBy(categories.level, categories.name);
+  }
+
+  async getCategoriesByLevel(level: string): Promise<Category[]> {
+    return db.select().from(categories).where(eq(categories.level, level)).orderBy(categories.name);
+  }
+
+  async getCategoriesByParent(parentId: string): Promise<Category[]> {
+    return db.select().from(categories).where(eq(categories.parentId, parentId)).orderBy(categories.name);
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const [cat] = await db.select().from(categories).where(eq(categories.id, id));
+    return cat;
+  }
+
+  async createCategory(data: InsertCategory): Promise<Category> {
+    const [cat] = await db.insert(categories).values(data).returning();
+    return cat;
+  }
+
+  async updateCategory(id: string, data: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [cat] = await db.update(categories).set({ ...data, updatedAt: new Date() }).where(eq(categories.id, id)).returning();
+    return cat;
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    const result = await db.delete(categories).where(eq(categories.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async hasChildCategories(id: string): Promise<boolean> {
+    const children = await db.select().from(categories).where(eq(categories.parentId, id));
+    return children.length > 0;
+  }
+
+  async getProductCountByCategory(categoryName: string, level: string): Promise<number> {
+    let whereClause;
+    if (level === 'large') {
+      whereClause = eq(productRegistrations.categoryLarge, categoryName);
+    } else if (level === 'medium') {
+      whereClause = eq(productRegistrations.categoryMedium, categoryName);
+    } else {
+      whereClause = eq(productRegistrations.categorySmall, categoryName);
+    }
+    const prods = await db.select().from(productRegistrations).where(whereClause);
+    return prods.length;
+  }
+
+  // Product Registration methods
+  async getAllProductRegistrations(status?: string): Promise<ProductRegistration[]> {
+    if (status) {
+      return db.select().from(productRegistrations).where(eq(productRegistrations.status, status)).orderBy(desc(productRegistrations.createdAt));
+    }
+    return db.select().from(productRegistrations).orderBy(desc(productRegistrations.createdAt));
+  }
+
+  async getProductRegistration(id: string): Promise<ProductRegistration | undefined> {
+    const [pr] = await db.select().from(productRegistrations).where(eq(productRegistrations.id, id));
+    return pr;
+  }
+
+  async getProductRegistrationByCode(code: string): Promise<ProductRegistration | undefined> {
+    const [pr] = await db.select().from(productRegistrations).where(eq(productRegistrations.productCode, code));
+    return pr;
+  }
+
+  async createProductRegistration(data: any): Promise<ProductRegistration> {
+    const calculated = this.calculateProductFields(data);
+    const [pr] = await db.insert(productRegistrations).values({ ...data, ...calculated }).returning();
+    return pr;
+  }
+
+  async updateProductRegistration(id: string, data: any): Promise<ProductRegistration | undefined> {
+    const calculated = this.calculateProductFields(data);
+    const [pr] = await db.update(productRegistrations).set({ ...data, ...calculated, updatedAt: new Date() }).where(eq(productRegistrations.id, id)).returning();
+    return pr;
+  }
+
+  async bulkUpdateProductRegistrations(ids: string[], data: any): Promise<ProductRegistration[]> {
+    const updated: ProductRegistration[] = [];
+    for (const id of ids) {
+      const existing = await this.getProductRegistration(id);
+      if (existing) {
+        const merged = { ...existing, ...data };
+        const calculated = this.calculateProductFields(merged);
+        const [pr] = await db.update(productRegistrations).set({ ...data, ...calculated, updatedAt: new Date() }).where(eq(productRegistrations.id, id)).returning();
+        if (pr) updated.push(pr);
+      }
+    }
+    return updated;
+  }
+
+  async deleteProductRegistration(id: string): Promise<boolean> {
+    const result = await db.delete(productRegistrations).where(eq(productRegistrations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async bulkDeleteProductRegistrations(ids: string[]): Promise<number> {
+    let deleted = 0;
+    for (const id of ids) {
+      const result = await db.delete(productRegistrations).where(eq(productRegistrations.id, id)).returning();
+      if (result.length > 0) deleted++;
+    }
+    return deleted;
+  }
+
+  async suspendProductRegistrations(ids: string[], reason: string): Promise<number> {
+    let updated = 0;
+    for (const id of ids) {
+      const result = await db.update(productRegistrations).set({
+        status: 'suspended',
+        suspendedAt: new Date(),
+        suspendReason: reason,
+        updatedAt: new Date(),
+      }).where(eq(productRegistrations.id, id)).returning();
+      if (result.length > 0) updated++;
+    }
+    return updated;
+  }
+
+  async resumeProductRegistrations(ids: string[]): Promise<number> {
+    let updated = 0;
+    for (const id of ids) {
+      const result = await db.update(productRegistrations).set({
+        status: 'active',
+        suspendedAt: null,
+        suspendReason: null,
+        updatedAt: new Date(),
+      }).where(eq(productRegistrations.id, id)).returning();
+      if (result.length > 0) updated++;
+    }
+    return updated;
+  }
+
+  private calculateProductFields(data: any): Partial<ProductRegistration> {
+    const sourcePrice = data.sourcePrice || 0;
+    const lossRate = data.lossRate || 0;
+    const sourceWeight = data.sourceWeight || 1;
+    
+    const unitPrice = sourceWeight > 0 ? Math.round((sourcePrice * (1 + lossRate / 100)) / sourceWeight) : 0;
+    
+    const boxCost = data.boxCost || 0;
+    const materialCost = data.materialCost || 0;
+    const outerBoxCost = data.outerBoxCost || 0;
+    const wrappingCost = data.wrappingCost || 0;
+    const laborCost = data.laborCost || 0;
+    const shippingCost = data.shippingCost || 0;
+    
+    const totalCost = unitPrice + boxCost + materialCost + outerBoxCost + wrappingCost + laborCost + shippingCost;
+    
+    const startMarginRate = data.startMarginRate;
+    const startPrice = startMarginRate != null ? Math.round(totalCost * (1 + startMarginRate / 100)) : null;
+    const startMargin = startPrice != null ? startPrice - totalCost : null;
+    
+    const drivingMarginRate = data.drivingMarginRate;
+    const drivingPrice = drivingMarginRate != null ? Math.round(totalCost * (1 + drivingMarginRate / 100)) : null;
+    const drivingMargin = drivingPrice != null ? drivingPrice - totalCost : null;
+    
+    const topMarginRate = data.topMarginRate;
+    const topPrice = topMarginRate != null ? Math.round(totalCost * (1 + topMarginRate / 100)) : null;
+    const topMargin = topPrice != null ? topPrice - totalCost : null;
+    
+    return {
+      unitPrice,
+      totalCost,
+      startPrice,
+      startMargin,
+      drivingPrice,
+      drivingMargin,
+      topPrice,
+      topMargin,
+    };
   }
 }
 

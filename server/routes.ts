@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -1042,6 +1042,314 @@ export async function registerRoutes(
 
   app.get("/api/admin/member-grades", async (req, res) => {
     return res.json(memberGrades);
+  });
+
+  // Category API endpoints
+  app.get("/api/categories", async (req, res) => {
+    const { level, parentId } = req.query;
+    
+    let cats;
+    if (level) {
+      cats = await storage.getCategoriesByLevel(level as string);
+    } else if (parentId) {
+      cats = await storage.getCategoriesByParent(parentId as string);
+    } else {
+      cats = await storage.getAllCategories();
+    }
+    
+    const allCats = await storage.getAllCategories();
+    const enriched = await Promise.all(cats.map(async (cat) => {
+      const childCount = allCats.filter(c => c.parentId === cat.id).length;
+      const productCount = await storage.getProductCountByCategory(cat.name, cat.level);
+      const parent = cat.parentId ? allCats.find(c => c.id === cat.parentId) : null;
+      const grandparent = parent?.parentId ? allCats.find(c => c.id === parent.parentId) : null;
+      return {
+        ...cat,
+        childCount,
+        productCount,
+        parentName: parent?.name || null,
+        grandparentName: grandparent?.name || null,
+      };
+    }));
+    
+    return res.json(enriched);
+  });
+
+  app.get("/api/categories/:id", async (req, res) => {
+    const cat = await storage.getCategory(req.params.id);
+    if (!cat) {
+      return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+    }
+    return res.json(cat);
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    try {
+      const data = categoryFormSchema.parse(req.body);
+      const cat = await storage.createCategory(data);
+      return res.json(cat);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.put("/api/categories/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    try {
+      const data = categoryFormSchema.partial().parse(req.body);
+      const cat = await storage.updateCategory(req.params.id, data);
+      if (!cat) {
+        return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+      }
+      return res.json(cat);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const cat = await storage.getCategory(req.params.id);
+    if (!cat) {
+      return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+    }
+    
+    const hasChildren = await storage.hasChildCategories(req.params.id);
+    if (hasChildren) {
+      return res.status(400).json({ message: "하위 분류가 있어 삭제할 수 없습니다" });
+    }
+    
+    const productCount = await storage.getProductCountByCategory(cat.name, cat.level);
+    if (productCount > 0) {
+      return res.status(400).json({ message: `해당 카테고리에 ${productCount}개 상품이 있어 삭제할 수 없습니다` });
+    }
+    
+    await storage.deleteCategory(req.params.id);
+    return res.json({ message: "삭제되었습니다" });
+  });
+
+  // Product Registration API endpoints
+  app.get("/api/product-registrations", async (req, res) => {
+    const status = req.query.status as string || 'active';
+    const prods = await storage.getAllProductRegistrations(status);
+    return res.json(prods);
+  });
+
+  app.get("/api/product-registrations/template", async (req, res) => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const data = [
+      ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명"],
+      ["과일", "사과", "부사", "5kg", "A001", "부사 5kg 한박스"],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "상품등록양식");
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", "attachment; filename=product_template.xlsx");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return res.send(buffer);
+  });
+
+  app.get("/api/product-registrations/:id", async (req, res) => {
+    const pr = await storage.getProductRegistration(req.params.id);
+    if (!pr) {
+      return res.status(404).json({ message: "상품을 찾을 수 없습니다" });
+    }
+    return res.json(pr);
+  });
+
+  app.post("/api/product-registrations", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    try {
+      const data = productRegistrationFormSchema.parse(req.body);
+      const existing = await storage.getProductRegistrationByCode(data.productCode);
+      if (existing) {
+        return res.status(400).json({ message: "이미 등록된 상품코드입니다" });
+      }
+      const pr = await storage.createProductRegistration(data);
+      return res.json(pr);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  const excelUpload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/product-registrations/upload", excelUpload.single("file"), async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "파일이 없습니다" });
+    }
+    
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      
+      const errors: { row: number; error: string }[] = [];
+      const created: any[] = [];
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length < 6) continue;
+        
+        const [categoryLarge, categoryMedium, categorySmall, weight, productCode, productName] = row;
+        
+        if (!weight || !productCode || !productName) {
+          errors.push({ row: i + 1, error: "필수값 누락 (중량, 상품코드, 상품명)" });
+          continue;
+        }
+        
+        if (!categoryLarge && !categoryMedium && !categorySmall) {
+          errors.push({ row: i + 1, error: "카테고리 1개 이상 필수" });
+          continue;
+        }
+        
+        const existing = await storage.getProductRegistrationByCode(String(productCode));
+        if (existing) {
+          errors.push({ row: i + 1, error: `상품코드 중복: ${productCode}` });
+          continue;
+        }
+        
+        const pr = await storage.createProductRegistration({
+          categoryLarge: categoryLarge ? String(categoryLarge) : null,
+          categoryMedium: categoryMedium ? String(categoryMedium) : null,
+          categorySmall: categorySmall ? String(categorySmall) : null,
+          weight: String(weight),
+          productCode: String(productCode),
+          productName: String(productName),
+        });
+        created.push(pr);
+      }
+      
+      return res.json({ created: created.length, errors });
+    } catch (error) {
+      return res.status(400).json({ message: "엑셀 파일 처리 중 오류가 발생했습니다" });
+    }
+  });
+
+  const productUpdateSchema = productRegistrationFormSchema.partial();
+  
+  app.put("/api/product-registrations/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    try {
+      const validatedData = productUpdateSchema.parse(req.body);
+      const pr = await storage.updateProductRegistration(req.params.id, validatedData);
+      if (!pr) {
+        return res.status(404).json({ message: "상품을 찾을 수 없습니다" });
+      }
+      return res.json(pr);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.put("/api/product-registrations/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.bulkUpdateProductRegistrations(ids, data);
+    return res.json({ updated: updated.length });
+  });
+
+  app.delete("/api/product-registrations/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    await storage.deleteProductRegistration(req.params.id);
+    return res.json({ message: "삭제되었습니다" });
+  });
+
+  app.delete("/api/product-registrations/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const deleted = await storage.bulkDeleteProductRegistrations(ids);
+    return res.json({ deleted });
+  });
+
+  app.post("/api/product-registrations/suspend", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids, reason } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.suspendProductRegistrations(ids, reason || "");
+    return res.json({ updated });
+  });
+
+  app.post("/api/product-registrations/resume", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.resumeProductRegistrations(ids);
+    return res.json({ updated });
+  });
+
+  app.post("/api/product-registrations/send-to-next-week", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    
+    const errors: { id: string; productCode: string; error: string }[] = [];
+    
+    for (const id of ids) {
+      const pr = await storage.getProductRegistration(id);
+      if (!pr) continue;
+      
+      if (!pr.startPrice || !pr.drivingPrice || !pr.topPrice) {
+        errors.push({ id, productCode: pr.productCode, error: "공급가가 없습니다. 마진율을 입력해주세요." });
+      }
+    }
+    
+    if (errors.length > 0) {
+      return res.status(400).json({ message: `상품코드 [${errors[0].productCode}]의 ${errors[0].error}`, errors });
+    }
+    
+    return res.json({ message: `${ids.length}개 상품이 차주 예상공급가로 전송되었습니다.`, sent: ids.length });
   });
 
   return httpServer;

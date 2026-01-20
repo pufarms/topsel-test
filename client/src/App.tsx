@@ -19,6 +19,9 @@ import PartnerManagement from "@/pages/admin/partners";
 import MemberManagement from "@/pages/admin/members";
 import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
+import CategoryManagement from "@/pages/admin/products/categories";
+import ProductRegistrationPage from "@/pages/admin/products/registration";
+import ProductPlaceholder from "@/pages/admin/products/placeholder";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -74,8 +77,20 @@ function Router() {
       <Route path="/admin/orders">
         <AdminRoute><AdminOrders /></AdminRoute>
       </Route>
-      <Route path="/admin/products">
-        <AdminRoute><PlaceholderPage title="상품관리" description="상품 목록을 관리합니다" /></AdminRoute>
+      <Route path="/admin/products/categories">
+        <AdminRoute><CategoryManagement /></AdminRoute>
+      </Route>
+      <Route path="/admin/products/registration">
+        <AdminRoute><ProductRegistrationPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/products/next-week">
+        <AdminRoute><ProductPlaceholder title="차주 예상공급가 상품" description="차주에 적용될 공급가 상품 목록입니다" /></AdminRoute>
+      </Route>
+      <Route path="/admin/products/current">
+        <AdminRoute><ProductPlaceholder title="현재 공급가 상품" description="현재 적용 중인 공급가 상품 목록입니다" /></AdminRoute>
+      </Route>
+      <Route path="/admin/products/suspended">
+        <AdminRoute><ProductPlaceholder title="공급 중지 상품" description="공급이 중지된 상품 목록입니다" /></AdminRoute>
       </Route>
       <Route path="/admin/settlements">
         <AdminRoute><PlaceholderPage title="정산관리" description="정산 내역을 관리합니다" /></AdminRoute>
