@@ -1319,6 +1319,20 @@ export async function registerRoutes(
 
   const productUpdateSchema = productRegistrationFormSchema.partial();
   
+  // IMPORTANT: Bulk update must be registered BEFORE single update 
+  // to prevent Express from matching "bulk" as :id parameter
+  app.put("/api/product-registrations/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids, data } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.bulkUpdateProductRegistrations(ids, data);
+    return res.json({ updated: updated.length });
+  });
+
   app.put("/api/product-registrations/:id", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1336,18 +1350,6 @@ export async function registerRoutes(
       }
       throw error;
     }
-  });
-
-  app.put("/api/product-registrations/bulk", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    const { ids, data } = req.body;
-    if (!ids || !Array.isArray(ids)) {
-      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
-    }
-    const updated = await storage.bulkUpdateProductRegistrations(ids, data);
-    return res.json({ updated: updated.length });
   });
 
   // IMPORTANT: Bulk delete must be registered BEFORE single delete 
