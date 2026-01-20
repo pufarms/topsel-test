@@ -329,3 +329,125 @@ export const insertMemberLogSchema = createInsertSchema(memberLogs).omit({
 
 export type InsertMemberLog = z.infer<typeof insertMemberLogSchema>;
 export type MemberLog = typeof memberLogs.$inferSelect;
+
+// 카테고리 레벨
+export const categoryLevels = ["large", "medium", "small"] as const;
+export type CategoryLevel = typeof categoryLevels[number];
+
+export const categoryLevelLabels: Record<CategoryLevel, string> = {
+  large: "대분류",
+  medium: "중분류",
+  small: "소분류",
+};
+
+// 카테고리 테이블
+export const categories = pgTable("categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  level: text("level").notNull(),
+  parentId: varchar("parent_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const categoryFormSchema = z.object({
+  name: z.string().min(1, "분류명을 입력해주세요"),
+  level: z.enum(categoryLevels),
+  parentId: z.string().nullable().optional(),
+});
+
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category = typeof categories.$inferSelect;
+
+// 상품등록 상태
+export const productRegistrationStatuses = ["active", "suspended"] as const;
+export type ProductRegistrationStatus = typeof productRegistrationStatuses[number];
+
+// 상품등록 (공급가 계산) 테이블
+export const productRegistrations = pgTable("product_registrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  status: text("status").notNull().default("active"),
+  suspendedAt: timestamp("suspended_at"),
+  suspendReason: text("suspend_reason"),
+  
+  categoryLarge: text("category_large"),
+  categoryMedium: text("category_medium"),
+  categorySmall: text("category_small"),
+  weight: text("weight").notNull(),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  
+  sourceProduct: text("source_product"),
+  sourcePrice: integer("source_price"),
+  lossRate: integer("loss_rate").notNull().default(0),
+  sourceWeight: integer("source_weight"),
+  unitPrice: integer("unit_price"),
+  
+  boxCost: integer("box_cost").notNull().default(0),
+  materialCost: integer("material_cost").notNull().default(0),
+  outerBoxCost: integer("outer_box_cost").notNull().default(0),
+  wrappingCost: integer("wrapping_cost").notNull().default(0),
+  laborCost: integer("labor_cost").notNull().default(0),
+  shippingCost: integer("shipping_cost").notNull().default(0),
+  totalCost: integer("total_cost"),
+  
+  startMarginRate: integer("start_margin_rate"),
+  startPrice: integer("start_price"),
+  startMargin: integer("start_margin"),
+  
+  drivingMarginRate: integer("driving_margin_rate"),
+  drivingPrice: integer("driving_price"),
+  drivingMargin: integer("driving_margin"),
+  
+  topMarginRate: integer("top_margin_rate"),
+  topPrice: integer("top_price"),
+  topMargin: integer("top_margin"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductRegistrationSchema = createInsertSchema(productRegistrations).omit({
+  id: true,
+  unitPrice: true,
+  totalCost: true,
+  startPrice: true,
+  startMargin: true,
+  drivingPrice: true,
+  drivingMargin: true,
+  topPrice: true,
+  topMargin: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const productRegistrationFormSchema = z.object({
+  categoryLarge: z.string().nullable().optional(),
+  categoryMedium: z.string().nullable().optional(),
+  categorySmall: z.string().nullable().optional(),
+  weight: z.string().min(1, "중량을 입력해주세요"),
+  productCode: z.string().min(1, "상품코드를 입력해주세요"),
+  productName: z.string().min(1, "상품명을 입력해주세요"),
+  sourceProduct: z.string().nullable().optional(),
+  sourcePrice: z.number().nullable().optional(),
+  lossRate: z.number().default(0),
+  sourceWeight: z.number().nullable().optional(),
+  boxCost: z.number().default(0),
+  materialCost: z.number().default(0),
+  outerBoxCost: z.number().default(0),
+  wrappingCost: z.number().default(0),
+  laborCost: z.number().default(0),
+  shippingCost: z.number().default(0),
+  startMarginRate: z.number().nullable().optional(),
+  drivingMarginRate: z.number().nullable().optional(),
+  topMarginRate: z.number().nullable().optional(),
+});
+
+export type InsertProductRegistration = z.infer<typeof insertProductRegistrationSchema>;
+export type ProductRegistration = typeof productRegistrations.$inferSelect;
