@@ -637,8 +637,10 @@ export class DatabaseStorage implements IStorage {
     const sourcePrice = data.sourcePrice || 0;
     const lossRate = data.lossRate || 0;
     const sourceWeight = data.sourceWeight || 1;
+    const weight = parseFloat(data.weight) || 0;
     
     const unitPrice = sourceWeight > 0 ? Math.round((sourcePrice * (1 + lossRate / 100)) / sourceWeight) : 0;
+    const sourceProductTotal = Math.round(weight * unitPrice);
     
     const boxCost = data.boxCost || 0;
     const materialCost = data.materialCost || 0;
@@ -647,7 +649,7 @@ export class DatabaseStorage implements IStorage {
     const laborCost = data.laborCost || 0;
     const shippingCost = data.shippingCost || 0;
     
-    const totalCost = unitPrice + boxCost + materialCost + outerBoxCost + wrappingCost + laborCost + shippingCost;
+    const totalCost = sourceProductTotal + boxCost + materialCost + outerBoxCost + wrappingCost + laborCost + shippingCost;
     
     const startMarginRate = data.startMarginRate;
     const startPrice = startMarginRate != null ? Math.round(totalCost * (1 + startMarginRate / 100)) : null;
@@ -663,6 +665,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       unitPrice,
+      sourceProductTotal,
       totalCost,
       startPrice,
       startMargin,
