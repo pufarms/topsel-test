@@ -508,7 +508,7 @@ export default function ProductRegistrationPage() {
             <p className="text-xs font-medium mb-1 text-muted-foreground">[중량(수량)]</p>
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">중량 (kg)</label>
+                <label className="text-xs text-muted-foreground">중량</label>
                 <Input 
                   value={bulkWeight} 
                   onChange={e => {
@@ -520,7 +520,7 @@ export default function ProductRegistrationPage() {
                   className="h-9" 
                   type="text"
                   inputMode="decimal"
-                  placeholder="0.0"
+                  placeholder=""
                   data-testid="input-bulk-weight" 
                 />
               </div>
