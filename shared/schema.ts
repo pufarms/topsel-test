@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -398,15 +398,15 @@ export const productRegistrations = pgTable("product_registrations", {
   shippingCost: integer("shipping_cost").notNull().default(0),
   totalCost: integer("total_cost"),
   
-  startMarginRate: integer("start_margin_rate"),
+  startMarginRate: real("start_margin_rate"),
   startPrice: integer("start_price"),
   startMargin: integer("start_margin"),
   
-  drivingMarginRate: integer("driving_margin_rate"),
+  drivingMarginRate: real("driving_margin_rate"),
   drivingPrice: integer("driving_price"),
   drivingMargin: integer("driving_margin"),
   
-  topMarginRate: integer("top_margin_rate"),
+  topMarginRate: real("top_margin_rate"),
   topPrice: integer("top_price"),
   topMargin: integer("top_margin"),
   
