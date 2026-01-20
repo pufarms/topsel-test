@@ -123,6 +123,7 @@ export default function Login() {
                           <Input 
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••" 
+                            className="pr-12"
                             data-testid="input-password"
                             {...field} 
                           />
@@ -130,14 +131,14 @@ export default function Login() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              <EyeOff className="h-5 w-5 text-muted-foreground" />
                             ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
+                              <Eye className="h-5 w-5 text-muted-foreground" />
                             )}
                           </Button>
                         </div>
