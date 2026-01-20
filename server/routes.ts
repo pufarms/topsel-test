@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -1096,6 +1096,75 @@ export async function registerRoutes(
         return res.status(400).json({ message: error.errors[0].message });
       }
       throw error;
+    }
+  });
+
+  // 카테고리 엑셀 일괄 등록
+  app.post("/api/categories/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    try {
+      const { categories } = req.body as { categories: Array<{ large: string; medium?: string; small?: string }> };
+      if (!categories || !Array.isArray(categories)) {
+        return res.status(400).json({ message: "카테고리 데이터가 필요합니다" });
+      }
+
+      const existingCategories = await storage.getAllCategories();
+      const largeMap = new Map<string, string>();
+      const mediumMap = new Map<string, string>();
+      
+      existingCategories.filter((c: Category) => c.level === "large").forEach((c: Category) => largeMap.set(c.name, c.id));
+      existingCategories.filter((c: Category) => c.level === "medium").forEach((c: Category) => mediumMap.set(`${c.parentId}:${c.name}`, c.id));
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const row of categories) {
+        // 대분류 처리
+        if (row.large && !largeMap.has(row.large)) {
+          const newLarge = await storage.createCategory({ name: row.large, level: "large", parentId: null });
+          largeMap.set(row.large, newLarge.id);
+          created++;
+        }
+
+        // 중분류 처리
+        if (row.medium && row.large) {
+          const parentId = largeMap.get(row.large);
+          if (parentId) {
+            const mediumKey = `${parentId}:${row.medium}`;
+            if (!mediumMap.has(mediumKey)) {
+              const newMedium = await storage.createCategory({ name: row.medium, level: "medium", parentId });
+              mediumMap.set(mediumKey, newMedium.id);
+              created++;
+            }
+          }
+        }
+
+        // 소분류 처리
+        if (row.small && row.medium && row.large) {
+          const largeId = largeMap.get(row.large);
+          if (largeId) {
+            const mediumKey = `${largeId}:${row.medium}`;
+            const mediumId = mediumMap.get(mediumKey);
+            if (mediumId) {
+              // Check if small category already exists
+              const exists = existingCategories.some((c: Category) => c.level === "small" && c.parentId === mediumId && c.name === row.small);
+              if (!exists) {
+                await storage.createCategory({ name: row.small, level: "small", parentId: mediumId });
+                created++;
+              } else {
+                skipped++;
+              }
+            }
+          }
+        }
+      }
+
+      return res.json({ created, skipped, message: `${created}개 카테고리가 등록되었습니다. ${skipped}개 중복 건너뜀.` });
+    } catch (error: any) {
+      console.error("Bulk category upload error:", error);
+      return res.status(500).json({ message: error.message || "일괄 등록에 실패했습니다" });
     }
   });
 

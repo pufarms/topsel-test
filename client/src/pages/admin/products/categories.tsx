@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import * as XLSX from "xlsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Plus, Pencil, Trash2, FolderTree, Search } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, FolderTree, Search, Upload, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader, FilterSection, FilterField, DataTable, MobileCard, MobileCardField, MobileCardsList, type Column } from "@/components/admin";
@@ -40,9 +41,11 @@ export default function CategoryManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [parentFilter, setParentFilter] = useState<string>("all");
   const [grandparentFilter, setGrandparentFilter] = useState<string>("all");
+  const [smallFilter, setSmallFilter] = useState<string>("all");
   const [showDialog, setShowDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<EnrichedCategory | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: categories = [], isLoading } = useQuery<EnrichedCategory[]>({
     queryKey: ["/api/categories"],
@@ -107,6 +110,69 @@ export default function CategoryManagement() {
     },
   });
 
+  const bulkUploadMutation = useMutation({
+    mutationFn: async (cats: Array<{ large: string; medium?: string; small?: string }>) => {
+      const res = await apiRequest("POST", "/api/categories/bulk", { categories: cats });
+      return res.json();
+    },
+    onSuccess: (data: { created: number; skipped: number; message: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      toast({ title: "일괄 등록 완료", description: data.message });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "일괄 등록 실패", description: error.message });
+    },
+  });
+
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<any>(sheet);
+
+        const categories: Array<{ large: string; medium?: string; small?: string }> = [];
+        for (const row of rows) {
+          const large = row["대분류"] || row["large"] || "";
+          const medium = row["중분류"] || row["medium"] || "";
+          const small = row["소분류"] || row["small"] || "";
+          if (large) {
+            categories.push({ large, medium: medium || undefined, small: small || undefined });
+          }
+        }
+
+        if (categories.length === 0) {
+          toast({ variant: "destructive", title: "오류", description: "유효한 카테고리 데이터가 없습니다" });
+          return;
+        }
+
+        bulkUploadMutation.mutate(categories);
+      } catch (err) {
+        toast({ variant: "destructive", title: "파일 오류", description: "엑셀 파일을 읽을 수 없습니다" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["대분류", "중분류", "소분류"],
+      ["과일", "국산과일", "사과"],
+      ["과일", "국산과일", "배"],
+      ["과일", "수입과일", "바나나"],
+      ["채소", "엽채류", "상추"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "카테고리");
+    XLSX.writeFile(wb, "카테고리_양식.xlsx");
+  };
+
   const closeDialog = () => {
     setShowDialog(false);
     setEditingCategory(null);
@@ -153,9 +219,24 @@ export default function CategoryManagement() {
       if (parentFilter !== "all") {
         filtered = filtered.filter(c => c.parentId === parentFilter);
       }
+      if (smallFilter !== "all") {
+        filtered = filtered.filter(c => c.id === smallFilter);
+      }
     }
     
     return filtered;
+  };
+
+  const getSmallCategoryOptions = () => {
+    let options = smallCategories;
+    if (grandparentFilter !== "all") {
+      const mediumIds = mediumCategories.filter(m => m.parentId === grandparentFilter).map(m => m.id);
+      options = options.filter(c => c.parentId && mediumIds.includes(c.parentId));
+    }
+    if (parentFilter !== "all") {
+      options = options.filter(c => c.parentId === parentFilter);
+    }
+    return options;
   };
 
   const filteredCategories = getFilteredCategories();
@@ -247,14 +328,32 @@ export default function CategoryManagement() {
         description="상품의 대분류/중분류/소분류 카테고리를 관리합니다"
         icon={FolderTree}
         actions={
-          <Button size="sm" onClick={openCreateDialog} data-testid="button-add-category">
-            <Plus className="h-4 w-4 mr-1" />
-            카테고리 추가
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".xlsx,.xls"
+              onChange={handleExcelUpload}
+              className="hidden"
+              data-testid="input-excel-file"
+            />
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploadMutation.isPending} data-testid="button-excel-upload">
+              {bulkUploadMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+              엑셀 업로드
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+              <Download className="h-4 w-4 mr-1" />
+              양식 다운로드
+            </Button>
+            <Button size="sm" onClick={openCreateDialog} data-testid="button-add-category">
+              <Plus className="h-4 w-4 mr-1" />
+              카테고리 추가
+            </Button>
+          </div>
         }
       />
 
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setParentFilter("all"); setGrandparentFilter("all"); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setParentFilter("all"); setGrandparentFilter("all"); setSmallFilter("all"); }}>
         <TabsList>
           <TabsTrigger value="large" data-testid="tab-large">대분류 ({largeCategories.length})</TabsTrigger>
           <TabsTrigger value="medium" data-testid="tab-medium">중분류 ({mediumCategories.length})</TabsTrigger>
@@ -262,10 +361,10 @@ export default function CategoryManagement() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-3 space-y-3">
-          <FilterSection onReset={() => { setSearchTerm(""); setParentFilter("all"); setGrandparentFilter("all"); }}>
+          <FilterSection onReset={() => { setSearchTerm(""); setParentFilter("all"); setGrandparentFilter("all"); setSmallFilter("all"); }}>
             {activeTab === "small" && (
               <FilterField label="대분류">
-                <Select value={grandparentFilter} onValueChange={setGrandparentFilter}>
+                <Select value={grandparentFilter} onValueChange={(v) => { setGrandparentFilter(v); setParentFilter("all"); setSmallFilter("all"); }}>
                   <SelectTrigger className="h-9" data-testid="select-grandparent">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
@@ -280,13 +379,28 @@ export default function CategoryManagement() {
             )}
             {(activeTab === "medium" || activeTab === "small") && (
               <FilterField label={activeTab === "medium" ? "대분류" : "중분류"}>
-                <Select value={parentFilter} onValueChange={setParentFilter}>
+                <Select value={parentFilter} onValueChange={(v) => { setParentFilter(v); setSmallFilter("all"); }}>
                   <SelectTrigger className="h-9" data-testid="select-parent">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">전체</SelectItem>
                     {(activeTab === "medium" ? largeCategories : getMediumOptionsForSmall()).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            )}
+            {activeTab === "small" && (
+              <FilterField label="소분류">
+                <Select value={smallFilter} onValueChange={setSmallFilter}>
+                  <SelectTrigger className="h-9" data-testid="select-small">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {getSmallCategoryOptions().map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
