@@ -37,8 +37,10 @@ export default function ProductRegistrationPage() {
   const [searchCategoryLarge, setSearchCategoryLarge] = useState<string>("all");
   const [searchCategoryMedium, setSearchCategoryMedium] = useState<string>("all");
   const [searchCategorySmall, setSearchCategorySmall] = useState<string>("all");
-  const [searchCode, setSearchCode] = useState("");
+  const [searchWeight, setSearchWeight] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
+  const [showTempOnly, setShowTempOnly] = useState(false);
+  const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
   const [bulkWeight, setBulkWeight] = useState<string>("");
   const [bulkSourcePrice, setBulkSourcePrice] = useState<string>("");
@@ -74,31 +76,42 @@ export default function ProductRegistrationPage() {
     return smallCategories.filter(s => s.parentId === mediumId || (mediumCat && s.parentName === mediumCat.name));
   };
 
+  const allWeights = Array.from(new Set([
+    ...tempProducts.map(p => p.weight).filter(w => w != null && w !== ""),
+    ...products.filter(p => !p.id.startsWith("new-")).map(p => p.weight).filter(w => w != null && w !== "")
+  ])).sort((a, b) => parseFloat(String(a)) - parseFloat(String(b)));
+
+  const applyFilters = (data: ProductRow[]) => {
+    let filtered = data;
+    if (searchCategoryLarge !== "all") {
+      const largeName = largeCategories.find(c => c.id === searchCategoryLarge)?.name;
+      filtered = filtered.filter(p => p.categoryLarge === largeName);
+    }
+    if (searchCategoryMedium !== "all") {
+      const mediumName = mediumCategories.find(c => c.id === searchCategoryMedium)?.name;
+      filtered = filtered.filter(p => p.categoryMedium === mediumName);
+    }
+    if (searchCategorySmall !== "all") {
+      const smallName = smallCategories.find(c => c.id === searchCategorySmall)?.name;
+      filtered = filtered.filter(p => p.categorySmall === smallName);
+    }
+    if (searchWeight !== "all") {
+      filtered = filtered.filter(p => String(p.weight) === searchWeight);
+    }
+    if (searchName) {
+      filtered = filtered.filter(p => p.productName?.toLowerCase().includes(searchName.toLowerCase()));
+    }
+    return filtered;
+  };
+
   const searchMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/product-registrations?status=active`);
       return res.json();
     },
     onSuccess: (data: ProductRegistration[]) => {
-      let filtered = data;
-      if (searchCategoryLarge !== "all") {
-        const largeName = largeCategories.find(c => c.id === searchCategoryLarge)?.name;
-        filtered = filtered.filter(p => p.categoryLarge === largeName);
-      }
-      if (searchCategoryMedium !== "all") {
-        const mediumName = mediumCategories.find(c => c.id === searchCategoryMedium)?.name;
-        filtered = filtered.filter(p => p.categoryMedium === mediumName);
-      }
-      if (searchCategorySmall !== "all") {
-        const smallName = smallCategories.find(c => c.id === searchCategorySmall)?.name;
-        filtered = filtered.filter(p => p.categorySmall === smallName);
-      }
-      if (searchCode) {
-        filtered = filtered.filter(p => p.productCode.toLowerCase().includes(searchCode.toLowerCase()));
-      }
-      if (searchName) {
-        filtered = filtered.filter(p => p.productName.toLowerCase().includes(searchName.toLowerCase()));
-      }
+      const allData = [...tempProducts, ...data.filter(d => !tempProducts.some(t => t.id === d.id))];
+      const filtered = applyFilters(allData);
       setProducts(filtered);
       setSelectedIds([]);
     },
@@ -206,10 +219,26 @@ export default function ProductRegistrationPage() {
     setSearchCategoryLarge("all");
     setSearchCategoryMedium("all");
     setSearchCategorySmall("all");
-    setSearchCode("");
+    setSearchWeight("all");
     setSearchName("");
+    setShowTempOnly(false);
     setProducts([]);
     setSelectedIds([]);
+  };
+
+  const handleShowTempList = () => {
+    const tempOnly = tempProducts.filter(p => {
+      const hasNoPrice = !p.startPrice && !p.drivingPrice && !p.topPrice;
+      return hasNoPrice;
+    });
+    setProducts(tempOnly);
+    setShowTempOnly(true);
+    setSelectedIds([]);
+  };
+
+  const handleShowAll = () => {
+    setShowTempOnly(false);
+    searchMutation.mutate();
   };
 
   const handleBulkApply = () => {
@@ -294,6 +323,7 @@ export default function ProductRegistrationPage() {
       isNew: true,
     };
     setProducts([...products, newRow]);
+    setTempProducts(prev => [...prev, newRow]);
   };
 
   const createMutation = useMutation({
@@ -338,6 +368,10 @@ export default function ProductRegistrationPage() {
     }
     
     setProducts(updated);
+    
+    if (p.id.startsWith("new-")) {
+      setTempProducts(prev => prev.map(t => t.id === p.id ? { ...p } : t));
+    }
   };
 
   const handleSaveRow = async (index: number) => {
@@ -482,7 +516,15 @@ export default function ProductRegistrationPage() {
                 {getFilteredSmall(searchCategoryMedium).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Input placeholder="상품코드" value={searchCode} onChange={e => setSearchCode(e.target.value)} className="h-9" data-testid="input-search-code" />
+            <Select value={searchWeight} onValueChange={setSearchWeight}>
+              <SelectTrigger className="h-9" data-testid="select-search-weight">
+                <SelectValue placeholder="중량(수량)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                {allWeights.map(w => <SelectItem key={String(w)} value={String(w)}>{String(w)}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Input placeholder="상품명" value={searchName} onChange={e => setSearchName(e.target.value)} className="h-9" data-testid="input-search-name" />
           </div>
           <div className="flex gap-2 mt-2">
@@ -495,6 +537,18 @@ export default function ProductRegistrationPage() {
               <RotateCcw className="h-4 w-4 mr-1" />
               초기화
             </Button>
+            {showTempOnly ? (
+              <Button size="sm" variant="secondary" onClick={handleShowAll} data-testid="button-show-all">
+                전체 보기
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={handleShowTempList} data-testid="button-show-temp">
+                임시등록 리스트 보기
+              </Button>
+            )}
+            {tempProducts.length > 0 && (
+              <Badge variant="outline" className="ml-2">임시등록: {tempProducts.length}건</Badge>
+            )}
           </div>
         </CardContent>
       </Card>
