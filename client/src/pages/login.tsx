@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Package, Loader2 } from "lucide-react";
+import { Package, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { loginSchema } from "@shared/schema";
@@ -15,11 +15,16 @@ import type { z } from "zod";
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+const SAVED_USERNAME_KEY = "saved_username";
+const REMEMBER_ME_KEY = "remember_me";
+
 export default function Login() {
   const [, navigate] = useLocation();
   const { login, user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -28,6 +33,15 @@ export default function Login() {
       password: "",
     },
   });
+
+  useEffect(() => {
+    const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY) === "true";
+    const savedUsername = localStorage.getItem(SAVED_USERNAME_KEY) || "";
+    setRememberMe(savedRememberMe);
+    if (savedRememberMe && savedUsername) {
+      form.setValue("username", savedUsername);
+    }
+  }, [form]);
 
   if (user) {
     const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
@@ -38,6 +52,13 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
+      if (rememberMe) {
+        localStorage.setItem(SAVED_USERNAME_KEY, data.username);
+        localStorage.setItem(REMEMBER_ME_KEY, "true");
+      } else {
+        localStorage.removeItem(SAVED_USERNAME_KEY);
+        localStorage.removeItem(REMEMBER_ME_KEY);
+      }
       await login(data.username, data.password);
       toast({ title: "로그인 성공", description: "환영합니다!" });
     } catch (error: any) {
@@ -98,17 +119,47 @@ export default function Login() {
                     <FormItem>
                       <FormLabel>비밀번호</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="••••••••" 
-                          data-testid="input-password"
-                          {...field} 
-                        />
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••" 
+                            data-testid="input-password"
+                            {...field} 
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    data-testid="checkbox-remember-me"
+                  />
+                  <label
+                    htmlFor="rememberMe"
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    아이디 저장
+                  </label>
+                </div>
                 <Button 
                   type="submit" 
                   className="w-full" 
