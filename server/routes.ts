@@ -998,7 +998,27 @@ export async function registerRoutes(
       description: "임시 비밀번호로 초기화",
     });
 
-    return res.json({ tempPassword });
+    // TODO: 이메일 발송 기능 구현 (Resend 또는 SendGrid 연동 필요)
+    // 이메일 내용:
+    // - 수신자: member.email
+    // - 제목: [Topsel] 비밀번호가 초기화되었습니다
+    // - 본문: 
+    //   안녕하세요, ${member.companyName}님.
+    //   귀하의 비밀번호가 초기화되었습니다.
+    //   임시 비밀번호: ${tempPassword}
+    //   로그인 후 반드시 비밀번호를 변경해 주세요.
+    // 
+    // 구현 예시:
+    // import { Resend } from 'resend';
+    // const resend = new Resend(process.env.RESEND_API_KEY);
+    // await resend.emails.send({
+    //   from: 'noreply@yourdomain.com',
+    //   to: member.email,
+    //   subject: '[Topsel] 비밀번호가 초기화되었습니다',
+    //   html: `<p>임시 비밀번호: ${tempPassword}</p><p>로그인 후 비밀번호를 변경해 주세요.</p>`
+    // });
+
+    return res.json({ tempPassword, email: member.email });
   });
 
   app.delete("/api/admin/members/:id", async (req, res) => {

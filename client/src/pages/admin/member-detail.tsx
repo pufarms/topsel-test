@@ -124,10 +124,20 @@ export default function MemberDetailPage() {
       const res = await apiRequest("POST", `/api/admin/members/${memberId}/reset-password`);
       return res.json();
     },
-    onSuccess: (data: { tempPassword: string }) => {
+    onSuccess: (data: { tempPassword: string; email?: string }) => {
       setTempPassword(data.tempPassword);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members", memberId] });
-      toast({ title: "비밀번호가 초기화되었습니다" });
+      if (data.email) {
+        toast({ 
+          title: "비밀번호가 초기화되었습니다",
+          description: `이메일 발송 예정: ${data.email} (TODO: 이메일 연동 필요)`
+        });
+      } else {
+        toast({ 
+          title: "비밀번호가 초기화되었습니다",
+          description: "회원 이메일이 등록되어 있지 않습니다"
+        });
+      }
     },
     onError: () => {
       toast({ title: "비밀번호 초기화 실패", variant: "destructive" });

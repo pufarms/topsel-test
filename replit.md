@@ -102,3 +102,13 @@ Main tables:
 - `SESSION_SECRET`: Secret key for session encryption (optional, has default)
 - `R2_ACCESS_KEY_ID`: Cloudflare R2 access key
 - `R2_SECRET_ACCESS_KEY`: Cloudflare R2 secret key
+- `RESEND_API_KEY`: (TODO) Resend API key for email sending (password reset notifications)
+
+## TODO: 미구현 기능
+### 이메일 발송 기능
+- **위치**: server/routes.ts - POST /api/admin/members/:id/reset-password
+- **목적**: 비밀번호 초기화 시 회원 이메일로 임시 비밀번호 발송
+- **필요 작업**:
+  1. Resend 또는 SendGrid 연동 설정
+  2. RESEND_API_KEY 환경변수 설정
+  3. TODO 주석 부분 구현
