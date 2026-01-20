@@ -99,7 +99,12 @@ export default function ProductRegistrationPage() {
       filtered = filtered.filter(p => String(p.weight) === searchWeight);
     }
     if (searchName) {
-      filtered = filtered.filter(p => p.productName?.toLowerCase().includes(searchName.toLowerCase()));
+      const searchWords = searchName.trim().toLowerCase().split(/\s+/);
+      filtered = filtered.filter(p => {
+        if (!p.productName) return false;
+        const productWords = p.productName.toLowerCase().split(/\s+/);
+        return searchWords.some(sw => productWords.some(pw => pw === sw));
+      });
     }
     return filtered;
   };
