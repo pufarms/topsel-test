@@ -50,6 +50,8 @@ Main tables:
 5. **partners**: id (UUID), username, password, companyName, businessNumber, representative, address, phone1, phone2, shippingCompany, status, createdAt, updatedAt
 6. **products**: id (UUID), productCode (unique), productName, category, price, status
 7. **partner_products**: id (UUID), partnerId (FK), productId (FK) - Many-to-many relationship
+8. **members**: id (UUID), username (unique), password, grade (PENDING/ASSOCIATE/START/DRIVING/TOP), companyName, businessNumber, businessAddress, representative, phone, managerName, managerPhone, email, deposit, point, status (활성/비활성), memo, approvedAt, approvedBy, createdAt, updatedAt
+9. **member_logs**: id (UUID), memberId (FK), adminId (FK), action, beforeData (JSON), afterData (JSON), createdAt - 회원 변경 이력
 
 ### Authentication Flow
 - Session-based authentication stored server-side
