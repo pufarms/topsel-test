@@ -227,15 +227,20 @@ export default function ProductRegistrationPage() {
     searchMutation.mutate();
   };
 
-  const handleReset = () => {
-    setSearchCategoryLarge("all");
-    setSearchCategoryMedium("all");
-    setSearchCategorySmall("all");
-    setSearchWeight("all");
-    setSearchName("");
-    setShowTempOnly(false);
-    setProducts([]);
-    setSelectedIds([]);
+  const handleBulkReset = () => {
+    setBulkWeight("");
+    setBulkSourcePrice("");
+    setBulkLossRate("");
+    setBulkSourceWeight("");
+    setBulkBoxCost("");
+    setBulkMaterialCost("");
+    setBulkOuterBoxCost("");
+    setBulkWrappingCost("");
+    setBulkLaborCost("");
+    setBulkShippingCost("");
+    setBulkStartMargin("");
+    setBulkDrivingMargin("");
+    setBulkTopMargin("");
   };
 
   const handleShowTempList = () => {
@@ -550,10 +555,6 @@ export default function ProductRegistrationPage() {
               <Search className="h-4 w-4 mr-1" />
               검색
             </Button>
-            <Button size="sm" variant="outline" onClick={handleReset} data-testid="button-reset">
-              <RotateCcw className="h-4 w-4 mr-1" />
-              초기화
-            </Button>
             {showTempOnly ? (
               <Button size="sm" variant="secondary" onClick={handleShowAll} data-testid="button-show-all">
                 전체 보기
@@ -660,7 +661,11 @@ export default function ProductRegistrationPage() {
               </div>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={handleBulkReset} data-testid="button-bulk-reset">
+              <RotateCcw className="h-4 w-4 mr-1" />
+              초기화
+            </Button>
             <Button size="sm" onClick={handleBulkApply} disabled={bulkUpdateMutation.isPending} data-testid="button-bulk-apply">
               {bulkUpdateMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               선택한 상품에 일괄 적용
