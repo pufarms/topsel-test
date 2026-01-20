@@ -40,7 +40,7 @@ export default function CategoryManagement() {
   const [largeFilter, setLargeFilter] = useState<string>("all");
   const [mediumFilter, setMediumFilter] = useState<string>("all");
   const [smallFilter, setSmallFilter] = useState<string>("all");
-  const [countFilter, setCountFilter] = useState<string>("all");
+  const [weightFilter, setWeightFilter] = useState<string>("all");
   const [showDialog, setShowDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<EnrichedCategory | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -253,9 +253,11 @@ export default function CategoryManagement() {
       filtered = filtered.filter(c => c.level === "small" && c.id === smallFilter);
     }
     
-    if (countFilter !== "all") {
-      const countNum = parseInt(countFilter);
-      filtered = filtered.filter(c => c.productCount >= countNum);
+    if (weightFilter !== "all") {
+      // Note: Weight filter placeholder - will be connected to product weights
+      // For now, filters by product count as a proxy
+      const weightNum = parseFloat(weightFilter);
+      filtered = filtered.filter(c => c.productCount >= weightNum);
     }
     
     if (searchTerm) {
@@ -284,7 +286,7 @@ export default function CategoryManagement() {
     setLargeFilter("all");
     setMediumFilter("all");
     setSmallFilter("all");
-    setCountFilter("all");
+    setWeightFilter("all");
   };
 
   const columns: Column<EnrichedCategory>[] = [
@@ -413,18 +415,18 @@ export default function CategoryManagement() {
             </SelectContent>
           </Select>
         </FilterField>
-        <FilterField label="수량">
-          <Select value={countFilter} onValueChange={setCountFilter}>
-            <SelectTrigger className="h-9" data-testid="select-count">
+        <FilterField label="중량">
+          <Select value={weightFilter} onValueChange={setWeightFilter}>
+            <SelectTrigger className="h-9" data-testid="select-weight">
               <SelectValue placeholder="전체" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">전체</SelectItem>
-              <SelectItem value="1">1개 이상</SelectItem>
-              <SelectItem value="5">5개 이상</SelectItem>
-              <SelectItem value="10">10개 이상</SelectItem>
-              <SelectItem value="50">50개 이상</SelectItem>
-              <SelectItem value="100">100개 이상</SelectItem>
+              <SelectItem value="0.5">0.5kg 이상</SelectItem>
+              <SelectItem value="1">1kg 이상</SelectItem>
+              <SelectItem value="2">2kg 이상</SelectItem>
+              <SelectItem value="5">5kg 이상</SelectItem>
+              <SelectItem value="10">10kg 이상</SelectItem>
             </SelectContent>
           </Select>
         </FilterField>

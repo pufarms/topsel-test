@@ -629,7 +629,20 @@ export default function ProductRegistrationPage() {
                     <Input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.weight, false)}`}>
-                    <Input value={p.weight} onChange={e => handleCellChange(idx, "weight", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input 
+                      value={p.weight} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
+                          handleCellChange(idx, "weight", val);
+                        }
+                      }} 
+                      className="h-7 text-xs w-16 text-right" 
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.0"
+                      data-testid={`input-weight-${idx}`}
+                    />
                   </td>
                   <td className={`p-1 ${getCellClass(p.productCode, false)}`}>
                     <Input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="h-7 text-xs w-20" />
