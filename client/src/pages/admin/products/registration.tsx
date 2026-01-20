@@ -319,6 +319,7 @@ export default function ProductRegistrationPage() {
       lossRate: 0,
       sourceWeight: null,
       unitPrice: null,
+      sourceProductTotal: null,
       boxCost: 0,
       materialCost: 0,
       outerBoxCost: 0,
@@ -364,11 +365,14 @@ export default function ProductRegistrationPage() {
     const sourcePrice = p.sourcePrice || 0;
     const lossRate = p.lossRate || 0;
     const sourceWeight = p.sourceWeight || 1;
+    const weight = parseFloat(p.weight) || 0;
     const unitPrice = sourceWeight > 0 ? Math.round((sourcePrice * (1 + lossRate / 100)) / sourceWeight) : 0;
+    const sourceProductTotal = Math.round(weight * unitPrice);
     
-    const totalCost = unitPrice + (p.boxCost || 0) + (p.materialCost || 0) + (p.outerBoxCost || 0) + (p.wrappingCost || 0) + (p.laborCost || 0) + (p.shippingCost || 0);
+    const totalCost = sourceProductTotal + (p.boxCost || 0) + (p.materialCost || 0) + (p.outerBoxCost || 0) + (p.wrappingCost || 0) + (p.laborCost || 0) + (p.shippingCost || 0);
     
     p.unitPrice = unitPrice;
+    p.sourceProductTotal = sourceProductTotal;
     p.totalCost = totalCost;
     
     if (p.startMarginRate != null) {
@@ -708,6 +712,7 @@ export default function ProductRegistrationPage() {
                 <th className="p-2 text-right whitespace-nowrap">로스율%</th>
                 <th className="p-2 text-right whitespace-nowrap">기준중량</th>
                 <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">개별단가</th>
+                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">원상품합계</th>
                 <th className="p-2 text-right whitespace-nowrap">박스비</th>
                 <th className="p-2 text-right whitespace-nowrap">자재비</th>
                 <th className="p-2 text-right whitespace-nowrap">아웃박스</th>
@@ -780,6 +785,7 @@ export default function ProductRegistrationPage() {
                     <Input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
                   <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[60px]">{formatNumber(p.unitPrice)}</td>
+                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[70px]">{formatNumber(p.sourceProductTotal)}</td>
                   <td className="p-1">
                     <Input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>

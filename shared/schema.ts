@@ -388,6 +388,7 @@ export const productRegistrations = pgTable("product_registrations", {
   lossRate: integer("loss_rate").notNull().default(0),
   sourceWeight: integer("source_weight"),
   unitPrice: integer("unit_price"),
+  sourceProductTotal: integer("source_product_total"),
   
   boxCost: integer("box_cost").notNull().default(0),
   materialCost: integer("material_cost").notNull().default(0),
@@ -416,6 +417,7 @@ export const productRegistrations = pgTable("product_registrations", {
 export const insertProductRegistrationSchema = createInsertSchema(productRegistrations).omit({
   id: true,
   unitPrice: true,
+  sourceProductTotal: true,
   totalCost: true,
   startPrice: true,
   startMargin: true,
