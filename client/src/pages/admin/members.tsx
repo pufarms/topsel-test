@@ -1,20 +1,29 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, RotateCcw, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberGrade } from "@shared/schema";
 import { memberGradeLabels } from "@shared/schema";
 import * as XLSX from "xlsx";
+import {
+  PageHeader,
+  StatCard,
+  StatCardsGrid,
+  FilterSection,
+  FilterField,
+  DataTable,
+  ActionSection,
+  MobileCard,
+  MobileCardField,
+  MobileCardsList,
+  type Column
+} from "@/components/admin";
 
 type MemberWithoutPassword = Omit<Member, "password">;
 
@@ -55,7 +64,6 @@ export default function MembersPage() {
   const [filterGrade, setFilterGrade] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [showBulkEdit, setShowBulkEdit] = useState(false);
   
   const [bulkGrade, setBulkGrade] = useState<string>("none");
   const [bulkDepositAdjust, setBulkDepositAdjust] = useState("");
@@ -70,7 +78,6 @@ export default function MembersPage() {
     queryKey: ["/api/admin/members/stats"],
   });
 
-  // Extract unique company names and usernames for dropdown
   const uniqueCompanyNames = Array.from(new Set(members.map(m => m.companyName))).sort((a, b) => a.localeCompare(b));
   const uniqueUsernames = Array.from(new Set(members.map(m => m.username))).sort((a, b) => a.localeCompare(b));
 
@@ -97,13 +104,11 @@ export default function MembersPage() {
   const filteredMembers = members
     .filter(m => {
       if (filterGrade !== "all" && m.grade !== filterGrade) return false;
-      // Company filter
       if (companySelectMode === "direct") {
         if (searchCompany && !m.companyName.toLowerCase().includes(searchCompany.toLowerCase())) return false;
       } else if (companySelectMode !== "all") {
         if (m.companyName !== companySelectMode) return false;
       }
-      // Username filter
       if (usernameSelectMode === "direct") {
         if (searchUsername && !m.username.toLowerCase().includes(searchUsername.toLowerCase())) return false;
       } else if (usernameSelectMode !== "all") {
@@ -113,33 +118,23 @@ export default function MembersPage() {
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case "newest":
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case "oldest":
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case "company":
-          return a.companyName.localeCompare(b.companyName);
-        case "deposit":
-          return b.deposit - a.deposit;
-        default:
-          return 0;
+        case "newest": return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "oldest": return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "company": return a.companyName.localeCompare(b.companyName);
+        case "deposit": return b.deposit - a.deposit;
+        default: return 0;
       }
     });
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedMembers(filteredMembers.map(m => m.id));
-    } else {
-      setSelectedMembers([]);
-    }
+    setSelectedMembers(checked ? filteredMembers.map(m => m.id) : []);
   };
 
   const handleSelectMember = (memberId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedMembers([...selectedMembers, memberId]);
-    } else {
-      setSelectedMembers(selectedMembers.filter(id => id !== memberId));
-    }
+    setSelectedMembers(checked 
+      ? [...selectedMembers, memberId] 
+      : selectedMembers.filter(id => id !== memberId)
+    );
   };
 
   const handleBulkUpdate = () => {
@@ -147,13 +142,11 @@ export default function MembersPage() {
       toast({ title: "선택된 회원이 없습니다", variant: "destructive" });
       return;
     }
-
     const updateData: any = { memberIds: selectedMembers };
     if (bulkGrade && bulkGrade !== "none") updateData.grade = bulkGrade;
     if (bulkDepositAdjust) updateData.depositAdjust = parseInt(bulkDepositAdjust);
     if (bulkPointAdjust) updateData.pointAdjust = parseInt(bulkPointAdjust);
     if (bulkMemoAdd) updateData.memoAdd = bulkMemoAdd;
-
     bulkUpdateMutation.mutate(updateData);
   };
 
@@ -182,13 +175,18 @@ export default function MembersPage() {
     XLSX.writeFile(wb, `회원목록_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
-  const statCards = [
-    { key: "total", label: "전체 회원", count: stats?.total || 0, icon: Users, color: "bg-primary text-primary-foreground", filter: "all" },
-    { key: "pending", label: "보류중", count: stats?.pending || 0, icon: Clock, color: "bg-yellow-500 text-white", filter: "PENDING" },
-    { key: "associate", label: "준회원", count: stats?.associate || 0, icon: UserCheck, color: "bg-gray-500 text-white", filter: "ASSOCIATE" },
-    { key: "start", label: "Start회원", count: stats?.start || 0, icon: Rocket, color: "bg-blue-500 text-white", filter: "START" },
-    { key: "driving", label: "Driving회원", count: stats?.driving || 0, icon: Car, color: "bg-green-500 text-white", filter: "DRIVING" },
-    { key: "top", label: "Top회원", count: stats?.top || 0, icon: Crown, color: "bg-purple-500 text-white", filter: "TOP" },
+  const columns: Column<MemberWithoutPassword>[] = [
+    { key: "companyName", label: "상호명", render: (m) => <span className="font-medium">{m.companyName}</span> },
+    { key: "username", label: "아이디", className: "text-muted-foreground" },
+    { key: "grade", label: "등급", render: (m) => (
+      <Badge className={gradeColors[m.grade]}>{memberGradeLabels[m.grade as MemberGrade]}</Badge>
+    )},
+    { key: "deposit", label: "예치금", className: "text-right", render: (m) => `${formatNumber(m.deposit)}원` },
+    { key: "point", label: "포인트", className: "text-right", render: (m) => `${formatNumber(m.point)}P` },
+    { key: "status", label: "상태", render: (m) => (
+      <Badge variant={m.status === "활성" ? "default" : "secondary"}>{m.status}</Badge>
+    )},
+    { key: "createdAt", label: "가입일", render: (m) => formatDate(m.createdAt) },
   ];
 
   if (isLoading) {
@@ -200,384 +198,229 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary rounded-lg">
-          <Users className="h-5 w-5 md:h-6 md:w-6 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold">회원관리</h1>
-          <p className="text-sm text-muted-foreground">검색/등급/예치금/포인트/메모/일괄 처리</p>
-        </div>
-      </div>
+    <div className="space-y-3 p-4">
+      <PageHeader 
+        title="회원관리" 
+        description="검색/등급/예치금/포인트/메모/일괄 처리"
+        icon={Users}
+        actions={
+          <Button size="sm" variant="outline" onClick={handleExcelDownload} data-testid="button-excel">
+            <Download className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">엑셀</span>
+          </Button>
+        }
+      />
 
-      {/* Stats Dashboard */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-4">
-        {statCards.map((card) => (
-          <Card 
-            key={card.key}
-            className={`cursor-pointer transition-all hover:scale-105 ${filterGrade === card.filter ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterGrade(card.filter)}
-            data-testid={`stat-card-${card.key}`}
-          >
-            <CardContent className="p-3 md:p-4">
-              <div className={`inline-flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-lg ${card.color} mb-2`}>
-                <card.icon className="h-4 w-4 md:h-5 md:w-5" />
-              </div>
-              <p className="text-xs md:text-sm text-muted-foreground">{card.label}</p>
-              <p className="text-lg md:text-2xl font-bold">{card.count}<span className="text-sm md:text-base font-normal">명</span></p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatCardsGrid columns={6}>
+        <StatCard
+          label="전체 회원"
+          value={stats?.total || 0}
+          suffix="명"
+          icon={Users}
+          iconColor="bg-primary text-primary-foreground"
+          isActive={filterGrade === "all"}
+          onClick={() => setFilterGrade("all")}
+          testId="stat-card-total"
+        />
+        <StatCard
+          label="보류중"
+          value={stats?.pending || 0}
+          suffix="명"
+          icon={Clock}
+          iconColor="bg-yellow-500 text-white"
+          isActive={filterGrade === "PENDING"}
+          onClick={() => setFilterGrade("PENDING")}
+          testId="stat-card-pending"
+        />
+        <StatCard
+          label="준회원"
+          value={stats?.associate || 0}
+          suffix="명"
+          icon={UserCheck}
+          iconColor="bg-gray-500 text-white"
+          isActive={filterGrade === "ASSOCIATE"}
+          onClick={() => setFilterGrade("ASSOCIATE")}
+          testId="stat-card-associate"
+        />
+        <StatCard
+          label="Start회원"
+          value={stats?.start || 0}
+          suffix="명"
+          icon={Rocket}
+          iconColor="bg-blue-500 text-white"
+          isActive={filterGrade === "START"}
+          onClick={() => setFilterGrade("START")}
+          testId="stat-card-start"
+        />
+        <StatCard
+          label="Driving회원"
+          value={stats?.driving || 0}
+          suffix="명"
+          icon={Car}
+          iconColor="bg-green-500 text-white"
+          isActive={filterGrade === "DRIVING"}
+          onClick={() => setFilterGrade("DRIVING")}
+          testId="stat-card-driving"
+        />
+        <StatCard
+          label="Top회원"
+          value={stats?.top || 0}
+          suffix="명"
+          icon={Crown}
+          iconColor="bg-purple-500 text-white"
+          isActive={filterGrade === "TOP"}
+          onClick={() => setFilterGrade("TOP")}
+          testId="stat-card-top"
+        />
+      </StatCardsGrid>
 
-      {/* Search and Filter */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base md:text-lg">검색 및 필터</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            <div className="space-y-1">
-              <Label className="text-sm">상호명</Label>
-              <Select 
-                value={companySelectMode} 
-                onValueChange={(value) => {
-                  setCompanySelectMode(value);
-                  if (value !== "direct") setSearchCompany("");
-                }}
-              >
-                <SelectTrigger data-testid="select-search-company">
-                  <SelectValue placeholder="상호명 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="direct">직접입력</SelectItem>
-                  {uniqueCompanyNames.map((name) => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {companySelectMode === "direct" && (
-                <Input
-                  placeholder="상호명 검색..."
-                  value={searchCompany}
-                  onChange={(e) => setSearchCompany(e.target.value)}
-                  className="mt-2"
-                  data-testid="input-search-company"
-                />
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">아이디</Label>
-              <Select 
-                value={usernameSelectMode} 
-                onValueChange={(value) => {
-                  setUsernameSelectMode(value);
-                  if (value !== "direct") setSearchUsername("");
-                }}
-              >
-                <SelectTrigger data-testid="select-search-username">
-                  <SelectValue placeholder="아이디 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="direct">직접입력</SelectItem>
-                  {uniqueUsernames.map((name) => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {usernameSelectMode === "direct" && (
-                <Input
-                  placeholder="아이디 검색..."
-                  value={searchUsername}
-                  onChange={(e) => setSearchUsername(e.target.value)}
-                  className="mt-2"
-                  data-testid="input-search-username"
-                />
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">등급</Label>
-              <Select value={filterGrade} onValueChange={setFilterGrade}>
-                <SelectTrigger data-testid="select-filter-grade">
-                  <SelectValue placeholder="전체 등급" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 등급</SelectItem>
-                  <SelectItem value="PENDING">보류중</SelectItem>
-                  <SelectItem value="ASSOCIATE">준회원</SelectItem>
-                  <SelectItem value="START">Start회원</SelectItem>
-                  <SelectItem value="DRIVING">Driving회원</SelectItem>
-                  <SelectItem value="TOP">Top회원</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">정렬</Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger data-testid="select-sort">
-                  <SelectValue placeholder="정렬 기준" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">가입일 최신순</SelectItem>
-                  <SelectItem value="oldest">가입일 오래된순</SelectItem>
-                  <SelectItem value="company">상호명순</SelectItem>
-                  <SelectItem value="deposit">예치금순</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <Button onClick={() => {}} data-testid="button-search">
-              <Search className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">검색</span>
-            </Button>
-            <Button variant="outline" onClick={handleReset} data-testid="button-reset">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">초기화</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bulk Edit Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div 
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => setShowBulkEdit(!showBulkEdit)}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Users className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle className="text-base md:text-lg">일괄 수정</CardTitle>
-              {selectedMembers.length > 0 && (
-                <Badge variant="secondary">{selectedMembers.length}명 선택</Badge>
-              )}
-            </div>
-            {showBulkEdit ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </div>
-          <CardDescription>체크한 회원에게 적용됩니다</CardDescription>
-        </CardHeader>
-        {showBulkEdit && (
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              <div className="space-y-1">
-                <Label className="text-sm">등급 변경</Label>
-                <Select value={bulkGrade} onValueChange={setBulkGrade}>
-                  <SelectTrigger data-testid="select-bulk-grade">
-                    <SelectValue placeholder="변경 안함" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">변경 안함</SelectItem>
-                    <SelectItem value="PENDING">보류중</SelectItem>
-                    <SelectItem value="ASSOCIATE">준회원</SelectItem>
-                    <SelectItem value="START">Start회원</SelectItem>
-                    <SelectItem value="DRIVING">Driving회원</SelectItem>
-                    <SelectItem value="TOP">Top회원</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">예치금 ±</Label>
-                <Input
-                  placeholder="예: 10000 또는 -5000"
-                  value={bulkDepositAdjust}
-                  onChange={(e) => setBulkDepositAdjust(e.target.value)}
-                  data-testid="input-bulk-deposit"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">포인트 ±</Label>
-                <Input
-                  placeholder="예: 1000 또는 -500"
-                  value={bulkPointAdjust}
-                  onChange={(e) => setBulkPointAdjust(e.target.value)}
-                  data-testid="input-bulk-point"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">메모 추가</Label>
-                <Input
-                  placeholder="기존 메모에 추가됨"
-                  value={bulkMemoAdd}
-                  onChange={(e) => setBulkMemoAdd(e.target.value)}
-                  data-testid="input-bulk-memo"
-                />
-              </div>
-            </div>
-            <Button 
-              className="mt-4" 
-              onClick={handleBulkUpdate}
-              disabled={selectedMembers.length === 0 || bulkUpdateMutation.isPending}
-              data-testid="button-bulk-save"
-            >
-              {bulkUpdateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              선택 회원 저장
-            </Button>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Members Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-base md:text-lg">회원 목록</CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                총 {filteredMembers.length}명
-              </span>
-              <Button variant="outline" size="sm" onClick={handleExcelDownload} data-testid="button-excel-download">
-                <Download className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">엑셀</span>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredMembers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              등록된 회원이 없습니다
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
-                          onCheckedChange={handleSelectAll}
-                          data-testid="checkbox-select-all"
-                        />
-                      </TableHead>
-                      <TableHead>상호명</TableHead>
-                      <TableHead>아이디</TableHead>
-                      <TableHead>등급</TableHead>
-                      <TableHead className="text-right">예치금</TableHead>
-                      <TableHead className="text-right">포인트</TableHead>
-                      <TableHead>연락처</TableHead>
-                      <TableHead>가입일</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMembers.map((member) => (
-                      <TableRow 
-                        key={member.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        data-testid={`row-member-${member.id}`}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedMembers.includes(member.id)}
-                            onCheckedChange={(checked) => handleSelectMember(member.id, checked as boolean)}
-                            data-testid={`checkbox-member-${member.id}`}
-                          />
-                        </TableCell>
-                        <TableCell 
-                          className="font-medium"
-                          onClick={() => setLocation(`/admin/members/${member.id}`)}
-                        >
-                          {member.companyName}
-                        </TableCell>
-                        <TableCell onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          {member.username}
-                        </TableCell>
-                        <TableCell onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          <Badge className={gradeColors[member.grade] || ""}>
-                            {memberGradeLabels[member.grade as MemberGrade] || member.grade}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          {formatNumber(member.deposit)}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          {formatNumber(member.point)}
-                        </TableCell>
-                        <TableCell onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          {member.phone}
-                        </TableCell>
-                        <TableCell onClick={() => setLocation(`/admin/members/${member.id}`)}>
-                          {formatDate(member.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile/Tablet Cards */}
-              <div className="lg:hidden space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b">
-                  <Checkbox
-                    checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
-                    onCheckedChange={handleSelectAll}
-                    data-testid="checkbox-select-all-mobile"
-                  />
-                  <span className="text-sm text-muted-foreground">전체 선택</span>
-                </div>
-                {filteredMembers.map((member) => (
-                  <Card 
-                    key={member.id} 
-                    className="p-4"
-                    data-testid={`card-member-${member.id}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={selectedMembers.includes(member.id)}
-                        onCheckedChange={(checked) => handleSelectMember(member.id, checked as boolean)}
-                        className="mt-1"
-                        data-testid={`checkbox-member-mobile-${member.id}`}
-                      />
-                      <div 
-                        className="flex-1 cursor-pointer"
-                        onClick={() => setLocation(`/admin/members/${member.id}`)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold">{member.companyName}</p>
-                            <p className="text-sm text-muted-foreground">{member.username}</p>
-                          </div>
-                          <Badge className={gradeColors[member.grade] || ""}>
-                            {memberGradeLabels[member.grade as MemberGrade] || member.grade}
-                          </Badge>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">예치금</span>
-                            <p className="font-medium">{formatNumber(member.deposit)}원</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">포인트</span>
-                            <p className="font-medium">{formatNumber(member.point)}P</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">연락처</span>
-                            <p className="font-medium">{member.phone}</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">가입일</span>
-                            <p className="font-medium">{formatDate(member.createdAt)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
+      <FilterSection onReset={handleReset}>
+        <FilterField label="상호명">
+          <Select value={companySelectMode} onValueChange={(v) => { setCompanySelectMode(v); if (v !== "direct") setSearchCompany(""); }}>
+            <SelectTrigger className="h-9" data-testid="select-search-company">
+              <SelectValue placeholder="상호명 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              <SelectItem value="direct">직접입력</SelectItem>
+              {uniqueCompanyNames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {companySelectMode === "direct" && (
+            <Input placeholder="상호명 검색..." value={searchCompany} onChange={(e) => setSearchCompany(e.target.value)} className="h-9 mt-1" data-testid="input-search-company" />
           )}
-        </CardContent>
-      </Card>
+        </FilterField>
+        <FilterField label="아이디">
+          <Select value={usernameSelectMode} onValueChange={(v) => { setUsernameSelectMode(v); if (v !== "direct") setSearchUsername(""); }}>
+            <SelectTrigger className="h-9" data-testid="select-search-username">
+              <SelectValue placeholder="아이디 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              <SelectItem value="direct">직접입력</SelectItem>
+              {uniqueUsernames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {usernameSelectMode === "direct" && (
+            <Input placeholder="아이디 검색..." value={searchUsername} onChange={(e) => setSearchUsername(e.target.value)} className="h-9 mt-1" data-testid="input-search-username" />
+          )}
+        </FilterField>
+        <FilterField label="등급">
+          <Select value={filterGrade} onValueChange={setFilterGrade}>
+            <SelectTrigger className="h-9" data-testid="select-filter-grade">
+              <SelectValue placeholder="전체 등급" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 등급</SelectItem>
+              <SelectItem value="PENDING">보류중</SelectItem>
+              <SelectItem value="ASSOCIATE">준회원</SelectItem>
+              <SelectItem value="START">Start회원</SelectItem>
+              <SelectItem value="DRIVING">Driving회원</SelectItem>
+              <SelectItem value="TOP">Top회원</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="정렬">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9" data-testid="select-sort">
+              <SelectValue placeholder="정렬 기준" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">가입일 최신순</SelectItem>
+              <SelectItem value="oldest">가입일 오래된순</SelectItem>
+              <SelectItem value="company">상호명순</SelectItem>
+              <SelectItem value="deposit">예치금순</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterSection>
+
+      <ActionSection
+        title="일괄 수정"
+        description="체크한 회원에게 적용됩니다"
+        icon={Users}
+        selectedCount={selectedMembers.length}
+        onApply={handleBulkUpdate}
+        applyLabel="일괄 적용"
+        applyDisabled={selectedMembers.length === 0 || bulkUpdateMutation.isPending}
+      >
+        <FilterField label="등급 변경">
+          <Select value={bulkGrade} onValueChange={setBulkGrade}>
+            <SelectTrigger className="h-9" data-testid="select-bulk-grade">
+              <SelectValue placeholder="변경 안함" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">변경 안함</SelectItem>
+              <SelectItem value="PENDING">보류중</SelectItem>
+              <SelectItem value="ASSOCIATE">준회원</SelectItem>
+              <SelectItem value="START">Start회원</SelectItem>
+              <SelectItem value="DRIVING">Driving회원</SelectItem>
+              <SelectItem value="TOP">Top회원</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="예치금 ±">
+          <Input placeholder="예: 10000 또는 -5000" value={bulkDepositAdjust} onChange={(e) => setBulkDepositAdjust(e.target.value)} className="h-9" data-testid="input-bulk-deposit" />
+        </FilterField>
+        <FilterField label="포인트 ±">
+          <Input placeholder="예: 1000 또는 -500" value={bulkPointAdjust} onChange={(e) => setBulkPointAdjust(e.target.value)} className="h-9" data-testid="input-bulk-point" />
+        </FilterField>
+        <FilterField label="메모 추가">
+          <Input placeholder="기존 메모에 추가됨" value={bulkMemoAdd} onChange={(e) => setBulkMemoAdd(e.target.value)} className="h-9" data-testid="input-bulk-memo" />
+        </FilterField>
+      </ActionSection>
+
+      {/* Desktop Table */}
+      <div className="hidden lg:block">
+        <DataTable
+          title={`총 ${filteredMembers.length}명`}
+          columns={columns}
+          data={filteredMembers}
+          keyField="id"
+          onRowClick={(m) => setLocation(`/admin/members/${m.id}`)}
+          selectable
+          selectedIds={selectedMembers}
+          onSelectAll={handleSelectAll}
+          onSelectItem={handleSelectMember}
+          emptyMessage="회원이 없습니다"
+        />
+      </div>
+
+      {/* Mobile Cards */}
+      <MobileCardsList>
+        {filteredMembers.map((member) => (
+          <MobileCard
+            key={member.id}
+            onClick={() => setLocation(`/admin/members/${member.id}`)}
+            selectable
+            selected={selectedMembers.includes(member.id)}
+            onSelect={(checked) => handleSelectMember(member.id, checked)}
+            testId={`card-member-${member.id}`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium truncate">{member.companyName}</span>
+              <Badge className={gradeColors[member.grade]}>
+                {memberGradeLabels[member.grade as MemberGrade]}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">@{member.username}</p>
+            <div className="space-y-1">
+              <MobileCardField label="예치금" value={`${formatNumber(member.deposit)}원`} />
+              <MobileCardField label="포인트" value={`${formatNumber(member.point)}P`} />
+              <MobileCardField label="가입일" value={formatDate(member.createdAt)} />
+            </div>
+          </MobileCard>
+        ))}
+        {filteredMembers.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            회원이 없습니다
+          </div>
+        )}
+      </MobileCardsList>
     </div>
   );
 }
