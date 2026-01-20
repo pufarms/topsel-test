@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -37,11 +36,11 @@ type CategoryForm = z.infer<typeof categoryFormSchema>;
 
 export default function CategoryManagement() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"large" | "medium" | "small">("large");
   const [searchTerm, setSearchTerm] = useState("");
-  const [parentFilter, setParentFilter] = useState<string>("all");
-  const [grandparentFilter, setGrandparentFilter] = useState<string>("all");
+  const [largeFilter, setLargeFilter] = useState<string>("all");
+  const [mediumFilter, setMediumFilter] = useState<string>("all");
   const [smallFilter, setSmallFilter] = useState<string>("all");
+  const [countFilter, setCountFilter] = useState<string>("all");
   const [showDialog, setShowDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState<EnrichedCategory | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -136,22 +135,22 @@ export default function CategoryManagement() {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<any>(sheet);
 
-        const categories: Array<{ large: string; medium?: string; small?: string }> = [];
+        const cats: Array<{ large: string; medium?: string; small?: string }> = [];
         for (const row of rows) {
           const large = row["대분류"] || row["large"] || "";
           const medium = row["중분류"] || row["medium"] || "";
           const small = row["소분류"] || row["small"] || "";
           if (large) {
-            categories.push({ large, medium: medium || undefined, small: small || undefined });
+            cats.push({ large, medium: medium || undefined, small: small || undefined });
           }
         }
 
-        if (categories.length === 0) {
+        if (cats.length === 0) {
           toast({ variant: "destructive", title: "오류", description: "유효한 카테고리 데이터가 없습니다" });
           return;
         }
 
-        bulkUploadMutation.mutate(categories);
+        bulkUploadMutation.mutate(cats);
       } catch (err) {
         toast({ variant: "destructive", title: "파일 오류", description: "엑셀 파일을 읽을 수 없습니다" });
       }
@@ -176,11 +175,11 @@ export default function CategoryManagement() {
   const closeDialog = () => {
     setShowDialog(false);
     setEditingCategory(null);
-    form.reset({ name: "", level: activeTab, parentId: null });
+    form.reset({ name: "", level: "large", parentId: null });
   };
 
   const openCreateDialog = () => {
-    form.reset({ name: "", level: activeTab, parentId: null });
+    form.reset({ name: "", level: "large", parentId: null });
     setShowDialog(true);
   };
 
@@ -200,106 +199,127 @@ export default function CategoryManagement() {
 
   const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR");
 
+  const getLevelLabel = (level: string) => {
+    switch (level) {
+      case "large": return "대분류";
+      case "medium": return "중분류";
+      case "small": return "소분류";
+      default: return level;
+    }
+  };
+
+  const getFilteredMediumCategories = () => {
+    if (largeFilter === "all") return mediumCategories;
+    return mediumCategories.filter(m => m.parentId === largeFilter);
+  };
+
+  const getFilteredSmallCategories = () => {
+    let filtered = smallCategories;
+    if (largeFilter !== "all") {
+      const mediumIds = mediumCategories.filter(m => m.parentId === largeFilter).map(m => m.id);
+      filtered = filtered.filter(s => s.parentId && mediumIds.includes(s.parentId));
+    }
+    if (mediumFilter !== "all") {
+      filtered = filtered.filter(s => s.parentId === mediumFilter);
+    }
+    return filtered;
+  };
+
   const getFilteredCategories = () => {
-    let filtered = categories.filter(c => c.level === activeTab);
+    let filtered = [...categories];
+    
+    if (largeFilter !== "all") {
+      filtered = filtered.filter(c => {
+        if (c.level === "large") return c.id === largeFilter;
+        if (c.level === "medium") return c.parentId === largeFilter;
+        if (c.level === "small") {
+          const mediumIds = mediumCategories.filter(m => m.parentId === largeFilter).map(m => m.id);
+          return c.parentId && mediumIds.includes(c.parentId);
+        }
+        return true;
+      });
+    }
+    
+    if (mediumFilter !== "all") {
+      filtered = filtered.filter(c => {
+        if (c.level === "large") return false;
+        if (c.level === "medium") return c.id === mediumFilter;
+        if (c.level === "small") return c.parentId === mediumFilter;
+        return true;
+      });
+    }
+    
+    if (smallFilter !== "all") {
+      filtered = filtered.filter(c => c.level === "small" && c.id === smallFilter);
+    }
+    
+    if (countFilter !== "all") {
+      const countNum = parseInt(countFilter);
+      filtered = filtered.filter(c => c.productCount >= countNum);
+    }
     
     if (searchTerm) {
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      filtered = filtered.filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.parentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.grandparentName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
     
-    if (activeTab === "medium" && parentFilter !== "all") {
-      filtered = filtered.filter(c => c.parentId === parentFilter);
-    }
-    
-    if (activeTab === "small") {
-      if (grandparentFilter !== "all") {
-        const mediumIds = mediumCategories.filter(m => m.parentId === grandparentFilter).map(m => m.id);
-        filtered = filtered.filter(c => c.parentId && mediumIds.includes(c.parentId));
-      }
-      if (parentFilter !== "all") {
-        filtered = filtered.filter(c => c.parentId === parentFilter);
-      }
-      if (smallFilter !== "all") {
-        filtered = filtered.filter(c => c.id === smallFilter);
-      }
-    }
+    filtered.sort((a, b) => {
+      const levelOrder = { large: 0, medium: 1, small: 2 };
+      const aOrder = levelOrder[a.level as keyof typeof levelOrder] ?? 3;
+      const bOrder = levelOrder[b.level as keyof typeof levelOrder] ?? 3;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.name.localeCompare(b.name, 'ko');
+    });
     
     return filtered;
   };
 
-  const getSmallCategoryOptions = () => {
-    let options = smallCategories;
-    if (grandparentFilter !== "all") {
-      const mediumIds = mediumCategories.filter(m => m.parentId === grandparentFilter).map(m => m.id);
-      options = options.filter(c => c.parentId && mediumIds.includes(c.parentId));
-    }
-    if (parentFilter !== "all") {
-      options = options.filter(c => c.parentId === parentFilter);
-    }
-    return options;
-  };
-
   const filteredCategories = getFilteredCategories();
 
-  const getMediumOptionsForSmall = () => {
-    if (grandparentFilter !== "all") {
-      return mediumCategories.filter(m => m.parentId === grandparentFilter);
-    }
-    return mediumCategories;
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setLargeFilter("all");
+    setMediumFilter("all");
+    setSmallFilter("all");
+    setCountFilter("all");
   };
 
-  const largeColumns: Column<EnrichedCategory>[] = [
-    { key: "name", label: "분류명", render: (c) => <span className="font-medium">{c.name}</span> },
-    { key: "createdAt", label: "등록일", render: (c) => formatDate(c.createdAt) },
-    { key: "childCount", label: "중분류 수", className: "text-center" },
-    { key: "productCount", label: "상품 수", className: "text-center" },
-    {
-      key: "actions",
-      label: "관리",
+  const columns: Column<EnrichedCategory>[] = [
+    { 
+      key: "level", 
+      label: "구분", 
+      className: "w-20",
       render: (c) => (
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => openEditDialog(c)} data-testid={`button-edit-${c.id}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDeleteId(c.id)} data-testid={`button-delete-${c.id}`}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      ),
+        <Badge variant={c.level === "large" ? "default" : c.level === "medium" ? "secondary" : "outline"}>
+          {getLevelLabel(c.level)}
+        </Badge>
+      )
     },
-  ];
-
-  const mediumColumns: Column<EnrichedCategory>[] = [
-    { key: "name", label: "분류명", render: (c) => <span className="font-medium">{c.name}</span> },
-    { key: "parentName", label: "상위분류" },
-    { key: "createdAt", label: "등록일", render: (c) => formatDate(c.createdAt) },
-    { key: "childCount", label: "소분류 수", className: "text-center" },
-    { key: "productCount", label: "상품 수", className: "text-center" },
+    { 
+      key: "grandparentName", 
+      label: "대분류",
+      render: (c) => c.level === "large" ? c.name : (c.grandparentName || c.parentName || "-")
+    },
+    { 
+      key: "parentName", 
+      label: "중분류",
+      render: (c) => c.level === "medium" ? c.name : (c.level === "small" ? c.parentName : "-") || "-"
+    },
+    { 
+      key: "name", 
+      label: "소분류",
+      render: (c) => c.level === "small" ? <span className="font-medium">{c.name}</span> : "-"
+    },
+    { key: "childCount", label: "하위분류 수", className: "text-center w-24" },
+    { key: "productCount", label: "상품 수", className: "text-center w-20" },
+    { key: "createdAt", label: "등록일", render: (c) => formatDate(c.createdAt), className: "w-24" },
     {
       key: "actions",
       label: "관리",
-      render: (c) => (
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => openEditDialog(c)} data-testid={`button-edit-${c.id}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setDeleteId(c.id)} data-testid={`button-delete-${c.id}`}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  const smallColumns: Column<EnrichedCategory>[] = [
-    { key: "name", label: "분류명", render: (c) => <span className="font-medium">{c.name}</span> },
-    { key: "grandparentName", label: "대분류" },
-    { key: "parentName", label: "중분류" },
-    { key: "createdAt", label: "등록일", render: (c) => formatDate(c.createdAt) },
-    { key: "productCount", label: "상품 수", className: "text-center" },
-    {
-      key: "actions",
-      label: "관리",
+      className: "w-20",
       render: (c) => (
         <div className="flex gap-1">
           <Button size="sm" variant="ghost" onClick={() => openEditDialog(c)} data-testid={`button-edit-${c.id}`}>
@@ -353,114 +373,118 @@ export default function CategoryManagement() {
         }
       />
 
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setParentFilter("all"); setGrandparentFilter("all"); setSmallFilter("all"); }}>
-        <TabsList>
-          <TabsTrigger value="large" data-testid="tab-large">대분류 ({largeCategories.length})</TabsTrigger>
-          <TabsTrigger value="medium" data-testid="tab-medium">중분류 ({mediumCategories.length})</TabsTrigger>
-          <TabsTrigger value="small" data-testid="tab-small">소분류 ({smallCategories.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab} className="mt-3 space-y-3">
-          <FilterSection onReset={() => { setSearchTerm(""); setParentFilter("all"); setGrandparentFilter("all"); setSmallFilter("all"); }}>
-            {activeTab === "small" && (
-              <FilterField label="대분류">
-                <Select value={grandparentFilter} onValueChange={(v) => { setGrandparentFilter(v); setParentFilter("all"); setSmallFilter("all"); }}>
-                  <SelectTrigger className="h-9" data-testid="select-grandparent">
-                    <SelectValue placeholder="전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체</SelectItem>
-                    {largeCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-            {(activeTab === "medium" || activeTab === "small") && (
-              <FilterField label={activeTab === "medium" ? "대분류" : "중분류"}>
-                <Select value={parentFilter} onValueChange={(v) => { setParentFilter(v); setSmallFilter("all"); }}>
-                  <SelectTrigger className="h-9" data-testid="select-parent">
-                    <SelectValue placeholder="전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체</SelectItem>
-                    {(activeTab === "medium" ? largeCategories : getMediumOptionsForSmall()).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-            {activeTab === "small" && (
-              <FilterField label="소분류">
-                <Select value={smallFilter} onValueChange={setSmallFilter}>
-                  <SelectTrigger className="h-9" data-testid="select-small">
-                    <SelectValue placeholder="전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체</SelectItem>
-                    {getSmallCategoryOptions().map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-            <FilterField label="검색">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="분류명 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-9"
-                  data-testid="input-search"
-                />
-              </div>
-            </FilterField>
-          </FilterSection>
-
-          <div className="hidden lg:block">
-            <DataTable
-              title={`총 ${filteredCategories.length}건`}
-              columns={activeTab === "large" ? largeColumns : activeTab === "medium" ? mediumColumns : smallColumns}
-              data={filteredCategories}
-              keyField="id"
-              emptyMessage="등록된 카테고리가 없습니다"
+      <FilterSection onReset={handleResetFilters}>
+        <FilterField label="대분류">
+          <Select value={largeFilter} onValueChange={(v) => { setLargeFilter(v); setMediumFilter("all"); setSmallFilter("all"); }}>
+            <SelectTrigger className="h-9" data-testid="select-large">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              {largeCategories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="중분류">
+          <Select value={mediumFilter} onValueChange={(v) => { setMediumFilter(v); setSmallFilter("all"); }}>
+            <SelectTrigger className="h-9" data-testid="select-medium">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              {getFilteredMediumCategories().map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="소분류">
+          <Select value={smallFilter} onValueChange={setSmallFilter}>
+            <SelectTrigger className="h-9" data-testid="select-small">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              {getFilteredSmallCategories().map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="수량">
+          <Select value={countFilter} onValueChange={setCountFilter}>
+            <SelectTrigger className="h-9" data-testid="select-count">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              <SelectItem value="1">1개 이상</SelectItem>
+              <SelectItem value="5">5개 이상</SelectItem>
+              <SelectItem value="10">10개 이상</SelectItem>
+              <SelectItem value="50">50개 이상</SelectItem>
+              <SelectItem value="100">100개 이상</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="검색어 입력">
+          <div className="flex gap-2">
+            <Input
+              placeholder="분류명 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9"
+              data-testid="input-search"
             />
           </div>
+        </FilterField>
+      </FilterSection>
 
-          <MobileCardsList>
-            {filteredCategories.map((cat) => (
-              <MobileCard key={cat.id} testId={`card-category-${cat.id}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium">{cat.name}</span>
-                  <Badge variant="secondary">{cat.productCount}개 상품</Badge>
-                </div>
-                {cat.parentName && (
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {cat.grandparentName && `${cat.grandparentName} > `}{cat.parentName}
-                  </p>
-                )}
-                <div className="flex justify-between items-center">
-                  <MobileCardField label="등록일" value={formatDate(cat.createdAt)} />
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEditDialog(cat)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setDeleteId(cat.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </MobileCard>
-            ))}
-            {filteredCategories.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">등록된 카테고리가 없습니다</div>
+      <div className="hidden lg:block">
+        <DataTable
+          title={`총 ${filteredCategories.length}건`}
+          columns={columns}
+          data={filteredCategories}
+          keyField="id"
+          emptyMessage="등록된 카테고리가 없습니다"
+        />
+      </div>
+
+      <MobileCardsList>
+        {filteredCategories.map((cat) => (
+          <MobileCard key={cat.id} testId={`card-category-${cat.id}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Badge variant={cat.level === "large" ? "default" : cat.level === "medium" ? "secondary" : "outline"}>
+                  {getLevelLabel(cat.level)}
+                </Badge>
+                <span className="font-medium">{cat.name}</span>
+              </div>
+              <Badge variant="secondary">{cat.productCount}개 상품</Badge>
+            </div>
+            {(cat.parentName || cat.grandparentName) && (
+              <p className="text-xs text-muted-foreground mb-2">
+                {cat.grandparentName && `${cat.grandparentName} > `}{cat.parentName}
+              </p>
             )}
-          </MobileCardsList>
-        </TabsContent>
-      </Tabs>
+            <div className="flex justify-between items-center">
+              <MobileCardField label="등록일" value={formatDate(cat.createdAt)} />
+              <div className="flex gap-1">
+                <Button size="sm" variant="ghost" onClick={() => openEditDialog(cat)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDeleteId(cat.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          </MobileCard>
+        ))}
+        {filteredCategories.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">등록된 카테고리가 없습니다</div>
+        )}
+      </MobileCardsList>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
@@ -565,7 +589,7 @@ export default function CategoryManagement() {
                           </FormControl>
                           <SelectContent>
                             {mediumCategories.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              <SelectItem key={c.id} value={c.id}>{c.name} ({largeCategories.find(l => l.id === c.parentId)?.name})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -583,7 +607,7 @@ export default function CategoryManagement() {
                   <FormItem>
                     <FormLabel>분류명</FormLabel>
                     <FormControl>
-                      <Input placeholder="분류명 입력" {...field} data-testid="input-category-name" />
+                      <Input {...field} placeholder="분류명 입력" data-testid="input-category-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -592,9 +616,9 @@ export default function CategoryManagement() {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={closeDialog}>취소</Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit">
-                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {editingCategory ? "수정" : "추가"}
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-category">
+                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  {editingCategory ? "수정" : "등록"}
                 </Button>
               </DialogFooter>
             </form>
@@ -607,12 +631,12 @@ export default function CategoryManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>카테고리 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              이 카테고리를 삭제하시겠습니까? 하위 분류나 연결된 상품이 있으면 삭제할 수 없습니다.
+              이 카테고리를 삭제하시겠습니까? 하위 카테고리가 있는 경우 삭제할 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction 
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
