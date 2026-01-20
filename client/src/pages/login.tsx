@@ -127,11 +127,9 @@ export default function Login() {
                             data-testid="input-password"
                             {...field} 
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent"
+                            className="absolute right-3 inset-y-0 flex items-center justify-center"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                           >
@@ -140,7 +138,7 @@ export default function Login() {
                             ) : (
                               <Eye className="h-5 w-5 text-muted-foreground" />
                             )}
-                          </Button>
+                          </button>
                         </div>
                       </FormControl>
                       <FormMessage />
