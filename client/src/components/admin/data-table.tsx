@@ -98,7 +98,7 @@ export function DataTable<T extends Record<string, any>>({
                     <TableRow
                       key={id}
                       className={cn(
-                        "hover:bg-muted/50 cursor-pointer",
+                        "cursor-pointer",
                         isSelected && "bg-primary/5"
                       )}
                       data-testid={`row-${id}`}

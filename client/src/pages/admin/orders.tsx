@@ -1,11 +1,25 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Download, ShoppingCart, Package, TrendingUp, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
 import * as XLSX from "xlsx";
+import {
+  PageHeader,
+  StatCard,
+  StatCardsGrid,
+  FilterSection,
+  FilterField,
+  DataTable,
+  MobileCard,
+  MobileCardField,
+  MobileCardsList,
+  type Column
+} from "@/components/admin";
 
 interface OrderWithUser extends Order {
   user?: { name: string; email: string };
@@ -13,18 +27,41 @@ interface OrderWithUser extends Order {
 
 export default function AdminOrders() {
   const { toast } = useToast();
+  const [searchSeller, setSearchSeller] = useState("");
+  const [searchProduct, setSearchProduct] = useState("");
+  const [sortBy, setSortBy] = useState<string>("newest");
 
   const { data: orders = [], isLoading } = useQuery<OrderWithUser[]>({
     queryKey: ["/api/admin/orders"],
   });
+
+  const filteredOrders = orders
+    .filter(o => {
+      if (searchSeller && !o.user?.name.toLowerCase().includes(searchSeller.toLowerCase())) return false;
+      if (searchProduct && !o.productName.toLowerCase().includes(searchProduct.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "newest": return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "oldest": return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "price": return b.price * b.quantity - a.price * a.quantity;
+        default: return 0;
+      }
+    });
+
+  const handleReset = () => {
+    setSearchSeller("");
+    setSearchProduct("");
+    setSortBy("newest");
+  };
 
   const handleExportExcel = () => {
     if (orders.length === 0) {
       toast({ variant: "destructive", title: "내보내기 실패", description: "내보낼 주문이 없습니다." });
       return;
     }
-
-    const data = orders.map(order => ({
+    const data = filteredOrders.map(order => ({
       주문ID: order.id,
       셀러: order.user?.name || "-",
       상품명: order.productName,
@@ -34,9 +71,8 @@ export default function AdminOrders() {
       수령인: order.recipientName,
       연락처: order.recipientPhone,
       주소: order.recipientAddress,
-      등록일: new Date(order.createdAt).toLocaleDateString("ko-KR"),
+      등록일: formatDate(order.createdAt),
     }));
-
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "주문목록");
@@ -44,122 +80,150 @@ export default function AdminOrders() {
     toast({ title: "내보내기 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
 
-  const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
+  const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR");
+  const formatPrice = (price: number) => price.toLocaleString("ko-KR") + "원";
 
-  const formatPrice = (price: number) => {
-    return price.toLocaleString("ko-KR") + "원";
-  };
+  const totalOrders = orders.length;
+  const todayOrders = orders.filter(o => {
+    const today = new Date();
+    const orderDate = new Date(o.createdAt);
+    return orderDate.toDateString() === today.toDateString();
+  }).length;
+  const totalRevenue = orders.reduce((sum, o) => sum + o.price * o.quantity, 0);
+  const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
+
+  const columns: Column<OrderWithUser>[] = [
+    { key: "seller", label: "셀러", render: (o) => o.user?.name || "-" },
+    { key: "productName", label: "상품명", render: (o) => <span className="font-medium">{o.productName}</span> },
+    { key: "quantity", label: "수량", className: "text-right" },
+    { key: "price", label: "가격", className: "text-right", render: (o) => formatPrice(o.price) },
+    { key: "total", label: "합계", className: "text-right", render: (o) => formatPrice(o.price * o.quantity) },
+    { key: "recipientName", label: "수령인" },
+    { key: "createdAt", label: "등록일", render: (o) => formatDate(o.createdAt) },
+  ];
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-bold">주문관리</h1>
-        <Button onClick={handleExportExcel} size="sm" data-testid="button-export-excel">
-          <Download className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">엑셀 내보내기</span>
-          <span className="sm:hidden">내보내기</span>
-        </Button>
+    <div className="space-y-3 p-4">
+      <PageHeader
+        title="주문관리"
+        description="시스템에 등록된 모든 주문을 관리합니다"
+        icon={ShoppingCart}
+        actions={
+          <Button size="sm" variant="outline" onClick={handleExportExcel} data-testid="button-export-excel">
+            <Download className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">엑셀</span>
+          </Button>
+        }
+      />
+
+      <StatCardsGrid columns={4}>
+        <StatCard
+          label="전체 주문"
+          value={totalOrders}
+          suffix="건"
+          icon={ShoppingCart}
+          iconColor="bg-primary text-primary-foreground"
+          testId="stat-card-total"
+        />
+        <StatCard
+          label="오늘 주문"
+          value={todayOrders}
+          suffix="건"
+          icon={Calendar}
+          iconColor="bg-blue-500 text-white"
+          testId="stat-card-today"
+        />
+        <StatCard
+          label="총 매출"
+          value={formatPrice(totalRevenue)}
+          icon={TrendingUp}
+          iconColor="bg-green-500 text-white"
+          testId="stat-card-revenue"
+        />
+        <StatCard
+          label="총 상품수"
+          value={totalItems}
+          suffix="개"
+          icon={Package}
+          iconColor="bg-purple-500 text-white"
+          testId="stat-card-items"
+        />
+      </StatCardsGrid>
+
+      <FilterSection onReset={handleReset}>
+        <FilterField label="셀러">
+          <Input
+            placeholder="셀러명 검색..."
+            value={searchSeller}
+            onChange={(e) => setSearchSeller(e.target.value)}
+            className="h-9"
+            data-testid="input-search-seller"
+          />
+        </FilterField>
+        <FilterField label="상품명">
+          <Input
+            placeholder="상품명 검색..."
+            value={searchProduct}
+            onChange={(e) => setSearchProduct(e.target.value)}
+            className="h-9"
+            data-testid="input-search-product"
+          />
+        </FilterField>
+        <FilterField label="정렬">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9" data-testid="select-sort">
+              <SelectValue placeholder="정렬 기준" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">최신순</SelectItem>
+              <SelectItem value="oldest">오래된순</SelectItem>
+              <SelectItem value="price">금액순</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterSection>
+
+      {/* Desktop Table */}
+      <div className="hidden lg:block">
+        <DataTable
+          title={`총 ${filteredOrders.length}건`}
+          columns={columns}
+          data={filteredOrders}
+          keyField="id"
+          emptyMessage="등록된 주문이 없습니다"
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>전체 주문 목록</CardTitle>
-          <CardDescription>시스템에 등록된 모든 주문을 확인합니다</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {orders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              등록된 주문이 없습니다
+      {/* Mobile Cards */}
+      <MobileCardsList>
+        {filteredOrders.map((order) => (
+          <MobileCard key={order.id} testId={`card-order-${order.id}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium truncate">{order.productName}</span>
+              <Badge variant="secondary">{order.quantity}개</Badge>
             </div>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>셀러</TableHead>
-                      <TableHead>상품명</TableHead>
-                      <TableHead className="text-right">수량</TableHead>
-                      <TableHead className="text-right">가격</TableHead>
-                      <TableHead className="text-right">합계</TableHead>
-                      <TableHead>수령인</TableHead>
-                      <TableHead>연락처</TableHead>
-                      <TableHead>주소</TableHead>
-                      <TableHead>등록일</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {orders.map((order) => (
-                      <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                        <TableCell>{order.user?.name || "-"}</TableCell>
-                        <TableCell className="font-medium">{order.productName}</TableCell>
-                        <TableCell className="text-right">{order.quantity}</TableCell>
-                        <TableCell className="text-right">{formatPrice(order.price)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatPrice(order.price * order.quantity)}</TableCell>
-                        <TableCell>{order.recipientName}</TableCell>
-                        <TableCell>{order.recipientPhone}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{order.recipientAddress}</TableCell>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile/Tablet Cards */}
-              <div className="lg:hidden space-y-3">
-                {orders.map((order) => (
-                  <Card key={order.id} className="p-4" data-testid={`card-order-${order.id}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold">{order.productName}</p>
-                        <p className="text-sm text-muted-foreground">{order.user?.name || "-"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-primary">{formatPrice(order.price * order.quantity)}</p>
-                        <p className="text-xs text-muted-foreground">{order.quantity}개</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">수령인</span>
-                        <p className="font-medium">{order.recipientName}</p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">연락처</span>
-                        <p className="font-medium">{order.recipientPhone}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-muted-foreground">주소</span>
-                        <p className="font-medium truncate">{order.recipientAddress}</p>
-                      </div>
-                      <div className="col-span-2 flex justify-between pt-2 border-t">
-                        <span className="text-muted-foreground">등록일</span>
-                        <span>{formatDate(order.createdAt)}</span>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground mb-2">{order.user?.name || "-"}</p>
+            <div className="space-y-1">
+              <MobileCardField label="수령인" value={order.recipientName} />
+              <MobileCardField label="합계" value={formatPrice(order.price * order.quantity)} />
+              <MobileCardField label="등록일" value={formatDate(order.createdAt)} />
+            </div>
+          </MobileCard>
+        ))}
+        {filteredOrders.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            등록된 주문이 없습니다
+          </div>
+        )}
+      </MobileCardsList>
     </div>
   );
 }

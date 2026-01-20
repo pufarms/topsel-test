@@ -26,7 +26,7 @@ export function StatCard({
   return (
     <Card 
       className={cn(
-        "cursor-pointer transition-all hover:scale-[1.02]",
+        "cursor-pointer hover-elevate",
         isActive && "ring-2 ring-primary"
       )}
       onClick={onClick}

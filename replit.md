@@ -104,6 +104,36 @@ Main tables:
 - `R2_SECRET_ACCESS_KEY`: Cloudflare R2 secret key
 - `RESEND_API_KEY`: (TODO) Resend API key for email sending (password reset notifications)
 
+## Admin Design System
+
+### Common Components (client/src/components/admin/)
+- **PageHeader**: Page title with icon, description, and action buttons
+- **StatCard / StatCardsGrid**: Compact statistics cards (h-16, 3-6 columns grid)
+- **FilterSection / FilterField**: Search and filter controls with p-3 padding
+- **DataTable**: Compact table with selectable rows, px-3 py-2 cells
+- **ActionSection**: Collapsible bulk action panel
+- **MobileCard / MobileCardsList**: Mobile-friendly card layout (lg:hidden)
+
+### Design Rules
+- Page padding: p-4
+- Section gap: space-y-3
+- Card padding: p-3
+- Input/Button height: h-9
+- Table cell padding: px-3 py-2
+- Responsive: Table on lg+, Cards on mobile
+
+### Usage Example
+```tsx
+import { PageHeader, StatCard, FilterSection, DataTable } from "@/components/admin";
+
+<div className="space-y-3 p-4">
+  <PageHeader title="페이지명" icon={Icon} />
+  <StatCardsGrid columns={6}>{/* StatCards */}</StatCardsGrid>
+  <FilterSection onReset={handleReset}>{/* FilterFields */}</FilterSection>
+  <DataTable columns={columns} data={data} keyField="id" />
+</div>
+```
+
 ## TODO: 미구현 기능
 ### 이메일 발송 기능
 - **위치**: server/routes.ts - POST /api/admin/members/:id/reset-password

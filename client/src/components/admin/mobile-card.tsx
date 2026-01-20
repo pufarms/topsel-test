@@ -22,7 +22,7 @@ export function MobileCard({
   return (
     <Card 
       className={cn(
-        "cursor-pointer hover:bg-muted/50 transition-colors",
+        "cursor-pointer hover-elevate",
         selected && "ring-2 ring-primary"
       )}
       onClick={onClick}
