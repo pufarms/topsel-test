@@ -16,6 +16,8 @@ import AdminOrders from "@/pages/admin/orders";
 import AdminGallery from "@/pages/admin/gallery";
 import AdminManagement from "@/pages/admin/admins";
 import PartnerManagement from "@/pages/admin/partners";
+import MemberManagement from "@/pages/admin/members";
+import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -58,7 +60,10 @@ function Router() {
         <AdminRoute><AdminDashboard /></AdminRoute>
       </Route>
       <Route path="/admin/users">
-        <AdminRoute><AdminUsers /></AdminRoute>
+        <AdminRoute><MemberManagement /></AdminRoute>
+      </Route>
+      <Route path="/admin/members/:id">
+        <AdminRoute><MemberDetail /></AdminRoute>
       </Route>
       <Route path="/admin/admins">
         <AdminRoute><AdminManagement /></AdminRoute>

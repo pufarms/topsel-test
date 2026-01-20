@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -705,6 +705,323 @@ export async function registerRoutes(
 
   app.get("/api/admin/shipping-companies", async (req, res) => {
     return res.json(shippingCompanies);
+  });
+
+  // Member routes
+  app.get("/api/admin/members", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const allMembers = await storage.getAllMembers();
+    const membersWithoutPasswords = allMembers.map(({ password, ...m }) => m);
+    return res.json(membersWithoutPasswords);
+  });
+
+  app.get("/api/admin/members/stats", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const stats = await storage.getMemberStats();
+    return res.json(stats);
+  });
+
+  app.get("/api/admin/members/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const member = await storage.getMember(req.params.id);
+    if (!member) {
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+    }
+
+    const { password, ...memberWithoutPassword } = member;
+    const logs = await storage.getMemberLogs(member.id);
+    return res.json({ ...memberWithoutPassword, logs });
+  });
+
+  app.get("/api/auth/check-member-username/:username", async (req, res) => {
+    const existing = await storage.getMemberByUsername(req.params.username);
+    return res.json({ available: !existing });
+  });
+
+  app.post("/api/admin/members", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    try {
+      const data = memberFormSchema.extend({
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+      }).parse(req.body);
+
+      const existing = await storage.getMemberByUsername(data.username);
+      if (existing) {
+        return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+
+      const member = await storage.createMember({
+        username: data.username,
+        password: data.password,
+        companyName: data.companyName,
+        businessNumber: data.businessNumber,
+        representative: data.representative,
+        phone: data.phone,
+        businessAddress: data.businessAddress || undefined,
+        managerName: data.managerName || undefined,
+        managerPhone: data.managerPhone || undefined,
+        email: data.email || undefined,
+        grade: data.grade,
+        status: data.status,
+        memo: data.memo || undefined,
+      });
+
+      await storage.createMemberLog({
+        memberId: member.id,
+        changedBy: user.id,
+        changeType: "생성",
+        description: "회원 생성",
+      });
+
+      const { password, ...memberWithoutPassword } = member;
+      return res.status(201).json(memberWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/admin/members/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const targetMember = await storage.getMember(req.params.id);
+    if (!targetMember) {
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+    }
+
+    try {
+      const data = updateMemberSchema.parse(req.body);
+      const updateData: any = {};
+      const changes: string[] = [];
+      
+      if (data.grade && data.grade !== targetMember.grade) {
+        updateData.grade = data.grade;
+        changes.push(`등급: ${targetMember.grade} → ${data.grade}`);
+      }
+      if (data.representative) updateData.representative = data.representative;
+      if (data.businessAddress !== undefined) updateData.businessAddress = data.businessAddress;
+      if (data.phone) updateData.phone = data.phone;
+      if (data.managerName !== undefined) updateData.managerName = data.managerName;
+      if (data.managerPhone !== undefined) updateData.managerPhone = data.managerPhone;
+      if (data.email !== undefined) updateData.email = data.email;
+      if (data.status && data.status !== targetMember.status) {
+        updateData.status = data.status;
+        changes.push(`상태: ${targetMember.status} → ${data.status}`);
+      }
+      if (data.memo !== undefined) updateData.memo = data.memo;
+      if (data.password && data.password.length >= 6) {
+        updateData.password = data.password;
+        changes.push("비밀번호 변경");
+      }
+      if (typeof data.deposit === "number" && data.deposit !== targetMember.deposit) {
+        const diff = data.deposit - targetMember.deposit;
+        updateData.deposit = data.deposit;
+        changes.push(`예치금: ${diff > 0 ? '+' : ''}${diff.toLocaleString()}원`);
+      }
+      if (typeof data.point === "number" && data.point !== targetMember.point) {
+        const diff = data.point - targetMember.point;
+        updateData.point = data.point;
+        changes.push(`포인트: ${diff > 0 ? '+' : ''}${diff.toLocaleString()}`);
+      }
+
+      const updatedMember = await storage.updateMember(req.params.id, updateData);
+      
+      if (changes.length > 0) {
+        await storage.createMemberLog({
+          memberId: req.params.id,
+          changedBy: user.id,
+          changeType: "수정",
+          description: changes.join(", "),
+        });
+      }
+
+      if (!updatedMember) {
+        return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+      }
+
+      const { password, ...memberWithoutPassword } = updatedMember;
+      return res.json(memberWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/admin/members/bulk-update", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    try {
+      const data = bulkUpdateMemberSchema.parse(req.body);
+      
+      const updatedMembers = await storage.bulkUpdateMembers(data.memberIds, {
+        grade: data.grade,
+        depositAdjust: data.depositAdjust,
+        pointAdjust: data.pointAdjust,
+        memoAdd: data.memoAdd,
+      });
+
+      const changes: string[] = [];
+      if (data.grade) changes.push(`등급: ${data.grade}`);
+      if (data.depositAdjust) changes.push(`예치금 조정: ${data.depositAdjust > 0 ? '+' : ''}${data.depositAdjust.toLocaleString()}원`);
+      if (data.pointAdjust) changes.push(`포인트 조정: ${data.pointAdjust > 0 ? '+' : ''}${data.pointAdjust.toLocaleString()}`);
+      if (data.memoAdd) changes.push(`메모 추가`);
+
+      for (const memberId of data.memberIds) {
+        await storage.createMemberLog({
+          memberId,
+          changedBy: user.id,
+          changeType: "일괄수정",
+          description: changes.join(", "),
+        });
+      }
+
+      const membersWithoutPasswords = updatedMembers.map(({ password, ...m }) => m);
+      return res.json(membersWithoutPasswords);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/admin/members/:id/approve", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const member = await storage.getMember(req.params.id);
+    if (!member) {
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+    }
+
+    if (member.grade !== "PENDING") {
+      return res.status(400).json({ message: "보류중인 회원만 승인할 수 있습니다" });
+    }
+
+    const updatedMember = await storage.approveMember(req.params.id, user.id);
+    
+    await storage.createMemberLog({
+      memberId: req.params.id,
+      changedBy: user.id,
+      changeType: "승인",
+      previousValue: "PENDING",
+      newValue: "ASSOCIATE",
+      description: "회원 승인 완료",
+    });
+
+    if (!updatedMember) {
+      return res.status(500).json({ message: "승인 처리 실패" });
+    }
+
+    const { password, ...memberWithoutPassword } = updatedMember;
+    return res.json(memberWithoutPassword);
+  });
+
+  app.post("/api/admin/members/:id/reset-password", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const member = await storage.getMember(req.params.id);
+    if (!member) {
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+    }
+
+    const tempPassword = Math.random().toString(36).slice(-8);
+    await storage.resetMemberPassword(req.params.id, tempPassword);
+    
+    await storage.createMemberLog({
+      memberId: req.params.id,
+      changedBy: user.id,
+      changeType: "비밀번호 초기화",
+      description: "임시 비밀번호로 초기화",
+    });
+
+    return res.json({ tempPassword });
+  });
+
+  app.delete("/api/admin/members/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const member = await storage.getMember(req.params.id);
+    if (!member) {
+      return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+    }
+
+    await storage.deleteMember(req.params.id);
+    return res.json({ message: "삭제되었습니다" });
+  });
+
+  app.get("/api/admin/member-grades", async (req, res) => {
+    return res.json(memberGrades);
   });
 
   return httpServer;

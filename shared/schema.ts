@@ -6,6 +6,22 @@ import { z } from "zod";
 export const userTiers = ["준회원", "start회원", "driving회원", "top회원"] as const;
 export type UserTier = typeof userTiers[number];
 
+// 회원 등급 (6단계)
+export const memberGrades = ["PENDING", "ASSOCIATE", "START", "DRIVING", "TOP"] as const;
+export type MemberGrade = typeof memberGrades[number];
+
+export const memberGradeLabels: Record<MemberGrade, string> = {
+  PENDING: "보류중",
+  ASSOCIATE: "준회원",
+  START: "Start회원",
+  DRIVING: "Driving회원",
+  TOP: "Top회원",
+};
+
+// 회원 상태
+export const memberStatuses = ["활성", "비활성"] as const;
+export type MemberStatus = typeof memberStatuses[number];
+
 export const adminRoles = ["SUPER_ADMIN", "ADMIN"] as const;
 export type AdminRole = typeof adminRoles[number];
 
@@ -230,3 +246,86 @@ export const insertPartnerProductSchema = createInsertSchema(partnerProducts).om
 
 export type InsertPartnerProduct = z.infer<typeof insertPartnerProductSchema>;
 export type PartnerProduct = typeof partnerProducts.$inferSelect;
+
+// 회원(셀러) 테이블
+export const members = pgTable("members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  grade: text("grade").notNull().default("PENDING"),
+  companyName: text("company_name").notNull(),
+  businessNumber: text("business_number").notNull(),
+  businessAddress: text("business_address"),
+  representative: text("representative").notNull(),
+  phone: text("phone").notNull(),
+  managerName: text("manager_name"),
+  managerPhone: text("manager_phone"),
+  email: text("email"),
+  deposit: integer("deposit").notNull().default(0),
+  point: integer("point").notNull().default(0),
+  status: text("status").notNull().default("활성"),
+  memo: text("memo"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMemberSchema = createInsertSchema(members).omit({
+  id: true,
+  approvedAt: true,
+  approvedBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const memberFormSchema = z.object({
+  username: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
+  password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다").optional().or(z.literal("")),
+  grade: z.enum(memberGrades),
+  companyName: z.string().min(1, "상호명을 입력해주세요"),
+  businessNumber: z.string().regex(/^\d{3}-\d{2}-\d{5}$/, "사업자번호 형식: 000-00-00000"),
+  businessAddress: z.string().optional().or(z.literal("")),
+  representative: z.string().min(1, "대표자명을 입력해주세요"),
+  phone: z.string().min(1, "대표연락처를 입력해주세요"),
+  managerName: z.string().optional().or(z.literal("")),
+  managerPhone: z.string().optional().or(z.literal("")),
+  email: z.string().email("유효한 이메일을 입력해주세요").optional().or(z.literal("")),
+  deposit: z.number().default(0),
+  point: z.number().default(0),
+  status: z.enum(memberStatuses),
+  memo: z.string().optional().or(z.literal("")),
+});
+
+export const updateMemberSchema = memberFormSchema.partial().omit({ username: true, businessNumber: true, companyName: true });
+
+export const bulkUpdateMemberSchema = z.object({
+  memberIds: z.array(z.string()),
+  grade: z.enum(memberGrades).optional(),
+  depositAdjust: z.number().optional(),
+  pointAdjust: z.number().optional(),
+  memoAdd: z.string().optional(),
+});
+
+export type InsertMember = z.infer<typeof insertMemberSchema>;
+export type Member = typeof members.$inferSelect;
+
+// 회원 수정 이력 테이블
+export const memberLogs = pgTable("member_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  changedBy: varchar("changed_by").notNull().references(() => users.id),
+  changeType: text("change_type").notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMemberLogSchema = createInsertSchema(memberLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMemberLog = z.infer<typeof insertMemberLogSchema>;
+export type MemberLog = typeof memberLogs.$inferSelect;

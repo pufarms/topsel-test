@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -289,6 +289,157 @@ export class DatabaseStorage implements IStorage {
   async getPartnerProductCount(partnerId: string): Promise<number> {
     const result = await db.select().from(partnerProducts).where(eq(partnerProducts.partnerId, partnerId));
     return result.length;
+  }
+
+  // Member methods
+  async getAllMembers(): Promise<Member[]> {
+    return db.select().from(members).orderBy(desc(members.createdAt));
+  }
+
+  async getMember(id: string): Promise<Member | undefined> {
+    const [member] = await db.select().from(members).where(eq(members.id, id));
+    return member;
+  }
+
+  async getMemberByUsername(username: string): Promise<Member | undefined> {
+    const [member] = await db.select().from(members).where(eq(members.username, username));
+    return member;
+  }
+
+  async getMembersByGrade(grade: string): Promise<Member[]> {
+    return db.select().from(members).where(eq(members.grade, grade)).orderBy(desc(members.createdAt));
+  }
+
+  async getMemberStats(): Promise<{ total: number; pending: number; associate: number; start: number; driving: number; top: number }> {
+    const allMembers = await db.select().from(members);
+    return {
+      total: allMembers.length,
+      pending: allMembers.filter(m => m.grade === "PENDING").length,
+      associate: allMembers.filter(m => m.grade === "ASSOCIATE").length,
+      start: allMembers.filter(m => m.grade === "START").length,
+      driving: allMembers.filter(m => m.grade === "DRIVING").length,
+      top: allMembers.filter(m => m.grade === "TOP").length,
+    };
+  }
+
+  async createMember(data: {
+    username: string;
+    password: string;
+    companyName: string;
+    businessNumber: string;
+    representative: string;
+    phone: string;
+    businessAddress?: string;
+    managerName?: string;
+    managerPhone?: string;
+    email?: string;
+    grade?: string;
+    status?: string;
+    memo?: string;
+  }): Promise<Member> {
+    const [member] = await db.insert(members).values({
+      username: data.username,
+      password: hashPassword(data.password),
+      companyName: data.companyName,
+      businessNumber: data.businessNumber,
+      representative: data.representative,
+      phone: data.phone,
+      businessAddress: data.businessAddress || null,
+      managerName: data.managerName || null,
+      managerPhone: data.managerPhone || null,
+      email: data.email || null,
+      grade: data.grade || "PENDING",
+      status: data.status || "활성",
+      memo: data.memo || null,
+    }).returning();
+    return member;
+  }
+
+  async updateMember(id: string, data: Partial<{
+    password: string;
+    grade: string;
+    businessAddress: string;
+    representative: string;
+    phone: string;
+    managerName: string;
+    managerPhone: string;
+    email: string;
+    deposit: number;
+    point: number;
+    status: string;
+    memo: string;
+    approvedAt: Date;
+    approvedBy: string;
+  }>): Promise<Member | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    if (data.password) {
+      updateData.password = hashPassword(data.password);
+    }
+    const [member] = await db.update(members).set(updateData).where(eq(members.id, id)).returning();
+    return member;
+  }
+
+  async bulkUpdateMembers(memberIds: string[], data: {
+    grade?: string;
+    depositAdjust?: number;
+    pointAdjust?: number;
+    memoAdd?: string;
+  }): Promise<Member[]> {
+    const updatedMembers: Member[] = [];
+    for (const memberId of memberIds) {
+      const member = await this.getMember(memberId);
+      if (!member) continue;
+      
+      const updateData: any = { updatedAt: new Date() };
+      if (data.grade) updateData.grade = data.grade;
+      if (data.depositAdjust) updateData.deposit = member.deposit + data.depositAdjust;
+      if (data.pointAdjust) updateData.point = member.point + data.pointAdjust;
+      if (data.memoAdd) updateData.memo = member.memo ? `${member.memo}\n${data.memoAdd}` : data.memoAdd;
+      
+      const [updated] = await db.update(members).set(updateData).where(eq(members.id, memberId)).returning();
+      if (updated) updatedMembers.push(updated);
+    }
+    return updatedMembers;
+  }
+
+  async deleteMember(id: string): Promise<boolean> {
+    await db.delete(memberLogs).where(eq(memberLogs.memberId, id));
+    const result = await db.delete(members).where(eq(members.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async resetMemberPassword(id: string, newPassword: string): Promise<Member | undefined> {
+    const [member] = await db.update(members).set({ 
+      password: hashPassword(newPassword),
+      updatedAt: new Date()
+    }).where(eq(members.id, id)).returning();
+    return member;
+  }
+
+  async approveMember(memberId: string, approvedById: string): Promise<Member | undefined> {
+    const [member] = await db.update(members).set({
+      grade: "ASSOCIATE",
+      approvedAt: new Date(),
+      approvedBy: approvedById,
+      updatedAt: new Date(),
+    }).where(eq(members.id, memberId)).returning();
+    return member;
+  }
+
+  // Member Log methods
+  async getMemberLogs(memberId: string): Promise<(MemberLog & { changedByUser?: { name: string } })[]> {
+    const logs = await db.select().from(memberLogs).where(eq(memberLogs.memberId, memberId)).orderBy(desc(memberLogs.createdAt));
+    const allUsers = await db.select().from(users);
+    
+    return logs.map(log => ({
+      ...log,
+      changedByUser: allUsers.find(u => u.id === log.changedBy),
+    }));
+  }
+
+  async createMemberLog(data: InsertMemberLog): Promise<MemberLog> {
+    const [log] = await db.insert(memberLogs).values(data).returning();
+    return log;
   }
 }
 
