@@ -111,7 +111,9 @@ export default function ProductRegistrationPage() {
 
   const searchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/product-registrations?status=active`);
+      const res = await fetch(`/api/product-registrations?status=active&_t=${Date.now()}`, {
+        cache: 'no-store'
+      });
       return res.json();
     },
     onSuccess: (data: ProductRegistration[]) => {

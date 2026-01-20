@@ -1350,14 +1350,8 @@ export async function registerRoutes(
     return res.json({ updated: updated.length });
   });
 
-  app.delete("/api/product-registrations/:id", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    await storage.deleteProductRegistration(req.params.id);
-    return res.json({ message: "삭제되었습니다" });
-  });
-
+  // IMPORTANT: Bulk delete must be registered BEFORE single delete 
+  // to prevent Express from matching "bulk" as :id parameter
   app.delete("/api/product-registrations/bulk", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1367,7 +1361,15 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
     }
     const deleted = await storage.bulkDeleteProductRegistrations(ids);
-    return res.json({ deleted });
+    return res.json({ deleted, message: "삭제되었습니다" });
+  });
+
+  app.delete("/api/product-registrations/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    await storage.deleteProductRegistration(req.params.id);
+    return res.json({ message: "삭제되었습니다" });
   });
 
   app.post("/api/product-registrations/suspend", async (req, res) => {
