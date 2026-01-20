@@ -170,13 +170,18 @@ export default function ProductRegistrationPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("DELETE", "/api/product-registrations/bulk", { ids });
+      const existingIds = ids.filter(id => !id.startsWith("new-"));
+      if (existingIds.length > 0) {
+        await apiRequest("DELETE", "/api/product-registrations/bulk", { ids: existingIds });
+      }
+      return ids;
     },
-    onSuccess: () => {
+    onSuccess: (deletedIds: string[]) => {
       toast({ title: "삭제 완료" });
       setDeleteDialogOpen(false);
       setSelectedIds([]);
-      searchMutation.mutate();
+      setProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
+      setTempProducts(prev => prev.filter(p => !deletedIds.includes(p.id)));
     },
   });
 
@@ -383,6 +388,11 @@ export default function ProductRegistrationPage() {
     const p = products[index];
     if (!p.productCode || !p.productName || !p.weight) {
       toast({ variant: "destructive", title: "오류", description: "상품코드, 상품명, 중량은 필수입니다" });
+      return;
+    }
+    
+    if (!p.startPrice && !p.drivingPrice && !p.topPrice) {
+      toast({ variant: "destructive", title: "오류", description: "공급가(Start/Driving/Top) 중 최소 1개는 입력해야 합니다" });
       return;
     }
     
