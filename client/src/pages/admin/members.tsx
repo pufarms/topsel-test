@@ -50,6 +50,8 @@ export default function MembersPage() {
   
   const [searchCompany, setSearchCompany] = useState("");
   const [searchUsername, setSearchUsername] = useState("");
+  const [companySelectMode, setCompanySelectMode] = useState<"direct" | string>("all");
+  const [usernameSelectMode, setUsernameSelectMode] = useState<"direct" | string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -67,6 +69,10 @@ export default function MembersPage() {
   const { data: stats } = useQuery<MemberStats>({
     queryKey: ["/api/admin/members/stats"],
   });
+
+  // Extract unique company names and usernames for dropdown
+  const uniqueCompanyNames = Array.from(new Set(members.map(m => m.companyName))).sort((a, b) => a.localeCompare(b));
+  const uniqueUsernames = Array.from(new Set(members.map(m => m.username))).sort((a, b) => a.localeCompare(b));
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async (data: { memberIds: string[]; grade?: string; depositAdjust?: number; pointAdjust?: number; memoAdd?: string }) => {
@@ -91,8 +97,18 @@ export default function MembersPage() {
   const filteredMembers = members
     .filter(m => {
       if (filterGrade !== "all" && m.grade !== filterGrade) return false;
-      if (searchCompany && !m.companyName.toLowerCase().includes(searchCompany.toLowerCase())) return false;
-      if (searchUsername && !m.username.toLowerCase().includes(searchUsername.toLowerCase())) return false;
+      // Company filter
+      if (companySelectMode === "direct") {
+        if (searchCompany && !m.companyName.toLowerCase().includes(searchCompany.toLowerCase())) return false;
+      } else if (companySelectMode !== "all") {
+        if (m.companyName !== companySelectMode) return false;
+      }
+      // Username filter
+      if (usernameSelectMode === "direct") {
+        if (searchUsername && !m.username.toLowerCase().includes(searchUsername.toLowerCase())) return false;
+      } else if (usernameSelectMode !== "all") {
+        if (m.username !== usernameSelectMode) return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -144,6 +160,8 @@ export default function MembersPage() {
   const handleReset = () => {
     setSearchCompany("");
     setSearchUsername("");
+    setCompanySelectMode("all");
+    setUsernameSelectMode("all");
     setFilterGrade("all");
     setSortBy("newest");
   };
@@ -225,21 +243,63 @@ export default function MembersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             <div className="space-y-1">
               <Label className="text-sm">상호명</Label>
-              <Input
-                placeholder="상호명 검색..."
-                value={searchCompany}
-                onChange={(e) => setSearchCompany(e.target.value)}
-                data-testid="input-search-company"
-              />
+              <Select 
+                value={companySelectMode} 
+                onValueChange={(value) => {
+                  setCompanySelectMode(value);
+                  if (value !== "direct") setSearchCompany("");
+                }}
+              >
+                <SelectTrigger data-testid="select-search-company">
+                  <SelectValue placeholder="상호명 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="direct">직접입력</SelectItem>
+                  {uniqueCompanyNames.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {companySelectMode === "direct" && (
+                <Input
+                  placeholder="상호명 검색..."
+                  value={searchCompany}
+                  onChange={(e) => setSearchCompany(e.target.value)}
+                  className="mt-2"
+                  data-testid="input-search-company"
+                />
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-sm">아이디</Label>
-              <Input
-                placeholder="아이디 검색..."
-                value={searchUsername}
-                onChange={(e) => setSearchUsername(e.target.value)}
-                data-testid="input-search-username"
-              />
+              <Select 
+                value={usernameSelectMode} 
+                onValueChange={(value) => {
+                  setUsernameSelectMode(value);
+                  if (value !== "direct") setSearchUsername("");
+                }}
+              >
+                <SelectTrigger data-testid="select-search-username">
+                  <SelectValue placeholder="아이디 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="direct">직접입력</SelectItem>
+                  {uniqueUsernames.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {usernameSelectMode === "direct" && (
+                <Input
+                  placeholder="아이디 검색..."
+                  value={searchUsername}
+                  onChange={(e) => setSearchUsername(e.target.value)}
+                  className="mt-2"
+                  data-testid="input-search-username"
+                />
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-sm">등급</Label>
