@@ -278,9 +278,9 @@ export default function ProductRegistrationPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: any): Promise<ProductRegistration> => {
       const res = await apiRequest("POST", "/api/product-registrations", data);
-      return res;
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/product-registrations"] });
@@ -398,24 +398,23 @@ export default function ProductRegistrationPage() {
       />
 
       <Card>
-        <CardHeader className="p-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            엑셀 업로드 (임시등록)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 pt-0">
-          <div 
-            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover-elevate"
-            onClick={() => fileInputRef.current?.click()}
-            data-testid="upload-zone"
-          >
-            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">엑셀 파일을 드래그하거나 클릭하여 업로드하세요</p>
-            <Button size="sm" variant="outline" className="mt-2" onClick={(e) => { e.stopPropagation(); handleDownloadTemplate(); }} data-testid="button-download-template">
-              <Download className="h-4 w-4 mr-1" />
-              양식 다운로드
-            </Button>
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Upload className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">엑셀 업로드 (임시등록)</span>
+              <span className="text-xs text-muted-foreground">* 업로드 시 기본정보(대분류~상품명)가 테이블에 추가됩니다.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="upload-zone">
+                <Upload className="h-4 w-4 mr-1" />
+                엑셀 파일 선택
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
+                <Download className="h-4 w-4 mr-1" />
+                양식 다운로드
+              </Button>
+            </div>
           </div>
           <input
             ref={fileInputRef}
@@ -425,7 +424,6 @@ export default function ProductRegistrationPage() {
             onChange={handleFileUpload}
             data-testid="input-file"
           />
-          <p className="text-xs text-muted-foreground mt-2">* 업로드 시 기본정보(대분류~상품명)가 테이블에 추가됩니다.</p>
         </CardContent>
       </Card>
 
@@ -490,28 +488,64 @@ export default function ProductRegistrationPage() {
           <div>
             <p className="text-xs font-medium mb-1 text-muted-foreground">[상품 원가]</p>
             <div className="grid grid-cols-3 gap-2">
-              <Input placeholder="원상품 기준가" value={bulkSourcePrice} onChange={e => setBulkSourcePrice(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-price" />
-              <Input placeholder="로스율 (%)" value={bulkLossRate} onChange={e => setBulkLossRate(e.target.value)} className="h-9" type="number" data-testid="input-bulk-loss-rate" />
-              <Input placeholder="원상품 기준중량 (kg)" value={bulkSourceWeight} onChange={e => setBulkSourceWeight(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-weight" />
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">원상품 기준가</label>
+                <Input value={bulkSourcePrice} onChange={e => setBulkSourcePrice(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-price" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">로스율 (%)</label>
+                <Input value={bulkLossRate} onChange={e => setBulkLossRate(e.target.value)} className="h-9" type="number" data-testid="input-bulk-loss-rate" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">원상품 기준중량 (kg)</label>
+                <Input value={bulkSourceWeight} onChange={e => setBulkSourceWeight(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-weight" />
+              </div>
             </div>
           </div>
           <div>
             <p className="text-xs font-medium mb-1 text-muted-foreground">[부대비용]</p>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              <Input placeholder="박스비" value={bulkBoxCost} onChange={e => setBulkBoxCost(e.target.value)} className="h-9" type="number" />
-              <Input placeholder="자재비" value={bulkMaterialCost} onChange={e => setBulkMaterialCost(e.target.value)} className="h-9" type="number" />
-              <Input placeholder="아웃박스" value={bulkOuterBoxCost} onChange={e => setBulkOuterBoxCost(e.target.value)} className="h-9" type="number" />
-              <Input placeholder="보자기" value={bulkWrappingCost} onChange={e => setBulkWrappingCost(e.target.value)} className="h-9" type="number" />
-              <Input placeholder="작업비" value={bulkLaborCost} onChange={e => setBulkLaborCost(e.target.value)} className="h-9" type="number" />
-              <Input placeholder="택배비" value={bulkShippingCost} onChange={e => setBulkShippingCost(e.target.value)} className="h-9" type="number" />
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">박스비</label>
+                <Input value={bulkBoxCost} onChange={e => setBulkBoxCost(e.target.value)} className="h-9" type="number" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">자재비</label>
+                <Input value={bulkMaterialCost} onChange={e => setBulkMaterialCost(e.target.value)} className="h-9" type="number" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">아웃박스</label>
+                <Input value={bulkOuterBoxCost} onChange={e => setBulkOuterBoxCost(e.target.value)} className="h-9" type="number" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">보자기</label>
+                <Input value={bulkWrappingCost} onChange={e => setBulkWrappingCost(e.target.value)} className="h-9" type="number" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">작업비</label>
+                <Input value={bulkLaborCost} onChange={e => setBulkLaborCost(e.target.value)} className="h-9" type="number" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">택배비</label>
+                <Input value={bulkShippingCost} onChange={e => setBulkShippingCost(e.target.value)} className="h-9" type="number" />
+              </div>
             </div>
           </div>
           <div>
             <p className="text-xs font-medium mb-1 text-muted-foreground">[등급별 마진율]</p>
             <div className="grid grid-cols-3 gap-2">
-              <Input placeholder="Start 마진율 (%)" value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-start-margin" />
-              <Input placeholder="Driving 마진율 (%)" value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-driving-margin" />
-              <Input placeholder="Top 마진율 (%)" value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-top-margin" />
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Start 마진율 (%)</label>
+                <Input value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-start-margin" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Driving 마진율 (%)</label>
+                <Input value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-driving-margin" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Top 마진율 (%)</label>
+                <Input value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-top-margin" />
+              </div>
             </div>
           </div>
           <div className="flex justify-end">
@@ -543,7 +577,7 @@ export default function ProductRegistrationPage() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="p-2 text-left sticky left-0 bg-muted/50 z-10">
+                <th className="p-2 text-left sticky left-0 bg-muted/50 z-10 min-w-[40px]">
                   <Checkbox checked={selectedIds.length === products.length && products.length > 0} onCheckedChange={toggleSelectAll} data-testid="checkbox-select-all" />
                 </th>
                 <th className="p-2 text-left whitespace-nowrap">대분류</th>
@@ -564,96 +598,99 @@ export default function ProductRegistrationPage() {
                 <th className="p-2 text-right whitespace-nowrap">작업비</th>
                 <th className="p-2 text-right whitespace-nowrap">택배비</th>
                 <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">총원가</th>
-                <th className="p-2 text-right whitespace-nowrap">S마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">S공급가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">S마진</th>
-                <th className="p-2 text-right whitespace-nowrap">D마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">D공급가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">D마진</th>
-                <th className="p-2 text-right whitespace-nowrap">T마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">T공급가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">T마진</th>
+                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30">S마진율</th>
+                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30">S마진</th>
+                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30 font-bold">S공급가</th>
+                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30">D마진율</th>
+                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30">D마진</th>
+                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30 font-bold">D공급가</th>
+                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30">T마진율</th>
+                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30">T마진</th>
+                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30 font-bold">T공급가</th>
                 <th className="p-2 text-center whitespace-nowrap">저장</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p, idx) => (
-                <tr key={p.id} className="border-b hover:bg-muted/30" data-testid={`row-product-${p.id}`}>
-                  <td className="p-2 sticky left-0 bg-background">
-                    <Checkbox checked={selectedIds.includes(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
+              {products.map((p, idx) => {
+                const isSelected = selectedIds.includes(p.id);
+                const rowBg = isSelected ? "bg-primary/10" : "";
+                return (
+                <tr key={p.id} className={`border-b hover:bg-muted/30 ${rowBg}`} data-testid={`row-product-${p.id}`}>
+                  <td className={`p-2 sticky left-0 z-10 min-w-[40px] ${isSelected ? "bg-primary/10" : "bg-background"}`}>
+                    <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(p.id)} />
                   </td>
                   <td className={`p-1 ${getCellClass(p.categoryLarge, false)}`}>
-                    <Input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.categoryMedium, false)}`}>
-                    <Input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.categorySmall, false)}`}>
-                    <Input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.weight, false)}`}>
-                    <Input value={p.weight} onChange={e => handleCellChange(idx, "weight", e.target.value)} className="h-7 text-xs w-14" />
+                    <Input value={p.weight} onChange={e => handleCellChange(idx, "weight", e.target.value)} className="h-7 text-xs w-16" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.productCode, false)}`}>
-                    <Input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.productName, false)}`}>
-                    <Input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="h-7 text-xs w-24" />
+                    <Input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="h-7 text-xs w-28" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="h-7 text-xs w-16" />
+                    <Input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="h-7 text-xs w-20" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.sourcePrice, false)}`}>
-                    <Input value={p.sourcePrice ?? ""} onChange={e => handleCellChange(idx, "sourcePrice", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-16 text-right" type="number" />
+                    <Input value={p.sourcePrice ?? ""} onChange={e => handleCellChange(idx, "sourcePrice", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-20 text-right" type="number" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.lossRate} onChange={e => handleCellChange(idx, "lossRate", parseInt(e.target.value) || 0)} className="h-7 text-xs w-12 text-right" type="number" />
+                    <Input value={p.lossRate} onChange={e => handleCellChange(idx, "lossRate", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
                   </td>
                   <td className={`p-1 ${getCellClass(p.sourceWeight, false)}`}>
-                    <Input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.unitPrice)}</td>
+                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[60px]">{formatNumber(p.unitPrice)}</td>
                   <td className="p-1">
-                    <Input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
-                  </td>
-                  <td className="p-1">
-                    <Input value={p.materialCost} onChange={e => handleCellChange(idx, "materialCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.outerBoxCost} onChange={e => handleCellChange(idx, "outerBoxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.materialCost} onChange={e => handleCellChange(idx, "materialCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.wrappingCost} onChange={e => handleCellChange(idx, "wrappingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.outerBoxCost} onChange={e => handleCellChange(idx, "outerBoxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.laborCost} onChange={e => handleCellChange(idx, "laborCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.wrappingCost} onChange={e => handleCellChange(idx, "wrappingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
                   <td className="p-1">
-                    <Input value={p.shippingCost} onChange={e => handleCellChange(idx, "shippingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.laborCost} onChange={e => handleCellChange(idx, "laborCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.totalCost)}</td>
-                  <td className={`p-1 ${getCellClass(p.startMarginRate, false)}`}>
-                    <Input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-12 text-right" type="number" />
+                  <td className="p-1">
+                    <Input value={p.shippingCost} onChange={e => handleCellChange(idx, "shippingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.startPrice)}</td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.startMargin)}</td>
-                  <td className={`p-1 ${getCellClass(p.drivingMarginRate, false)}`}>
-                    <Input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-12 text-right" type="number" />
+                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[70px]">{formatNumber(p.totalCost)}</td>
+                  <td className={`p-1 bg-blue-50 dark:bg-blue-900/20 ${getCellClass(p.startMarginRate, false)}`}>
+                    <Input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.drivingPrice)}</td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.drivingMargin)}</td>
-                  <td className={`p-1 ${getCellClass(p.topMarginRate, false)}`}>
-                    <Input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-12 text-right" type="number" />
+                  <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right min-w-[60px]">{formatNumber(p.startMargin)}</td>
+                  <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.startPrice)}</td>
+                  <td className={`p-1 bg-green-50 dark:bg-green-900/20 ${getCellClass(p.drivingMarginRate, false)}`}>
+                    <Input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.topPrice)}</td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right">{formatNumber(p.topMargin)}</td>
+                  <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right min-w-[60px]">{formatNumber(p.drivingMargin)}</td>
+                  <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.drivingPrice)}</td>
+                  <td className={`p-1 bg-purple-50 dark:bg-purple-900/20 ${getCellClass(p.topMarginRate, false)}`}>
+                    <Input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
+                  </td>
+                  <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right min-w-[60px]">{formatNumber(p.topMargin)}</td>
+                  <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.topPrice)}</td>
                   <td className="p-1 text-center">
                     <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} data-testid={`button-save-${p.id}`}>
                       <Save className="h-4 w-4" />
                     </Button>
                   </td>
                 </tr>
-              ))}
+              );})}
               {products.length === 0 && (
                 <tr>
                   <td colSpan={29} className="text-center py-8 text-muted-foreground">
