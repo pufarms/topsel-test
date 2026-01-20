@@ -274,9 +274,9 @@ export default function ProductRegistrationPage() {
     if (bulkWrappingCost) data.wrappingCost = parseInt(bulkWrappingCost);
     if (bulkLaborCost) data.laborCost = parseInt(bulkLaborCost);
     if (bulkShippingCost) data.shippingCost = parseInt(bulkShippingCost);
-    if (bulkStartMargin) data.startMarginRate = parseInt(bulkStartMargin);
-    if (bulkDrivingMargin) data.drivingMarginRate = parseInt(bulkDrivingMargin);
-    if (bulkTopMargin) data.topMarginRate = parseInt(bulkTopMargin);
+    if (bulkStartMargin) data.startMarginRate = parseFloat(bulkStartMargin);
+    if (bulkDrivingMargin) data.drivingMarginRate = parseFloat(bulkDrivingMargin);
+    if (bulkTopMargin) data.topMarginRate = parseFloat(bulkTopMargin);
     
     if (Object.keys(data).length === 0) {
       toast({ variant: "destructive", title: "오류", description: "적용할 값을 입력해주세요" });
