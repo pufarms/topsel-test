@@ -653,15 +653,15 @@ export default function ProductRegistrationPage() {
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Start 마진율 (%)</label>
-                <Input value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-start-margin" />
+                <Input value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-start-margin" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Driving 마진율 (%)</label>
-                <Input value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-driving-margin" />
+                <Input value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-driving-margin" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Top 마진율 (%)</label>
-                <Input value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-9" type="number" data-testid="input-bulk-top-margin" />
+                <Input value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-top-margin" />
               </div>
             </div>
           </div>
@@ -806,17 +806,17 @@ export default function ProductRegistrationPage() {
                   </td>
                   <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[70px]">{formatNumber(p.totalCost)}</td>
                   <td className={`p-1 bg-blue-50 dark:bg-blue-900/20 ${getCellClass(p.startMarginRate, false)}`}>
-                    <Input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
                   </td>
                   <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right min-w-[60px]">{formatNumber(p.startMargin)}</td>
                   <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.startPrice)}</td>
                   <td className={`p-1 bg-green-50 dark:bg-green-900/20 ${getCellClass(p.drivingMarginRate, false)}`}>
-                    <Input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
                   </td>
                   <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right min-w-[60px]">{formatNumber(p.drivingMargin)}</td>
                   <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.drivingPrice)}</td>
                   <td className={`p-1 bg-purple-50 dark:bg-purple-900/20 ${getCellClass(p.topMarginRate, false)}`}>
-                    <Input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" />
+                    <Input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
                   </td>
                   <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right min-w-[60px]">{formatNumber(p.topMargin)}</td>
                   <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.topPrice)}</td>
