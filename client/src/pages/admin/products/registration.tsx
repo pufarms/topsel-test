@@ -40,6 +40,7 @@ export default function ProductRegistrationPage() {
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");
   
+  const [bulkWeight, setBulkWeight] = useState<string>("");
   const [bulkSourcePrice, setBulkSourcePrice] = useState<string>("");
   const [bulkLossRate, setBulkLossRate] = useState<string>("");
   const [bulkSourceWeight, setBulkSourceWeight] = useState<string>("");
@@ -217,6 +218,7 @@ export default function ProductRegistrationPage() {
       return;
     }
     const data: any = {};
+    if (bulkWeight) data.weight = bulkWeight;
     if (bulkSourcePrice) data.sourcePrice = parseInt(bulkSourcePrice);
     if (bulkLossRate) data.lossRate = parseInt(bulkLossRate);
     if (bulkSourceWeight) data.sourceWeight = parseInt(bulkSourceWeight);
@@ -234,7 +236,24 @@ export default function ProductRegistrationPage() {
       toast({ variant: "destructive", title: "오류", description: "적용할 값을 입력해주세요" });
       return;
     }
-    bulkUpdateMutation.mutate({ ids: selectedIds, data });
+
+    const newRowIds = selectedIds.filter(id => id.startsWith("new-"));
+    const existingRowIds = selectedIds.filter(id => !id.startsWith("new-"));
+
+    if (newRowIds.length > 0) {
+      setProducts(prev => prev.map(p => {
+        if (newRowIds.includes(p.id)) {
+          return { ...p, ...data };
+        }
+        return p;
+      }));
+    }
+
+    if (existingRowIds.length > 0) {
+      bulkUpdateMutation.mutate({ ids: existingRowIds, data });
+    } else {
+      toast({ title: "일괄 적용 완료" });
+    }
   };
 
   const handleAddRow = () => {
@@ -485,6 +504,28 @@ export default function ProductRegistrationPage() {
           <CardTitle className="text-sm">일괄 적용 (선택한 상품에 한꺼번에 값 적용)</CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-0 space-y-3">
+          <div>
+            <p className="text-xs font-medium mb-1 text-muted-foreground">[중량(수량)]</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">중량 (kg)</label>
+                <Input 
+                  value={bulkWeight} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
+                      setBulkWeight(val);
+                    }
+                  }} 
+                  className="h-9" 
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.0"
+                  data-testid="input-bulk-weight" 
+                />
+              </div>
+            </div>
+          </div>
           <div>
             <p className="text-xs font-medium mb-1 text-muted-foreground">[상품 원가]</p>
             <div className="grid grid-cols-3 gap-2">
