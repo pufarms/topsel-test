@@ -103,7 +103,7 @@ export default function ProductRegistrationPage() {
       filtered = filtered.filter(p => {
         if (!p.productName) return false;
         const productWords = p.productName.toLowerCase().split(/\s+/);
-        return searchWords.some(sw => productWords.some(pw => pw === sw));
+        return searchWords.every(sw => productWords.some(pw => pw === sw));
       });
     }
     return filtered;
