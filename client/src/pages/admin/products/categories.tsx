@@ -17,7 +17,7 @@ import { Loader2, Plus, Pencil, Trash2, FolderTree, Search, Upload, Download } f
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader, FilterSection, FilterField, DataTable, MobileCard, MobileCardField, MobileCardsList, type Column } from "@/components/admin";
-import type { Category } from "@shared/schema";
+import type { Category, ProductRegistration } from "@shared/schema";
 
 interface EnrichedCategory extends Category {
   childCount: number;
@@ -49,6 +49,12 @@ export default function CategoryManagement() {
   const { data: categories = [], isLoading } = useQuery<EnrichedCategory[]>({
     queryKey: ["/api/categories"],
   });
+
+  const { data: productRegistrations = [] } = useQuery<ProductRegistration[]>({
+    queryKey: ["/api/product-registrations"],
+  });
+
+  const uniqueWeights = Array.from(new Set(productRegistrations.map(p => p.weight).filter(w => w && w !== ""))).sort((a, b) => parseFloat(a) - parseFloat(b));
 
   const largeCategories = categories.filter(c => c.level === "large");
   const mediumCategories = categories.filter(c => c.level === "medium");
@@ -254,10 +260,14 @@ export default function CategoryManagement() {
     }
     
     if (weightFilter !== "all") {
-      // Note: Weight filter placeholder - will be connected to product weights
-      // For now, filters by product count as a proxy
-      const weightNum = parseFloat(weightFilter);
-      filtered = filtered.filter(c => c.productCount >= weightNum);
+      const productsWithWeight = productRegistrations.filter(p => p.weight === weightFilter);
+      const categoryNames = new Set<string>();
+      productsWithWeight.forEach(p => {
+        if (p.categoryLarge) categoryNames.add(p.categoryLarge);
+        if (p.categoryMedium) categoryNames.add(p.categoryMedium);
+        if (p.categorySmall) categoryNames.add(p.categorySmall);
+      });
+      filtered = filtered.filter(c => categoryNames.has(c.name));
     }
     
     if (searchTerm) {
@@ -422,11 +432,9 @@ export default function CategoryManagement() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">전체</SelectItem>
-              <SelectItem value="0.5">0.5kg 이상</SelectItem>
-              <SelectItem value="1">1kg 이상</SelectItem>
-              <SelectItem value="2">2kg 이상</SelectItem>
-              <SelectItem value="5">5kg 이상</SelectItem>
-              <SelectItem value="10">10kg 이상</SelectItem>
+              {uniqueWeights.map((w) => (
+                <SelectItem key={w} value={w}>{w}kg</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </FilterField>
