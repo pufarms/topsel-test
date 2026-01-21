@@ -153,6 +153,11 @@ export default function ProductRegistrationPage() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [newProductsList, setNewProductsList] = useState<{ productCode: string; productName: string }[]>([]);
   const [isSending, setIsSending] = useState(false);
+  
+  // Send confirmation dialog state
+  const [sendConfirmDialogOpen, setSendConfirmDialogOpen] = useState(false);
+  const [sendMode, setSendMode] = useState<"all" | "selected">("all");
+  const [productsToSend, setProductsToSend] = useState<ProductRow[]>([]);
 
   useEffect(() => {
     if (products.length === 0) return;
@@ -723,10 +728,21 @@ export default function ProductRegistrationPage() {
     return "";
   };
 
-  // Send to next week products
-  const handleSendToNextWeek = async () => {
+  // Open confirmation dialog for sending to next week
+  const openSendConfirmDialog = (mode: "all" | "selected") => {
+    const targetProducts = mode === "all" ? products : products.filter(p => selectedIds.includes(p.id));
+    
+    if (targetProducts.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "전송 불가",
+        description: mode === "all" ? "전송할 상품이 없습니다." : "선택된 상품이 없습니다.",
+      });
+      return;
+    }
+
     // Check if there are unsaved new products
-    const newProducts = products.filter(p => p.id.startsWith("new-"));
+    const newProducts = targetProducts.filter(p => p.id.startsWith("new-"));
     if (newProducts.length > 0) {
       toast({
         variant: "destructive",
@@ -737,7 +753,7 @@ export default function ProductRegistrationPage() {
     }
 
     // Check if all products have valid prices
-    const invalidProducts = products.filter(p => 
+    const invalidProducts = targetProducts.filter(p => 
       p.startPrice === null || p.startPrice === 0 ||
       p.drivingPrice === null || p.drivingPrice === 0 ||
       p.topPrice === null || p.topPrice === 0
@@ -752,10 +768,20 @@ export default function ProductRegistrationPage() {
       return;
     }
 
+    // Set the mode and products to send, then open confirmation dialog
+    setSendMode(mode);
+    setProductsToSend(targetProducts);
+    setSendConfirmDialogOpen(true);
+  };
+
+  // Actually send to next week products (after confirmation)
+  const handleConfirmSend = async () => {
+    setSendConfirmDialogOpen(false);
     setIsSending(true);
+    
     try {
       const res = await apiRequest("POST", "/api/admin/send-to-next-week", {
-        productIds: products.map(p => p.id),
+        productIds: productsToSend.map(p => p.id),
       });
       const result = await res.json();
       
@@ -776,6 +802,7 @@ export default function ProductRegistrationPage() {
       });
     } finally {
       setIsSending(false);
+      setProductsToSend([]);
     }
   };
 
@@ -1201,14 +1228,33 @@ export default function ProductRegistrationPage() {
           )}
         </div>
         
-        <Button onClick={handleSendToNextWeek} disabled={products.length === 0 || isSending} data-testid="button-send">
-          {isSending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4 mr-2" />
-          )}
-          차주 예상공급가 상품으로 전송
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => openSendConfirmDialog("selected")} 
+            disabled={selectedIds.length === 0 || isSending} 
+            data-testid="button-send-selected"
+          >
+            {isSending && sendMode === "selected" ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            선택 전송 ({selectedIds.length}개)
+          </Button>
+          <Button 
+            onClick={() => openSendConfirmDialog("all")} 
+            disabled={products.length === 0 || isSending} 
+            data-testid="button-send-all"
+          >
+            {isSending && sendMode === "all" ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            전체 전송 ({products.length}개)
+          </Button>
+        </div>
       </div>
 
       <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
@@ -1249,6 +1295,54 @@ export default function ProductRegistrationPage() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteMutation.mutate(selectedIds)} className="bg-destructive text-destructive-foreground" data-testid="button-confirm-delete">
               삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Send Confirmation Dialog */}
+      <AlertDialog open={sendConfirmDialogOpen} onOpenChange={setSendConfirmDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-blue-500" />
+              차주 예상공급가 상품으로 전송
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  {sendMode === "all" 
+                    ? `전체 ${productsToSend.length}개 상품을 차주 예상공급가로 전송하시겠습니까?`
+                    : `선택한 ${productsToSend.length}개 상품을 차주 예상공급가로 전송하시겠습니까?`
+                  }
+                </p>
+                <div className="bg-muted p-3 rounded-md text-sm">
+                  <div className="font-medium mb-2">전송 대상 상품 ({productsToSend.length}개)</div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {productsToSend.slice(0, 10).map((p, idx) => (
+                      <div key={p.id} className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{p.productCode}</span>
+                        <span className="truncate ml-2">{p.productName}</span>
+                      </div>
+                    ))}
+                    {productsToSend.length > 10 && (
+                      <div className="text-xs text-muted-foreground text-center pt-1">
+                        ... 외 {productsToSend.length - 10}개 상품
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  전송된 상품은 "차주 예상공급가 상품" 목록에서 확인할 수 있습니다.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-send">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSend} data-testid="button-confirm-send">
+              <Send className="h-4 w-4 mr-2" />
+              전송
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
