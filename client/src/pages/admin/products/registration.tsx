@@ -112,8 +112,7 @@ export default function ProductRegistrationPage() {
   const [searchCategorySmall, setSearchCategorySmall] = useState<string>("all");
   const [searchWeight, setSearchWeight] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
-  const [showTempOnly, setShowTempOnly] = useState(false);
-  const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
+    const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
   const [bulkWeight, setBulkWeight] = useState<string>("");
   const [bulkSourcePrice, setBulkSourcePrice] = useState<string>("");
@@ -376,21 +375,6 @@ export default function ProductRegistrationPage() {
     setBulkStartMargin("");
     setBulkDrivingMargin("");
     setBulkTopMargin("");
-  };
-
-  const handleShowTempList = () => {
-    const tempOnly = tempProducts.filter(p => {
-      const hasNoPrice = !p.startPrice && !p.drivingPrice && !p.topPrice;
-      return hasNoPrice;
-    });
-    setProducts(tempOnly);
-    setShowTempOnly(true);
-    setSelectedIds([]);
-  };
-
-  const handleShowAll = () => {
-    setShowTempOnly(false);
-    searchMutation.mutate();
   };
 
   const handleBulkApply = () => {
@@ -711,19 +695,7 @@ export default function ProductRegistrationPage() {
               <Search className="h-4 w-4 mr-1" />
               검색
             </Button>
-            {showTempOnly ? (
-              <Button size="sm" variant="secondary" onClick={handleShowAll} data-testid="button-show-all">
-                전체 보기
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={handleShowTempList} data-testid="button-show-temp">
-                임시등록 리스트 보기
-              </Button>
-            )}
-            {tempProducts.length > 0 && (
-              <Badge variant="outline" className="ml-2">임시등록: {tempProducts.length}건</Badge>
-            )}
-          </div>
+                      </div>
         </CardContent>
       </Card>
 
