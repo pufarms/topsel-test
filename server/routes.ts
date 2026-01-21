@@ -1339,6 +1339,15 @@ export async function registerRoutes(
     }
     try {
       const validatedData = productUpdateSchema.parse(req.body);
+      
+      // Check for duplicate product code if it's being changed
+      if (validatedData.productCode) {
+        const existing = await storage.getProductRegistrationByCode(validatedData.productCode);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ message: `상품코드 중복: ${validatedData.productCode} - 이미 등록된 상품코드입니다` });
+        }
+      }
+      
       const pr = await storage.updateProductRegistration(req.params.id, validatedData);
       if (!pr) {
         return res.status(404).json({ message: "상품을 찾을 수 없습니다" });

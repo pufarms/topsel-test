@@ -281,10 +281,14 @@ export default function ProductRegistrationPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await apiRequest("PUT", `/api/product-registrations/${id}`, data);
+      const res = await apiRequest("PUT", `/api/product-registrations/${id}`, data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/product-registrations"] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "저장 실패", description: error.message });
     },
   });
 
@@ -538,6 +542,19 @@ export default function ProductRegistrationPage() {
       return;
     }
     
+    // Check for duplicate product code in current list (excluding self)
+    const duplicateInList = products.find((other, otherIdx) => 
+      otherIdx !== index && other.productCode === p.productCode
+    );
+    if (duplicateInList) {
+      toast({ 
+        variant: "destructive", 
+        title: "상품코드 중복", 
+        description: `상품코드 "${p.productCode}"가 현재 목록에 이미 존재합니다. 다른 상품코드를 입력해주세요.` 
+      });
+      return;
+    }
+    
     if (p.isNew) {
       try {
         const res = await createMutation.mutateAsync({
@@ -566,11 +583,15 @@ export default function ProductRegistrationPage() {
         setProducts(updated);
         toast({ title: "저장 완료", description: "상품이 등록되었습니다" });
       } catch (err) {
-        // Error handled in mutation
+        // Error handled in mutation onError
       }
     } else {
-      updateMutation.mutate({ id: p.id, data: p });
-      toast({ title: "저장 완료", description: "상품이 수정되었습니다" });
+      try {
+        await updateMutation.mutateAsync({ id: p.id, data: p });
+        toast({ title: "저장 완료", description: "상품이 수정되었습니다" });
+      } catch (err) {
+        // Error handled in mutation onError
+      }
     }
   };
 
