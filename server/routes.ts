@@ -1407,6 +1407,41 @@ export async function registerRoutes(
     return res.json({ updated });
   });
 
+  // Check new products before sending (미리 확인용)
+  app.post("/api/product-registrations/check-new-products", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    
+    const newProducts: { productCode: string; productName: string }[] = [];
+    const existingProducts: { productCode: string; productName: string }[] = [];
+    const invalidProducts: { productCode: string; productName: string }[] = [];
+    
+    for (const id of ids) {
+      const pr = await storage.getProductRegistration(id);
+      if (!pr) continue;
+      
+      // Check if prices are set
+      if (!pr.startPrice || !pr.drivingPrice || !pr.topPrice) {
+        invalidProducts.push({ productCode: pr.productCode, productName: pr.productName });
+        continue;
+      }
+      
+      const existing = await storage.getNextWeekProductByCode(pr.productCode);
+      if (existing) {
+        existingProducts.push({ productCode: pr.productCode, productName: pr.productName });
+      } else {
+        newProducts.push({ productCode: pr.productCode, productName: pr.productName });
+      }
+    }
+    
+    return res.json({ newProducts, existingProducts, invalidProducts });
+  });
+
   app.post("/api/product-registrations/send-to-next-week", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1416,22 +1451,64 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
     }
     
-    const errors: { id: string; productCode: string; error: string }[] = [];
+    const invalidProducts: { productCode: string; productName: string }[] = [];
+    const validProducts: any[] = [];
     
+    // Validate all products first
     for (const id of ids) {
       const pr = await storage.getProductRegistration(id);
       if (!pr) continue;
       
       if (!pr.startPrice || !pr.drivingPrice || !pr.topPrice) {
-        errors.push({ id, productCode: pr.productCode, error: "공급가가 없습니다. 마진율을 입력해주세요." });
+        invalidProducts.push({ productCode: pr.productCode, productName: pr.productName });
+      } else {
+        validProducts.push(pr);
       }
     }
     
-    if (errors.length > 0) {
-      return res.status(400).json({ message: `상품코드 [${errors[0].productCode}]의 ${errors[0].error}`, errors });
+    if (invalidProducts.length > 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: "MISSING_PRICE",
+        message: `상품코드 [${invalidProducts[0].productCode}]의 공급가가 없습니다. 마진율을 입력해주세요.`,
+        data: { invalidProducts }
+      });
     }
     
-    return res.json({ message: `${ids.length}개 상품이 차주 예상공급가로 전송되었습니다.`, sent: ids.length });
+    // Send to next_week_products
+    let created = 0;
+    let updated = 0;
+    
+    for (const pr of validProducts) {
+      const existing = await storage.getNextWeekProductByCode(pr.productCode);
+      
+      const productData = {
+        productCode: pr.productCode,
+        productName: pr.productName,
+        categoryLarge: pr.categoryLarge,
+        categoryMedium: pr.categoryMedium,
+        categorySmall: pr.categorySmall,
+        weight: pr.weight,
+        startPrice: pr.startPrice!,
+        drivingPrice: pr.drivingPrice!,
+        topPrice: pr.topPrice!,
+        supplyStatus: "supply" as const,
+      };
+      
+      if (existing) {
+        await storage.updateNextWeekProduct(existing.id, productData);
+        updated++;
+      } else {
+        await storage.createNextWeekProduct(productData);
+        created++;
+      }
+    }
+    
+    return res.json({ 
+      success: true,
+      message: `${validProducts.length}개 상품이 차주 예상공급가로 전송되었습니다.`,
+      data: { total: validProducts.length, updated, created }
+    });
   });
 
   return httpServer;
