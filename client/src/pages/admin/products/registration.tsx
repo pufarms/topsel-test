@@ -787,61 +787,6 @@ export default function ProductRegistrationPage() {
         icon={Calculator}
       />
 
-      {/* Save Status and Send Button */}
-      <Card>
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2" data-testid="save-status-indicator">
-                {saveStatus === "saving" && (
-                  <>
-                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" data-testid="status-saving" />
-                    <span className="text-sm text-muted-foreground">저장 중...</span>
-                  </>
-                )}
-                {saveStatus === "saved" && (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500" data-testid="status-saved" />
-                    <span className="text-sm text-green-600">저장됨</span>
-                    {lastSavedAt && (
-                      <span className="text-xs text-muted-foreground">
-                        ({lastSavedAt.toLocaleTimeString()})
-                      </span>
-                    )}
-                  </>
-                )}
-                {saveStatus === "error" && (
-                  <>
-                    <AlertTriangle className="h-4 w-4 text-red-500" data-testid="status-error" />
-                    <span className="text-sm text-red-600">저장 실패</span>
-                  </>
-                )}
-                {saveStatus === "idle" && (
-                  <span className="text-sm text-muted-foreground" data-testid="status-idle">자동저장 대기</span>
-                )}
-              </div>
-            </div>
-            <Button 
-              onClick={handleSendToNextWeek} 
-              disabled={products.length === 0 || isSending}
-              data-testid="button-send-next-week"
-            >
-              {isSending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  전송 중...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  차주 예상공급가 전송
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardContent className="p-3">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1225,10 +1170,43 @@ export default function ProductRegistrationPage() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-center">
-        <Button onClick={handleSend} disabled={products.length === 0 || sendMutation.isPending} data-testid="button-send">
-          {sendMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Send className="h-4 w-4 mr-2" />
+      <div className="flex items-center justify-center gap-4">
+        {/* Save Status Indicator */}
+        <div className="flex items-center gap-2" data-testid="save-status-indicator">
+          {saveStatus === "saving" && (
+            <>
+              <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" data-testid="status-saving" />
+              <span className="text-sm text-muted-foreground">저장 중...</span>
+            </>
+          )}
+          {saveStatus === "saved" && (
+            <>
+              <CheckCircle className="h-4 w-4 text-green-500" data-testid="status-saved" />
+              <span className="text-sm text-green-600">저장됨</span>
+              {lastSavedAt && (
+                <span className="text-xs text-muted-foreground">
+                  ({lastSavedAt.toLocaleTimeString()})
+                </span>
+              )}
+            </>
+          )}
+          {saveStatus === "error" && (
+            <>
+              <AlertTriangle className="h-4 w-4 text-red-500" data-testid="status-error" />
+              <span className="text-sm text-red-600">저장 실패</span>
+            </>
+          )}
+          {saveStatus === "idle" && (
+            <span className="text-sm text-muted-foreground" data-testid="status-idle">자동저장 대기</span>
+          )}
+        </div>
+        
+        <Button onClick={handleSendToNextWeek} disabled={products.length === 0 || isSending} data-testid="button-send">
+          {isSending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4 mr-2" />
+          )}
           차주 예상공급가 상품으로 전송
         </Button>
       </div>
