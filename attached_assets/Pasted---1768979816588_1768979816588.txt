@@ -1,0 +1,266 @@
+# 🚨 긴급 수정 요청 - 기존 상품 업데이트 기능
+
+## 📋 문제 상황
+
+**전송 기능에서 기존 상품 업데이트가 작동하지 않습니다.**
+
+| 기능 | 신규 상품 | 기존 상품 업데이트 |
+|------|:--------:|:----------------:|
+| 상품등록 → 차주 예상공급가 전송 | ✅ 작동 | ❌ **안 됨** |
+| 차주 예상공급가 → 현재 공급가 적용 | ✅ 작동 | ❌ **안 됨** |
+
+---
+
+## ⚠️ 핵심 문제
+
+현재 코드가 **INSERT만** 하고 **UPDATE를 하지 않는 것** 같습니다.
+
+### 올바른 동작 (Upsert)
+
+```
+전송 시:
+1. 상품코드가 이미 존재하면 → UPDATE (가격 등 정보 수정)
+2. 상품코드가 없으면 → INSERT (신규 추가)
+```
+
+---
+
+## 🔧 수정 방법
+
+### 1) 상품등록 → 차주 예상공급가 전송
+
+```javascript
+const sendToNextWeekProducts = async (products) => {
+  for (const product of products) {
+    // 상품코드로 기존 상품 조회
+    const existing = await db.nextWeekProducts.findUnique({
+      where: { productCode: product.productCode }
+    });
+    
+    if (existing) {
+      // ⭐ 기존 상품 → UPDATE (이 부분이 작동 안 하고 있음!)
+      await db.nextWeekProducts.update({
+        where: { productCode: product.productCode },
+        data: {
+          productName: product.productName,
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+          weight: product.weight,
+          startPrice: product.startPrice,      // 수정된 가격 반영!
+          drivingPrice: product.drivingPrice,  // 수정된 가격 반영!
+          topPrice: product.topPrice,          // 수정된 가격 반영!
+          supplyStatus: 'supply',
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // 신규 상품 → INSERT
+      await db.nextWeekProducts.create({
+        data: {
+          productCode: product.productCode,
+          productName: product.productName,
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+          weight: product.weight,
+          startPrice: product.startPrice,
+          drivingPrice: product.drivingPrice,
+          topPrice: product.topPrice,
+          supplyStatus: 'supply',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    }
+  }
+};
+```
+
+### 2) 차주 예상공급가 → 현재 공급가 적용
+
+```javascript
+const applyToCurrentProducts = async (products) => {
+  for (const product of products) {
+    // 상품코드로 기존 상품 조회
+    const existing = await db.currentProducts.findUnique({
+      where: { productCode: product.productCode }
+    });
+    
+    if (existing) {
+      // ⭐ 기존 상품 → UPDATE (이 부분이 작동 안 하고 있음!)
+      await db.currentProducts.update({
+        where: { productCode: product.productCode },
+        data: {
+          productName: product.productName,
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+          weight: product.weight,
+          startPrice: product.startPrice,      // 수정된 가격 반영!
+          drivingPrice: product.drivingPrice,  // 수정된 가격 반영!
+          topPrice: product.topPrice,          // 수정된 가격 반영!
+          supplyStatus: product.supplyStatus,
+          appliedAt: new Date(),               // 적용일 갱신
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // 신규 상품 → INSERT
+      await db.currentProducts.create({
+        data: {
+          productCode: product.productCode,
+          productName: product.productName,
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+          weight: product.weight,
+          startPrice: product.startPrice,
+          drivingPrice: product.drivingPrice,
+          topPrice: product.topPrice,
+          supplyStatus: 'supply',
+          appliedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    }
+  }
+};
+```
+
+### 3) Prisma upsert 사용 (더 간단한 방법)
+
+```javascript
+// 상품등록 → 차주 예상공급가
+const sendToNextWeekProducts = async (products) => {
+  for (const product of products) {
+    await db.nextWeekProducts.upsert({
+      where: { productCode: product.productCode },
+      update: {
+        // 기존 상품이면 이 데이터로 UPDATE
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: 'supply',
+        updatedAt: new Date()
+      },
+      create: {
+        // 신규 상품이면 이 데이터로 INSERT
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: 'supply',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+  }
+};
+
+// 차주 예상공급가 → 현재 공급가
+const applyToCurrentProducts = async (products) => {
+  for (const product of products) {
+    await db.currentProducts.upsert({
+      where: { productCode: product.productCode },
+      update: {
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: product.supplyStatus,
+        appliedAt: new Date(),
+        updatedAt: new Date()
+      },
+      create: {
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: 'supply',
+        appliedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+  }
+};
+```
+
+---
+
+## 🧪 테스트 시나리오
+
+### 테스트 1: 상품등록 → 차주 예상공급가 업데이트
+
+```
+1. 상품등록에서 상품 A001 등록 (Start공급가: 10,000원)
+2. "차주 예상공급가로 전송" 클릭
+3. 차주 예상공급가에서 A001 확인 → 10,000원 ✅
+
+4. 상품등록에서 A001 수정 (Start공급가: 12,000원으로 변경)
+5. "차주 예상공급가로 전송" 클릭
+6. 차주 예상공급가에서 A001 확인 → 12,000원으로 변경되어야 함 ✅
+```
+
+### 테스트 2: 차주 예상공급가 → 현재 공급가 업데이트
+
+```
+1. 차주 예상공급가에서 상품 A001 (Start공급가: 10,000원)
+2. "현재 공급가 적용" 클릭
+3. 현재 공급가에서 A001 확인 → 10,000원 ✅
+
+4. 상품등록에서 A001 수정 후 차주 예상공급가로 전송 (12,000원)
+5. 차주 예상공급가에서 "현재 공급가 적용" 클릭
+6. 현재 공급가에서 A001 확인 → 12,000원으로 변경되어야 함 ✅
+```
+
+---
+
+## ✅ 체크리스트
+
+### 상품등록 → 차주 예상공급가 전송
+- [ ] 신규 상품 INSERT 작동 ✅ (이미 됨)
+- [ ] **기존 상품 UPDATE 작동** ← 수정 필요!
+- [ ] 상품코드 기준으로 중복 체크
+- [ ] 가격 정보 (startPrice, drivingPrice, topPrice) 업데이트
+
+### 차주 예상공급가 → 현재 공급가 적용
+- [ ] 신규 상품 INSERT 작동 ✅ (이미 됨)
+- [ ] **기존 상품 UPDATE 작동** ← 수정 필요!
+- [ ] 상품코드 기준으로 중복 체크
+- [ ] 가격 정보 업데이트
+- [ ] appliedAt (적용일) 갱신
+
+---
+
+## ⚠️ 중요
+
+| 규칙 | 설명 |
+|------|------|
+| **상품코드 = 고유 키** | 상품코드로 기존 상품 여부 판단 |
+| **기존 상품** | UPDATE로 가격 등 정보 수정 |
+| **신규 상품** | INSERT로 새로 추가 |
+| **upsert 사용 권장** | INSERT OR UPDATE를 한 번에 처리 |
+
+**이 기능이 작동해야 가격 변경이 정상적으로 반영됩니다!**
