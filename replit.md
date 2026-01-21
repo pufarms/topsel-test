@@ -64,6 +64,17 @@ Main tables:
 - Role-based access control: SUPER_ADMIN (최고관리자), ADMIN (관리자), seller (셀러)
 - Single SUPER_ADMIN account: kgong5026
 
+### Product Management (관리자 전용)
+- **접근 권한**: SUPER_ADMIN, ADMIN만 접근 가능 (회원 접근 불가)
+- **라우트**: /admin/products/* (AdminRoute로 보호)
+- **페이지**:
+  - 카테고리 관리: /admin/products/categories
+  - 상품등록 (공급가 계산): /admin/products/registration
+  - 차주 예상공급가 상품: /admin/products/next-week
+  - 현재 공급가 상품: /admin/products/current
+  - 공급 중지 상품: /admin/products/suspended
+- **API 보안**: 모든 mutation 엔드포인트에 관리자 권한 검사 (403 반환)
+
 ### Admin Sidebar Responsive Behavior
 - **Mobile (< 768px)**: Sidebar hidden, hamburger menu toggles overlay
 - **Tablet (768px - 1024px)**: Sidebar collapsed (icons only with tooltips)

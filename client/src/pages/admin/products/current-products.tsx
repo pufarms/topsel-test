@@ -11,21 +11,20 @@ import { Loader2, Download, RotateCcw, Package, CheckCircle, Calendar, StopCircl
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
-import type { CurrentProduct, Category, User } from "@shared/schema";
+import type { CurrentProduct, Category } from "@shared/schema";
 import * as XLSX from "xlsx";
 
 const MIN_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 40, categoryLarge: 70, categoryMedium: 70, categorySmall: 70, weight: 60,
-  productCode: 90, productName: 120, startPrice: 100, drivingPrice: 100, topPrice: 100, supplyStatus: 80, supplyPrice: 100,
+  productCode: 90, productName: 120, startPrice: 100, drivingPrice: 100, topPrice: 100, supplyStatus: 80,
 };
 
-const ADMIN_COLUMNS = ["checkbox", "categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName", "startPrice", "drivingPrice", "topPrice", "supplyStatus"];
-const MEMBER_COLUMNS = ["categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName", "supplyPrice"];
+const COLUMNS = ["checkbox", "categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName", "startPrice", "drivingPrice", "topPrice", "supplyStatus"];
 
 const HEADER_LABELS: Record<string, string> = {
   checkbox: "", categoryLarge: "대분류", categoryMedium: "중분류", categorySmall: "소분류", weight: "중량(수량)",
   productCode: "상품코드", productName: "상품명", startPrice: "Start회원 공급가", drivingPrice: "Driving회원 공급가",
-  topPrice: "Top회원 공급가", supplyStatus: "공급상태", supplyPrice: "공급가",
+  topPrice: "Top회원 공급가", supplyStatus: "공급상태",
 };
 
 export default function CurrentProductsPage() {
@@ -43,9 +42,6 @@ export default function CurrentProductsPage() {
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
-  const { data: user } = useQuery<User>({ queryKey: ["/api/auth/me"] });
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
-  const memberGrade = (user as any)?.grade || "START";
 
   const { data: products = [], isLoading } = useQuery<CurrentProduct[]>({
     queryKey: ["/api/current-products"],
@@ -144,23 +140,10 @@ export default function CurrentProductsPage() {
     setSearchSupplyStatus("all");
   };
 
-  const getMemberPrice = (product: CurrentProduct) => {
-    switch (memberGrade) {
-      case "TOP": return product.topPrice;
-      case "DRIVING": return product.drivingPrice;
-      default: return product.startPrice;
-    }
-  };
-
   const handleDownload = () => {
-    const headerRow = isAdmin
-      ? ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명", "Start회원 공급가", "Driving회원 공급가", "Top회원 공급가", "공급상태"]
-      : ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명", "공급가"];
+    const headerRow = ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명", "Start회원 공급가", "Driving회원 공급가", "Top회원 공급가", "공급상태"];
     
-    const dataRows = filteredProducts.map(p => isAdmin
-      ? [p.categoryLarge, p.categoryMedium, p.categorySmall, p.weight, p.productCode, p.productName, p.startPrice, p.drivingPrice, p.topPrice, p.supplyStatus === "supply" ? "공급" : "공급예정"]
-      : [p.categoryLarge, p.categoryMedium, p.categorySmall, p.weight, p.productCode, p.productName, getMemberPrice(p)]
-    );
+    const dataRows = filteredProducts.map(p => [p.categoryLarge, p.categoryMedium, p.categorySmall, p.weight, p.productCode, p.productName, p.startPrice, p.drivingPrice, p.topPrice, p.supplyStatus === "supply" ? "공급" : "공급예정"]);
 
     const data = [
       ["현재 공급가 상품"],
@@ -178,7 +161,7 @@ export default function CurrentProductsPage() {
     toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
 
-  const columns = isAdmin ? ADMIN_COLUMNS : MEMBER_COLUMNS;
+  const columns = COLUMNS;
 
   if (isLoading) {
     return (
@@ -253,16 +236,14 @@ export default function CurrentProductsPage() {
             <Input placeholder="중량" value={searchWeight} onChange={e => setSearchWeight(e.target.value)} className="h-9" />
             <Input placeholder="상품코드" value={searchProductCode} onChange={e => setSearchProductCode(e.target.value)} className="h-9" />
             <Input placeholder="상품명" value={searchProductName} onChange={e => setSearchProductName(e.target.value)} className="h-9" />
-            {isAdmin && (
-              <Select value={searchSupplyStatus} onValueChange={setSearchSupplyStatus}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="공급상태" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="supply">공급</SelectItem>
-                  <SelectItem value="scheduled">공급예정</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={searchSupplyStatus} onValueChange={setSearchSupplyStatus}>
+              <SelectTrigger className="h-9"><SelectValue placeholder="공급상태" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="supply">공급</SelectItem>
+                <SelectItem value="scheduled">공급예정</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex gap-2 mt-2 justify-end">
             <Button variant="outline" size="sm" onClick={handleReset}>
@@ -273,11 +254,9 @@ export default function CurrentProductsPage() {
       </Card>
 
       <div className="flex gap-2 flex-wrap">
-        {isAdmin && (
-          <Button variant="destructive" onClick={handleSuspend} disabled={selectedIds.length === 0}>
-            <StopCircle className="h-4 w-4 mr-1" /> 선택 공급중지
-          </Button>
-        )}
+        <Button variant="destructive" onClick={handleSuspend} disabled={selectedIds.length === 0}>
+          <StopCircle className="h-4 w-4 mr-1" /> 선택 공급중지
+        </Button>
         <Button variant="outline" onClick={handleDownload}>
           <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
         </Button>
@@ -289,7 +268,7 @@ export default function CurrentProductsPage() {
             <table className="w-full text-sm" data-testid="current-products-table">
               <thead className="bg-muted sticky top-0 z-10">
                 <tr>
-                  {columns.map(col => (
+                  {columns.map((col: string) => (
                     <th
                       key={col}
                       className={`px-3 py-2 text-left whitespace-nowrap border-b ${col === "checkbox" ? "sticky left-0 z-20 bg-muted" : ""}`}
@@ -315,7 +294,7 @@ export default function CurrentProductsPage() {
                       className={isSelected ? "bg-blue-100" : idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
                       data-testid={`row-product-${product.id}`}
                     >
-                      {columns.map(col => (
+                      {columns.map((col: string) => (
                         <td
                           key={col}
                           className={`px-3 py-2 border-b whitespace-nowrap ${col === "checkbox" ? "sticky left-0 z-10 border-r-2" : ""}`}
@@ -339,7 +318,6 @@ export default function CurrentProductsPage() {
                             col === "startPrice" ? product.startPrice?.toLocaleString() :
                             col === "drivingPrice" ? product.drivingPrice?.toLocaleString() :
                             col === "topPrice" ? product.topPrice?.toLocaleString() :
-                            col === "supplyPrice" ? getMemberPrice(product)?.toLocaleString() + "원" :
                             col === "supplyStatus" ? (
                               <Badge variant={product.supplyStatus === "supply" ? "default" : "secondary"} className={product.supplyStatus === "supply" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
                                 {product.supplyStatus === "supply" ? "공급" : "공급예정"}

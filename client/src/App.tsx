@@ -53,41 +53,6 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <AdminLayout>{children}</AdminLayout>;
 }
 
-function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-  const [, navigate] = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
-
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-  if (isAdmin) {
-    return <AdminLayout>{children}</AdminLayout>;
-  }
-  
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center px-4">
-          <span className="font-bold text-lg">Topsel</span>
-        </div>
-      </header>
-      <main className="container py-4 px-4">
-        {children}
-      </main>
-    </div>
-  );
-}
 
 function Router() {
   return (
@@ -122,16 +87,10 @@ function Router() {
         <AdminRoute><ProductRegistrationPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/next-week">
-        <AuthRoute><NextWeekProductsPage /></AuthRoute>
+        <AdminRoute><NextWeekProductsPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/current">
-        <AuthRoute><CurrentProductsPage /></AuthRoute>
-      </Route>
-      <Route path="/products/next-week">
-        <AuthRoute><NextWeekProductsPage /></AuthRoute>
-      </Route>
-      <Route path="/products/current">
-        <AuthRoute><CurrentProductsPage /></AuthRoute>
+        <AdminRoute><CurrentProductsPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/suspended">
         <AdminRoute><SuspendedProductsPage /></AdminRoute>
