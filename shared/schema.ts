@@ -482,3 +482,32 @@ export const insertNextWeekProductSchema = createInsertSchema(nextWeekProducts).
 
 export type InsertNextWeekProduct = z.infer<typeof insertNextWeekProductSchema>;
 export type NextWeekProduct = typeof nextWeekProducts.$inferSelect;
+
+// Current Products (현재 공급가 상품)
+export const currentProducts = pgTable("current_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  categoryLarge: text("category_large"),
+  categoryMedium: text("category_medium"),
+  categorySmall: text("category_small"),
+  weight: text("weight").notNull(),
+  startPrice: integer("start_price").notNull(),
+  drivingPrice: integer("driving_price").notNull(),
+  topPrice: integer("top_price").notNull(),
+  supplyStatus: text("supply_status").notNull().default("supply"), // 'supply' | 'suspended'
+  suspendedAt: timestamp("suspended_at"),
+  suspendReason: text("suspend_reason"),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCurrentProductSchema = createInsertSchema(currentProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCurrentProduct = z.infer<typeof insertCurrentProductSchema>;
+export type CurrentProduct = typeof currentProducts.$inferSelect;
