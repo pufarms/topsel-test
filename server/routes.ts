@@ -1551,6 +1551,10 @@ export async function registerRoutes(
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
@@ -1597,6 +1601,10 @@ export async function registerRoutes(
   app.post("/api/next-week-products/apply-current-all", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     
     const allProducts = await storage.getAllNextWeekProducts();
@@ -1653,6 +1661,10 @@ export async function registerRoutes(
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
     const { ids, reason } = req.body;
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
@@ -1678,6 +1690,10 @@ export async function registerRoutes(
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
@@ -1694,6 +1710,10 @@ export async function registerRoutes(
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
@@ -1709,6 +1729,10 @@ export async function registerRoutes(
   app.delete("/api/suspended-products/:id", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const deleted = await storage.deleteCurrentProduct(req.params.id);
     if (!deleted) {

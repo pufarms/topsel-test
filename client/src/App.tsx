@@ -21,7 +21,9 @@ import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import CategoryManagement from "@/pages/admin/products/categories";
 import ProductRegistrationPage from "@/pages/admin/products/registration";
-import ProductPlaceholder from "@/pages/admin/products/placeholder";
+import NextWeekProductsPage from "@/pages/admin/products/next-week-products";
+import CurrentProductsPage from "@/pages/admin/products/current-products";
+import SuspendedProductsPage from "@/pages/admin/products/suspended-products";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -49,6 +51,42 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <AdminLayout>{children}</AdminLayout>;
+}
+
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
+
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  if (isAdmin) {
+    return <AdminLayout>{children}</AdminLayout>;
+  }
+  
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center px-4">
+          <span className="font-bold text-lg">Topsel</span>
+        </div>
+      </header>
+      <main className="container py-4 px-4">
+        {children}
+      </main>
+    </div>
+  );
 }
 
 function Router() {
@@ -84,13 +122,19 @@ function Router() {
         <AdminRoute><ProductRegistrationPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/next-week">
-        <AdminRoute><ProductPlaceholder title="차주 예상공급가 상품" description="차주에 적용될 공급가 상품 목록입니다" /></AdminRoute>
+        <AuthRoute><NextWeekProductsPage /></AuthRoute>
       </Route>
       <Route path="/admin/products/current">
-        <AdminRoute><ProductPlaceholder title="현재 공급가 상품" description="현재 적용 중인 공급가 상품 목록입니다" /></AdminRoute>
+        <AuthRoute><CurrentProductsPage /></AuthRoute>
+      </Route>
+      <Route path="/products/next-week">
+        <AuthRoute><NextWeekProductsPage /></AuthRoute>
+      </Route>
+      <Route path="/products/current">
+        <AuthRoute><CurrentProductsPage /></AuthRoute>
       </Route>
       <Route path="/admin/products/suspended">
-        <AdminRoute><ProductPlaceholder title="공급 중지 상품" description="공급이 중지된 상품 목록입니다" /></AdminRoute>
+        <AdminRoute><SuspendedProductsPage /></AdminRoute>
       </Route>
       <Route path="/admin/settlements">
         <AdminRoute><PlaceholderPage title="정산관리" description="정산 내역을 관리합니다" /></AdminRoute>
