@@ -792,16 +792,16 @@ export default function ProductRegistrationPage() {
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" data-testid="save-status-indicator">
                 {saveStatus === "saving" && (
                   <>
-                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" />
+                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" data-testid="status-saving" />
                     <span className="text-sm text-muted-foreground">저장 중...</span>
                   </>
                 )}
                 {saveStatus === "saved" && (
                   <>
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle className="h-4 w-4 text-green-500" data-testid="status-saved" />
                     <span className="text-sm text-green-600">저장됨</span>
                     {lastSavedAt && (
                       <span className="text-xs text-muted-foreground">
@@ -812,12 +812,12 @@ export default function ProductRegistrationPage() {
                 )}
                 {saveStatus === "error" && (
                   <>
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <AlertTriangle className="h-4 w-4 text-red-500" data-testid="status-error" />
                     <span className="text-sm text-red-600">저장 실패</span>
                   </>
                 )}
                 {saveStatus === "idle" && (
-                  <span className="text-sm text-muted-foreground">자동저장 대기</span>
+                  <span className="text-sm text-muted-foreground" data-testid="status-idle">자동저장 대기</span>
                 )}
               </div>
             </div>
@@ -1288,7 +1288,7 @@ export default function ProductRegistrationPage() {
               다음 상품들이 처음으로 차주 예상공급가에 추가되었습니다.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-60 overflow-y-auto" data-testid="new-products-list">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
@@ -1298,9 +1298,9 @@ export default function ProductRegistrationPage() {
               </thead>
               <tbody>
                 {newProductsList.map((p, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="py-2 px-2 text-muted-foreground">{p.productCode}</td>
-                    <td className="py-2 px-2">{p.productName}</td>
+                  <tr key={idx} className="border-b" data-testid={`new-product-row-${idx}`}>
+                    <td className="py-2 px-2 text-muted-foreground" data-testid={`new-product-code-${idx}`}>{p.productCode}</td>
+                    <td className="py-2 px-2" data-testid={`new-product-name-${idx}`}>{p.productName}</td>
                   </tr>
                 ))}
               </tbody>
