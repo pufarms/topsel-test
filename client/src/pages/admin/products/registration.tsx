@@ -812,46 +812,46 @@ export default function ProductRegistrationPage() {
       <Card>
         <CardContent className="p-0 overflow-x-auto overflow-y-auto border rounded-lg" style={{ maxHeight: 'calc(40px + (36px * 15))' }}>
           <table className="text-xs border-collapse" style={{ tableLayout: 'fixed', minWidth: Object.values(columnWidths).reduce((sum, w) => sum + w, 0) }}>
-            <thead className="bg-muted/50 sticky top-0 z-20">
+            <thead className="sticky top-0 z-20">
               <tr>
-                <th className="px-2 py-2 text-center sticky left-0 z-30 bg-muted border-r-2 border-gray-300 dark:border-gray-600" style={{ width: columnWidths.checkbox }}>
+                <th className="px-2 py-2 text-center sticky left-0 z-30 bg-muted/80 border-r-2 border-gray-300 dark:border-gray-600" style={{ width: columnWidths.checkbox }}>
                   <Checkbox checked={selectedIds.length === products.length && products.length > 0} onCheckedChange={toggleSelectAll} data-testid="checkbox-select-all" />
                 </th>
                 {[
-                  { key: "categoryLarge", label: "대분류", align: "left", bg: "" },
-                  { key: "categoryMedium", label: "중분류", align: "left", bg: "" },
-                  { key: "categorySmall", label: "소분류", align: "left", bg: "" },
-                  { key: "weight", label: "중량", align: "center", bg: "" },
-                  { key: "productCode", label: "코드", align: "left", bg: "" },
-                  { key: "productName", label: "상품명", align: "left", bg: "" },
-                  { key: "sourceProduct", label: "원상품", align: "left", bg: "" },
-                  { key: "sourcePrice", label: "기준가", align: "right", bg: "" },
-                  { key: "lossRate", label: "로스율%", align: "right", bg: "" },
-                  { key: "sourceWeight", label: "기준중량", align: "right", bg: "" },
-                  { key: "unitPrice", label: "개별단가", align: "right", bg: "bg-yellow-100 dark:bg-yellow-900/30" },
-                  { key: "sourceProductTotal", label: "원상품합계", align: "right", bg: "bg-yellow-100 dark:bg-yellow-900/30" },
-                  { key: "boxCost", label: "박스비", align: "right", bg: "" },
-                  { key: "materialCost", label: "자재비", align: "right", bg: "" },
-                  { key: "outerBoxCost", label: "아웃박스", align: "right", bg: "" },
-                  { key: "wrappingCost", label: "보자기", align: "right", bg: "" },
-                  { key: "laborCost", label: "작업비", align: "right", bg: "" },
-                  { key: "shippingCost", label: "택배비", align: "right", bg: "" },
-                  { key: "totalCost", label: "총원가", align: "right", bg: "bg-yellow-100 dark:bg-yellow-900/30" },
-                  { key: "startMarginRate", label: "S마진율", align: "right", bg: "bg-blue-100 dark:bg-blue-900/30" },
-                  { key: "startMargin", label: "S마진", align: "right", bg: "bg-blue-100 dark:bg-blue-900/30" },
-                  { key: "startPrice", label: "S공급가", align: "right", bg: "bg-blue-100 dark:bg-blue-900/30", bold: true },
-                  { key: "drivingMarginRate", label: "D마진율", align: "right", bg: "bg-green-100 dark:bg-green-900/30" },
-                  { key: "drivingMargin", label: "D마진", align: "right", bg: "bg-green-100 dark:bg-green-900/30" },
-                  { key: "drivingPrice", label: "D공급가", align: "right", bg: "bg-green-100 dark:bg-green-900/30", bold: true },
-                  { key: "topMarginRate", label: "T마진율", align: "right", bg: "bg-purple-100 dark:bg-purple-900/30" },
-                  { key: "topMargin", label: "T마진", align: "right", bg: "bg-purple-100 dark:bg-purple-900/30" },
-                  { key: "topPrice", label: "T공급가", align: "right", bg: "bg-purple-100 dark:bg-purple-900/30", bold: true },
-                  { key: "save", label: "저장", align: "center", bg: "" },
+                  { key: "categoryLarge", label: "대분류", align: "left", bgColor: "" },
+                  { key: "categoryMedium", label: "중분류", align: "left", bgColor: "" },
+                  { key: "categorySmall", label: "소분류", align: "left", bgColor: "" },
+                  { key: "weight", label: "중량", align: "center", bgColor: "" },
+                  { key: "productCode", label: "코드", align: "left", bgColor: "" },
+                  { key: "productName", label: "상품명", align: "left", bgColor: "" },
+                  { key: "sourceProduct", label: "원상품", align: "left", bgColor: "" },
+                  { key: "sourcePrice", label: "기준가", align: "right", bgColor: "" },
+                  { key: "lossRate", label: "로스율%", align: "right", bgColor: "" },
+                  { key: "sourceWeight", label: "기준중량", align: "right", bgColor: "" },
+                  { key: "unitPrice", label: "개별단가", align: "right", bgColor: "#fef9c3" },
+                  { key: "sourceProductTotal", label: "원상품합계", align: "right", bgColor: "#fef9c3" },
+                  { key: "boxCost", label: "박스비", align: "right", bgColor: "" },
+                  { key: "materialCost", label: "자재비", align: "right", bgColor: "" },
+                  { key: "outerBoxCost", label: "아웃박스", align: "right", bgColor: "" },
+                  { key: "wrappingCost", label: "보자기", align: "right", bgColor: "" },
+                  { key: "laborCost", label: "작업비", align: "right", bgColor: "" },
+                  { key: "shippingCost", label: "택배비", align: "right", bgColor: "" },
+                  { key: "totalCost", label: "총원가", align: "right", bgColor: "#fef9c3" },
+                  { key: "startMarginRate", label: "S마진율", align: "right", bgColor: "#dbeafe" },
+                  { key: "startMargin", label: "S마진", align: "right", bgColor: "#dbeafe" },
+                  { key: "startPrice", label: "S공급가", align: "right", bgColor: "#dbeafe", bold: true },
+                  { key: "drivingMarginRate", label: "D마진율", align: "right", bgColor: "#dcfce7" },
+                  { key: "drivingMargin", label: "D마진", align: "right", bgColor: "#dcfce7" },
+                  { key: "drivingPrice", label: "D공급가", align: "right", bgColor: "#dcfce7", bold: true },
+                  { key: "topMarginRate", label: "T마진율", align: "right", bgColor: "#fee2e2" },
+                  { key: "topMargin", label: "T마진", align: "right", bgColor: "#fee2e2" },
+                  { key: "topPrice", label: "T공급가", align: "right", bgColor: "#fee2e2", bold: true },
+                  { key: "save", label: "저장", align: "center", bgColor: "" },
                 ].map((col) => (
                   <th 
                     key={col.key}
-                    className={`relative px-2 py-2 whitespace-nowrap border border-gray-200 dark:border-gray-700 ${col.bg} ${col.bold ? "font-bold" : ""} text-${col.align}`}
-                    style={{ width: columnWidths[col.key] || MIN_COLUMN_WIDTHS[col.key] }}
+                    className={`relative px-2 py-2 whitespace-nowrap border border-gray-300 dark:border-gray-600 bg-muted/80 ${col.bold ? "font-bold" : ""} text-${col.align}`}
+                    style={{ width: columnWidths[col.key] || MIN_COLUMN_WIDTHS[col.key], backgroundColor: col.bgColor || undefined }}
                   >
                     {col.label}
                     <div
@@ -872,16 +872,16 @@ export default function ProductRegistrationPage() {
                   <td className={`px-2 py-1 sticky left-0 z-10 border-r-2 border-gray-300 dark:border-gray-600 ${isSelected ? "bg-blue-100 dark:bg-blue-900/30" : "bg-background"}`} style={{ width: columnWidths.checkbox }}>
                     <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(p.id)} />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.categoryLarge, false)}`} style={{ width: columnWidths.categoryLarge }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categoryLarge, false)}`} style={{ width: columnWidths.categoryLarge }}>
                     <input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.categoryMedium, false)}`} style={{ width: columnWidths.categoryMedium }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categoryMedium, false)}`} style={{ width: columnWidths.categoryMedium }}>
                     <input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.categorySmall, false)}`} style={{ width: columnWidths.categorySmall }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categorySmall, false)}`} style={{ width: columnWidths.categorySmall }}>
                     <input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.weight, false)}`} style={{ width: columnWidths.weight }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.weight, false)}`} style={{ width: columnWidths.weight }}>
                     <input 
                       value={p.weight} 
                       onChange={e => {
@@ -897,61 +897,61 @@ export default function ProductRegistrationPage() {
                       data-testid={`input-weight-${idx}`}
                     />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.productCode, false)}`} style={{ width: columnWidths.productCode }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.productCode, false)}`} style={{ width: columnWidths.productCode }}>
                     <input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.productName, false)}`} style={{ width: columnWidths.productName }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.productName, false)}`} style={{ width: columnWidths.productName }}>
                     <input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.sourceProduct }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.sourceProduct }}>
                     <input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.sourcePrice, false)}`} style={{ width: columnWidths.sourcePrice }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.sourcePrice, false)}`} style={{ width: columnWidths.sourcePrice }}>
                     <input value={p.sourcePrice ?? ""} onChange={e => handleCellChange(idx, "sourcePrice", e.target.value ? parseInt(e.target.value) : null)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.lossRate }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.lossRate }}>
                     <input value={p.lossRate} onChange={e => handleCellChange(idx, "lossRate", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden ${getCellClass(p.sourceWeight, false)}`} style={{ width: columnWidths.sourceWeight }}>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.sourceWeight, false)}`} style={{ width: columnWidths.sourceWeight }}>
                     <input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.unitPrice }}>{formatNumber(p.unitPrice)}</td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.sourceProductTotal }}>{formatNumber(p.sourceProductTotal)}</td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.boxCost }}>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.unitPrice }}>{formatNumber(p.unitPrice)}</td>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.sourceProductTotal }}>{formatNumber(p.sourceProductTotal)}</td>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.boxCost }}>
                     <input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.materialCost }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.materialCost }}>
                     <input value={p.materialCost} onChange={e => handleCellChange(idx, "materialCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.outerBoxCost }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.outerBoxCost }}>
                     <input value={p.outerBoxCost} onChange={e => handleCellChange(idx, "outerBoxCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.wrappingCost }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.wrappingCost }}>
                     <input value={p.wrappingCost} onChange={e => handleCellChange(idx, "wrappingCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.laborCost }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.laborCost }}>
                     <input value={p.laborCost} onChange={e => handleCellChange(idx, "laborCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ width: columnWidths.shippingCost }}>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.shippingCost }}>
                     <input value={p.shippingCost} onChange={e => handleCellChange(idx, "shippingCost", parseInt(e.target.value) || 0)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.totalCost }}>{formatNumber(p.totalCost)}</td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 overflow-hidden ${getCellClass(p.startMarginRate, false)}`} style={{ width: columnWidths.startMarginRate }}>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-yellow-100 dark:bg-yellow-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.totalCost }}>{formatNumber(p.totalCost)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20 overflow-hidden ${getCellClass(p.startMarginRate, false)}`} style={{ width: columnWidths.startMarginRate }}>
                     <input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.startMargin }}>{formatNumber(p.startMargin)}</td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.startPrice }}>{formatNumber(p.startPrice)}</td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20 overflow-hidden ${getCellClass(p.drivingMarginRate, false)}`} style={{ width: columnWidths.drivingMarginRate }}>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-blue-100 dark:bg-blue-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.startMargin }}>{formatNumber(p.startMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-blue-100 dark:bg-blue-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.startPrice }}>{formatNumber(p.startPrice)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-green-50 dark:bg-green-900/20 overflow-hidden ${getCellClass(p.drivingMarginRate, false)}`} style={{ width: columnWidths.drivingMarginRate }}>
                     <input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.drivingMargin }}>{formatNumber(p.drivingMargin)}</td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.drivingPrice }}>{formatNumber(p.drivingPrice)}</td>
-                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-purple-50 dark:bg-purple-900/20 overflow-hidden ${getCellClass(p.topMarginRate, false)}`} style={{ width: columnWidths.topMarginRate }}>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-green-100 dark:bg-green-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.drivingMargin }}>{formatNumber(p.drivingMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-green-100 dark:bg-green-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.drivingPrice }}>{formatNumber(p.drivingPrice)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-red-50 dark:bg-red-900/20 overflow-hidden ${getCellClass(p.topMarginRate, false)}`} style={{ width: columnWidths.topMarginRate }}>
                     <input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.topMargin }}>{formatNumber(p.topMargin)}</td>
-                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.topPrice }}>{formatNumber(p.topPrice)}</td>
-                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 text-center overflow-hidden" style={{ width: columnWidths.save }}>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.topMargin }}>{formatNumber(p.topMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 bg-red-100 dark:bg-red-900/30 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.topPrice }}>{formatNumber(p.topPrice)}</td>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 text-center overflow-hidden" style={{ width: columnWidths.save }}>
                     <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} className="h-6 w-6 p-0" data-testid={`button-save-${p.id}`}>
                       <Save className="h-3 w-3" />
                     </Button>
