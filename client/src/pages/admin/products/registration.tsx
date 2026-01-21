@@ -798,6 +798,8 @@ export default function ProductRegistrationPage() {
         title: "전송 완료",
         description: `${result.count}개의 상품이 차주 예상공급가로 전송되었습니다.`,
       });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/next-week-products"] });
 
       if (result.newProducts && result.newProducts.length > 0) {
         setNewProductsList(result.newProducts);
@@ -1249,7 +1251,7 @@ export default function ProductRegistrationPage() {
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            선택 전송 ({selectedIds.length}개)
+            선택항목 예상공급가 전송 ({selectedIds.length}개)
           </Button>
           <Button 
             onClick={() => openSendConfirmDialog("all")} 
@@ -1261,7 +1263,7 @@ export default function ProductRegistrationPage() {
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            전체 전송 ({products.length}개)
+            전체목록 예상공급가 전송 ({products.length}개)
           </Button>
         </div>
       </div>
