@@ -679,64 +679,64 @@ export default function ProductRegistrationPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/50">
+        <CardContent className="p-0 overflow-x-auto overflow-y-auto border rounded-lg" style={{ maxHeight: 'calc(40px + (36px * 15))' }}>
+          <table className="w-max min-w-full text-xs border-collapse">
+            <thead className="bg-muted/50 sticky top-0 z-20">
               <tr>
-                <th className="p-2 text-left sticky left-0 bg-muted/50 z-10 min-w-[40px]">
+                <th className="px-2 py-2 text-center sticky left-0 z-30 bg-muted border-r-2 border-gray-300 dark:border-gray-600 min-w-[40px]">
                   <Checkbox checked={selectedIds.length === products.length && products.length > 0} onCheckedChange={toggleSelectAll} data-testid="checkbox-select-all" />
                 </th>
-                <th className="p-2 text-left whitespace-nowrap">대분류</th>
-                <th className="p-2 text-left whitespace-nowrap">중분류</th>
-                <th className="p-2 text-left whitespace-nowrap">소분류</th>
-                <th className="p-2 text-left whitespace-nowrap">중량</th>
-                <th className="p-2 text-left whitespace-nowrap">코드</th>
-                <th className="p-2 text-left whitespace-nowrap">상품명</th>
-                <th className="p-2 text-left whitespace-nowrap">원상품</th>
-                <th className="p-2 text-right whitespace-nowrap">기준가</th>
-                <th className="p-2 text-right whitespace-nowrap">로스율%</th>
-                <th className="p-2 text-right whitespace-nowrap">기준중량</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">개별단가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">원상품합계</th>
-                <th className="p-2 text-right whitespace-nowrap">박스비</th>
-                <th className="p-2 text-right whitespace-nowrap">자재비</th>
-                <th className="p-2 text-right whitespace-nowrap">아웃박스</th>
-                <th className="p-2 text-right whitespace-nowrap">보자기</th>
-                <th className="p-2 text-right whitespace-nowrap">작업비</th>
-                <th className="p-2 text-right whitespace-nowrap">택배비</th>
-                <th className="p-2 text-right whitespace-nowrap bg-yellow-100 dark:bg-yellow-900/30">총원가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30">S마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30">S마진</th>
-                <th className="p-2 text-right whitespace-nowrap bg-blue-100 dark:bg-blue-900/30 font-bold">S공급가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30">D마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30">D마진</th>
-                <th className="p-2 text-right whitespace-nowrap bg-green-100 dark:bg-green-900/30 font-bold">D공급가</th>
-                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30">T마진율</th>
-                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30">T마진</th>
-                <th className="p-2 text-right whitespace-nowrap bg-purple-100 dark:bg-purple-900/30 font-bold">T공급가</th>
-                <th className="p-2 text-center whitespace-nowrap">저장</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[80px] border border-gray-200 dark:border-gray-700">대분류</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[80px] border border-gray-200 dark:border-gray-700">중분류</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[80px] border border-gray-200 dark:border-gray-700">소분류</th>
+                <th className="px-2 py-2 text-center whitespace-nowrap min-w-[60px] border border-gray-200 dark:border-gray-700">중량</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[100px] border border-gray-200 dark:border-gray-700">코드</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[150px] border border-gray-200 dark:border-gray-700">상품명</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap min-w-[100px] border border-gray-200 dark:border-gray-700">원상품</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700">기준가</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[60px] border border-gray-200 dark:border-gray-700">로스율%</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">기준중량</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[80px] border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30">개별단가</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30">원상품합계</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">박스비</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">자재비</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">아웃박스</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">보자기</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">작업비</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700">택배비</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30">총원가</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30">S마진율</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30">S마진</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30 font-bold">S공급가</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30">D마진율</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30">D마진</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30 font-bold">D공급가</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30">T마진율</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[70px] border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30">T마진</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap min-w-[90px] border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30 font-bold">T공급가</th>
+                <th className="px-2 py-2 text-center whitespace-nowrap min-w-[50px] border border-gray-200 dark:border-gray-700">저장</th>
               </tr>
             </thead>
             <tbody>
               {products.map((p, idx) => {
                 const isSelected = selectedIds.includes(p.id);
-                const rowBg = isSelected ? "bg-primary/10" : "";
+                const rowBg = isSelected ? "bg-blue-100 dark:bg-blue-900/30" : "";
                 return (
-                <tr key={p.id} className={`border-b hover:bg-muted/30 ${rowBg}`} data-testid={`row-product-${p.id}`}>
-                  <td className={`p-2 sticky left-0 z-10 min-w-[40px] ${isSelected ? "bg-primary/10" : "bg-background"}`}>
+                <tr key={p.id} className={`hover:bg-muted/30 ${rowBg}`} data-testid={`row-product-${p.id}`}>
+                  <td className={`px-2 py-1 sticky left-0 z-10 border-r-2 border-gray-300 dark:border-gray-600 ${isSelected ? "bg-blue-100 dark:bg-blue-900/30" : "bg-background"}`}>
                     <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(p.id)} />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.categoryLarge, false)}`}>
-                    <Input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="h-7 text-xs w-20" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.categoryLarge, false)}`}>
+                    <input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="w-full min-w-[70px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.categoryMedium, false)}`}>
-                    <Input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="h-7 text-xs w-20" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.categoryMedium, false)}`}>
+                    <input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="w-full min-w-[70px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.categorySmall, false)}`}>
-                    <Input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="h-7 text-xs w-20" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.categorySmall, false)}`}>
+                    <input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="w-full min-w-[70px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.weight, false)}`}>
-                    <Input 
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.weight, false)}`}>
+                    <input 
                       value={p.weight} 
                       onChange={e => {
                         const val = e.target.value;
@@ -744,70 +744,70 @@ export default function ProductRegistrationPage() {
                           handleCellChange(idx, "weight", val);
                         }
                       }} 
-                      className="h-7 text-xs w-16 text-right" 
+                      className="w-full min-w-[50px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" 
                       type="text"
                       inputMode="decimal"
                       placeholder="0.0"
                       data-testid={`input-weight-${idx}`}
                     />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.productCode, false)}`}>
-                    <Input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="h-7 text-xs w-20" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.productCode, false)}`}>
+                    <input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="w-full min-w-[90px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.productName, false)}`}>
-                    <Input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="h-7 text-xs w-28" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.productName, false)}`}>
+                    <input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="w-full min-w-[140px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="h-7 text-xs w-20" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="w-full min-w-[90px] px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.sourcePrice, false)}`}>
-                    <Input value={p.sourcePrice ?? ""} onChange={e => handleCellChange(idx, "sourcePrice", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-20 text-right" type="number" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.sourcePrice, false)}`}>
+                    <input value={p.sourcePrice ?? ""} onChange={e => handleCellChange(idx, "sourcePrice", e.target.value ? parseInt(e.target.value) : null)} className="w-full min-w-[80px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.lossRate} onChange={e => handleCellChange(idx, "lossRate", parseInt(e.target.value) || 0)} className="h-7 text-xs w-14 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.lossRate} onChange={e => handleCellChange(idx, "lossRate", parseInt(e.target.value) || 0)} className="w-full min-w-[50px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className={`p-1 ${getCellClass(p.sourceWeight, false)}`}>
-                    <Input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 ${getCellClass(p.sourceWeight, false)}`}>
+                    <input value={p.sourceWeight ?? ""} onChange={e => handleCellChange(idx, "sourceWeight", e.target.value ? parseInt(e.target.value) : null)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[60px]">{formatNumber(p.unitPrice)}</td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[70px]">{formatNumber(p.sourceProductTotal)}</td>
-                  <td className="p-1">
-                    <Input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right whitespace-nowrap min-w-[80px]">{formatNumber(p.unitPrice)}</td>
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right whitespace-nowrap min-w-[90px]">{formatNumber(p.sourceProductTotal)}</td>
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.boxCost} onChange={e => handleCellChange(idx, "boxCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.materialCost} onChange={e => handleCellChange(idx, "materialCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.materialCost} onChange={e => handleCellChange(idx, "materialCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.outerBoxCost} onChange={e => handleCellChange(idx, "outerBoxCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.outerBoxCost} onChange={e => handleCellChange(idx, "outerBoxCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.wrappingCost} onChange={e => handleCellChange(idx, "wrappingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.wrappingCost} onChange={e => handleCellChange(idx, "wrappingCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.laborCost} onChange={e => handleCellChange(idx, "laborCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.laborCost} onChange={e => handleCellChange(idx, "laborCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1">
-                    <Input value={p.shippingCost} onChange={e => handleCellChange(idx, "shippingCost", parseInt(e.target.value) || 0)} className="h-7 text-xs w-16 text-right" type="number" />
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700">
+                    <input value={p.shippingCost} onChange={e => handleCellChange(idx, "shippingCost", parseInt(e.target.value) || 0)} className="w-full min-w-[60px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" />
                   </td>
-                  <td className="p-1 bg-yellow-100 dark:bg-yellow-900/30 text-right min-w-[70px]">{formatNumber(p.totalCost)}</td>
-                  <td className={`p-1 bg-blue-50 dark:bg-blue-900/20 ${getCellClass(p.startMarginRate, false)}`}>
-                    <Input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-yellow-100 dark:bg-yellow-900/30 text-right whitespace-nowrap min-w-[90px]">{formatNumber(p.totalCost)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 ${getCellClass(p.startMarginRate, false)}`}>
+                    <input value={p.startMarginRate ?? ""} onChange={e => handleCellChange(idx, "startMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full min-w-[50px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right min-w-[60px]">{formatNumber(p.startMargin)}</td>
-                  <td className="p-1 bg-blue-100 dark:bg-blue-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.startPrice)}</td>
-                  <td className={`p-1 bg-green-50 dark:bg-green-900/20 ${getCellClass(p.drivingMarginRate, false)}`}>
-                    <Input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30 text-right whitespace-nowrap min-w-[70px]">{formatNumber(p.startMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30 text-right font-bold whitespace-nowrap min-w-[90px]">{formatNumber(p.startPrice)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20 ${getCellClass(p.drivingMarginRate, false)}`}>
+                    <input value={p.drivingMarginRate ?? ""} onChange={e => handleCellChange(idx, "drivingMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full min-w-[50px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right min-w-[60px]">{formatNumber(p.drivingMargin)}</td>
-                  <td className="p-1 bg-green-100 dark:bg-green-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.drivingPrice)}</td>
-                  <td className={`p-1 bg-purple-50 dark:bg-purple-900/20 ${getCellClass(p.topMarginRate, false)}`}>
-                    <Input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="h-7 text-xs w-14 text-right" type="number" step="0.1" />
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30 text-right whitespace-nowrap min-w-[70px]">{formatNumber(p.drivingMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30 text-right font-bold whitespace-nowrap min-w-[90px]">{formatNumber(p.drivingPrice)}</td>
+                  <td className={`px-1 py-0.5 border border-gray-200 dark:border-gray-700 bg-purple-50 dark:bg-purple-900/20 ${getCellClass(p.topMarginRate, false)}`}>
+                    <input value={p.topMarginRate ?? ""} onChange={e => handleCellChange(idx, "topMarginRate", e.target.value ? parseFloat(e.target.value) : null)} className="w-full min-w-[50px] px-1 py-0.5 border-none bg-transparent outline-none text-xs text-right focus:ring-2 focus:ring-inset focus:ring-blue-500" type="number" step="0.1" />
                   </td>
-                  <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right min-w-[60px]">{formatNumber(p.topMargin)}</td>
-                  <td className="p-1 bg-purple-100 dark:bg-purple-900/30 text-right font-bold min-w-[70px]">{formatNumber(p.topPrice)}</td>
-                  <td className="p-1 text-center">
-                    <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} data-testid={`button-save-${p.id}`}>
-                      <Save className="h-4 w-4" />
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30 text-right whitespace-nowrap min-w-[70px]">{formatNumber(p.topMargin)}</td>
+                  <td className="px-2 py-1 border border-gray-200 dark:border-gray-700 bg-purple-100 dark:bg-purple-900/30 text-right font-bold whitespace-nowrap min-w-[90px]">{formatNumber(p.topPrice)}</td>
+                  <td className="px-1 py-0.5 border border-gray-200 dark:border-gray-700 text-center">
+                    <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} className="h-6 w-6 p-0" data-testid={`button-save-${p.id}`}>
+                      <Save className="h-3 w-3" />
                     </Button>
                   </td>
                 </tr>
