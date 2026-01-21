@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
@@ -723,6 +723,62 @@ export default function ProductRegistrationPage() {
     return "";
   };
 
+  // Send to next week products
+  const handleSendToNextWeek = async () => {
+    // Check if there are unsaved new products
+    const newProducts = products.filter(p => p.id.startsWith("new-"));
+    if (newProducts.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "전송 불가",
+        description: `${newProducts.length}개의 신규 상품이 저장되지 않았습니다. 먼저 저장해주세요.`,
+      });
+      return;
+    }
+
+    // Check if all products have valid prices
+    const invalidProducts = products.filter(p => 
+      p.startPrice === null || p.startPrice === 0 ||
+      p.drivingPrice === null || p.drivingPrice === 0 ||
+      p.topPrice === null || p.topPrice === 0
+    );
+    
+    if (invalidProducts.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "전송 불가",
+        description: `${invalidProducts.length}개의 상품에 공급가가 계산되지 않았습니다. 마진율을 입력해주세요.`,
+      });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/send-to-next-week", {
+        productIds: products.map(p => p.id),
+      });
+      const result = await res.json();
+      
+      toast({
+        title: "전송 완료",
+        description: `${result.count}개의 상품이 차주 예상공급가로 전송되었습니다.`,
+      });
+
+      if (result.newProducts && result.newProducts.length > 0) {
+        setNewProductsList(result.newProducts);
+        setSendDialogOpen(true);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "전송 실패",
+        description: error.message || "전송 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <div className="space-y-3 p-4">
       <PageHeader
@@ -730,6 +786,61 @@ export default function ProductRegistrationPage() {
         description="상품 정보를 입력하고 공급가를 계산하여 차주 예상공급가로 전송합니다"
         icon={Calculator}
       />
+
+      {/* Save Status and Send Button */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                {saveStatus === "saving" && (
+                  <>
+                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-muted-foreground">저장 중...</span>
+                  </>
+                )}
+                {saveStatus === "saved" && (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-600">저장됨</span>
+                    {lastSavedAt && (
+                      <span className="text-xs text-muted-foreground">
+                        ({lastSavedAt.toLocaleTimeString()})
+                      </span>
+                    )}
+                  </>
+                )}
+                {saveStatus === "error" && (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <span className="text-sm text-red-600">저장 실패</span>
+                  </>
+                )}
+                {saveStatus === "idle" && (
+                  <span className="text-sm text-muted-foreground">자동저장 대기</span>
+                )}
+              </div>
+            </div>
+            <Button 
+              onClick={handleSendToNextWeek} 
+              disabled={products.length === 0 || isSending}
+              data-testid="button-send-next-week"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  전송 중...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  차주 예상공급가 전송
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-3">
@@ -1164,6 +1275,44 @@ export default function ProductRegistrationPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* New Products Dialog */}
+      <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              신규 상품 전송 완료
+            </DialogTitle>
+            <DialogDescription>
+              다음 상품들이 처음으로 차주 예상공급가에 추가되었습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-60 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-2">상품코드</th>
+                  <th className="text-left py-2 px-2">상품명</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newProductsList.map((p, idx) => (
+                  <tr key={idx} className="border-b">
+                    <td className="py-2 px-2 text-muted-foreground">{p.productCode}</td>
+                    <td className="py-2 px-2">{p.productName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSendDialogOpen(false)} data-testid="button-close-new-products">
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
