@@ -453,3 +453,32 @@ export const productRegistrationFormSchema = z.object({
 
 export type InsertProductRegistration = z.infer<typeof insertProductRegistrationSchema>;
 export type ProductRegistration = typeof productRegistrations.$inferSelect;
+
+// 차주 예상공급가 상품 (회원 공개용)
+export const supplyStatuses = ["supply", "suspended"] as const;
+export type SupplyStatus = typeof supplyStatuses[number];
+
+export const nextWeekProducts = pgTable("next_week_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  categoryLarge: text("category_large"),
+  categoryMedium: text("category_medium"),
+  categorySmall: text("category_small"),
+  weight: text("weight").notNull(),
+  startPrice: integer("start_price").notNull(),
+  drivingPrice: integer("driving_price").notNull(),
+  topPrice: integer("top_price").notNull(),
+  supplyStatus: text("supply_status").notNull().default("supply"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNextWeekProductSchema = createInsertSchema(nextWeekProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNextWeekProduct = z.infer<typeof insertNextWeekProductSchema>;
+export type NextWeekProduct = typeof nextWeekProducts.$inferSelect;
