@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -89,6 +89,14 @@ export interface IStorage {
   bulkDeleteProductRegistrations(ids: string[]): Promise<number>;
   suspendProductRegistrations(ids: string[], reason: string): Promise<number>;
   resumeProductRegistrations(ids: string[]): Promise<number>;
+
+  // Next Week Products methods (차주 예상공급가)
+  getAllNextWeekProducts(): Promise<NextWeekProduct[]>;
+  getNextWeekProduct(id: string): Promise<NextWeekProduct | undefined>;
+  getNextWeekProductByCode(code: string): Promise<NextWeekProduct | undefined>;
+  createNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
+  updateNextWeekProduct(id: string, data: Partial<InsertNextWeekProduct>): Promise<NextWeekProduct | undefined>;
+  upsertNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -674,6 +682,43 @@ export class DatabaseStorage implements IStorage {
       topPrice,
       topMargin,
     };
+  }
+
+  // Next Week Products methods
+  async getAllNextWeekProducts(): Promise<NextWeekProduct[]> {
+    return db.select().from(nextWeekProducts).orderBy(desc(nextWeekProducts.updatedAt));
+  }
+
+  async getNextWeekProduct(id: string): Promise<NextWeekProduct | undefined> {
+    const [product] = await db.select().from(nextWeekProducts).where(eq(nextWeekProducts.id, id));
+    return product;
+  }
+
+  async getNextWeekProductByCode(code: string): Promise<NextWeekProduct | undefined> {
+    const [product] = await db.select().from(nextWeekProducts).where(eq(nextWeekProducts.productCode, code));
+    return product;
+  }
+
+  async createNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct> {
+    const [product] = await db.insert(nextWeekProducts).values(data).returning();
+    return product;
+  }
+
+  async updateNextWeekProduct(id: string, data: Partial<InsertNextWeekProduct>): Promise<NextWeekProduct | undefined> {
+    const [product] = await db.update(nextWeekProducts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(nextWeekProducts.id, id))
+      .returning();
+    return product;
+  }
+
+  async upsertNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct> {
+    const existing = await this.getNextWeekProductByCode(data.productCode);
+    if (existing) {
+      const updated = await this.updateNextWeekProduct(existing.id, data);
+      return updated!;
+    }
+    return this.createNextWeekProduct(data);
   }
 }
 
