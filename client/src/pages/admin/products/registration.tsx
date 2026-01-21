@@ -23,13 +23,69 @@ const COLUMN_KEYS = [
   "topMarginRate", "topMargin", "topPrice", "save"
 ] as const;
 
-const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
-  checkbox: 40, categoryLarge: 70, categoryMedium: 70, categorySmall: 70, weight: 50,
-  productCode: 90, productName: 140, sourceProduct: 90, sourcePrice: 80, lossRate: 50,
-  sourceWeight: 60, unitPrice: 80, sourceProductTotal: 90, boxCost: 60, materialCost: 60,
-  outerBoxCost: 60, wrappingCost: 60, laborCost: 60, shippingCost: 60, totalCost: 90,
-  startMarginRate: 60, startMargin: 70, startPrice: 90, drivingMarginRate: 60, drivingMargin: 70,
-  drivingPrice: 90, topMarginRate: 60, topMargin: 70, topPrice: 90, save: 50
+const MIN_COLUMN_WIDTHS: Record<string, number> = {
+  checkbox: 40, categoryLarge: 50, categoryMedium: 50, categorySmall: 50, weight: 40,
+  productCode: 50, productName: 80, sourceProduct: 50, sourcePrice: 50, lossRate: 45,
+  sourceWeight: 50, unitPrice: 60, sourceProductTotal: 70, boxCost: 50, materialCost: 50,
+  outerBoxCost: 55, wrappingCost: 50, laborCost: 50, shippingCost: 50, totalCost: 60,
+  startMarginRate: 50, startMargin: 55, startPrice: 60, drivingMarginRate: 50, drivingMargin: 55,
+  drivingPrice: 60, topMarginRate: 50, topMargin: 55, topPrice: 60, save: 45
+};
+
+const HEADER_LABELS: Record<string, string> = {
+  checkbox: "", categoryLarge: "대분류", categoryMedium: "중분류", categorySmall: "소분류", weight: "중량",
+  productCode: "코드", productName: "상품명", sourceProduct: "원상품", sourcePrice: "기준가", lossRate: "로스율%",
+  sourceWeight: "기준중량", unitPrice: "개별단가", sourceProductTotal: "원상품합계", boxCost: "박스비", materialCost: "자재비",
+  outerBoxCost: "아웃박스", wrappingCost: "보자기", laborCost: "작업비", shippingCost: "택배비", totalCost: "총원가",
+  startMarginRate: "S마진율", startMargin: "S마진", startPrice: "S공급가", drivingMarginRate: "D마진율", drivingMargin: "D마진",
+  drivingPrice: "D공급가", topMarginRate: "T마진율", topMargin: "T마진", topPrice: "T공급가", save: "저장"
+};
+
+const calculateColumnWidth = (key: string, data: ProductRow[]): number => {
+  const headerLen = (HEADER_LABELS[key] || "").length;
+  let maxDataLen = 0;
+  
+  for (const row of data) {
+    let value = "";
+    switch (key) {
+      case "categoryLarge": value = row.categoryLarge || ""; break;
+      case "categoryMedium": value = row.categoryMedium || ""; break;
+      case "categorySmall": value = row.categorySmall || ""; break;
+      case "weight": value = String(row.weight || ""); break;
+      case "productCode": value = row.productCode || ""; break;
+      case "productName": value = row.productName || ""; break;
+      case "sourceProduct": value = row.sourceProduct || ""; break;
+      case "sourcePrice": value = row.sourcePrice != null ? row.sourcePrice.toLocaleString() : ""; break;
+      case "lossRate": value = String(row.lossRate || ""); break;
+      case "sourceWeight": value = row.sourceWeight != null ? String(row.sourceWeight) : ""; break;
+      case "unitPrice": value = row.unitPrice != null ? row.unitPrice.toLocaleString() : ""; break;
+      case "sourceProductTotal": value = row.sourceProductTotal != null ? row.sourceProductTotal.toLocaleString() : ""; break;
+      case "boxCost": value = String(row.boxCost || ""); break;
+      case "materialCost": value = String(row.materialCost || ""); break;
+      case "outerBoxCost": value = String(row.outerBoxCost || ""); break;
+      case "wrappingCost": value = String(row.wrappingCost || ""); break;
+      case "laborCost": value = String(row.laborCost || ""); break;
+      case "shippingCost": value = String(row.shippingCost || ""); break;
+      case "totalCost": value = row.totalCost != null ? row.totalCost.toLocaleString() : ""; break;
+      case "startMarginRate": value = row.startMarginRate != null ? String(row.startMarginRate) : ""; break;
+      case "startMargin": value = row.startMargin != null ? row.startMargin.toLocaleString() : ""; break;
+      case "startPrice": value = row.startPrice != null ? row.startPrice.toLocaleString() : ""; break;
+      case "drivingMarginRate": value = row.drivingMarginRate != null ? String(row.drivingMarginRate) : ""; break;
+      case "drivingMargin": value = row.drivingMargin != null ? row.drivingMargin.toLocaleString() : ""; break;
+      case "drivingPrice": value = row.drivingPrice != null ? row.drivingPrice.toLocaleString() : ""; break;
+      case "topMarginRate": value = row.topMarginRate != null ? String(row.topMarginRate) : ""; break;
+      case "topMargin": value = row.topMargin != null ? row.topMargin.toLocaleString() : ""; break;
+      case "topPrice": value = row.topPrice != null ? row.topPrice.toLocaleString() : ""; break;
+    }
+    if (value.length > maxDataLen) maxDataLen = value.length;
+  }
+  
+  const maxLen = Math.max(headerLen, maxDataLen);
+  const charWidth = 8;
+  const padding = 16;
+  const calculatedWidth = maxLen * charWidth + padding;
+  
+  return Math.max(MIN_COLUMN_WIDTHS[key] || 50, calculatedWidth);
 };
 
 interface EnrichedCategory extends Category {
@@ -73,8 +129,30 @@ export default function ProductRegistrationPage() {
   const [bulkDrivingMargin, setBulkDrivingMargin] = useState<string>("");
   const [bulkTopMargin, setBulkTopMargin] = useState<string>("");
 
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({ ...DEFAULT_COLUMN_WIDTHS });
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({ ...MIN_COLUMN_WIDTHS });
+  const [manuallyResizedColumns, setManuallyResizedColumns] = useState<Set<string>>(new Set());
   const [resizing, setResizing] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    if (products.length === 0) return;
+    
+    const newWidths: Record<string, number> = { ...columnWidths };
+    let changed = false;
+    
+    for (const key of COLUMN_KEYS) {
+      if (manuallyResizedColumns.has(key)) continue;
+      
+      const calculatedWidth = calculateColumnWidth(key, products);
+      if (calculatedWidth !== newWidths[key]) {
+        newWidths[key] = calculatedWidth;
+        changed = true;
+      }
+    }
+    
+    if (changed) {
+      setColumnWidths(newWidths);
+    }
+  }, [products, manuallyResizedColumns]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, key: string) => {
     e.preventDefault();
@@ -82,7 +160,7 @@ export default function ProductRegistrationPage() {
     setResizing({
       key,
       startX: e.clientX,
-      startWidth: columnWidths[key] || DEFAULT_COLUMN_WIDTHS[key] || 80
+      startWidth: columnWidths[key] || MIN_COLUMN_WIDTHS[key] || 80
     });
   }, [columnWidths]);
 
@@ -96,6 +174,7 @@ export default function ProductRegistrationPage() {
     };
 
     const handleMouseUp = () => {
+      setManuallyResizedColumns(prev => new Set(Array.from(prev).concat(resizing.key)));
       setResizing(null);
     };
 
@@ -732,7 +811,7 @@ export default function ProductRegistrationPage() {
 
       <Card>
         <CardContent className="p-0 overflow-x-auto overflow-y-auto border rounded-lg" style={{ maxHeight: 'calc(40px + (36px * 15))' }}>
-          <table className="text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
+          <table className="text-xs border-collapse" style={{ tableLayout: 'fixed', minWidth: Object.values(columnWidths).reduce((sum, w) => sum + w, 0) }}>
             <thead className="bg-muted/50 sticky top-0 z-20">
               <tr>
                 <th className="px-2 py-2 text-center sticky left-0 z-30 bg-muted border-r-2 border-gray-300 dark:border-gray-600" style={{ width: columnWidths.checkbox }}>
@@ -772,7 +851,7 @@ export default function ProductRegistrationPage() {
                   <th 
                     key={col.key}
                     className={`relative px-2 py-2 whitespace-nowrap border border-gray-200 dark:border-gray-700 ${col.bg} ${col.bold ? "font-bold" : ""} text-${col.align}`}
-                    style={{ width: columnWidths[col.key] || DEFAULT_COLUMN_WIDTHS[col.key] }}
+                    style={{ width: columnWidths[col.key] || MIN_COLUMN_WIDTHS[col.key] }}
                   >
                     {col.label}
                     <div
