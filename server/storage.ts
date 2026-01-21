@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -97,6 +97,19 @@ export interface IStorage {
   createNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
   updateNextWeekProduct(id: string, data: Partial<InsertNextWeekProduct>): Promise<NextWeekProduct | undefined>;
   upsertNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
+
+  // Current Products methods (현재 공급가)
+  getAllCurrentProducts(): Promise<CurrentProduct[]>;
+  getCurrentProductsByStatus(status: string): Promise<CurrentProduct[]>;
+  getCurrentProduct(id: string): Promise<CurrentProduct | undefined>;
+  getCurrentProductByCode(code: string): Promise<CurrentProduct | undefined>;
+  createCurrentProduct(data: InsertCurrentProduct): Promise<CurrentProduct>;
+  updateCurrentProduct(id: string, data: Partial<InsertCurrentProduct>): Promise<CurrentProduct | undefined>;
+  upsertCurrentProduct(data: InsertCurrentProduct): Promise<CurrentProduct>;
+  suspendCurrentProducts(ids: string[], reason: string): Promise<number>;
+  resumeCurrentProducts(ids: string[]): Promise<number>;
+  deleteCurrentProduct(id: string): Promise<boolean>;
+  bulkDeleteCurrentProducts(ids: string[]): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -260,6 +273,19 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
+  async updateProduct(id: string, data: Partial<InsertProduct>): Promise<Product | undefined> {
+    const [product] = await db.update(products)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    return product;
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(products).where(eq(products.id, id)).returning();
+    return !!deleted;
+  }
+
   async getProductByCode(code: string): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.productCode, code));
     return product;
@@ -337,7 +363,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async setPartnerProducts(partnerId: string, productIds: string[]): Promise<void> {
+  async updatePartnerProducts(partnerId: string, productIds: string[]): Promise<void> {
     // Remove all existing
     await db.delete(partnerProducts).where(eq(partnerProducts.partnerId, partnerId));
     // Add new ones
@@ -719,6 +745,75 @@ export class DatabaseStorage implements IStorage {
       return updated!;
     }
     return this.createNextWeekProduct(data);
+  }
+
+  // Current Products methods (현재 공급가)
+  async getAllCurrentProducts(): Promise<CurrentProduct[]> {
+    return db.select().from(currentProducts).orderBy(desc(currentProducts.updatedAt));
+  }
+
+  async getCurrentProductsByStatus(status: string): Promise<CurrentProduct[]> {
+    return db.select().from(currentProducts)
+      .where(eq(currentProducts.supplyStatus, status))
+      .orderBy(desc(currentProducts.updatedAt));
+  }
+
+  async getCurrentProduct(id: string): Promise<CurrentProduct | undefined> {
+    const [product] = await db.select().from(currentProducts).where(eq(currentProducts.id, id));
+    return product;
+  }
+
+  async getCurrentProductByCode(code: string): Promise<CurrentProduct | undefined> {
+    const [product] = await db.select().from(currentProducts).where(eq(currentProducts.productCode, code));
+    return product;
+  }
+
+  async createCurrentProduct(data: InsertCurrentProduct): Promise<CurrentProduct> {
+    const [product] = await db.insert(currentProducts).values(data).returning();
+    return product;
+  }
+
+  async updateCurrentProduct(id: string, data: Partial<InsertCurrentProduct>): Promise<CurrentProduct | undefined> {
+    const [product] = await db.update(currentProducts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(currentProducts.id, id))
+      .returning();
+    return product;
+  }
+
+  async upsertCurrentProduct(data: InsertCurrentProduct): Promise<CurrentProduct> {
+    const existing = await this.getCurrentProductByCode(data.productCode);
+    if (existing) {
+      const updated = await this.updateCurrentProduct(existing.id, data);
+      return updated!;
+    }
+    return this.createCurrentProduct(data);
+  }
+
+  async suspendCurrentProducts(ids: string[], reason: string): Promise<number> {
+    const result = await db.update(currentProducts)
+      .set({ supplyStatus: "suspended", suspendedAt: new Date(), suspendReason: reason, updatedAt: new Date() })
+      .where(inArray(currentProducts.id, ids))
+      .returning();
+    return result.length;
+  }
+
+  async resumeCurrentProducts(ids: string[]): Promise<number> {
+    const result = await db.update(currentProducts)
+      .set({ supplyStatus: "supply", suspendedAt: null, suspendReason: null, updatedAt: new Date() })
+      .where(inArray(currentProducts.id, ids))
+      .returning();
+    return result.length;
+  }
+
+  async deleteCurrentProduct(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(currentProducts).where(eq(currentProducts.id, id)).returning();
+    return !!deleted;
+  }
+
+  async bulkDeleteCurrentProducts(ids: string[]): Promise<number> {
+    const result = await db.delete(currentProducts).where(inArray(currentProducts.id, ids)).returning();
+    return result.length;
   }
 }
 
