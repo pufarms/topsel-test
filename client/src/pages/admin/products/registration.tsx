@@ -1263,7 +1263,7 @@ export default function ProductRegistrationPage() {
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            전체목록 예상공급가 전송 ({products.length}개)
+            전체항목 예상공급가 전송 ({products.length}개)
           </Button>
         </div>
       </div>
