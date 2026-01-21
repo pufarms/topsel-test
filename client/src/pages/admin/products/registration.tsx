@@ -459,8 +459,8 @@ export default function ProductRegistrationPage() {
       updatedAt: new Date(),
       isNew: true,
     };
-    setProducts([...products, newRow]);
-    setTempProducts(prev => [...prev, newRow]);
+    setProducts([newRow, ...products]);
+    setTempProducts(prev => [newRow, ...prev]);
   };
 
   const createMutation = useMutation({
