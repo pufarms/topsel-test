@@ -579,99 +579,84 @@ export default function ProductRegistrationPage() {
         <CardHeader className="p-3">
           <CardTitle className="text-sm">일괄 적용 (선택한 상품에 한꺼번에 값 적용)</CardTitle>
         </CardHeader>
-        <CardContent className="p-3 pt-0 space-y-3">
-          <div>
-            <p className="text-xs font-medium mb-1 text-muted-foreground">[중량(수량)]</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">중량</label>
-                <Input 
-                  value={bulkWeight} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
-                      setBulkWeight(val);
-                    }
-                  }} 
-                  className="h-9" 
-                  type="text"
-                  inputMode="decimal"
-                  placeholder=""
-                  data-testid="input-bulk-weight" 
-                />
-              </div>
-            </div>
+        <CardContent className="p-3 pt-0">
+          {/* 1행: 중량 ~ 아웃박스 */}
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">중량:</span>
+              <Input 
+                value={bulkWeight} 
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
+                    setBulkWeight(val);
+                  }
+                }} 
+                className="h-7 w-16 px-2 text-xs" 
+                type="text"
+                inputMode="decimal"
+                data-testid="input-bulk-weight" 
+              />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">기준가:</span>
+              <Input value={bulkSourcePrice} onChange={e => setBulkSourcePrice(e.target.value)} className="h-7 w-20 px-2 text-xs" type="number" data-testid="input-bulk-source-price" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">로스율%:</span>
+              <Input value={bulkLossRate} onChange={e => setBulkLossRate(e.target.value)} className="h-7 w-14 px-2 text-xs" type="number" data-testid="input-bulk-loss-rate" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">기준중량:</span>
+              <Input value={bulkSourceWeight} onChange={e => setBulkSourceWeight(e.target.value)} className="h-7 w-14 px-2 text-xs" type="number" data-testid="input-bulk-source-weight" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">박스비:</span>
+              <Input value={bulkBoxCost} onChange={e => setBulkBoxCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">자재비:</span>
+              <Input value={bulkMaterialCost} onChange={e => setBulkMaterialCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">아웃박스:</span>
+              <Input value={bulkOuterBoxCost} onChange={e => setBulkOuterBoxCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
           </div>
-          <div>
-            <p className="text-xs font-medium mb-1 text-muted-foreground">[상품 원가]</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">원상품 기준가</label>
-                <Input value={bulkSourcePrice} onChange={e => setBulkSourcePrice(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-price" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">로스율 (%)</label>
-                <Input value={bulkLossRate} onChange={e => setBulkLossRate(e.target.value)} className="h-9" type="number" data-testid="input-bulk-loss-rate" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">원상품 기준중량 (kg)</label>
-                <Input value={bulkSourceWeight} onChange={e => setBulkSourceWeight(e.target.value)} className="h-9" type="number" data-testid="input-bulk-source-weight" />
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium mb-1 text-muted-foreground">[부대비용]</p>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">박스비</label>
-                <Input value={bulkBoxCost} onChange={e => setBulkBoxCost(e.target.value)} className="h-9" type="number" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">자재비</label>
-                <Input value={bulkMaterialCost} onChange={e => setBulkMaterialCost(e.target.value)} className="h-9" type="number" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">아웃박스</label>
-                <Input value={bulkOuterBoxCost} onChange={e => setBulkOuterBoxCost(e.target.value)} className="h-9" type="number" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">보자기</label>
-                <Input value={bulkWrappingCost} onChange={e => setBulkWrappingCost(e.target.value)} className="h-9" type="number" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">작업비</label>
-                <Input value={bulkLaborCost} onChange={e => setBulkLaborCost(e.target.value)} className="h-9" type="number" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">택배비</label>
-                <Input value={bulkShippingCost} onChange={e => setBulkShippingCost(e.target.value)} className="h-9" type="number" />
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium mb-1 text-muted-foreground">[등급별 마진율]</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Start 마진율 (%)</label>
-                <Input value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-start-margin" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Driving 마진율 (%)</label>
-                <Input value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-driving-margin" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Top 마진율 (%)</label>
-                <Input value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-9" type="number" step="0.1" data-testid="input-bulk-top-margin" />
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={handleBulkReset} data-testid="button-bulk-reset">
-              <RotateCcw className="h-4 w-4 mr-1" />
+          
+          {/* 2행: 보자기 ~ Top마진율 */}
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">보자기:</span>
+              <Input value={bulkWrappingCost} onChange={e => setBulkWrappingCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">작업비:</span>
+              <Input value={bulkLaborCost} onChange={e => setBulkLaborCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">택배비:</span>
+              <Input value={bulkShippingCost} onChange={e => setBulkShippingCost(e.target.value)} className="h-7 w-16 px-2 text-xs" type="number" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">S마진율%:</span>
+              <Input value={bulkStartMargin} onChange={e => setBulkStartMargin(e.target.value)} className="h-7 w-14 px-2 text-xs" type="number" step="0.1" data-testid="input-bulk-start-margin" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">D마진율%:</span>
+              <Input value={bulkDrivingMargin} onChange={e => setBulkDrivingMargin(e.target.value)} className="h-7 w-14 px-2 text-xs" type="number" step="0.1" data-testid="input-bulk-driving-margin" />
+            </label>
+            <label className="flex items-center gap-1">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">T마진율%:</span>
+              <Input value={bulkTopMargin} onChange={e => setBulkTopMargin(e.target.value)} className="h-7 w-14 px-2 text-xs" type="number" step="0.1" data-testid="input-bulk-top-margin" />
+            </label>
+            <div className="flex-1" />
+            <Button size="sm" variant="outline" onClick={handleBulkReset} className="h-7 text-xs" data-testid="button-bulk-reset">
+              <RotateCcw className="h-3 w-3 mr-1" />
               초기화
             </Button>
-            <Button size="sm" onClick={handleBulkApply} disabled={bulkUpdateMutation.isPending} data-testid="button-bulk-apply">
-              {bulkUpdateMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            <Button size="sm" onClick={handleBulkApply} disabled={bulkUpdateMutation.isPending} className="h-7 text-xs" data-testid="button-bulk-apply">
+              {bulkUpdateMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
               선택한 상품에 일괄 적용
             </Button>
           </div>
