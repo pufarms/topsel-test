@@ -1511,5 +1511,214 @@ export async function registerRoutes(
     });
   });
 
+  // ========================================
+  // 차주 예상공급가 상품 API (Next Week Products)
+  // ========================================
+  
+  app.get("/api/next-week-products", async (req, res) => {
+    const products = await storage.getAllNextWeekProducts();
+    return res.json(products);
+  });
+
+  app.post("/api/next-week-products/check-new", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    
+    const newProducts: { productCode: string; productName: string }[] = [];
+    const existingProducts: { productCode: string; productName: string }[] = [];
+    
+    for (const id of ids) {
+      const product = await storage.getNextWeekProduct(id);
+      if (product) {
+        const existing = await storage.getCurrentProductByCode(product.productCode);
+        if (existing) {
+          existingProducts.push({ productCode: product.productCode, productName: product.productName });
+        } else {
+          newProducts.push({ productCode: product.productCode, productName: product.productName });
+        }
+      }
+    }
+    
+    return res.json({ newProducts, existingProducts });
+  });
+
+  app.post("/api/next-week-products/apply-current", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    
+    let created = 0;
+    let updated = 0;
+    
+    for (const id of ids) {
+      const product = await storage.getNextWeekProduct(id);
+      if (product) {
+        const existing = await storage.getCurrentProductByCode(product.productCode);
+        const productData = {
+          productCode: product.productCode,
+          productName: product.productName,
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+          weight: product.weight,
+          startPrice: product.startPrice,
+          drivingPrice: product.drivingPrice,
+          topPrice: product.topPrice,
+          supplyStatus: "supply" as const,
+          appliedAt: new Date(),
+        };
+        
+        if (existing) {
+          await storage.updateCurrentProduct(existing.id, productData);
+          updated++;
+        } else {
+          await storage.createCurrentProduct(productData);
+          created++;
+        }
+      }
+    }
+    
+    return res.json({ 
+      success: true,
+      message: `${ids.length}개 상품이 현재 공급가로 적용되었습니다.`,
+      data: { total: ids.length, updated, created }
+    });
+  });
+
+  app.post("/api/next-week-products/apply-current-all", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const allProducts = await storage.getAllNextWeekProducts();
+    let created = 0;
+    let updated = 0;
+    
+    for (const product of allProducts) {
+      const existing = await storage.getCurrentProductByCode(product.productCode);
+      const productData = {
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: "supply" as const,
+        appliedAt: new Date(),
+      };
+      
+      if (existing) {
+        await storage.updateCurrentProduct(existing.id, productData);
+        updated++;
+      } else {
+        await storage.createCurrentProduct(productData);
+        created++;
+      }
+    }
+    
+    return res.json({ 
+      success: true,
+      message: `${allProducts.length}개 상품이 현재 공급가로 적용되었습니다.`,
+      data: { total: allProducts.length, updated, created }
+    });
+  });
+
+  // ========================================
+  // 현재 공급가 상품 API (Current Products)
+  // ========================================
+  
+  app.get("/api/current-products", async (req, res) => {
+    const status = req.query.status as string;
+    if (status) {
+      const products = await storage.getCurrentProductsByStatus(status);
+      return res.json(products);
+    }
+    const products = await storage.getAllCurrentProducts();
+    return res.json(products);
+  });
+
+  app.post("/api/current-products/suspend", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids, reason } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.suspendCurrentProducts(ids, reason || "");
+    return res.json({ 
+      success: true,
+      message: `${updated}개 상품이 공급 중지되었습니다.`,
+      updated 
+    });
+  });
+
+  // ========================================
+  // 공급 중지 상품 API (Suspended Products)
+  // ========================================
+  
+  app.get("/api/suspended-products", async (req, res) => {
+    const products = await storage.getCurrentProductsByStatus("suspended");
+    return res.json(products);
+  });
+
+  app.post("/api/suspended-products/resume", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const updated = await storage.resumeCurrentProducts(ids);
+    return res.json({ 
+      success: true,
+      message: `${updated}개 상품의 공급이 재개되었습니다.`,
+      updated 
+    });
+  });
+
+  app.delete("/api/suspended-products/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
+    }
+    const deleted = await storage.bulkDeleteCurrentProducts(ids);
+    return res.json({ 
+      success: true,
+      message: `${deleted}개 상품이 삭제되었습니다.`,
+      deleted 
+    });
+  });
+
+  app.delete("/api/suspended-products/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const deleted = await storage.deleteCurrentProduct(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "상품을 찾을 수 없습니다" });
+    }
+    return res.json({ 
+      success: true,
+      message: "상품이 삭제되었습니다."
+    });
+  });
+
   return httpServer;
 }
