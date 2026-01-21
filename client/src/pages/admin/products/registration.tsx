@@ -206,6 +206,47 @@ export default function ProductRegistrationPage() {
     return smallCategories.filter(s => s.parentId === mediumId || (mediumCat && s.parentName === mediumCat.name));
   };
 
+  // Helper functions for cascading category selection in table cells (by name)
+  const getMediumCategoriesByLargeName = (largeName: string | null) => {
+    if (!largeName) return [];
+    const largeCat = largeCategories.find(c => c.name === largeName);
+    if (!largeCat) return [];
+    return mediumCategories.filter(m => m.parentId === largeCat.id);
+  };
+
+  const getSmallCategoriesByMediumName = (largeName: string | null, mediumName: string | null) => {
+    if (!largeName || !mediumName) return [];
+    const largeCat = largeCategories.find(c => c.name === largeName);
+    if (!largeCat) return [];
+    const mediumCat = mediumCategories.find(m => m.parentId === largeCat.id && m.name === mediumName);
+    if (!mediumCat) return [];
+    return smallCategories.filter(s => s.parentId === mediumCat.id);
+  };
+
+  // Handle category change with cascading clear
+  const handleCategoryChange = (idx: number, field: "categoryLarge" | "categoryMedium" | "categorySmall", value: string) => {
+    const updated = [...products];
+    const p = { ...updated[idx] };
+    
+    if (field === "categoryLarge") {
+      p.categoryLarge = value || null;
+      p.categoryMedium = null; // Clear dependent categories
+      p.categorySmall = null;
+    } else if (field === "categoryMedium") {
+      p.categoryMedium = value || null;
+      p.categorySmall = null; // Clear dependent category
+    } else {
+      p.categorySmall = value || null;
+    }
+    
+    updated[idx] = p;
+    setProducts(updated);
+    
+    if (p.id.startsWith("new-")) {
+      setTempProducts(prev => prev.map(t => t.id === p.id ? { ...p } : t));
+    }
+  };
+
   const allWeights = Array.from(new Set([
     ...tempProducts.map(p => p.weight).filter(w => w != null && w !== ""),
     ...products.filter(p => !p.id.startsWith("new-")).map(p => p.weight).filter(w => w != null && w !== "")
@@ -865,14 +906,46 @@ export default function ProductRegistrationPage() {
                   <td className={`px-2 py-1 sticky left-0 z-10 border-r-2 border-gray-300 dark:border-gray-600 ${isSelected ? "bg-blue-100 dark:bg-blue-900/30" : "bg-background"}`} style={{ width: columnWidths.checkbox }}>
                     <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(p.id)} />
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categoryLarge, false)}`} style={{ width: columnWidths.categoryLarge }}>
-                    <input value={p.categoryLarge || ""} onChange={e => handleCellChange(idx, "categoryLarge", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                  <td className={`px-0 py-0 border border-gray-300 dark:border-gray-600 overflow-visible ${getCellClass(p.categoryLarge, false)}`} style={{ width: columnWidths.categoryLarge }}>
+                    <select 
+                      value={p.categoryLarge || ""} 
+                      onChange={e => handleCategoryChange(idx, "categoryLarge", e.target.value)}
+                      className="w-full h-6 px-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer"
+                      data-testid={`select-category-large-${idx}`}
+                    >
+                      <option value="">선택</option>
+                      {largeCategories.map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categoryMedium, false)}`} style={{ width: columnWidths.categoryMedium }}>
-                    <input value={p.categoryMedium || ""} onChange={e => handleCellChange(idx, "categoryMedium", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                  <td className={`px-0 py-0 border border-gray-300 dark:border-gray-600 overflow-visible ${getCellClass(p.categoryMedium, false)}`} style={{ width: columnWidths.categoryMedium }}>
+                    <select 
+                      value={p.categoryMedium || ""} 
+                      onChange={e => handleCategoryChange(idx, "categoryMedium", e.target.value)}
+                      className="w-full h-6 px-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                      disabled={!p.categoryLarge}
+                      data-testid={`select-category-medium-${idx}`}
+                    >
+                      <option value="">선택</option>
+                      {getMediumCategoriesByLargeName(p.categoryLarge).map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </td>
-                  <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.categorySmall, false)}`} style={{ width: columnWidths.categorySmall }}>
-                    <input value={p.categorySmall || ""} onChange={e => handleCellChange(idx, "categorySmall", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                  <td className={`px-0 py-0 border border-gray-300 dark:border-gray-600 overflow-visible ${getCellClass(p.categorySmall, false)}`} style={{ width: columnWidths.categorySmall }}>
+                    <select 
+                      value={p.categorySmall || ""} 
+                      onChange={e => handleCategoryChange(idx, "categorySmall", e.target.value)}
+                      className="w-full h-6 px-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                      disabled={!p.categoryMedium}
+                      data-testid={`select-category-small-${idx}`}
+                    >
+                      <option value="">선택</option>
+                      {getSmallCategoriesByMediumName(p.categoryLarge, p.categoryMedium).map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.weight, false)}`} style={{ width: columnWidths.weight }}>
                     <input 
