@@ -61,8 +61,8 @@ export default function SuspendedProductsPage() {
       setResumeIds([]);
       setResumeDialogOpen(false);
     },
-    onError: () => {
-      toast({ title: "공급 재개 실패", description: "공급 재개 처리에 실패했습니다.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "공급 재개 실패", description: error.message || "공급 재개 처리에 실패했습니다.", variant: "destructive" });
     },
   });
 
@@ -77,8 +77,8 @@ export default function SuspendedProductsPage() {
       setSelectedIds([]);
       setDeleteDialogOpen(false);
     },
-    onError: () => {
-      toast({ title: "삭제 실패", description: "삭제 처리에 실패했습니다.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "삭제 실패", description: error.message || "삭제 처리에 실패했습니다.", variant: "destructive" });
     },
   });
 

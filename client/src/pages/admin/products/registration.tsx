@@ -337,7 +337,16 @@ export default function ProductRegistrationPage() {
     onSuccess: (data) => {
       toast({ title: "업로드 완료", description: `${data.created}개 상품이 추가되었습니다.` });
       if (data.errors?.length > 0) {
-        toast({ variant: "destructive", title: "일부 오류", description: `${data.errors.length}개 행에서 오류 발생` });
+        const errorDetails = data.errors.slice(0, 5).map((e: any) => 
+          `행 ${e.row}: ${e.error || e.message || '알 수 없는 오류'}`
+        ).join('\n');
+        const moreText = data.errors.length > 5 ? `\n... 외 ${data.errors.length - 5}건 더 있음` : '';
+        toast({ 
+          variant: "destructive", 
+          title: `일부 오류 (${data.errors.length}건)`, 
+          description: errorDetails + moreText,
+          duration: 10000,
+        });
       }
       searchMutation.mutate();
     },

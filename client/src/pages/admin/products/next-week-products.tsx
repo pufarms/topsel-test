@@ -93,8 +93,8 @@ export default function NextWeekProductsPage() {
       setSelectedIds([]);
       setApplyDialogOpen(false);
     },
-    onError: () => {
-      toast({ title: "적용 실패", description: "현재 공급가 적용에 실패했습니다.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "적용 실패", description: error.message || "현재 공급가 적용에 실패했습니다.", variant: "destructive" });
     },
   });
 
@@ -109,8 +109,8 @@ export default function NextWeekProductsPage() {
       toast({ title: "적용 완료", description: data.message });
       setApplyAllDialogOpen(false);
     },
-    onError: () => {
-      toast({ title: "적용 실패", description: "현재 공급가 적용에 실패했습니다.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "적용 실패", description: error.message || "현재 공급가 적용에 실패했습니다.", variant: "destructive" });
     },
   });
 

@@ -64,8 +64,8 @@ export default function CurrentProductsPage() {
       setSuspendDialogOpen(false);
       setSuspendReason("");
     },
-    onError: () => {
-      toast({ title: "공급 중지 실패", description: "공급 중지 처리에 실패했습니다.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "공급 중지 실패", description: error.message || "공급 중지 처리에 실패했습니다.", variant: "destructive" });
     },
   });
 
