@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
 import type { ProductRegistration, Category } from "@shared/schema";
 import * as XLSX from "xlsx";
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): T & { cancel: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const debounced = (...args: Parameters<T>) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+  debounced.cancel = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+  return debounced as T & { cancel: () => void };
+}
 
 const COLUMN_KEYS = [
   "checkbox", "categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName",
@@ -131,6 +144,15 @@ export default function ProductRegistrationPage() {
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({ ...MIN_COLUMN_WIDTHS });
   const [manuallyResizedColumns, setManuallyResizedColumns] = useState<Set<string>>(new Set());
   const [resizing, setResizing] = useState<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  // Auto-save state
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  // Send to next week state
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [newProductsList, setNewProductsList] = useState<{ productCode: string; productName: string }[]>([]);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (products.length === 0) return;
@@ -517,6 +539,59 @@ export default function ProductRegistrationPage() {
     },
   });
 
+  // Auto-save mutation for existing products
+  const autoSaveMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }): Promise<ProductRegistration> => {
+      const res = await apiRequest("PUT", `/api/product-registrations/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      setSaveStatus("saved");
+      setLastSavedAt(new Date());
+      setTimeout(() => {
+        if (saveStatus === "saved") setSaveStatus("idle");
+      }, 3000);
+    },
+    onError: (error: any) => {
+      setSaveStatus("error");
+      console.error("Auto-save error:", error);
+    },
+  });
+
+  // Debounced auto-save function
+  const debouncedAutoSave = useMemo(
+    () => debounce((id: string, productData: ProductRow) => {
+      if (id.startsWith("new-")) return; // Don't auto-save new rows
+      
+      setSaveStatus("saving");
+      autoSaveMutation.mutate({
+        id,
+        data: {
+          categoryLarge: productData.categoryLarge,
+          categoryMedium: productData.categoryMedium,
+          categorySmall: productData.categorySmall,
+          weight: productData.weight,
+          productCode: productData.productCode,
+          productName: productData.productName,
+          sourceProduct: productData.sourceProduct,
+          sourcePrice: productData.sourcePrice,
+          lossRate: productData.lossRate,
+          sourceWeight: productData.sourceWeight,
+          boxCost: productData.boxCost,
+          materialCost: productData.materialCost,
+          outerBoxCost: productData.outerBoxCost,
+          wrappingCost: productData.wrappingCost,
+          laborCost: productData.laborCost,
+          shippingCost: productData.shippingCost,
+          startMarginRate: productData.startMarginRate,
+          drivingMarginRate: productData.drivingMarginRate,
+          topMarginRate: productData.topMarginRate,
+        }
+      });
+    }, 500),
+    []
+  );
+
   const handleCellChange = (index: number, field: keyof ProductRow, value: any) => {
     const updated = [...products];
     (updated[index] as any)[field] = value;
@@ -552,6 +627,9 @@ export default function ProductRegistrationPage() {
     
     if (p.id.startsWith("new-")) {
       setTempProducts(prev => prev.map(t => t.id === p.id ? { ...p } : t));
+    } else {
+      // Auto-save for existing products (debounced 500ms)
+      debouncedAutoSave(p.id, p);
     }
   };
 
