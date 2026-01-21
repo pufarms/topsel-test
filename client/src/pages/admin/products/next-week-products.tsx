@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Download, Search, RotateCcw, Calendar, Package, ArrowRight, CheckCircle } from "lucide-react";
+import { Loader2, Download, Search, RotateCcw, Calendar, Package, ArrowRight, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
@@ -62,6 +62,7 @@ export default function NextWeekProductsPage() {
   
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [applyAllDialogOpen, setApplyAllDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [newProductsList, setNewProductsList] = useState<{ productCode: string; productName: string }[]>([]);
   const [isApplying, setIsApplying] = useState(false);
 
@@ -111,6 +112,22 @@ export default function NextWeekProductsPage() {
     },
     onError: (error: any) => {
       toast({ title: "적용 실패", description: error.message || "현재 공급가 적용에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest("DELETE", "/api/next-week-products/bulk", { ids });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/next-week-products"] });
+      toast({ title: "삭제 완료", description: data.message });
+      setSelectedIds([]);
+      setDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "삭제 실패", description: error.message || "삭제에 실패했습니다.", variant: "destructive" });
     },
   });
 
@@ -204,6 +221,18 @@ export default function NextWeekProductsPage() {
     } finally {
       setIsApplying(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (selectedIds.length === 0) {
+      toast({ title: "선택 항목 없음", description: "삭제할 상품을 선택해주세요.", variant: "destructive" });
+      return;
+    }
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate(selectedIds);
   };
 
   const handleReset = () => {
@@ -342,18 +371,6 @@ export default function NextWeekProductsPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 flex-wrap">
-        <Button onClick={handleApplySelected} disabled={selectedIds.length === 0}>
-          <ArrowRight className="h-4 w-4 mr-1" /> 선택 항목 현재 공급가 적용
-        </Button>
-        <Button variant="outline" onClick={handleApplyAll}>
-          <ArrowRight className="h-4 w-4 mr-1" /> 전체 현재 공급가 적용
-        </Button>
-        <Button variant="outline" onClick={handleDownload}>
-          <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
-        </Button>
-      </div>
-
       <Card>
         <CardContent className="p-0">
           <div className="overflow-auto" style={{ maxHeight: "calc(40px + 40px * 15)" }}>
@@ -432,6 +449,40 @@ export default function NextWeekProductsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex gap-2 flex-wrap">
+        <Button onClick={handleApplySelected} disabled={selectedIds.length === 0}>
+          <ArrowRight className="h-4 w-4 mr-1" /> 선택 항목 현재 공급가 적용
+        </Button>
+        <Button variant="outline" onClick={handleApplyAll}>
+          <ArrowRight className="h-4 w-4 mr-1" /> 전체 현재 공급가 적용
+        </Button>
+        <Button variant="destructive" onClick={handleDelete} disabled={selectedIds.length === 0}>
+          <Trash2 className="h-4 w-4 mr-1" /> 선택 항목 삭제
+        </Button>
+        <Button variant="outline" onClick={handleDownload}>
+          <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
+        </Button>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>상품 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedIds.length}개 상품을 삭제하시겠습니까?
+              <br />
+              <span className="text-destructive font-medium">삭제된 상품은 복구할 수 없습니다.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
         <DialogContent>

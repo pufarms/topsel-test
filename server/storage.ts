@@ -97,6 +97,7 @@ export interface IStorage {
   createNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
   updateNextWeekProduct(id: string, data: Partial<InsertNextWeekProduct>): Promise<NextWeekProduct | undefined>;
   upsertNextWeekProduct(data: InsertNextWeekProduct): Promise<NextWeekProduct>;
+  bulkDeleteNextWeekProducts(ids: string[]): Promise<number>;
 
   // Current Products methods (현재 공급가)
   getAllCurrentProducts(): Promise<CurrentProduct[]>;
@@ -745,6 +746,11 @@ export class DatabaseStorage implements IStorage {
       return updated!;
     }
     return this.createNextWeekProduct(data);
+  }
+
+  async bulkDeleteNextWeekProducts(ids: string[]): Promise<number> {
+    const result = await db.delete(nextWeekProducts).where(inArray(nextWeekProducts.id, ids)).returning();
+    return result.length;
   }
 
   // Current Products methods (현재 공급가)

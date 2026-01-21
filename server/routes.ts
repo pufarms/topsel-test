@@ -1643,6 +1643,28 @@ export async function registerRoutes(
     });
   });
 
+  // 차주 예상공급가 상품 일괄 삭제
+  app.delete("/api/next-week-products/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "삭제할 상품 ID 목록이 필요합니다" });
+    }
+    
+    const deleted = await storage.bulkDeleteNextWeekProducts(ids);
+    return res.json({ 
+      success: true,
+      message: `${deleted}개 상품이 삭제되었습니다.`,
+      data: { deleted }
+    });
+  });
+
   // ========================================
   // 현재 공급가 상품 API (Current Products)
   // ========================================
@@ -1674,6 +1696,28 @@ export async function registerRoutes(
       success: true,
       message: `${updated}개 상품이 공급 중지되었습니다.`,
       updated 
+    });
+  });
+
+  // 현재 공급가 상품 일괄 삭제
+  app.delete("/api/current-products/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "삭제할 상품 ID 목록이 필요합니다" });
+    }
+    
+    const deleted = await storage.bulkDeleteCurrentProducts(ids);
+    return res.json({ 
+      success: true,
+      message: `${deleted}개 상품이 삭제되었습니다.`,
+      data: { deleted }
     });
   });
 

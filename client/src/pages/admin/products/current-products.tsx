@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Download, RotateCcw, Package, CheckCircle, Calendar, StopCircle } from "lucide-react";
+import { Loader2, Download, RotateCcw, Package, CheckCircle, Calendar, StopCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
@@ -41,6 +42,7 @@ export default function CurrentProductsPage() {
   
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
 
   const { data: products = [], isLoading } = useQuery<CurrentProduct[]>({
@@ -66,6 +68,22 @@ export default function CurrentProductsPage() {
     },
     onError: (error: any) => {
       toast({ title: "공급 중지 실패", description: error.message || "공급 중지 처리에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest("DELETE", "/api/current-products/bulk", { ids });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/current-products"] });
+      toast({ title: "삭제 완료", description: data.message });
+      setSelectedIds([]);
+      setDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "삭제 실패", description: error.message || "삭제에 실패했습니다.", variant: "destructive" });
     },
   });
 
@@ -128,6 +146,18 @@ export default function CurrentProductsPage() {
 
   const confirmSuspend = () => {
     suspendMutation.mutate({ ids: selectedIds, reason: suspendReason });
+  };
+
+  const handleDelete = () => {
+    if (selectedIds.length === 0) {
+      toast({ title: "선택 항목 없음", description: "삭제할 상품을 선택해주세요.", variant: "destructive" });
+      return;
+    }
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate(selectedIds);
   };
 
   const handleReset = () => {
@@ -253,15 +283,6 @@ export default function CurrentProductsPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 flex-wrap">
-        <Button variant="destructive" onClick={handleSuspend} disabled={selectedIds.length === 0}>
-          <StopCircle className="h-4 w-4 mr-1" /> 선택 공급중지
-        </Button>
-        <Button variant="outline" onClick={handleDownload}>
-          <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
-        </Button>
-      </div>
-
       <Card>
         <CardContent className="p-0">
           <div className="overflow-auto" style={{ maxHeight: "calc(40px + 40px * 15)" }}>
@@ -340,6 +361,37 @@ export default function CurrentProductsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex gap-2 flex-wrap">
+        <Button variant="destructive" onClick={handleSuspend} disabled={selectedIds.length === 0}>
+          <StopCircle className="h-4 w-4 mr-1" /> 선택 공급중지
+        </Button>
+        <Button variant="destructive" onClick={handleDelete} disabled={selectedIds.length === 0}>
+          <Trash2 className="h-4 w-4 mr-1" /> 선택 항목 삭제
+        </Button>
+        <Button variant="outline" onClick={handleDownload}>
+          <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
+        </Button>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>상품 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedIds.length}개 상품을 삭제하시겠습니까?
+              <br />
+              <span className="text-destructive font-medium">삭제된 상품은 복구할 수 없습니다.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
         <DialogContent>
