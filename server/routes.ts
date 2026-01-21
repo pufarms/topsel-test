@@ -589,7 +589,7 @@ export async function registerRoutes(
       });
 
       if (data.productIds && data.productIds.length > 0) {
-        await storage.setPartnerProducts(partner.id, data.productIds);
+        await storage.updatePartnerProducts(partner.id, data.productIds);
       }
 
       const { password, ...partnerWithoutPassword } = partner;
@@ -638,7 +638,7 @@ export async function registerRoutes(
       const updatedPartner = await storage.updatePartner(req.params.id, updateData);
 
       if (data.productIds !== undefined) {
-        await storage.setPartnerProducts(req.params.id, data.productIds);
+        await storage.updatePartnerProducts(req.params.id, data.productIds);
       }
 
       if (!updatedPartner) {
