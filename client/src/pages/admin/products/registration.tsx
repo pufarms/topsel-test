@@ -780,8 +780,8 @@ export default function ProductRegistrationPage() {
     setIsSending(true);
     
     try {
-      const res = await apiRequest("POST", "/api/admin/send-to-next-week", {
-        productIds: productsToSend.map(p => p.id),
+      const res = await apiRequest("POST", "/api/product-registrations/send-to-next-week", {
+        ids: productsToSend.map(p => p.id),
       });
       const result = await res.json();
       
