@@ -2271,5 +2271,262 @@ export async function registerRoutes(
     }
   });
 
+  // =====================================================
+  // Product Mapping API (상품 매핑)
+  // =====================================================
+
+  // 상품 매핑 목록 조회
+  app.get("/api/product-mappings", async (req, res) => {
+    const mappings = await storage.getAllProductMappings();
+    const result = await Promise.all(mappings.map(async (m) => {
+      const materialMappings = await storage.getProductMaterialMappings(m.productCode);
+      return { ...m, materials: materialMappings };
+    }));
+    return res.json(result);
+  });
+
+  // 상품 매핑 상세 조회
+  app.get("/api/product-mappings/:productCode", async (req, res) => {
+    const { productCode } = req.params;
+    const mapping = await storage.getProductMappingByCode(productCode);
+    if (!mapping) {
+      return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
+    }
+    const materials = await storage.getProductMaterialMappings(productCode);
+    return res.json({ ...mapping, materials });
+  });
+
+  // 상품 추가 (단일)
+  app.post("/api/product-mappings", async (req, res) => {
+    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { productCode, productName } = req.body;
+    if (!productCode || !productName) {
+      return res.status(400).json({ message: "상품코드와 상품명은 필수입니다" });
+    }
+    const existing = await storage.getProductMappingByCode(productCode);
+    if (existing) {
+      return res.status(400).json({ message: "이미 존재하는 상품코드입니다" });
+    }
+    const mapping = await storage.createProductMapping({
+      productCode,
+      productName,
+      mappingStatus: "incomplete",
+    });
+    return res.json(mapping);
+  });
+
+  // 상품 일괄 추가 (복수)
+  app.post("/api/product-mappings/bulk", async (req, res) => {
+    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { products } = req.body;
+    if (!products || !Array.isArray(products)) {
+      return res.status(400).json({ message: "products 배열이 필요합니다" });
+    }
+    const created: any[] = [];
+    const errors: string[] = [];
+    for (const p of products) {
+      if (!p.productCode || !p.productName) {
+        errors.push(`상품코드 또는 상품명 누락`);
+        continue;
+      }
+      const existing = await storage.getProductMappingByCode(p.productCode);
+      if (existing) {
+        errors.push(`이미 존재하는 상품코드: ${p.productCode}`);
+        continue;
+      }
+      const mapping = await storage.createProductMapping({
+        productCode: p.productCode,
+        productName: p.productName,
+        mappingStatus: "incomplete",
+      });
+      created.push(mapping);
+    }
+    return res.json({ success: true, created: created.length, errors });
+  });
+
+  // 상품 매핑 삭제
+  app.delete("/api/product-mappings/:productCode", async (req, res) => {
+    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { productCode } = req.params;
+    const deleted = await storage.deleteProductMapping(productCode);
+    if (!deleted) {
+      return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "매핑 정보가 삭제되었습니다" });
+  });
+
+  // 재료 매핑 조회
+  app.get("/api/product-mappings/:productCode/materials", async (req, res) => {
+    const { productCode } = req.params;
+    const materials = await storage.getProductMaterialMappings(productCode);
+    return res.json(materials);
+  });
+
+  // 재료 매핑 저장 (전체 교체)
+  app.put("/api/product-mappings/:productCode/materials", async (req, res) => {
+    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { productCode } = req.params;
+    const { materials } = req.body;
+    
+    const mapping = await storage.getProductMappingByCode(productCode);
+    if (!mapping) {
+      return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
+    }
+    
+    if (!materials || !Array.isArray(materials)) {
+      return res.status(400).json({ message: "materials 배열이 필요합니다" });
+    }
+    
+    const validMaterials = [];
+    for (const m of materials) {
+      if (!m.materialCode || !m.materialName || m.quantity === undefined) {
+        return res.status(400).json({ message: "재료코드, 재료명, 수량은 필수입니다" });
+      }
+      validMaterials.push({
+        materialCode: m.materialCode,
+        materialName: m.materialName,
+        quantity: parseFloat(m.quantity),
+      });
+    }
+    
+    const result = await storage.replaceProductMaterialMappings(productCode, validMaterials);
+    return res.json({ success: true, materials: result });
+  });
+
+  // 상품등록에서 가져올 수 있는 상품 목록 (이미 매핑된 상품 제외)
+  app.get("/api/product-mappings/available-products", async (req, res) => {
+    const productRegistrations = await storage.getAllProductRegistrations("active");
+    const existingMappings = await storage.getAllProductMappings();
+    const existingCodes = new Set(existingMappings.map(m => m.productCode));
+    
+    const availableProducts = productRegistrations.filter(p => !existingCodes.has(p.productCode));
+    return res.json(availableProducts.map(p => ({
+      productCode: p.productCode,
+      productName: p.productName,
+    })));
+  });
+
+  // 상품 매핑 엑셀 양식 다운로드
+  app.get("/api/product-mappings/template", async (req, res) => {
+    const XLSX = await import("xlsx");
+    const headers = ["상품코드", "상품명", "재료명", "수량"];
+    const sampleData = [
+      ["A001", "부사 3kg 선물", "부사 정품 4다이(원물)", "3.3"],
+      ["A001", "부사 3kg 선물", "3kg 선물박스", "1"],
+      ["A001", "부사 3kg 선물", "고급 보자기", "1"],
+      ["A002", "부사 5kg 가정", "부사 정품 4다이(원물)", "5.5"],
+      ["A002", "부사 5kg 가정", "5kg 일반박스", "1"],
+      ["B001", "신고 3kg 선물", "", ""],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "상품매핑");
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=product_mapping_template.xlsx");
+    return res.send(buffer);
+  });
+
+  // 상품 매핑 엑셀 업로드
+  const mappingExcelUpload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/product-mappings/upload", mappingExcelUpload.single("file"), async (req, res) => {
+    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "파일이 필요합니다" });
+    }
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      
+      if (rows.length < 2) {
+        return res.status(400).json({ message: "데이터가 없습니다" });
+      }
+      
+      const dataRows = rows.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== ""));
+      const errors: string[] = [];
+      
+      const productGroups: { [key: string]: { productName: string; materials: { materialCode: string; materialName: string; quantity: number }[] } } = {};
+      
+      for (let i = 0; i < dataRows.length; i++) {
+        const [상품코드, 상품명, 재료명, 수량] = dataRows[i];
+        const rowNum = i + 2;
+        
+        if (!상품코드 || !상품명) {
+          errors.push(`행 ${rowNum}: 상품코드 또는 상품명 누락`);
+          continue;
+        }
+        
+        const productCode = String(상품코드);
+        if (!productGroups[productCode]) {
+          productGroups[productCode] = { productName: String(상품명), materials: [] };
+        }
+        
+        if (재료명 && 수량 !== undefined && 수량 !== "") {
+          const material = await storage.getMaterialByName(String(재료명));
+          if (!material) {
+            errors.push(`행 ${rowNum}: "${재료명}" 재료가 존재하지 않습니다`);
+            continue;
+          }
+          productGroups[productCode].materials.push({
+            materialCode: material.materialCode,
+            materialName: String(재료명),
+            quantity: parseFloat(String(수량)) || 0,
+          });
+        }
+      }
+      
+      let productOnlyCount = 0;
+      let productWithMappingCount = 0;
+      
+      for (const [productCode, data] of Object.entries(productGroups)) {
+        const existing = await storage.getProductMappingByCode(productCode);
+        
+        if (existing) {
+          if (data.materials.length > 0) {
+            await storage.replaceProductMaterialMappings(productCode, data.materials);
+            productWithMappingCount++;
+          }
+        } else {
+          await storage.createProductMapping({
+            productCode,
+            productName: data.productName,
+            mappingStatus: data.materials.length > 0 ? "complete" : "incomplete",
+          });
+          
+          if (data.materials.length > 0) {
+            await storage.replaceProductMaterialMappings(productCode, data.materials);
+            productWithMappingCount++;
+          } else {
+            productOnlyCount++;
+          }
+        }
+      }
+      
+      const totalProducts = Object.keys(productGroups).length;
+      return res.json({
+        success: true,
+        message: `${totalProducts}개 상품이 등록되었습니다.`,
+        totalProducts,
+        productOnlyCount,
+        productWithMappingCount,
+        errors,
+      });
+    } catch (error) {
+      return res.status(400).json({ message: "엑셀 파일 처리 중 오류가 발생했습니다" });
+    }
+  });
+
   return httpServer;
 }
