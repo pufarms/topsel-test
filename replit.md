@@ -64,6 +64,10 @@ Preferred communication style: Simple, everyday language.
 ### Product Mapping
 - Enables mapping products to necessary materials (raw, semi, sub) for inventory integration.
 - Provides a list of products with filtering and search, supporting responsive table/card views.
+- **Category Filtering**: Hierarchical filtering by product categories (대/중/소분류)
+  - Large category (대분류) dropdown enables medium category dropdown when selected
+  - Medium category (중분류) dropdown enables small category dropdown when selected
+  - Category data synced from product_registrations categories
 - Allows adding products from existing registrations or direct input.
 - Supports material selection, quantity input, and full replacement saving for mappings.
 - Automatic status updates (complete/incomplete) based on material assignments.

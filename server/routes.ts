@@ -2295,6 +2295,9 @@ export async function registerRoutes(
     return res.json(availableProducts.map(p => ({
       productCode: p.productCode,
       productName: p.productName,
+      categoryLarge: p.categoryLarge,
+      categoryMedium: p.categoryMedium,
+      categorySmall: p.categorySmall,
     })));
   });
 
@@ -2339,7 +2342,7 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    const { productCode, productName } = req.body;
+    const { productCode, productName, categoryLarge, categoryMedium, categorySmall } = req.body;
     if (!productCode || !productName) {
       return res.status(400).json({ message: "상품코드와 상품명은 필수입니다" });
     }
@@ -2350,6 +2353,9 @@ export async function registerRoutes(
     const mapping = await storage.createProductMapping({
       productCode,
       productName,
+      categoryLarge: categoryLarge || null,
+      categoryMedium: categoryMedium || null,
+      categorySmall: categorySmall || null,
       mappingStatus: "incomplete",
     });
     return res.json(mapping);
@@ -2382,6 +2388,9 @@ export async function registerRoutes(
       }
       const mapping = await storage.createProductMapping({
         productCode: p.productCode,
+        categoryLarge: p.categoryLarge || null,
+        categoryMedium: p.categoryMedium || null,
+        categorySmall: p.categorySmall || null,
         productName: p.productName,
         mappingStatus: "incomplete",
       });

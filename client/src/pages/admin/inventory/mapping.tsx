@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
-import type { ProductMapping, ProductMaterialMapping, Material } from "@shared/schema";
+import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical, Filter } from "lucide-react";
+import type { ProductMapping, ProductMaterialMapping, Material, Category } from "@shared/schema";
 
 interface ProductMappingWithMaterials extends ProductMapping {
   materials: ProductMaterialMapping[];
@@ -61,6 +61,10 @@ export default function ProductMappingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
+  const [filterCategoryLarge, setFilterCategoryLarge] = useState<string>("all");
+  const [filterCategoryMedium, setFilterCategoryMedium] = useState<string>("all");
+  const [filterCategorySmall, setFilterCategorySmall] = useState<string>("all");
+  
   const [columnWidths, setColumnWidths] = useState<ColumnWidth>(DEFAULT_COLUMN_WIDTHS);
   const [resizing, setResizing] = useState<{ column: keyof ColumnWidth; startX: number; startWidth: number } | null>(null);
   
@@ -98,12 +102,40 @@ export default function ProductMappingPage() {
     queryKey: ["/api/materials"],
   });
 
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  const largeCategories = useMemo(() => 
+    categories.filter(c => c.level === "large"), [categories]);
+  
+  const selectedLargeCategory = useMemo(() => 
+    largeCategories.find(lc => lc.name === filterCategoryLarge), [largeCategories, filterCategoryLarge]);
+  
+  const mediumCategories = useMemo(() => {
+    if (filterCategoryLarge === "all") return [];
+    if (!selectedLargeCategory) return [];
+    return categories.filter(c => c.level === "medium" && c.parentId === selectedLargeCategory.id);
+  }, [categories, filterCategoryLarge, selectedLargeCategory]);
+  
+  const selectedMediumCategory = useMemo(() => 
+    mediumCategories.find(mc => mc.name === filterCategoryMedium), [mediumCategories, filterCategoryMedium]);
+  
+  const smallCategories = useMemo(() => {
+    if (filterCategoryMedium === "all") return [];
+    if (!selectedMediumCategory) return [];
+    return categories.filter(c => c.level === "small" && c.parentId === selectedMediumCategory.id);
+  }, [categories, filterCategoryMedium, selectedMediumCategory]);
+
   const filteredAndSortedMappings = useMemo(() => {
     let result = productMappings.filter((m) => {
       const matchesSearch = searchQuery === "" || 
         m.productCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.productName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      const matchesCategoryLarge = filterCategoryLarge === "all" || m.categoryLarge === filterCategoryLarge;
+      const matchesCategoryMedium = filterCategoryMedium === "all" || m.categoryMedium === filterCategoryMedium;
+      const matchesCategorySmall = filterCategorySmall === "all" || m.categorySmall === filterCategorySmall;
+      return matchesSearch && matchesCategoryLarge && matchesCategoryMedium && matchesCategorySmall;
     });
 
     if (sortOption === "code_asc") {
@@ -117,7 +149,7 @@ export default function ProductMappingPage() {
     }
 
     return result;
-  }, [productMappings, searchQuery, sortOption]);
+  }, [productMappings, searchQuery, sortOption, filterCategoryLarge, filterCategoryMedium, filterCategorySmall]);
 
   const totalPages = Math.ceil(filteredAndSortedMappings.length / itemsPerPage);
   const paginatedMappings = filteredAndSortedMappings.slice(
@@ -403,8 +435,65 @@ export default function ProductMappingPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-          <div className="flex items-center gap-1">
-            <Label className="text-xs whitespace-nowrap">판매상품명</Label>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Filter className="w-3 h-3 text-muted-foreground" />
+            <Select 
+              value={filterCategoryLarge} 
+              onValueChange={(v) => {
+                setFilterCategoryLarge(v);
+                setFilterCategoryMedium("all");
+                setFilterCategorySmall("all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-large">
+                <SelectValue placeholder="대분류" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">대분류 전체</SelectItem>
+                {largeCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select 
+              value={filterCategoryMedium} 
+              onValueChange={(v) => {
+                setFilterCategoryMedium(v);
+                setFilterCategorySmall("all");
+                setCurrentPage(1);
+              }}
+              disabled={filterCategoryLarge === "all"}
+            >
+              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-medium">
+                <SelectValue placeholder="중분류" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">중분류 전체</SelectItem>
+                {mediumCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select 
+              value={filterCategorySmall} 
+              onValueChange={(v) => {
+                setFilterCategorySmall(v);
+                setCurrentPage(1);
+              }}
+              disabled={filterCategoryMedium === "all"}
+            >
+              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-small">
+                <SelectValue placeholder="소분류" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">소분류 전체</SelectItem>
+                {smallCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Label className="text-xs whitespace-nowrap ml-2">판매상품명</Label>
             <Input
               placeholder="검색"
               value={searchQuery}
