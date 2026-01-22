@@ -1922,6 +1922,75 @@ export async function registerRoutes(
   });
 
   // ========================================
+  // 재료 소분류 API (Material Small Categories)
+  // ========================================
+
+  app.get("/api/material-categories/small", async (req, res) => {
+    const { mediumCategoryId } = req.query;
+    if (mediumCategoryId && typeof mediumCategoryId === "string") {
+      const categories = await storage.getMaterialCategoriesSmallByMedium(mediumCategoryId);
+      return res.json(categories);
+    }
+    const categories = await storage.getAllMaterialCategoriesSmall();
+    return res.json(categories);
+  });
+
+  app.post("/api/material-categories/small", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { mediumCategoryId, name, sortOrder } = req.body;
+    if (!mediumCategoryId || !name) {
+      return res.status(400).json({ message: "중분류와 소분류명을 입력해주세요" });
+    }
+    const existing = await storage.getMaterialCategorySmallByName(mediumCategoryId, name);
+    if (existing) {
+      return res.status(400).json({ message: "동일한 중분류에 이미 존재하는 소분류명입니다" });
+    }
+    const category = await storage.createMaterialCategorySmall({ mediumCategoryId, name, sortOrder: sortOrder || 0 });
+    return res.json(category);
+  });
+
+  app.put("/api/material-categories/small/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { name, sortOrder } = req.body;
+    const updated = await storage.updateMaterialCategorySmall(req.params.id, { name, sortOrder });
+    if (!updated) {
+      return res.status(404).json({ message: "소분류를 찾을 수 없습니다" });
+    }
+    return res.json(updated);
+  });
+
+  app.delete("/api/material-categories/small/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const materials = await storage.getMaterialsBySmallCategory(req.params.id);
+    if (materials.length > 0) {
+      return res.status(400).json({ message: "해당 소분류에 재료가 존재합니다. 먼저 재료를 삭제해주세요." });
+    }
+    const deleted = await storage.deleteMaterialCategorySmall(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "소분류를 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "소분류가 삭제되었습니다." });
+  });
+
+  // ========================================
   // 재료 API (Materials)
   // ========================================
 

@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type Material, type InsertMaterial, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materials } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -129,9 +129,19 @@ export interface IStorage {
   updateMaterialCategoryMedium(id: string, data: Partial<InsertMaterialCategoryMedium>): Promise<MaterialCategoryMedium | undefined>;
   deleteMaterialCategoryMedium(id: string): Promise<boolean>;
 
+  // Material Category Small methods (재료 소분류)
+  getAllMaterialCategoriesSmall(): Promise<MaterialCategorySmall[]>;
+  getMaterialCategoriesSmallByMedium(mediumCategoryId: string): Promise<MaterialCategorySmall[]>;
+  getMaterialCategorySmall(id: string): Promise<MaterialCategorySmall | undefined>;
+  getMaterialCategorySmallByName(mediumCategoryId: string, name: string): Promise<MaterialCategorySmall | undefined>;
+  createMaterialCategorySmall(data: InsertMaterialCategorySmall): Promise<MaterialCategorySmall>;
+  updateMaterialCategorySmall(id: string, data: Partial<InsertMaterialCategorySmall>): Promise<MaterialCategorySmall | undefined>;
+  deleteMaterialCategorySmall(id: string): Promise<boolean>;
+
   // Material methods (재료)
   getAllMaterials(): Promise<Material[]>;
   getMaterialsByCategory(largeCategoryId?: string, mediumCategoryId?: string): Promise<Material[]>;
+  getMaterialsBySmallCategory(smallCategoryId: string): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
   getMaterialByCode(code: string): Promise<Material | undefined>;
   createMaterial(data: InsertMaterial): Promise<Material>;
@@ -926,6 +936,49 @@ export class DatabaseStorage implements IStorage {
     return !!deleted;
   }
 
+  // Material Category Small methods (재료 소분류)
+  async getAllMaterialCategoriesSmall(): Promise<MaterialCategorySmall[]> {
+    return db.select().from(materialCategoriesSmall).orderBy(materialCategoriesSmall.sortOrder);
+  }
+
+  async getMaterialCategoriesSmallByMedium(mediumCategoryId: string): Promise<MaterialCategorySmall[]> {
+    return db.select().from(materialCategoriesSmall)
+      .where(eq(materialCategoriesSmall.mediumCategoryId, mediumCategoryId))
+      .orderBy(materialCategoriesSmall.sortOrder);
+  }
+
+  async getMaterialCategorySmall(id: string): Promise<MaterialCategorySmall | undefined> {
+    const [category] = await db.select().from(materialCategoriesSmall).where(eq(materialCategoriesSmall.id, id));
+    return category;
+  }
+
+  async getMaterialCategorySmallByName(mediumCategoryId: string, name: string): Promise<MaterialCategorySmall | undefined> {
+    const [category] = await db.select().from(materialCategoriesSmall)
+      .where(and(
+        eq(materialCategoriesSmall.mediumCategoryId, mediumCategoryId),
+        eq(materialCategoriesSmall.name, name)
+      ));
+    return category;
+  }
+
+  async createMaterialCategorySmall(data: InsertMaterialCategorySmall): Promise<MaterialCategorySmall> {
+    const [category] = await db.insert(materialCategoriesSmall).values(data).returning();
+    return category;
+  }
+
+  async updateMaterialCategorySmall(id: string, data: Partial<InsertMaterialCategorySmall>): Promise<MaterialCategorySmall | undefined> {
+    const [category] = await db.update(materialCategoriesSmall)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(materialCategoriesSmall.id, id))
+      .returning();
+    return category;
+  }
+
+  async deleteMaterialCategorySmall(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(materialCategoriesSmall).where(eq(materialCategoriesSmall.id, id)).returning();
+    return !!deleted;
+  }
+
   // Material methods (재료)
   async getAllMaterials(): Promise<Material[]> {
     return db.select().from(materials).orderBy(desc(materials.createdAt));
@@ -943,6 +996,12 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(materials.createdAt));
     }
     return this.getAllMaterials();
+  }
+
+  async getMaterialsBySmallCategory(smallCategoryId: string): Promise<Material[]> {
+    return db.select().from(materials)
+      .where(eq(materials.smallCategoryId, smallCategoryId))
+      .orderBy(desc(materials.createdAt));
   }
 
   async getMaterial(id: string): Promise<Material | undefined> {
