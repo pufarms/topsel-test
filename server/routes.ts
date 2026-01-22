@@ -2332,7 +2332,11 @@ export async function registerRoutes(
 
   // 상품 추가 (단일)
   app.post("/api/product-mappings", async (req, res) => {
-    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { productCode, productName } = req.body;
@@ -2353,7 +2357,11 @@ export async function registerRoutes(
 
   // 상품 일괄 추가 (복수)
   app.post("/api/product-mappings/bulk", async (req, res) => {
-    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { products } = req.body;
@@ -2384,7 +2392,11 @@ export async function registerRoutes(
 
   // 상품 매핑 삭제
   app.delete("/api/product-mappings/:productCode", async (req, res) => {
-    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { productCode } = req.params;
@@ -2404,7 +2416,11 @@ export async function registerRoutes(
 
   // 재료 매핑 저장 (전체 교체)
   app.put("/api/product-mappings/:productCode/materials", async (req, res) => {
-    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { productCode } = req.params;
@@ -2438,7 +2454,11 @@ export async function registerRoutes(
   // 상품 매핑 엑셀 업로드
   const mappingExcelUpload = multer({ storage: multer.memoryStorage() });
   app.post("/api/product-mappings/upload", mappingExcelUpload.single("file"), async (req, res) => {
-    if (!req.session?.user || !["SUPER_ADMIN", "ADMIN"].includes(req.session.user.role)) {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const uploadUser = await storage.getUser(req.session.userId);
+    if (!uploadUser || (uploadUser.role !== "SUPER_ADMIN" && uploadUser.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     if (!req.file) {
