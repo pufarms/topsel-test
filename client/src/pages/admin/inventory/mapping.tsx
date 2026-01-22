@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Download, Upload, Loader2, Search, Eye, Edit, Package, X } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Loader2, Search, Eye, Edit, Package, X, ChevronLeft, ChevronRight } from "lucide-react";
 import type { ProductMapping, ProductMaterialMapping, Material } from "@shared/schema";
 
 interface ProductMappingWithMaterials extends ProductMapping {
@@ -25,7 +25,9 @@ export default function ProductMappingPage() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortOption, setSortOption] = useState("default");
+  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
@@ -33,9 +35,6 @@ export default function ProductMappingPage() {
   const [manualProductCode, setManualProductCode] = useState("");
   const [manualProductName, setManualProductName] = useState("");
   const [selectedImportProducts, setSelectedImportProducts] = useState<string[]>([]);
-  
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<ProductMappingWithMaterials | null>(null);
   
   const [editMappingDialogOpen, setEditMappingDialogOpen] = useState(false);
   const [editProductCode, setEditProductCode] = useState("");
@@ -65,13 +64,32 @@ export default function ProductMappingPage() {
     queryKey: ["/api/materials"],
   });
 
-  const filteredMappings = productMappings.filter((m) => {
-    const matchesSearch = searchQuery === "" || 
-      m.productCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.productName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || m.mappingStatus === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredAndSortedMappings = useMemo(() => {
+    let result = productMappings.filter((m) => {
+      const matchesSearch = searchQuery === "" || 
+        m.productCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.productName.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
+
+    if (sortOption === "code_asc") {
+      result = [...result].sort((a, b) => a.productCode.localeCompare(b.productCode));
+    } else if (sortOption === "code_desc") {
+      result = [...result].sort((a, b) => b.productCode.localeCompare(a.productCode));
+    } else if (sortOption === "name_asc") {
+      result = [...result].sort((a, b) => a.productName.localeCompare(b.productName));
+    } else if (sortOption === "name_desc") {
+      result = [...result].sort((a, b) => b.productName.localeCompare(a.productName));
+    }
+
+    return result;
+  }, [productMappings, searchQuery, sortOption]);
+
+  const totalPages = Math.ceil(filteredAndSortedMappings.length / itemsPerPage);
+  const paginatedMappings = filteredAndSortedMappings.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const filteredMaterials = allMaterials.filter((m) => 
     materialSearchQuery === "" ||
@@ -193,11 +211,6 @@ export default function ProductMappingPage() {
     }
   };
 
-  const handleOpenDetail = (product: ProductMappingWithMaterials) => {
-    setSelectedProduct(product);
-    setDetailDialogOpen(true);
-  };
-
   const handleOpenEditMapping = (product: ProductMappingWithMaterials) => {
     setEditProductCode(product.productCode);
     setEditProductName(product.productName);
@@ -264,7 +277,7 @@ export default function ProductMappingPage() {
 
   const toggleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(filteredMappings.map(m => m.productCode));
+      setSelectedIds(paginatedMappings.map(m => m.productCode));
     } else {
       setSelectedIds([]);
     }
@@ -278,169 +291,192 @@ export default function ProductMappingPage() {
     }
   };
 
-  const completeCount = productMappings.filter(m => m.mappingStatus === "complete").length;
-  const incompleteCount = productMappings.filter(m => m.mappingStatus === "incomplete").length;
+  const getMaterialInfo = (materials: ProductMaterialMapping[], index: number) => {
+    const mat = materials[index];
+    return mat ? { name: mat.materialName, qty: mat.quantity } : { name: "", qty: "" };
+  };
 
   return (
     <div className="space-y-4 p-4" data-testid="page-product-mapping">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">상품 매핑</h1>
-          <p className="text-sm text-muted-foreground mt-1">상품에 필요한 재료를 매핑합니다</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
-            <Download className="w-4 h-4 mr-1" />
-            양식 다운로드
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
-            {uploadMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
-            엑셀 업로드
-          </Button>
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleUpload}
-            className="hidden"
-            data-testid="input-upload-file"
-          />
-          <Button size="sm" onClick={() => setAddProductDialogOpen(true)} data-testid="button-add-product">
-            <Plus className="w-4 h-4 mr-1" />
-            상품 추가
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="p-3" data-testid="card-stat-total">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Package className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">전체 상품</span>
+            <span className="text-lg font-medium">총</span>
+            <span className="text-lg font-bold text-primary">{filteredAndSortedMappings.length}건</span>
+            <span className="text-sm text-muted-foreground ml-4">
+              ({currentPage} Page / Tot {totalPages || 1} Page)
+            </span>
           </div>
-          <div className="text-2xl font-bold mt-1">{productMappings.length}</div>
-        </Card>
-        <Card className="p-3" data-testid="card-stat-complete">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-sm text-muted-foreground">매핑 완료</span>
-          </div>
-          <div className="text-2xl font-bold mt-1">{completeCount}</div>
-        </Card>
-        <Card className="p-3" data-testid="card-stat-incomplete">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-yellow-500" />
-            <span className="text-sm text-muted-foreground">매핑 미완료</span>
-          </div>
-          <div className="text-2xl font-bold mt-1">{incompleteCount}</div>
-        </Card>
-      </div>
-
-      <Card className="p-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="상품코드 또는 상품명 검색"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search"
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
+              <Download className="w-4 h-4 mr-1" />
+              양식 다운로드
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
+              {uploadMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+              엑셀 업로드
+            </Button>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleUpload}
+              className="hidden"
+              data-testid="input-upload-file"
             />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-status-filter">
-              <SelectValue placeholder="상태 필터" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체</SelectItem>
-              <SelectItem value="complete">매핑 완료</SelectItem>
-              <SelectItem value="incomplete">매핑 미완료</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
-
-      {selectedIds.length > 0 && (
-        <Card className="p-3 bg-muted/50">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">{selectedIds.length}개 선택됨</span>
-            <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
-              <Trash2 className="w-4 h-4 mr-1" />
-              선택 삭제
+            <Button size="sm" onClick={() => setAddProductDialogOpen(true)} data-testid="button-add-product">
+              <Plus className="w-4 h-4 mr-1" />
+              상품 추가
             </Button>
           </div>
-        </Card>
-      )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm whitespace-nowrap">판매상품명</Label>
+            <Input
+              placeholder="검색"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-40"
+              data-testid="input-search"
+            />
+            <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
+              <Search className="w-4 h-4" />
+              검색
+            </Button>
+            {selectedIds.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
+                삭제하기
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Select value={sortOption} onValueChange={setSortOption}>
+              <SelectTrigger className="w-32" data-testid="select-sort">
+                <SelectValue placeholder="정렬" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">정렬_기본</SelectItem>
+                <SelectItem value="code_asc">코드 오름차순</SelectItem>
+                <SelectItem value="code_desc">코드 내림차순</SelectItem>
+                <SelectItem value="name_asc">상품명 오름차순</SelectItem>
+                <SelectItem value="name_desc">상품명 내림차순</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+              <SelectTrigger className="w-32" data-testid="select-items-per-page">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="50">50개씩 출력</SelectItem>
+                <SelectItem value="100">100개씩 출력</SelectItem>
+                <SelectItem value="200">200개씩 출력</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
 
       <Card>
         <CardContent className="p-0">
           <div className="hidden lg:block overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
+                <TableRow className="bg-amber-50 dark:bg-amber-950/30">
+                  <TableHead className="w-12 text-center">
                     <Checkbox
-                      checked={filteredMappings.length > 0 && selectedIds.length === filteredMappings.length}
+                      checked={paginatedMappings.length > 0 && selectedIds.length === paginatedMappings.length}
                       onCheckedChange={toggleSelectAll}
                       data-testid="checkbox-select-all"
                     />
                   </TableHead>
-                  <TableHead>상품코드</TableHead>
-                  <TableHead>상품명</TableHead>
-                  <TableHead>매핑된 재료</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead className="w-24">작업</TableHead>
+                  <TableHead className="min-w-[120px]">판매상품코드</TableHead>
+                  <TableHead className="min-w-[200px]">판매상품명</TableHead>
+                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료1</TableHead>
+                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료2</TableHead>
+                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료3</TableHead>
+                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료4</TableHead>
+                  <TableHead className="text-center">사용유무</TableHead>
+                  <TableHead className="w-24 text-center">작업</TableHead>
+                </TableRow>
+                <TableRow className="bg-amber-50/50 dark:bg-amber-950/20">
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
+                  <TableHead className="text-center text-xs">원재료품목1</TableHead>
+                  <TableHead className="text-center text-xs w-16">수량</TableHead>
+                  <TableHead className="text-center text-xs">원재료품목2</TableHead>
+                  <TableHead className="text-center text-xs w-16">수량</TableHead>
+                  <TableHead className="text-center text-xs">원재료품목3</TableHead>
+                  <TableHead className="text-center text-xs w-16">수량</TableHead>
+                  <TableHead className="text-center text-xs">원재료품목4</TableHead>
+                  <TableHead className="text-center text-xs w-16">수량</TableHead>
+                  <TableHead></TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={13} className="text-center py-8">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                     </TableCell>
                   </TableRow>
-                ) : filteredMappings.length === 0 ? (
+                ) : paginatedMappings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       등록된 상품이 없습니다
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMappings.map((mapping) => (
-                    <TableRow key={mapping.productCode} data-testid={`row-product-${mapping.productCode}`}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.includes(mapping.productCode)}
-                          onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
-                          data-testid={`checkbox-product-${mapping.productCode}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{mapping.productCode}</TableCell>
-                      <TableCell>{mapping.productName}</TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">{mapping.materials.length}개</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"}>
-                          {mapping.mappingStatus === "complete" ? "완료" : "미완료"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(mapping)} data-testid={`button-view-${mapping.productCode}`}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)} data-testid={`button-edit-${mapping.productCode}`}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)} data-testid={`button-delete-${mapping.productCode}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  paginatedMappings.map((mapping) => {
+                    const mat1 = getMaterialInfo(mapping.materials, 0);
+                    const mat2 = getMaterialInfo(mapping.materials, 1);
+                    const mat3 = getMaterialInfo(mapping.materials, 2);
+                    const mat4 = getMaterialInfo(mapping.materials, 3);
+                    return (
+                      <TableRow key={mapping.productCode} data-testid={`row-product-${mapping.productCode}`}>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={selectedIds.includes(mapping.productCode)}
+                            onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
+                            data-testid={`checkbox-product-${mapping.productCode}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-blue-600 dark:text-blue-400 underline cursor-pointer" onClick={() => handleOpenEditMapping(mapping)}>
+                          {mapping.productCode}
+                        </TableCell>
+                        <TableCell>{mapping.productName}</TableCell>
+                        <TableCell className="text-sm">{mat1.name}</TableCell>
+                        <TableCell className="text-center text-sm">{mat1.qty}</TableCell>
+                        <TableCell className="text-sm">{mat2.name}</TableCell>
+                        <TableCell className="text-center text-sm">{mat2.qty}</TableCell>
+                        <TableCell className="text-sm">{mat3.name}</TableCell>
+                        <TableCell className="text-center text-sm">{mat3.qty}</TableCell>
+                        <TableCell className="text-sm">{mat4.name}</TableCell>
+                        <TableCell className="text-center text-sm">{mat4.qty}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={mapping.mappingStatus === "complete" ? "text-green-600" : "text-muted-foreground"}>
+                            {mapping.mappingStatus === "complete" ? "사용" : "-"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)} data-testid={`button-edit-${mapping.productCode}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)} data-testid={`button-delete-${mapping.productCode}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -451,40 +487,46 @@ export default function ProductMappingPage() {
               <div className="p-8 text-center">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : filteredMappings.length === 0 ? (
+            ) : paginatedMappings.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 등록된 상품이 없습니다
               </div>
             ) : (
-              filteredMappings.map((mapping) => (
+              paginatedMappings.map((mapping) => (
                 <div key={mapping.productCode} className="p-4" data-testid={`card-product-${mapping.productCode}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={selectedIds.includes(mapping.productCode)}
-                        onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
-                      />
-                      <div>
-                        <div className="font-mono text-sm text-muted-foreground">{mapping.productCode}</div>
-                        <div className="font-medium mt-1">{mapping.productName}</div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-sm text-muted-foreground">재료 {mapping.materials.length}개</span>
-                          <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"} className="text-xs">
-                            {mapping.mappingStatus === "complete" ? "완료" : "미완료"}
-                          </Badge>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selectedIds.includes(mapping.productCode)}
+                      onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-mono text-sm text-blue-600 dark:text-blue-400">{mapping.productCode}</div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDetail(mapping)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="font-medium mt-1">{mapping.productName}</div>
+                      <div className="mt-2 space-y-1">
+                        {mapping.materials.slice(0, 4).map((mat, idx) => (
+                          <div key={mat.materialCode} className="text-sm text-muted-foreground">
+                            원재료{idx + 1}: {mat.materialName} ({mat.quantity})
+                          </div>
+                        ))}
+                        {mapping.materials.length === 0 && (
+                          <div className="text-sm text-muted-foreground">매핑된 재료 없음</div>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"}>
+                          {mapping.mappingStatus === "complete" ? "사용" : "미사용"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -493,6 +535,34 @@ export default function ProductMappingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => p - 1)}
+            data-testid="button-prev-page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            이전
+          </Button>
+          <span className="text-sm">
+            {currentPage} / {totalPages} 페이지
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => p + 1)}
+            data-testid="button-next-page"
+          >
+            다음
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
 
       <Dialog open={addProductDialogOpen} onOpenChange={setAddProductDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -541,12 +611,11 @@ export default function ProductMappingPage() {
                               setSelectedImportProducts([...selectedImportProducts, p.productCode]);
                             }
                           }}
-                          data-testid={`import-product-${p.productCode}`}
                         >
                           <Checkbox checked={selectedImportProducts.includes(p.productCode)} />
-                          <div className="flex-1">
-                            <span className="font-mono text-sm text-muted-foreground">{p.productCode}</span>
-                            <span className="ml-2">{p.productName}</span>
+                          <div>
+                            <div className="font-mono text-sm">{p.productCode}</div>
+                            <div className="text-sm text-muted-foreground">{p.productName}</div>
                           </div>
                         </div>
                       ))}
@@ -562,22 +631,22 @@ export default function ProductMappingPage() {
             ) : (
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="productCode">상품코드</Label>
+                  <Label className="text-sm">상품코드</Label>
                   <Input
-                    id="productCode"
                     value={manualProductCode}
                     onChange={(e) => setManualProductCode(e.target.value)}
                     placeholder="상품코드 입력"
+                    className="mt-1"
                     data-testid="input-product-code"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="productName">상품명</Label>
+                  <Label className="text-sm">상품명</Label>
                   <Input
-                    id="productName"
                     value={manualProductName}
                     onChange={(e) => setManualProductName(e.target.value)}
                     placeholder="상품명 입력"
+                    className="mt-1"
                     data-testid="input-product-name"
                   />
                 </div>
@@ -586,115 +655,63 @@ export default function ProductMappingPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetAddProductForm}>취소</Button>
-            <Button 
-              onClick={handleAddProduct} 
+            <Button
+              onClick={handleAddProduct}
               disabled={addProductMutation.isPending || bulkAddProductMutation.isPending}
               data-testid="button-confirm-add"
             >
-              {(addProductMutation.isPending || bulkAddProductMutation.isPending) && (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              )}
+              {(addProductMutation.isPending || bulkAddProductMutation.isPending) && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               추가
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>상품 상세</DialogTitle>
-            <DialogDescription>{selectedProduct?.productCode} - {selectedProduct?.productName}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">매핑 상태</span>
-              <Badge variant={selectedProduct?.mappingStatus === "complete" ? "default" : "secondary"}>
-                {selectedProduct?.mappingStatus === "complete" ? "완료" : "미완료"}
-              </Badge>
-            </div>
-            <div>
-              <Label className="text-sm">매핑된 재료 ({selectedProduct?.materials.length || 0}개)</Label>
-              {selectedProduct?.materials.length === 0 ? (
-                <div className="mt-2 p-4 text-center text-muted-foreground border rounded-md">
-                  매핑된 재료가 없습니다
-                </div>
-              ) : (
-                <ScrollArea className="h-[200px] mt-2 border rounded-md">
-                  <div className="p-2 space-y-1">
-                    {selectedProduct?.materials.map((m) => (
-                      <div key={m.materialCode} className="flex items-center justify-between p-2 rounded bg-muted/50">
-                        <div>
-                          <span className="font-mono text-sm text-muted-foreground">{m.materialCode}</span>
-                          <span className="ml-2">{m.materialName}</span>
-                        </div>
-                        <span className="text-sm font-medium">{m.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>닫기</Button>
-            <Button onClick={() => {
-              setDetailDialogOpen(false);
-              if (selectedProduct) handleOpenEditMapping(selectedProduct);
-            }} data-testid="button-edit-from-detail">
-              <Edit className="w-4 h-4 mr-1" />
-              매핑 편집
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={editMappingDialogOpen} onOpenChange={setEditMappingDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>재료 매핑 편집</DialogTitle>
-            <DialogDescription>{editProductCode} - {editProductName}</DialogDescription>
+            <DialogDescription>
+              {editProductCode} - {editProductName}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm">매핑된 재료 ({editMaterials.length}개)</Label>
-              <Button variant="outline" size="sm" onClick={() => setAddMaterialDialogOpen(true)} data-testid="button-add-material">
+              <Button size="sm" variant="outline" onClick={() => setAddMaterialDialogOpen(true)} data-testid="button-add-material">
                 <Plus className="w-4 h-4 mr-1" />
                 재료 추가
               </Button>
             </div>
             {editMaterials.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground border rounded-md">
-                매핑된 재료가 없습니다. 재료를 추가해주세요.
+              <div className="p-8 text-center text-muted-foreground border rounded-md">
+                매핑된 재료가 없습니다
               </div>
             ) : (
-              <ScrollArea className="h-[250px] border rounded-md">
-                <div className="p-2 space-y-2">
-                  {editMaterials.map((m) => (
-                    <div key={m.materialCode} className="flex items-center gap-3 p-2 rounded bg-muted/50">
-                      <div className="flex-1">
-                        <span className="font-mono text-sm text-muted-foreground">{m.materialCode}</span>
-                        <span className="ml-2">{m.materialName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs text-muted-foreground">수량</Label>
-                        <Input
-                          type="number"
-                          value={m.quantity}
-                          onChange={(e) => handleUpdateMaterialQuantity(m.materialCode, parseFloat(e.target.value) || 0)}
-                          className="w-20 h-8 text-sm"
-                          step="0.1"
-                          min="0"
-                          data-testid={`input-quantity-${m.materialCode}`}
-                        />
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveMaterialFromMapping(m.materialCode)} data-testid={`button-remove-material-${m.materialCode}`}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+              <div className="border rounded-md divide-y">
+                {editMaterials.map((mat) => (
+                  <div key={mat.materialCode} className="p-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm">{mat.materialCode}</div>
+                      <div className="text-sm text-muted-foreground truncate">{mat.materialName}</div>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">수량:</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={mat.quantity}
+                        onChange={(e) => handleUpdateMaterialQuantity(mat.materialCode, Number(e.target.value) || 1)}
+                        className="w-20"
+                        data-testid={`input-quantity-${mat.materialCode}`}
+                      />
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveMaterialFromMapping(mat.materialCode)} data-testid={`button-remove-material-${mat.materialCode}`}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <DialogFooter>
@@ -711,7 +728,7 @@ export default function ProductMappingPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>재료 선택</DialogTitle>
-            <DialogDescription>매핑할 재료를 선택하세요</DialogDescription>
+            <DialogDescription>매핑할 재료를 선택합니다</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="relative">
@@ -728,23 +745,21 @@ export default function ProductMappingPage() {
               <div className="p-2 space-y-1">
                 {filteredMaterials.length === 0 ? (
                   <div className="p-4 text-center text-muted-foreground">
-                    검색 결과가 없습니다
+                    재료를 찾을 수 없습니다
                   </div>
                 ) : (
                   filteredMaterials.map((m) => (
                     <div
-                      key={m.id}
-                      className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer"
+                      key={m.materialCode}
+                      className="flex items-center gap-3 p-2 rounded hover-elevate cursor-pointer"
                       onClick={() => handleAddMaterialToMapping(m)}
-                      data-testid={`select-material-${m.materialCode}`}
+                      data-testid={`material-option-${m.materialCode}`}
                     >
-                      <div>
-                        <span className="font-mono text-sm text-muted-foreground">{m.materialCode}</span>
-                        <span className="ml-2">{m.materialName}</span>
+                      <Badge variant="secondary" className="text-xs">{m.materialType === "raw" ? "원" : m.materialType === "semi" ? "반" : "부"}</Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-sm">{m.materialCode}</div>
+                        <div className="text-sm text-muted-foreground truncate">{m.materialName}</div>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {m.materialType === "raw" ? "원재료" : m.materialType === "semi" ? "반재료" : "부재료"}
-                      </Badge>
                     </div>
                   ))
                 )}
@@ -759,12 +774,18 @@ export default function ProductMappingPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>상품 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              상품 "{deleteProductCode}"를 삭제하시겠습니까? 연결된 재료 매핑도 함께 삭제됩니다.
+              "{deleteProductCode}" 상품을 삭제하시겠습니까? 매핑된 재료 정보도 함께 삭제됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteProductMutation.mutate(deleteProductCode)} data-testid="button-confirm-delete">삭제</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => deleteProductMutation.mutate(deleteProductCode)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              삭제
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -772,14 +793,20 @@ export default function ProductMappingPage() {
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>선택 삭제</AlertDialogTitle>
+            <AlertDialogTitle>선택 상품 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              선택한 {selectedIds.length}개 상품을 삭제하시겠습니까? 연결된 재료 매핑도 함께 삭제됩니다.
+              선택한 {selectedIds.length}개 상품을 삭제하시겠습니까? 매핑된 재료 정보도 함께 삭제됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} data-testid="button-confirm-bulk-delete">삭제</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-bulk-delete"
+            >
+              삭제
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -789,30 +816,28 @@ export default function ProductMappingPage() {
           <DialogHeader>
             <DialogTitle>업로드 결과</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-muted/50 rounded-md">
-                <div className="text-sm text-muted-foreground">등록된 상품</div>
-                <div className="text-xl font-bold">{uploadResult?.totalProducts || 0}개</div>
+          {uploadResult && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>전체 상품:</div>
+                <div className="font-medium">{uploadResult.totalProducts}개</div>
+                <div>상품만 추가:</div>
+                <div className="font-medium">{uploadResult.productOnlyCount}개</div>
+                <div>재료 매핑 포함:</div>
+                <div className="font-medium">{uploadResult.productWithMappingCount}개</div>
               </div>
-              <div className="p-3 bg-muted/50 rounded-md">
-                <div className="text-sm text-muted-foreground">재료 매핑 완료</div>
-                <div className="text-xl font-bold">{uploadResult?.productWithMappingCount || 0}개</div>
-              </div>
-            </div>
-            {uploadResult?.errors && uploadResult.errors.length > 0 && (
-              <div>
-                <Label className="text-sm text-destructive">오류 ({uploadResult.errors.length}건)</Label>
-                <ScrollArea className="h-[150px] mt-2 border rounded-md border-destructive/50">
-                  <div className="p-2 space-y-1">
-                    {uploadResult.errors.map((err, i) => (
-                      <div key={i} className="text-sm text-destructive">{err}</div>
+              {uploadResult.errors.length > 0 && (
+                <div className="mt-4">
+                  <Label className="text-sm text-destructive">오류 ({uploadResult.errors.length}건)</Label>
+                  <ScrollArea className="h-[100px] mt-2 border rounded-md p-2">
+                    {uploadResult.errors.map((err, idx) => (
+                      <div key={idx} className="text-sm text-destructive">{err}</div>
                     ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button onClick={() => setUploadResultDialogOpen(false)}>확인</Button>
           </DialogFooter>
