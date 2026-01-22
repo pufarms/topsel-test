@@ -2304,16 +2304,19 @@ export async function registerRoutes(
   // 상품 매핑 엑셀 양식 다운로드
   app.get("/api/product-mappings/template", async (req, res) => {
     const XLSX = await import("xlsx");
-    const headers = ["상품코드", "상품명", "대분류", "중분류", "소분류", "재료명", "수량"];
+    // 2행 헤더 구조 (샘플 양식과 동일)
+    const headerRow1 = ["대분류", "중분류", "소분류", "판매상품코드", "판매상품명", "원재료 구성내역", null, null, null, null, null, null, null, "사용유무"];
+    const headerRow2 = [null, null, null, null, null, "원재료품목코드1", "수량", "원재료품목코드2", "수량", "원재료품목코드3", "수량", "원재료품목코드4", "수량", null];
     const sampleData = [
-      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "부사 정품 4다이(원물)", "3.3"],
-      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "3kg 선물박스", "1"],
-      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "고급 보자기", "1"],
-      ["A002", "부사 5kg 가정", "과일", "사과", "부사", "부사 정품 4다이(원물)", "5.5"],
-      ["A002", "부사 5kg 가정", "과일", "사과", "부사", "5kg 일반박스", "1"],
-      ["B001", "신고 3kg 선물", "과일", "배", "신고", "", ""],
+      ["과일", "사과", "부사", "S00001", "판매상품1", "APB001", 1, "APS001", 2, null, null, null, null, "Y"],
+      ["과일", "사과", "부사", "S00002", "판매상품2", "APB002", 3, null, null, null, null, null, null, "Y"],
+      ["과일", "사과", "부사", "S00003", "판매상품3", null, null, null, null, null, null, null, null, "N"],
     ];
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+    const ws = XLSX.utils.aoa_to_sheet([headerRow1, headerRow2, ...sampleData]);
+    // 셀 병합 설정 (원재료 구성내역 헤더)
+    ws["!merges"] = [
+      { s: { r: 0, c: 5 }, e: { r: 0, c: 12 } }, // 원재료 구성내역 병합
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "상품매핑");
     const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
@@ -2342,7 +2345,7 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    const { productCode, productName, categoryLarge, categoryMedium, categorySmall } = req.body;
+    const { productCode, productName, categoryLarge, categoryMedium, categorySmall, usageStatus } = req.body;
     if (!productCode || !productName) {
       return res.status(400).json({ message: "상품코드와 상품명은 필수입니다" });
     }
@@ -2356,6 +2359,7 @@ export async function registerRoutes(
       categoryLarge: categoryLarge || null,
       categoryMedium: categoryMedium || null,
       categorySmall: categorySmall || null,
+      usageStatus: usageStatus || "Y",
       mappingStatus: "incomplete",
     });
     return res.json(mapping);
@@ -2409,7 +2413,7 @@ export async function registerRoutes(
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { productCode } = req.params;
-    const { productName, categoryLarge, categoryMedium, categorySmall } = req.body;
+    const { productName, categoryLarge, categoryMedium, categorySmall, usageStatus } = req.body;
     
     const existing = await storage.getProductMappingByCode(productCode);
     if (!existing) {
@@ -2421,6 +2425,7 @@ export async function registerRoutes(
       categoryLarge: categoryLarge !== undefined ? categoryLarge : existing.categoryLarge,
       categoryMedium: categoryMedium !== undefined ? categoryMedium : existing.categoryMedium,
       categorySmall: categorySmall !== undefined ? categorySmall : existing.categorySmall,
+      usageStatus: usageStatus !== undefined ? usageStatus : existing.usageStatus,
     });
     
     return res.json(updated);
@@ -2506,46 +2511,74 @@ export async function registerRoutes(
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
       
-      if (rows.length < 2) {
+      // 새 양식: 2행 헤더 (row 0, row 1), 데이터는 row 2부터
+      if (rows.length < 3) {
         return res.status(400).json({ message: "데이터가 없습니다" });
       }
       
-      const dataRows = rows.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== ""));
+      // 2행 헤더 건너뛰기 (row 0: 메인 헤더, row 1: 서브 헤더)
+      const dataRows = rows.slice(2).filter(row => row.some(cell => cell !== undefined && cell !== ""));
       const errors: string[] = [];
       
-      const productGroups: { [key: string]: { productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; materials: { materialCode: string; materialName: string; quantity: number }[] } } = {};
+      interface ProductData {
+        productName: string;
+        categoryLarge?: string;
+        categoryMedium?: string;
+        categorySmall?: string;
+        usageStatus: string;
+        materials: { materialCode: string; materialName: string; quantity: number }[];
+      }
+      
+      const productGroups: { [key: string]: ProductData } = {};
       
       for (let i = 0; i < dataRows.length; i++) {
-        const [상품코드, 상품명, 대분류, 중분류, 소분류, 재료명, 수량] = dataRows[i];
-        const rowNum = i + 2;
+        const row = dataRows[i];
+        const rowNum = i + 3; // 실제 엑셀 행 번호 (1-indexed + 2행 헤더)
         
-        if (!상품코드 || !상품명) {
-          errors.push(`행 ${rowNum}: 상품코드 또는 상품명 누락`);
+        // 컬럼 구조: 대분류, 중분류, 소분류, 판매상품코드, 판매상품명, 원재료품목코드1, 수량, ...(4쌍), 사용유무
+        const 대분류 = row[0];
+        const 중분류 = row[1];
+        const 소분류 = row[2];
+        const 판매상품코드 = row[3];
+        const 판매상품명 = row[4];
+        const 사용유무 = row[13]; // 마지막 컬럼
+        
+        if (!판매상품코드 || !판매상품명) {
+          errors.push(`행 ${rowNum}: 판매상품코드 또는 판매상품명 누락`);
           continue;
         }
         
-        const productCode = String(상품코드);
+        const productCode = String(판매상품코드);
         if (!productGroups[productCode]) {
           productGroups[productCode] = { 
-            productName: String(상품명), 
+            productName: String(판매상품명), 
             categoryLarge: 대분류 ? String(대분류) : undefined,
             categoryMedium: 중분류 ? String(중분류) : undefined,
             categorySmall: 소분류 ? String(소분류) : undefined,
+            usageStatus: 사용유무 === "N" ? "N" : "Y",
             materials: [] 
           };
         }
         
-        if (재료명 && 수량 !== undefined && 수량 !== "") {
-          const material = await storage.getMaterialByName(String(재료명));
-          if (!material) {
-            errors.push(`행 ${rowNum}: "${재료명}" 재료가 존재하지 않습니다`);
-            continue;
+        // 원재료 4쌍 처리 (코드1, 수량1, 코드2, 수량2, 코드3, 수량3, 코드4, 수량4)
+        for (let j = 0; j < 4; j++) {
+          const codeIdx = 5 + j * 2;
+          const qtyIdx = 6 + j * 2;
+          const materialCode = row[codeIdx];
+          const quantity = row[qtyIdx];
+          
+          if (materialCode && quantity !== undefined && quantity !== "") {
+            const material = await storage.getMaterialByCode(String(materialCode));
+            if (!material) {
+              errors.push(`행 ${rowNum}: 원재료품목코드 "${materialCode}"가 존재하지 않습니다`);
+              continue;
+            }
+            productGroups[productCode].materials.push({
+              materialCode: String(materialCode),
+              materialName: material.materialName,
+              quantity: parseFloat(String(quantity)) || 0,
+            });
           }
-          productGroups[productCode].materials.push({
-            materialCode: material.materialCode,
-            materialName: String(재료명),
-            quantity: parseFloat(String(수량)) || 0,
-          });
         }
       }
       
@@ -2556,6 +2589,14 @@ export async function registerRoutes(
         const existing = await storage.getProductMappingByCode(productCode);
         
         if (existing) {
+          // 기존 상품 업데이트
+          await storage.updateProductMappingByCode(productCode, {
+            productName: data.productName,
+            categoryLarge: data.categoryLarge || null,
+            categoryMedium: data.categoryMedium || null,
+            categorySmall: data.categorySmall || null,
+            usageStatus: data.usageStatus,
+          });
           if (data.materials.length > 0) {
             await storage.replaceProductMaterialMappings(productCode, data.materials);
             productWithMappingCount++;
@@ -2567,6 +2608,7 @@ export async function registerRoutes(
             categoryLarge: data.categoryLarge || null,
             categoryMedium: data.categoryMedium || null,
             categorySmall: data.categorySmall || null,
+            usageStatus: data.usageStatus,
             mappingStatus: data.materials.length > 0 ? "complete" : "incomplete",
           });
           

@@ -623,6 +623,7 @@ export const productMappings = pgTable("product_mappings", {
   categoryLarge: text("category_large"),
   categoryMedium: text("category_medium"),
   categorySmall: text("category_small"),
+  usageStatus: text("usage_status").notNull().default("Y"),
   mappingStatus: text("mapping_status").notNull().default("incomplete"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

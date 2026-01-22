@@ -241,7 +241,7 @@ export default function ProductMappingPage() {
   }, [resizing, handleMouseMove, handleMouseUp]);
 
   const addProductMutation = useMutation({
-    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string }) => {
+    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; usageStatus?: string }) => {
       const res = await apiRequest("POST", "/api/product-mappings", data);
       return res.json();
     },
@@ -298,7 +298,7 @@ export default function ProductMappingPage() {
   });
 
   const updateProductMappingMutation = useMutation({
-    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string }) => {
+    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; usageStatus?: string }) => {
       const res = await apiRequest("PUT", `/api/product-mappings/${data.productCode}`, data);
       return res.json();
     },
@@ -367,7 +367,7 @@ export default function ProductMappingPage() {
         quantity: m.quantity,
       };
     }));
-    setEditUsageStatus(product.mappingStatus === "complete" ? "사용" : "미사용");
+    setEditUsageStatus(product.usageStatus === "Y" ? "사용" : "미사용");
     setEditMemo("");
     setProductDialogOpen(true);
   };
@@ -409,6 +409,7 @@ export default function ProductMappingPage() {
           categoryLarge: editCategoryLarge || undefined,
           categoryMedium: editCategoryMedium || undefined,
           categorySmall: editCategorySmall || undefined,
+          usageStatus: editUsageStatus === "사용" ? "Y" : "N",
         });
         // 재료가 있으면 저장
         if (editMaterials.length > 0) {
@@ -426,6 +427,7 @@ export default function ProductMappingPage() {
           categoryLarge: editCategoryLarge || undefined,
           categoryMedium: editCategoryMedium || undefined,
           categorySmall: editCategorySmall || undefined,
+          usageStatus: editUsageStatus === "사용" ? "Y" : "N",
         });
         // 재료 저장
         await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
@@ -505,7 +507,7 @@ export default function ProductMappingPage() {
           <div className="flex flex-wrap gap-1">
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleDownloadTemplate} data-testid="button-download-template">
               <Download className="w-3 h-3 mr-1" />
-              양식
+              양식 다운로드
             </Button>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
               {uploadMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}
@@ -745,8 +747,8 @@ export default function ProductMappingPage() {
                       <div className={`${cellClass} truncate`} style={{ width: columnWidths.mat4Name }}>{mat4.name}</div>
                       <div className={`${cellClass} text-center`} style={{ width: columnWidths.mat4Qty }}>{mat4.qty}</div>
                       <div className={`${cellClass} text-center`} style={{ width: columnWidths.status }}>
-                        <span className={mapping.mappingStatus === "complete" ? "text-green-600" : "text-muted-foreground"}>
-                          {mapping.mappingStatus === "complete" ? "사용" : "-"}
+                        <span className={mapping.usageStatus === "Y" ? "text-green-600" : "text-muted-foreground"}>
+                          {mapping.usageStatus === "Y" ? "사용" : "미사용"}
                         </span>
                       </div>
                       <div className={`${cellClass} text-center`} style={{ width: columnWidths.actions }}>
@@ -808,8 +810,8 @@ export default function ProductMappingPage() {
                               <div className="text-xs text-muted-foreground">매핑된 재료 없음</div>
                             )}
                           </div>
-                          <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"} className="mt-1 text-xs h-5">
-                            {mapping.mappingStatus === "complete" ? "사용" : "미사용"}
+                          <Badge variant={mapping.usageStatus === "Y" ? "default" : "secondary"} className="mt-1 text-xs h-5">
+                            {mapping.usageStatus === "Y" ? "사용" : "미사용"}
                           </Badge>
                         </div>
                       </div>
