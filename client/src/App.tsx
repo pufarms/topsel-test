@@ -24,6 +24,12 @@ import ProductRegistrationPage from "@/pages/admin/products/registration";
 import NextWeekProductsPage from "@/pages/admin/products/next-week-products";
 import CurrentProductsPage from "@/pages/admin/products/current-products";
 import SuspendedProductsPage from "@/pages/admin/products/suspended-products";
+import InventoryCategoriesPage from "@/pages/admin/inventory/categories";
+import MaterialsPage from "@/pages/admin/inventory/materials";
+import ProductMappingPage from "@/pages/admin/inventory/mapping";
+import StockStatusPage from "@/pages/admin/inventory/stock";
+import ReceivingPage from "@/pages/admin/inventory/receiving";
+import InventoryHistoryPage from "@/pages/admin/inventory/history";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -94,6 +100,24 @@ function Router() {
       </Route>
       <Route path="/admin/products/suspended">
         <AdminRoute><SuspendedProductsPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/categories">
+        <AdminRoute><InventoryCategoriesPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/materials">
+        <AdminRoute><MaterialsPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/mapping">
+        <AdminRoute><ProductMappingPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/stock">
+        <AdminRoute><StockStatusPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/receiving">
+        <AdminRoute><ReceivingPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/history">
+        <AdminRoute><InventoryHistoryPage /></AdminRoute>
       </Route>
       <Route path="/admin/settlements">
         <AdminRoute><PlaceholderPage title="정산관리" description="정산 내역을 관리합니다" /></AdminRoute>

@@ -28,7 +28,8 @@ import {
   UserCog,
   Building2,
   User,
-  ChevronLeft
+  ChevronLeft,
+  Warehouse
 } from "lucide-react";
 
 interface MenuItem {
@@ -64,6 +65,19 @@ const menuItems: MenuItem[] = [
       { id: "suspended-products", label: "공급 중지 상품", path: "/admin/products/suspended" },
     ]
   },
+  { 
+    id: "inventory", 
+    label: "재고관리", 
+    icon: <Warehouse className="h-5 w-5" />,
+    children: [
+      { id: "inventory-categories", label: "재료 카테고리 관리", path: "/admin/inventory/categories" },
+      { id: "inventory-materials", label: "재료 관리", path: "/admin/inventory/materials" },
+      { id: "inventory-mapping", label: "상품 매핑", path: "/admin/inventory/mapping" },
+      { id: "inventory-stock", label: "재고 현황", path: "/admin/inventory/stock" },
+      { id: "inventory-receiving", label: "입고 관리", path: "/admin/inventory/receiving" },
+      { id: "inventory-history", label: "재고 이력", path: "/admin/inventory/history" },
+    ]
+  },
   { id: "settlements", label: "정산관리", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
@@ -86,7 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
-  const [openMenus, setOpenMenus] = useState<string[]>(["members", "products", "settings"]);
+  const [openMenus, setOpenMenus] = useState<string[]>(["members", "products", "inventory", "settings"]);
 
   useEffect(() => {
     const handleResize = () => {
