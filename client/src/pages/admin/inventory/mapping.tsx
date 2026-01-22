@@ -72,6 +72,9 @@ export default function ProductMappingPage() {
   const [addProductMode, setAddProductMode] = useState<"import" | "manual">("import");
   const [manualProductCode, setManualProductCode] = useState("");
   const [manualProductName, setManualProductName] = useState("");
+  const [manualCategoryLarge, setManualCategoryLarge] = useState("");
+  const [manualCategoryMedium, setManualCategoryMedium] = useState("");
+  const [manualCategorySmall, setManualCategorySmall] = useState("");
   const [selectedImportProducts, setSelectedImportProducts] = useState<string[]>([]);
   
   const [editMappingDialogOpen, setEditMappingDialogOpen] = useState(false);
@@ -126,6 +129,22 @@ export default function ProductMappingPage() {
     if (!selectedMediumCategory) return [];
     return categories.filter(c => c.level === "small" && c.parentId === selectedMediumCategory.id);
   }, [categories, filterCategoryMedium, selectedMediumCategory]);
+
+  const manualSelectedLargeCategory = useMemo(() => 
+    largeCategories.find(lc => lc.name === manualCategoryLarge), [largeCategories, manualCategoryLarge]);
+  
+  const manualMediumCategories = useMemo(() => {
+    if (!manualCategoryLarge || !manualSelectedLargeCategory) return [];
+    return categories.filter(c => c.level === "medium" && c.parentId === manualSelectedLargeCategory.id);
+  }, [categories, manualCategoryLarge, manualSelectedLargeCategory]);
+  
+  const manualSelectedMediumCategory = useMemo(() => 
+    manualMediumCategories.find(mc => mc.name === manualCategoryMedium), [manualMediumCategories, manualCategoryMedium]);
+  
+  const manualSmallCategories = useMemo(() => {
+    if (!manualCategoryMedium || !manualSelectedMediumCategory) return [];
+    return categories.filter(c => c.level === "small" && c.parentId === manualSelectedMediumCategory.id);
+  }, [categories, manualCategoryMedium, manualSelectedMediumCategory]);
 
   const filteredAndSortedMappings = useMemo(() => {
     let result = productMappings.filter((m) => {
@@ -191,7 +210,7 @@ export default function ProductMappingPage() {
   }, [resizing, handleMouseMove, handleMouseUp]);
 
   const addProductMutation = useMutation({
-    mutationFn: async (data: { productCode: string; productName: string }) => {
+    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string }) => {
       const res = await apiRequest("POST", "/api/product-mappings", data);
       return res.json();
     },
@@ -281,6 +300,9 @@ export default function ProductMappingPage() {
     setAddProductMode("import");
     setManualProductCode("");
     setManualProductName("");
+    setManualCategoryLarge("");
+    setManualCategoryMedium("");
+    setManualCategorySmall("");
     setSelectedImportProducts([]);
   };
 
@@ -290,7 +312,13 @@ export default function ProductMappingPage() {
         toast({ title: "상품코드와 상품명을 입력해주세요", variant: "destructive" });
         return;
       }
-      addProductMutation.mutate({ productCode: manualProductCode, productName: manualProductName });
+      addProductMutation.mutate({ 
+        productCode: manualProductCode, 
+        productName: manualProductName,
+        categoryLarge: manualCategoryLarge || undefined,
+        categoryMedium: manualCategoryMedium || undefined,
+        categorySmall: manualCategorySmall || undefined,
+      });
     } else {
       if (selectedImportProducts.length === 0) {
         toast({ title: "가져올 상품을 선택해주세요", variant: "destructive" });
@@ -845,6 +873,65 @@ export default function ProductMappingPage() {
                     className="mt-1"
                     data-testid="input-product-name"
                   />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-sm">대분류</Label>
+                    <Select 
+                      value={manualCategoryLarge} 
+                      onValueChange={(v) => {
+                        setManualCategoryLarge(v);
+                        setManualCategoryMedium("");
+                        setManualCategorySmall("");
+                      }}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="input-category-large">
+                        <SelectValue placeholder="대분류 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {largeCategories.map((c) => (
+                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">중분류</Label>
+                    <Select 
+                      value={manualCategoryMedium} 
+                      onValueChange={(v) => {
+                        setManualCategoryMedium(v);
+                        setManualCategorySmall("");
+                      }}
+                      disabled={!manualCategoryLarge}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="input-category-medium">
+                        <SelectValue placeholder="중분류 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {manualMediumCategories.map((c) => (
+                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">소분류</Label>
+                    <Select 
+                      value={manualCategorySmall} 
+                      onValueChange={setManualCategorySmall}
+                      disabled={!manualCategoryMedium}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="input-category-small">
+                        <SelectValue placeholder="소분류 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {manualSmallCategories.map((c) => (
+                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             )}

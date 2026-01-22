@@ -2304,14 +2304,14 @@ export async function registerRoutes(
   // 상품 매핑 엑셀 양식 다운로드
   app.get("/api/product-mappings/template", async (req, res) => {
     const XLSX = await import("xlsx");
-    const headers = ["상품코드", "상품명", "재료명", "수량"];
+    const headers = ["상품코드", "상품명", "대분류", "중분류", "소분류", "재료명", "수량"];
     const sampleData = [
-      ["A001", "부사 3kg 선물", "부사 정품 4다이(원물)", "3.3"],
-      ["A001", "부사 3kg 선물", "3kg 선물박스", "1"],
-      ["A001", "부사 3kg 선물", "고급 보자기", "1"],
-      ["A002", "부사 5kg 가정", "부사 정품 4다이(원물)", "5.5"],
-      ["A002", "부사 5kg 가정", "5kg 일반박스", "1"],
-      ["B001", "신고 3kg 선물", "", ""],
+      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "부사 정품 4다이(원물)", "3.3"],
+      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "3kg 선물박스", "1"],
+      ["A001", "부사 3kg 선물", "과일", "사과", "부사", "고급 보자기", "1"],
+      ["A002", "부사 5kg 가정", "과일", "사과", "부사", "부사 정품 4다이(원물)", "5.5"],
+      ["A002", "부사 5kg 가정", "과일", "사과", "부사", "5kg 일반박스", "1"],
+      ["B001", "신고 3kg 선물", "과일", "배", "신고", "", ""],
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
     const wb = XLSX.utils.book_new();
@@ -2486,10 +2486,10 @@ export async function registerRoutes(
       const dataRows = rows.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== ""));
       const errors: string[] = [];
       
-      const productGroups: { [key: string]: { productName: string; materials: { materialCode: string; materialName: string; quantity: number }[] } } = {};
+      const productGroups: { [key: string]: { productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; materials: { materialCode: string; materialName: string; quantity: number }[] } } = {};
       
       for (let i = 0; i < dataRows.length; i++) {
-        const [상품코드, 상품명, 재료명, 수량] = dataRows[i];
+        const [상품코드, 상품명, 대분류, 중분류, 소분류, 재료명, 수량] = dataRows[i];
         const rowNum = i + 2;
         
         if (!상품코드 || !상품명) {
@@ -2499,7 +2499,13 @@ export async function registerRoutes(
         
         const productCode = String(상품코드);
         if (!productGroups[productCode]) {
-          productGroups[productCode] = { productName: String(상품명), materials: [] };
+          productGroups[productCode] = { 
+            productName: String(상품명), 
+            categoryLarge: 대분류 ? String(대분류) : undefined,
+            categoryMedium: 중분류 ? String(중분류) : undefined,
+            categorySmall: 소분류 ? String(소분류) : undefined,
+            materials: [] 
+          };
         }
         
         if (재료명 && 수량 !== undefined && 수량 !== "") {
@@ -2531,6 +2537,9 @@ export async function registerRoutes(
           await storage.createProductMapping({
             productCode,
             productName: data.productName,
+            categoryLarge: data.categoryLarge || null,
+            categoryMedium: data.categoryMedium || null,
+            categorySmall: data.categorySmall || null,
             mappingStatus: data.materials.length > 0 ? "complete" : "incomplete",
           });
           
