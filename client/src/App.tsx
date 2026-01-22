@@ -24,7 +24,6 @@ import ProductRegistrationPage from "@/pages/admin/products/registration";
 import NextWeekProductsPage from "@/pages/admin/products/next-week-products";
 import CurrentProductsPage from "@/pages/admin/products/current-products";
 import SuspendedProductsPage from "@/pages/admin/products/suspended-products";
-import InventoryCategoriesPage from "@/pages/admin/inventory/categories";
 import MaterialsPage from "@/pages/admin/inventory/materials";
 import ProductMappingPage from "@/pages/admin/inventory/mapping";
 import StockStatusPage from "@/pages/admin/inventory/stock";
@@ -100,9 +99,6 @@ function Router() {
       </Route>
       <Route path="/admin/products/suspended">
         <AdminRoute><SuspendedProductsPage /></AdminRoute>
-      </Route>
-      <Route path="/admin/inventory/categories">
-        <AdminRoute><InventoryCategoriesPage /></AdminRoute>
       </Route>
       <Route path="/admin/inventory/materials">
         <AdminRoute><MaterialsPage /></AdminRoute>
