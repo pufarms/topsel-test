@@ -2175,16 +2175,12 @@ export async function registerRoutes(
 
       const errors: { row: number; error: string }[] = [];
       let created = 0;
-      let newLargeCategories = 0;
-      let newMediumCategories = 0;
 
       const materialTypeMap: Record<string, string> = {
         "원재료": "raw",
         "반재료": "semi",
         "부재료": "sub",
       };
-
-      let newSmallCategories = 0;
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
@@ -2199,7 +2195,7 @@ export async function registerRoutes(
 
         const materialType = materialTypeMap[String(재료타입)];
         if (!materialType) {
-          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입}` });
+          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입} (원재료/반재료/부재료 중 선택)` });
           continue;
         }
 
@@ -2211,32 +2207,41 @@ export async function registerRoutes(
           }
         }
 
-        let largeCategory = await storage.getMaterialCategoryLargeByName(String(대분류));
+        // 대분류 확인 - 미리 설정된 카테고리만 허용
+        const largeCategory = await storage.getMaterialCategoryLargeByName(String(대분류));
         if (!largeCategory) {
-          largeCategory = await storage.createMaterialCategoryLarge({ name: String(대분류), sortOrder: 0 });
-          newLargeCategories++;
+          errors.push({ row: i + 1, error: `대분류 카테고리 없음: "${대분류}" (미리 등록된 카테고리만 사용 가능)` });
+          continue;
         }
 
-        let mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, String(중분류));
+        // 중분류 확인 - 해당 대분류 하위에 있어야 함
+        const mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, String(중분류));
         if (!mediumCategory) {
-          mediumCategory = await storage.createMaterialCategoryMedium({ 
-            largeCategoryId: largeCategory.id, 
-            name: String(중분류), 
-            sortOrder: 0 
-          });
-          newMediumCategories++;
+          // 다른 대분류 아래에 같은 이름의 중분류가 있는지 확인
+          const allMediumCategories = await storage.getAllMaterialCategoriesMedium();
+          const existsElsewhere = allMediumCategories.find(m => m.name === String(중분류));
+          if (existsElsewhere) {
+            errors.push({ row: i + 1, error: `카테고리 불일치: 중분류 "${중분류}"가 대분류 "${대분류}" 하위에 없습니다` });
+          } else {
+            errors.push({ row: i + 1, error: `중분류 카테고리 없음: "${중분류}" (미리 등록된 카테고리만 사용 가능)` });
+          }
+          continue;
         }
 
+        // 소분류 확인 (선택사항) - 입력된 경우 해당 중분류 하위에 있어야 함
         let smallCategoryId: string | null = null;
         if (소분류 && String(소분류).trim()) {
-          let smallCategory = await storage.getMaterialCategorySmallByName(mediumCategory.id, String(소분류));
+          const smallCategory = await storage.getMaterialCategorySmallByName(mediumCategory.id, String(소분류));
           if (!smallCategory) {
-            smallCategory = await storage.createMaterialCategorySmall({ 
-              mediumCategoryId: mediumCategory.id, 
-              name: String(소분류), 
-              sortOrder: 0 
-            });
-            newSmallCategories++;
+            // 다른 중분류 아래에 같은 이름의 소분류가 있는지 확인
+            const allSmallCategories = await storage.getAllMaterialCategoriesSmall();
+            const existsElsewhere = allSmallCategories.find(s => s.name === String(소분류));
+            if (existsElsewhere) {
+              errors.push({ row: i + 1, error: `카테고리 불일치: 소분류 "${소분류}"가 중분류 "${중분류}" 하위에 없습니다` });
+            } else {
+              errors.push({ row: i + 1, error: `소분류 카테고리 없음: "${소분류}" (미리 등록된 카테고리만 사용 가능)` });
+            }
+            continue;
           }
           smallCategoryId = smallCategory.id;
         }
@@ -2259,9 +2264,6 @@ export async function registerRoutes(
         success: true,
         message: `${created}개 재료가 등록되었습니다.`,
         created,
-        newLargeCategories,
-        newMediumCategories,
-        newSmallCategories,
         errors,
       });
     } catch (error) {
