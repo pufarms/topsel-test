@@ -610,3 +610,46 @@ export const materialFormSchema = z.object({
 
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type Material = typeof materials.$inferSelect;
+
+// 상품 매핑 상태
+export const mappingStatuses = ["complete", "incomplete"] as const;
+export type MappingStatus = typeof mappingStatuses[number];
+
+// 상품 매핑 테이블 (상품 정보)
+export const productMappings = pgTable("product_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  mappingStatus: text("mapping_status").notNull().default("incomplete"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductMappingSchema = createInsertSchema(productMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductMapping = z.infer<typeof insertProductMappingSchema>;
+export type ProductMapping = typeof productMappings.$inferSelect;
+
+// 상품-재료 매핑 테이블
+export const productMaterialMappings = pgTable("product_material_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull(),
+  materialCode: text("material_code").notNull(),
+  materialName: text("material_name").notNull(),
+  quantity: real("quantity").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductMaterialMappingSchema = createInsertSchema(productMaterialMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductMaterialMapping = z.infer<typeof insertProductMaterialMappingSchema>;
+export type ProductMaterialMapping = typeof productMaterialMappings.$inferSelect;

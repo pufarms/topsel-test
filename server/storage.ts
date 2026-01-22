@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -144,11 +144,27 @@ export interface IStorage {
   getMaterialsBySmallCategory(smallCategoryId: string): Promise<Material[]>;
   getMaterial(id: string): Promise<Material | undefined>;
   getMaterialByCode(code: string): Promise<Material | undefined>;
+  getMaterialByName(name: string): Promise<Material | undefined>;
   createMaterial(data: InsertMaterial): Promise<Material>;
   updateMaterial(id: string, data: Partial<InsertMaterial>): Promise<Material | undefined>;
   deleteMaterial(id: string): Promise<boolean>;
   bulkDeleteMaterials(ids: string[]): Promise<number>;
   getNextMaterialCode(type: string): Promise<string>;
+
+  // Product Mapping methods (상품 매핑)
+  getAllProductMappings(): Promise<ProductMapping[]>;
+  getProductMapping(id: string): Promise<ProductMapping | undefined>;
+  getProductMappingByCode(productCode: string): Promise<ProductMapping | undefined>;
+  createProductMapping(data: InsertProductMapping): Promise<ProductMapping>;
+  updateProductMapping(id: string, data: Partial<InsertProductMapping>): Promise<ProductMapping | undefined>;
+  deleteProductMapping(productCode: string): Promise<boolean>;
+  bulkCreateProductMappings(data: InsertProductMapping[]): Promise<ProductMapping[]>;
+
+  // Product Material Mapping methods (상품-재료 매핑)
+  getProductMaterialMappings(productCode: string): Promise<ProductMaterialMapping[]>;
+  createProductMaterialMapping(data: InsertProductMaterialMapping): Promise<ProductMaterialMapping>;
+  deleteProductMaterialMappingsByProduct(productCode: string): Promise<number>;
+  replaceProductMaterialMappings(productCode: string, mappings: Omit<InsertProductMaterialMapping, "productCode">[]): Promise<ProductMaterialMapping[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1049,6 +1065,90 @@ export class DatabaseStorage implements IStorage {
       return max;
     }, 0);
     return `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
+  }
+
+  async getMaterialByName(name: string): Promise<Material | undefined> {
+    const [material] = await db.select().from(materials).where(eq(materials.materialName, name));
+    return material;
+  }
+
+  // Product Mapping methods
+  async getAllProductMappings(): Promise<ProductMapping[]> {
+    return db.select().from(productMappings).orderBy(desc(productMappings.createdAt));
+  }
+
+  async getProductMapping(id: string): Promise<ProductMapping | undefined> {
+    const [mapping] = await db.select().from(productMappings).where(eq(productMappings.id, id));
+    return mapping;
+  }
+
+  async getProductMappingByCode(productCode: string): Promise<ProductMapping | undefined> {
+    const [mapping] = await db.select().from(productMappings).where(eq(productMappings.productCode, productCode));
+    return mapping;
+  }
+
+  async createProductMapping(data: InsertProductMapping): Promise<ProductMapping> {
+    const [mapping] = await db.insert(productMappings).values(data).returning();
+    return mapping;
+  }
+
+  async updateProductMapping(id: string, data: Partial<InsertProductMapping>): Promise<ProductMapping | undefined> {
+    const [mapping] = await db.update(productMappings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(productMappings.id, id))
+      .returning();
+    return mapping;
+  }
+
+  async deleteProductMapping(productCode: string): Promise<boolean> {
+    await db.delete(productMaterialMappings).where(eq(productMaterialMappings.productCode, productCode));
+    const [deleted] = await db.delete(productMappings).where(eq(productMappings.productCode, productCode)).returning();
+    return !!deleted;
+  }
+
+  async bulkCreateProductMappings(data: InsertProductMapping[]): Promise<ProductMapping[]> {
+    if (data.length === 0) return [];
+    const mappings = await db.insert(productMappings).values(data).returning();
+    return mappings;
+  }
+
+  // Product Material Mapping methods
+  async getProductMaterialMappings(productCode: string): Promise<ProductMaterialMapping[]> {
+    return db.select().from(productMaterialMappings)
+      .where(eq(productMaterialMappings.productCode, productCode))
+      .orderBy(productMaterialMappings.createdAt);
+  }
+
+  async createProductMaterialMapping(data: InsertProductMaterialMapping): Promise<ProductMaterialMapping> {
+    const [mapping] = await db.insert(productMaterialMappings).values(data).returning();
+    return mapping;
+  }
+
+  async deleteProductMaterialMappingsByProduct(productCode: string): Promise<number> {
+    const result = await db.delete(productMaterialMappings)
+      .where(eq(productMaterialMappings.productCode, productCode))
+      .returning();
+    return result.length;
+  }
+
+  async replaceProductMaterialMappings(productCode: string, mappings: Omit<InsertProductMaterialMapping, "productCode">[]): Promise<ProductMaterialMapping[]> {
+    await db.delete(productMaterialMappings).where(eq(productMaterialMappings.productCode, productCode));
+    
+    if (mappings.length === 0) {
+      await db.update(productMappings)
+        .set({ mappingStatus: "incomplete", updatedAt: new Date() })
+        .where(eq(productMappings.productCode, productCode));
+      return [];
+    }
+    
+    const dataToInsert = mappings.map(m => ({ ...m, productCode }));
+    const result = await db.insert(productMaterialMappings).values(dataToInsert).returning();
+    
+    await db.update(productMappings)
+      .set({ mappingStatus: "complete", updatedAt: new Date() })
+      .where(eq(productMappings.productCode, productCode));
+    
+    return result;
   }
 }
 
