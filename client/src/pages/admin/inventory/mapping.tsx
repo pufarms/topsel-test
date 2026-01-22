@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -12,13 +12,44 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Download, Upload, Loader2, Search, Eye, Edit, Package, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import type { ProductMapping, ProductMaterialMapping, Material } from "@shared/schema";
 
 interface ProductMappingWithMaterials extends ProductMapping {
   materials: ProductMaterialMapping[];
 }
+
+interface ColumnWidth {
+  checkbox: number;
+  productCode: number;
+  productName: number;
+  mat1Name: number;
+  mat1Qty: number;
+  mat2Name: number;
+  mat2Qty: number;
+  mat3Name: number;
+  mat3Qty: number;
+  mat4Name: number;
+  mat4Qty: number;
+  status: number;
+  actions: number;
+}
+
+const DEFAULT_COLUMN_WIDTHS: ColumnWidth = {
+  checkbox: 40,
+  productCode: 120,
+  productName: 180,
+  mat1Name: 140,
+  mat1Qty: 50,
+  mat2Name: 140,
+  mat2Qty: 50,
+  mat3Name: 140,
+  mat3Qty: 50,
+  mat4Name: 140,
+  mat4Qty: 50,
+  status: 70,
+  actions: 80,
+};
 
 export default function ProductMappingPage() {
   const { toast } = useToast();
@@ -26,9 +57,12 @@ export default function ProductMappingPage() {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState("default");
-  const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  const [columnWidths, setColumnWidths] = useState<ColumnWidth>(DEFAULT_COLUMN_WIDTHS);
+  const [resizing, setResizing] = useState<{ column: keyof ColumnWidth; startX: number; startWidth: number } | null>(null);
   
   const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
   const [addProductMode, setAddProductMode] = useState<"import" | "manual">("import");
@@ -96,6 +130,33 @@ export default function ProductMappingPage() {
     m.materialCode.toLowerCase().includes(materialSearchQuery.toLowerCase()) ||
     m.materialName.toLowerCase().includes(materialSearchQuery.toLowerCase())
   );
+
+  const handleMouseDown = useCallback((column: keyof ColumnWidth, e: React.MouseEvent) => {
+    e.preventDefault();
+    setResizing({ column, startX: e.clientX, startWidth: columnWidths[column] });
+  }, [columnWidths]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!resizing) return;
+    const diff = e.clientX - resizing.startX;
+    const newWidth = Math.max(30, resizing.startWidth + diff);
+    setColumnWidths(prev => ({ ...prev, [resizing.column]: newWidth }));
+  }, [resizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setResizing(null);
+  }, []);
+
+  useEffect(() => {
+    if (resizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [resizing, handleMouseMove, handleMouseUp]);
 
   const addProductMutation = useMutation({
     mutationFn: async (data: { productCode: string; productName: string }) => {
@@ -296,25 +357,35 @@ export default function ProductMappingPage() {
     return mat ? { name: mat.materialName, qty: mat.quantity } : { name: "", qty: "" };
   };
 
+  const ResizeHandle = ({ column }: { column: keyof ColumnWidth }) => (
+    <div
+      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary"
+      onMouseDown={(e) => handleMouseDown(column, e)}
+    />
+  );
+
+  const cellClass = "border border-border/50 px-1.5 py-0.5 text-xs";
+  const headerCellClass = "border border-border/50 px-1.5 py-1 text-xs font-medium relative";
+
   return (
-    <div className="space-y-4 p-4" data-testid="page-product-mapping">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-2 p-2" data-testid="page-product-mapping">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-medium">총</span>
-            <span className="text-lg font-bold text-primary">{filteredAndSortedMappings.length}건</span>
-            <span className="text-sm text-muted-foreground ml-4">
+            <span className="text-sm font-medium">총</span>
+            <span className="text-sm font-bold text-primary">{filteredAndSortedMappings.length}건</span>
+            <span className="text-xs text-muted-foreground ml-2">
               ({currentPage} Page / Tot {totalPages || 1} Page)
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
-              <Download className="w-4 h-4 mr-1" />
-              양식 다운로드
+          <div className="flex flex-wrap gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleDownloadTemplate} data-testid="button-download-template">
+              <Download className="w-3 h-3 mr-1" />
+              양식
             </Button>
-            <Button variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
-              {uploadMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
-              엑셀 업로드
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
+              {uploadMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}
+              업로드
             </Button>
             <input
               ref={uploadInputRef}
@@ -324,16 +395,16 @@ export default function ProductMappingPage() {
               className="hidden"
               data-testid="input-upload-file"
             />
-            <Button size="sm" onClick={() => setAddProductDialogOpen(true)} data-testid="button-add-product">
-              <Plus className="w-4 h-4 mr-1" />
-              상품 추가
+            <Button size="sm" className="h-7 text-xs" onClick={() => setAddProductDialogOpen(true)} data-testid="button-add-product">
+              <Plus className="w-3 h-3 mr-1" />
+              추가
             </Button>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm whitespace-nowrap">판매상품명</Label>
+        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+          <div className="flex items-center gap-1">
+            <Label className="text-xs whitespace-nowrap">판매상품명</Label>
             <Input
               placeholder="검색"
               value={searchQuery}
@@ -341,225 +412,261 @@ export default function ProductMappingPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-40"
+              className="w-32 h-7 text-xs"
               data-testid="input-search"
             />
-            <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
-              <Search className="w-4 h-4" />
-              검색
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSearchQuery("")}>
+              <Search className="w-3 h-3" />
             </Button>
             {selectedIds.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
+              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
                 삭제하기
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="flex items-center gap-1 sm:ml-auto">
             <Select value={sortOption} onValueChange={setSortOption}>
-              <SelectTrigger className="w-32" data-testid="select-sort">
+              <SelectTrigger className="w-28 h-7 text-xs" data-testid="select-sort">
                 <SelectValue placeholder="정렬" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">정렬_기본</SelectItem>
-                <SelectItem value="code_asc">코드 오름차순</SelectItem>
-                <SelectItem value="code_desc">코드 내림차순</SelectItem>
-                <SelectItem value="name_asc">상품명 오름차순</SelectItem>
-                <SelectItem value="name_desc">상품명 내림차순</SelectItem>
+                <SelectItem value="code_asc">코드↑</SelectItem>
+                <SelectItem value="code_desc">코드↓</SelectItem>
+                <SelectItem value="name_asc">상품명↑</SelectItem>
+                <SelectItem value="name_desc">상품명↓</SelectItem>
               </SelectContent>
             </Select>
             <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
-              <SelectTrigger className="w-32" data-testid="select-items-per-page">
+              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-items-per-page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="50">50개씩 출력</SelectItem>
-                <SelectItem value="100">100개씩 출력</SelectItem>
-                <SelectItem value="200">200개씩 출력</SelectItem>
+                <SelectItem value="20">20개</SelectItem>
+                <SelectItem value="50">50개</SelectItem>
+                <SelectItem value="100">100개</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="hidden lg:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-amber-50 dark:bg-amber-950/30">
-                  <TableHead className="w-12 text-center">
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <div className="bg-amber-50 dark:bg-amber-950/30 border-b">
+                <div className="flex">
+                  <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50 text-center`} style={{ width: columnWidths.checkbox, minWidth: columnWidths.checkbox }}>
                     <Checkbox
                       checked={paginatedMappings.length > 0 && selectedIds.length === paginatedMappings.length}
                       onCheckedChange={toggleSelectAll}
                       data-testid="checkbox-select-all"
                     />
-                  </TableHead>
-                  <TableHead className="min-w-[120px]">판매상품코드</TableHead>
-                  <TableHead className="min-w-[200px]">판매상품명</TableHead>
-                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료1</TableHead>
-                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료2</TableHead>
-                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료3</TableHead>
-                  <TableHead className="bg-amber-100/50 dark:bg-amber-900/30 text-center" colSpan={2}>원재료4</TableHead>
-                  <TableHead className="text-center">사용유무</TableHead>
-                  <TableHead className="w-24 text-center">작업</TableHead>
-                </TableRow>
-                <TableRow className="bg-amber-50/50 dark:bg-amber-950/20">
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                  <TableHead className="text-center text-xs">원재료품목1</TableHead>
-                  <TableHead className="text-center text-xs w-16">수량</TableHead>
-                  <TableHead className="text-center text-xs">원재료품목2</TableHead>
-                  <TableHead className="text-center text-xs w-16">수량</TableHead>
-                  <TableHead className="text-center text-xs">원재료품목3</TableHead>
-                  <TableHead className="text-center text-xs w-16">수량</TableHead>
-                  <TableHead className="text-center text-xs">원재료품목4</TableHead>
-                  <TableHead className="text-center text-xs w-16">수량</TableHead>
-                  <TableHead></TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                    </TableCell>
-                  </TableRow>
-                ) : paginatedMappings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
-                      등록된 상품이 없습니다
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedMappings.map((mapping) => {
-                    const mat1 = getMaterialInfo(mapping.materials, 0);
-                    const mat2 = getMaterialInfo(mapping.materials, 1);
-                    const mat3 = getMaterialInfo(mapping.materials, 2);
-                    const mat4 = getMaterialInfo(mapping.materials, 3);
-                    return (
-                      <TableRow key={mapping.productCode} data-testid={`row-product-${mapping.productCode}`}>
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={selectedIds.includes(mapping.productCode)}
-                            onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
-                            data-testid={`checkbox-product-${mapping.productCode}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-blue-600 dark:text-blue-400 underline cursor-pointer" onClick={() => handleOpenEditMapping(mapping)}>
-                          {mapping.productCode}
-                        </TableCell>
-                        <TableCell>{mapping.productName}</TableCell>
-                        <TableCell className="text-sm">{mat1.name}</TableCell>
-                        <TableCell className="text-center text-sm">{mat1.qty}</TableCell>
-                        <TableCell className="text-sm">{mat2.name}</TableCell>
-                        <TableCell className="text-center text-sm">{mat2.qty}</TableCell>
-                        <TableCell className="text-sm">{mat3.name}</TableCell>
-                        <TableCell className="text-center text-sm">{mat3.qty}</TableCell>
-                        <TableCell className="text-sm">{mat4.name}</TableCell>
-                        <TableCell className="text-center text-sm">{mat4.qty}</TableCell>
-                        <TableCell className="text-center">
-                          <span className={mapping.mappingStatus === "complete" ? "text-green-600" : "text-muted-foreground"}>
-                            {mapping.mappingStatus === "complete" ? "사용" : "-"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)} data-testid={`button-edit-${mapping.productCode}`}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)} data-testid={`button-delete-${mapping.productCode}`}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="lg:hidden divide-y">
-            {isLoading ? (
-              <div className="p-8 text-center">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50`} style={{ width: columnWidths.productCode, minWidth: columnWidths.productCode }}>
+                    판매상품코드
+                    <ResizeHandle column="productCode" />
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50`} style={{ width: columnWidths.productName, minWidth: columnWidths.productName }}>
+                    판매상품명
+                    <ResizeHandle column="productName" />
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-200/60 dark:bg-amber-800/40 text-center`} style={{ width: columnWidths.mat1Name + columnWidths.mat1Qty }}>
+                    원재료1
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-200/60 dark:bg-amber-800/40 text-center`} style={{ width: columnWidths.mat2Name + columnWidths.mat2Qty }}>
+                    원재료2
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-200/60 dark:bg-amber-800/40 text-center`} style={{ width: columnWidths.mat3Name + columnWidths.mat3Qty }}>
+                    원재료3
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-200/60 dark:bg-amber-800/40 text-center`} style={{ width: columnWidths.mat4Name + columnWidths.mat4Qty }}>
+                    원재료4
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50 text-center`} style={{ width: columnWidths.status, minWidth: columnWidths.status }}>
+                    사용유무
+                    <ResizeHandle column="status" />
+                  </div>
+                  <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50 text-center`} style={{ width: columnWidths.actions, minWidth: columnWidths.actions }}>
+                    작업
+                  </div>
+                </div>
+                <div className="flex">
+                  <div className={`${headerCellClass}`} style={{ width: columnWidths.checkbox }}></div>
+                  <div className={`${headerCellClass}`} style={{ width: columnWidths.productCode }}></div>
+                  <div className={`${headerCellClass}`} style={{ width: columnWidths.productName }}></div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat1Name }}>
+                    원재료품목1
+                    <ResizeHandle column="mat1Name" />
+                  </div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat1Qty }}>수량</div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat2Name }}>
+                    원재료품목2
+                    <ResizeHandle column="mat2Name" />
+                  </div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat2Qty }}>수량</div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat3Name }}>
+                    원재료품목3
+                    <ResizeHandle column="mat3Name" />
+                  </div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat3Qty }}>수량</div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat4Name }}>
+                    원재료품목4
+                    <ResizeHandle column="mat4Name" />
+                  </div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat4Qty }}>수량</div>
+                  <div className={`${headerCellClass}`} style={{ width: columnWidths.status }}></div>
+                  <div className={`${headerCellClass}`} style={{ width: columnWidths.actions }}></div>
+                </div>
               </div>
-            ) : paginatedMappings.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                등록된 상품이 없습니다
-              </div>
-            ) : (
-              paginatedMappings.map((mapping) => (
-                <div key={mapping.productCode} className="p-4" data-testid={`card-product-${mapping.productCode}`}>
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={selectedIds.includes(mapping.productCode)}
-                      onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-mono text-sm text-blue-600 dark:text-blue-400">{mapping.productCode}</div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditMapping(mapping)}>
-                            <Edit className="w-4 h-4" />
+            </div>
+            <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : paginatedMappings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  등록된 상품이 없습니다
+                </div>
+              ) : (
+                paginatedMappings.map((mapping) => {
+                  const mat1 = getMaterialInfo(mapping.materials, 0);
+                  const mat2 = getMaterialInfo(mapping.materials, 1);
+                  const mat3 = getMaterialInfo(mapping.materials, 2);
+                  const mat4 = getMaterialInfo(mapping.materials, 3);
+                  return (
+                    <div key={mapping.productCode} className="flex hover:bg-muted/30" data-testid={`row-product-${mapping.productCode}`}>
+                      <div className={`${cellClass} text-center flex items-center justify-center`} style={{ width: columnWidths.checkbox, minWidth: columnWidths.checkbox }}>
+                        <Checkbox
+                          checked={selectedIds.includes(mapping.productCode)}
+                          onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
+                          data-testid={`checkbox-product-${mapping.productCode}`}
+                        />
+                      </div>
+                      <div 
+                        className={`${cellClass} font-mono text-blue-600 dark:text-blue-400 underline cursor-pointer truncate`} 
+                        style={{ width: columnWidths.productCode, minWidth: columnWidths.productCode }}
+                        onClick={() => handleOpenEditMapping(mapping)}
+                      >
+                        {mapping.productCode}
+                      </div>
+                      <div className={`${cellClass} truncate`} style={{ width: columnWidths.productName, minWidth: columnWidths.productName }}>
+                        {mapping.productName}
+                      </div>
+                      <div className={`${cellClass} truncate`} style={{ width: columnWidths.mat1Name }}>{mat1.name}</div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.mat1Qty }}>{mat1.qty}</div>
+                      <div className={`${cellClass} truncate`} style={{ width: columnWidths.mat2Name }}>{mat2.name}</div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.mat2Qty }}>{mat2.qty}</div>
+                      <div className={`${cellClass} truncate`} style={{ width: columnWidths.mat3Name }}>{mat3.name}</div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.mat3Qty }}>{mat3.qty}</div>
+                      <div className={`${cellClass} truncate`} style={{ width: columnWidths.mat4Name }}>{mat4.name}</div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.mat4Qty }}>{mat4.qty}</div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.status }}>
+                        <span className={mapping.mappingStatus === "complete" ? "text-green-600" : "text-muted-foreground"}>
+                          {mapping.mappingStatus === "complete" ? "사용" : "-"}
+                        </span>
+                      </div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.actions }}>
+                        <div className="flex justify-center gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleOpenEditMapping(mapping)} data-testid={`button-edit-${mapping.productCode}`}>
+                            <Edit className="w-3 h-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(mapping.productCode)}>
-                            <Trash2 className="w-4 h-4" />
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDeleteProduct(mapping.productCode)} data-testid={`button-delete-${mapping.productCode}`}>
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
-                      <div className="font-medium mt-1">{mapping.productName}</div>
-                      <div className="mt-2 space-y-1">
-                        {mapping.materials.slice(0, 4).map((mat, idx) => (
-                          <div key={mat.materialCode} className="text-sm text-muted-foreground">
-                            원재료{idx + 1}: {mat.materialName} ({mat.quantity})
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="lg:hidden">
+            <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
+              {isLoading ? (
+                <div className="p-4 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : paginatedMappings.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground text-sm">
+                  등록된 상품이 없습니다
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {paginatedMappings.map((mapping) => (
+                    <div key={mapping.productCode} className="p-2" data-testid={`card-product-${mapping.productCode}`}>
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={selectedIds.includes(mapping.productCode)}
+                          onCheckedChange={(checked) => toggleSelectOne(mapping.productCode, checked as boolean)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="font-mono text-xs text-blue-600 dark:text-blue-400">{mapping.productCode}</div>
+                            <div className="flex gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleOpenEditMapping(mapping)}>
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteProduct(mapping.productCode)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
-                        ))}
-                        {mapping.materials.length === 0 && (
-                          <div className="text-sm text-muted-foreground">매핑된 재료 없음</div>
-                        )}
-                      </div>
-                      <div className="mt-2">
-                        <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"}>
-                          {mapping.mappingStatus === "complete" ? "사용" : "미사용"}
-                        </Badge>
+                          <div className="text-sm font-medium truncate">{mapping.productName}</div>
+                          <div className="mt-1 space-y-0.5">
+                            {mapping.materials.slice(0, 4).map((mat, idx) => (
+                              <div key={mat.materialCode} className="text-xs text-muted-foreground">
+                                원재료{idx + 1}: {mat.materialName} ({mat.quantity})
+                              </div>
+                            ))}
+                            {mapping.materials.length === 0 && (
+                              <div className="text-xs text-muted-foreground">매핑된 재료 없음</div>
+                            )}
+                          </div>
+                          <Badge variant={mapping.mappingStatus === "complete" ? "default" : "secondary"} className="mt-1 text-xs h-5">
+                            {mapping.mappingStatus === "complete" ? "사용" : "미사용"}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))
-            )}
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-1">
           <Button
             variant="outline"
             size="sm"
+            className="h-6 text-xs"
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(p => p - 1)}
             data-testid="button-prev-page"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3 h-3" />
             이전
           </Button>
-          <span className="text-sm">
-            {currentPage} / {totalPages} 페이지
+          <span className="text-xs px-2">
+            {currentPage} / {totalPages}
           </span>
           <Button
             variant="outline"
             size="sm"
+            className="h-6 text-xs"
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage(p => p + 1)}
             data-testid="button-next-page"
           >
             다음
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3 h-3" />
           </Button>
         </div>
       )}
