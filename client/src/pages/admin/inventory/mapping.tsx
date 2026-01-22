@@ -82,7 +82,7 @@ export default function ProductMappingPage() {
   
   const [materialSelectDialogOpen, setMaterialSelectDialogOpen] = useState(false);
   const [materialSearchQuery, setMaterialSearchQuery] = useState("");
-  const [materialFilterLarge, setMaterialFilterLarge] = useState("");
+  const [materialFilterLarge, setMaterialFilterLarge] = useState("all");
   const [materialCurrentPage, setMaterialCurrentPage] = useState(1);
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -155,7 +155,7 @@ export default function ProductMappingPage() {
       const matchesSearch = materialSearchQuery === "" ||
         m.materialCode.toLowerCase().includes(materialSearchQuery.toLowerCase()) ||
         m.materialName.toLowerCase().includes(materialSearchQuery.toLowerCase());
-      const matchesCategory = materialFilterLarge === "" || m.largeCategoryId === materialFilterLarge;
+      const matchesCategory = materialFilterLarge === "" || materialFilterLarge === "all" || m.largeCategoryId === materialFilterLarge;
       return matchesSearch && matchesCategory;
     });
   }, [allMaterials, materialSearchQuery, materialFilterLarge]);
@@ -370,7 +370,7 @@ export default function ProductMappingPage() {
     }]);
     setMaterialSelectDialogOpen(false);
     setMaterialSearchQuery("");
-    setMaterialFilterLarge("");
+    setMaterialFilterLarge("all");
   };
 
   const handleRemoveMaterialFromMapping = (materialCode: string) => {
@@ -907,7 +907,7 @@ export default function ProductMappingPage() {
                   onClick={() => {
                     setMaterialSelectDialogOpen(true);
                     setMaterialSearchQuery("");
-                    setMaterialFilterLarge("");
+                    setMaterialFilterLarge("all");
                     setMaterialCurrentPage(1);
                   }} 
                   data-testid="button-add-material"
@@ -1051,7 +1051,7 @@ export default function ProductMappingPage() {
                   <SelectValue placeholder="대분류 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">전체</SelectItem>
+                  <SelectItem value="all">전체</SelectItem>
                   {materialCategoriesLarge.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
