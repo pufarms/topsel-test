@@ -2016,7 +2016,7 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    const { materialType, largeCategoryId, mediumCategoryId, materialCode, materialName, currentStock } = req.body;
+    const { materialType, largeCategoryId, mediumCategoryId, smallCategoryId, materialCode, materialName, currentStock } = req.body;
     if (!materialType || !largeCategoryId || !mediumCategoryId || !materialName) {
       return res.status(400).json({ message: "필수 필드를 입력해주세요" });
     }
@@ -2032,6 +2032,7 @@ export async function registerRoutes(
       materialType,
       largeCategoryId,
       mediumCategoryId,
+      smallCategoryId: smallCategoryId || null,
       materialCode: code,
       materialName,
       currentStock: currentStock || 0,
@@ -2047,11 +2048,12 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    const { materialType, largeCategoryId, mediumCategoryId, materialName } = req.body;
+    const { materialType, largeCategoryId, mediumCategoryId, smallCategoryId, materialName } = req.body;
     const updated = await storage.updateMaterial(req.params.id, {
       materialType,
       largeCategoryId,
       mediumCategoryId,
+      smallCategoryId: smallCategoryId || null,
       materialName,
     });
     if (!updated) {
