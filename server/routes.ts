@@ -2285,6 +2285,40 @@ export async function registerRoutes(
     return res.json(result);
   });
 
+  // 상품등록에서 가져올 수 있는 상품 목록 (이미 매핑된 상품 제외)
+  app.get("/api/product-mappings/available-products", async (req, res) => {
+    const productRegistrations = await storage.getAllProductRegistrations("active");
+    const existingMappings = await storage.getAllProductMappings();
+    const existingCodes = new Set(existingMappings.map(m => m.productCode));
+    
+    const availableProducts = productRegistrations.filter(p => !existingCodes.has(p.productCode));
+    return res.json(availableProducts.map(p => ({
+      productCode: p.productCode,
+      productName: p.productName,
+    })));
+  });
+
+  // 상품 매핑 엑셀 양식 다운로드
+  app.get("/api/product-mappings/template", async (req, res) => {
+    const XLSX = await import("xlsx");
+    const headers = ["상품코드", "상품명", "재료명", "수량"];
+    const sampleData = [
+      ["A001", "부사 3kg 선물", "부사 정품 4다이(원물)", "3.3"],
+      ["A001", "부사 3kg 선물", "3kg 선물박스", "1"],
+      ["A001", "부사 3kg 선물", "고급 보자기", "1"],
+      ["A002", "부사 5kg 가정", "부사 정품 4다이(원물)", "5.5"],
+      ["A002", "부사 5kg 가정", "5kg 일반박스", "1"],
+      ["B001", "신고 3kg 선물", "", ""],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "상품매핑");
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=product_mapping_template.xlsx");
+    return res.send(buffer);
+  });
+
   // 상품 매핑 상세 조회
   app.get("/api/product-mappings/:productCode", async (req, res) => {
     const { productCode } = req.params;
@@ -2399,40 +2433,6 @@ export async function registerRoutes(
     
     const result = await storage.replaceProductMaterialMappings(productCode, validMaterials);
     return res.json({ success: true, materials: result });
-  });
-
-  // 상품등록에서 가져올 수 있는 상품 목록 (이미 매핑된 상품 제외)
-  app.get("/api/product-mappings/available-products", async (req, res) => {
-    const productRegistrations = await storage.getAllProductRegistrations("active");
-    const existingMappings = await storage.getAllProductMappings();
-    const existingCodes = new Set(existingMappings.map(m => m.productCode));
-    
-    const availableProducts = productRegistrations.filter(p => !existingCodes.has(p.productCode));
-    return res.json(availableProducts.map(p => ({
-      productCode: p.productCode,
-      productName: p.productName,
-    })));
-  });
-
-  // 상품 매핑 엑셀 양식 다운로드
-  app.get("/api/product-mappings/template", async (req, res) => {
-    const XLSX = await import("xlsx");
-    const headers = ["상품코드", "상품명", "재료명", "수량"];
-    const sampleData = [
-      ["A001", "부사 3kg 선물", "부사 정품 4다이(원물)", "3.3"],
-      ["A001", "부사 3kg 선물", "3kg 선물박스", "1"],
-      ["A001", "부사 3kg 선물", "고급 보자기", "1"],
-      ["A002", "부사 5kg 가정", "부사 정품 4다이(원물)", "5.5"],
-      ["A002", "부사 5kg 가정", "5kg 일반박스", "1"],
-      ["B001", "신고 3kg 선물", "", ""],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "상품매핑");
-    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=product_mapping_template.xlsx");
-    return res.send(buffer);
   });
 
   // 상품 매핑 엑셀 업로드
