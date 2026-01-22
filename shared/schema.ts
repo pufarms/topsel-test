@@ -559,12 +559,32 @@ export const insertMaterialCategoryMediumSchema = createInsertSchema(materialCat
 export type InsertMaterialCategoryMedium = z.infer<typeof insertMaterialCategoryMediumSchema>;
 export type MaterialCategoryMedium = typeof materialCategoriesMedium.$inferSelect;
 
+// 재료 소분류
+export const materialCategoriesSmall = pgTable("material_categories_small", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mediumCategoryId: varchar("medium_category_id").notNull().references(() => materialCategoriesMedium.id),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMaterialCategorySmallSchema = createInsertSchema(materialCategoriesSmall).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaterialCategorySmall = z.infer<typeof insertMaterialCategorySmallSchema>;
+export type MaterialCategorySmall = typeof materialCategoriesSmall.$inferSelect;
+
 // 재료
 export const materials = pgTable("materials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   materialType: text("material_type").notNull(),
   largeCategoryId: varchar("large_category_id").notNull().references(() => materialCategoriesLarge.id),
   mediumCategoryId: varchar("medium_category_id").notNull().references(() => materialCategoriesMedium.id),
+  smallCategoryId: varchar("small_category_id").references(() => materialCategoriesSmall.id),
   materialCode: text("material_code").notNull().unique(),
   materialName: text("material_name").notNull(),
   currentStock: real("current_stock").notNull().default(0),
@@ -582,6 +602,7 @@ export const materialFormSchema = z.object({
   materialType: z.enum(materialTypes),
   largeCategoryId: z.string().min(1, "대분류를 선택해주세요"),
   mediumCategoryId: z.string().min(1, "중분류를 선택해주세요"),
+  smallCategoryId: z.string().optional(),
   materialCode: z.string().optional(),
   materialName: z.string().min(1, "재료명을 입력해주세요"),
   currentStock: z.number().default(0),
