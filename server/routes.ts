@@ -2117,12 +2117,12 @@ export async function registerRoutes(
     try {
       const XLSX = await import("xlsx");
       
-      const headers = ["재료타입", "대분류", "중분류", "재료코드", "재료명", "초기재고"];
+      const headers = ["재료타입", "대분류", "중분류", "소분류", "재료코드", "재료명", "초기재고"];
       const sampleData = [
-        ["원재료", "사과", "부사", "R001", "부사 정품 4다이(원물)", 0],
-        ["원재료", "사과", "부사", "R002", "부사 상2번(원물)", 0],
-        ["반재료", "사과", "부사", "S001", "부사 상2번(선별)", 0],
-        ["부재료", "부재료", "박스", "B001", "3kg 선물박스", 0],
+        ["원재료", "사과", "부사", "고급", "R001", "부사 정품 4다이(원물)", 0],
+        ["원재료", "사과", "부사", "", "R002", "부사 상2번(원물)", 0],
+        ["반재료", "사과", "부사", "일반", "S001", "부사 상2번(선별)", 0],
+        ["부재료", "부재료", "박스", "", "B001", "3kg 선물박스", 0],
       ];
       
       const wsData = [headers, ...sampleData];
@@ -2132,6 +2132,7 @@ export async function registerRoutes(
         { wch: 10 },
         { wch: 12 },
         { wch: 12 },
+        { wch: 10 },
         { wch: 10 },
         { wch: 30 },
         { wch: 10 },
@@ -2181,11 +2182,13 @@ export async function registerRoutes(
         "부재료": "sub",
       };
 
+      let newSmallCategories = 0;
+
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || row.length < 5) continue;
+        if (!row || row.length < 6) continue;
         
-        const [재료타입, 대분류, 중분류, 재료코드, 재료명, 초기재고] = row;
+        const [재료타입, 대분류, 중분류, 소분류, 재료코드, 재료명, 초기재고] = row;
         
         if (!재료타입 || !대분류 || !중분류 || !재료명) {
           errors.push({ row: i + 1, error: "필수값 누락 (재료타입, 대분류, 중분류, 재료명)" });
@@ -2222,12 +2225,27 @@ export async function registerRoutes(
           newMediumCategories++;
         }
 
+        let smallCategoryId: string | null = null;
+        if (소분류 && String(소분류).trim()) {
+          let smallCategory = await storage.getMaterialCategorySmallByName(mediumCategory.id, String(소분류));
+          if (!smallCategory) {
+            smallCategory = await storage.createMaterialCategorySmall({ 
+              mediumCategoryId: mediumCategory.id, 
+              name: String(소분류), 
+              sortOrder: 0 
+            });
+            newSmallCategories++;
+          }
+          smallCategoryId = smallCategory.id;
+        }
+
         const code = 재료코드 ? String(재료코드) : await storage.getNextMaterialCode(materialType);
         
         await storage.createMaterial({
           materialType,
           largeCategoryId: largeCategory.id,
           mediumCategoryId: mediumCategory.id,
+          smallCategoryId,
           materialCode: code,
           materialName: String(재료명),
           currentStock: parseFloat(String(초기재고 || 0)) || 0,
@@ -2241,6 +2259,7 @@ export async function registerRoutes(
         created,
         newLargeCategories,
         newMediumCategories,
+        newSmallCategories,
         errors,
       });
     } catch (error) {

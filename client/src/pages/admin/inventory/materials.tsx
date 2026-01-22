@@ -13,13 +13,14 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, MoreHorizontal, Pencil, Trash2, Download, Upload, Loader2 } from "lucide-react";
-import type { MaterialCategoryLarge, MaterialCategoryMedium, Material, MaterialType } from "@shared/schema";
+import type { MaterialCategoryLarge, MaterialCategoryMedium, MaterialCategorySmall, Material, MaterialType } from "@shared/schema";
 import { materialTypeLabels } from "@shared/schema";
 
 export default function MaterialsPage() {
   const { toast } = useToast();
   const [selectedLarge, setSelectedLarge] = useState<string | null>(null);
   const [selectedMedium, setSelectedMedium] = useState<string | null>(null);
+  const [selectedSmall, setSelectedSmall] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [largeCategoryDialogOpen, setLargeCategoryDialogOpen] = useState(false);
@@ -30,17 +31,22 @@ export default function MaterialsPage() {
   const [mediumCategoryEditId, setMediumCategoryEditId] = useState<string | null>(null);
   const [mediumCategoryName, setMediumCategoryName] = useState("");
 
+  const [smallCategoryDialogOpen, setSmallCategoryDialogOpen] = useState(false);
+  const [smallCategoryEditId, setSmallCategoryEditId] = useState<string | null>(null);
+  const [smallCategoryName, setSmallCategoryName] = useState("");
+
   const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
   const [materialEditId, setMaterialEditId] = useState<string | null>(null);
   const [materialType, setMaterialType] = useState<MaterialType>("raw");
   const [materialLargeCategoryId, setMaterialLargeCategoryId] = useState("");
   const [materialMediumCategoryId, setMaterialMediumCategoryId] = useState("");
+  const [materialSmallCategoryId, setMaterialSmallCategoryId] = useState("");
   const [materialCode, setMaterialCode] = useState("");
   const [materialName, setMaterialName] = useState("");
   const [materialStock, setMaterialStock] = useState("0");
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteCategoryType, setDeleteCategoryType] = useState<"large" | "medium" | null>(null);
+  const [deleteCategoryType, setDeleteCategoryType] = useState<"large" | "medium" | "small" | null>(null);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [deleteCategoryName, setDeleteCategoryName] = useState("");
 
@@ -57,6 +63,10 @@ export default function MaterialsPage() {
     queryKey: ["/api/material-categories/medium"],
   });
 
+  const { data: smallCategories = [] } = useQuery<MaterialCategorySmall[]>({
+    queryKey: ["/api/material-categories/small"],
+  });
+
   const { data: allMaterials = [] } = useQuery<Material[]>({
     queryKey: ["/api/materials"],
   });
@@ -65,7 +75,14 @@ export default function MaterialsPage() {
     ? mediumCategories.filter(m => m.largeCategoryId === selectedLarge)
     : [];
 
+  const filteredSmallCategories = selectedMedium
+    ? smallCategories.filter(s => s.mediumCategoryId === selectedMedium)
+    : [];
+
   const filteredMaterials = (() => {
+    if (selectedSmall) {
+      return allMaterials.filter(m => m.smallCategoryId === selectedSmall);
+    }
     if (selectedMedium) {
       return allMaterials.filter(m => m.mediumCategoryId === selectedMedium);
     }
@@ -170,8 +187,60 @@ export default function MaterialsPage() {
       setDeleteDialogOpen(false);
       if (selectedMedium === deleteCategoryId) {
         setSelectedMedium(null);
+        setSelectedSmall(null);
       }
       toast({ title: "중분류가 삭제되었습니다." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "오류", description: error.message });
+    },
+  });
+
+  const createSmallCategoryMutation = useMutation({
+    mutationFn: async (data: { mediumCategoryId: string; name: string }) => {
+      const res = await apiRequest("POST", "/api/material-categories/small", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories/small"] });
+      setSmallCategoryDialogOpen(false);
+      setSmallCategoryName("");
+      toast({ title: "소분류가 추가되었습니다." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "오류", description: error.message });
+    },
+  });
+
+  const updateSmallCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await apiRequest("PUT", `/api/material-categories/small/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories/small"] });
+      setSmallCategoryDialogOpen(false);
+      setSmallCategoryEditId(null);
+      setSmallCategoryName("");
+      toast({ title: "소분류가 수정되었습니다." });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "오류", description: error.message });
+    },
+  });
+
+  const deleteSmallCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/material-categories/small/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories/small"] });
+      setDeleteDialogOpen(false);
+      if (selectedSmall === deleteCategoryId) {
+        setSelectedSmall(null);
+      }
+      toast({ title: "소분류가 삭제되었습니다." });
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "오류", description: error.message });
@@ -246,10 +315,11 @@ export default function MaterialsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       queryClient.invalidateQueries({ queryKey: ["/api/material-categories/large"] });
       queryClient.invalidateQueries({ queryKey: ["/api/material-categories/medium"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/material-categories/small"] });
       
       let message = data.message;
-      if (data.newLargeCategories > 0 || data.newMediumCategories > 0) {
-        message += ` (신규 대분류 ${data.newLargeCategories}개, 중분류 ${data.newMediumCategories}개 생성)`;
+      if (data.newLargeCategories > 0 || data.newMediumCategories > 0 || data.newSmallCategories > 0) {
+        message += ` (신규 대분류 ${data.newLargeCategories}개, 중분류 ${data.newMediumCategories}개, 소분류 ${data.newSmallCategories || 0}개 생성)`;
       }
       toast({ title: message });
       
@@ -267,6 +337,7 @@ export default function MaterialsPage() {
     setMaterialType("raw");
     setMaterialLargeCategoryId("");
     setMaterialMediumCategoryId("");
+    setMaterialSmallCategoryId("");
     setMaterialCode("");
     setMaterialName("");
     setMaterialStock("0");
@@ -294,12 +365,24 @@ export default function MaterialsPage() {
     setMediumCategoryDialogOpen(true);
   };
 
+  const handleOpenSmallCategoryDialog = (category?: MaterialCategorySmall) => {
+    if (category) {
+      setSmallCategoryEditId(category.id);
+      setSmallCategoryName(category.name);
+    } else {
+      setSmallCategoryEditId(null);
+      setSmallCategoryName("");
+    }
+    setSmallCategoryDialogOpen(true);
+  };
+
   const handleOpenMaterialDialog = (material?: Material) => {
     if (material) {
       setMaterialEditId(material.id);
       setMaterialType(material.materialType as MaterialType);
       setMaterialLargeCategoryId(material.largeCategoryId);
       setMaterialMediumCategoryId(material.mediumCategoryId);
+      setMaterialSmallCategoryId(material.smallCategoryId || "");
       setMaterialCode(material.materialCode);
       setMaterialName(material.materialName);
       setMaterialStock(String(material.currentStock));
@@ -308,6 +391,7 @@ export default function MaterialsPage() {
       resetMaterialForm();
       if (selectedLarge) setMaterialLargeCategoryId(selectedLarge);
       if (selectedMedium) setMaterialMediumCategoryId(selectedMedium);
+      if (selectedSmall) setMaterialSmallCategoryId(selectedSmall);
     }
     setMaterialDialogOpen(true);
   };
@@ -329,12 +413,22 @@ export default function MaterialsPage() {
     }
   };
 
+  const handleSaveSmallCategory = () => {
+    if (!selectedMedium) return;
+    if (smallCategoryEditId) {
+      updateSmallCategoryMutation.mutate({ id: smallCategoryEditId, name: smallCategoryName });
+    } else {
+      createSmallCategoryMutation.mutate({ mediumCategoryId: selectedMedium, name: smallCategoryName });
+    }
+  };
+
   const handleSaveMaterial = () => {
     if (materialEditId) {
       const updateData = {
         materialType,
         largeCategoryId: materialLargeCategoryId,
         mediumCategoryId: materialMediumCategoryId,
+        smallCategoryId: materialSmallCategoryId || null,
         materialName,
       };
       updateMaterialMutation.mutate({ id: materialEditId, data: updateData });
@@ -343,6 +437,7 @@ export default function MaterialsPage() {
         materialType,
         largeCategoryId: materialLargeCategoryId,
         mediumCategoryId: materialMediumCategoryId,
+        smallCategoryId: materialSmallCategoryId || null,
         materialCode: materialCode || undefined,
         materialName,
         currentStock: parseFloat(materialStock) || 0,
@@ -351,7 +446,7 @@ export default function MaterialsPage() {
     }
   };
 
-  const handleDeleteCategory = (type: "large" | "medium", id: string, name: string) => {
+  const handleDeleteCategory = (type: "large" | "medium" | "small", id: string, name: string) => {
     setDeleteCategoryType(type);
     setDeleteCategoryId(id);
     setDeleteCategoryName(name);
@@ -362,8 +457,10 @@ export default function MaterialsPage() {
     if (!deleteCategoryId) return;
     if (deleteCategoryType === "large") {
       deleteLargeCategoryMutation.mutate(deleteCategoryId);
-    } else {
+    } else if (deleteCategoryType === "medium") {
       deleteMediumCategoryMutation.mutate(deleteCategoryId);
+    } else if (deleteCategoryType === "small") {
+      deleteSmallCategoryMutation.mutate(deleteCategoryId);
     }
   };
 
@@ -398,8 +495,17 @@ export default function MaterialsPage() {
     return mediumCategories.find(c => c.id === id)?.name || "";
   };
 
+  const getSmallCategoryName = (id: string | null) => {
+    if (!id) return "-";
+    return smallCategories.find(c => c.id === id)?.name || "-";
+  };
+
   const availableMediumCategories = materialLargeCategoryId
     ? mediumCategories.filter(m => m.largeCategoryId === materialLargeCategoryId)
+    : [];
+
+  const availableSmallCategories = materialMediumCategoryId
+    ? smallCategories.filter(s => s.mediumCategoryId === materialMediumCategoryId)
     : [];
 
   return (
@@ -451,6 +557,7 @@ export default function MaterialsPage() {
                     onClick={() => {
                       setSelectedLarge(selectedLarge === category.id ? null : category.id);
                       setSelectedMedium(null);
+                      setSelectedSmall(null);
                     }}
                     data-testid={`large-category-${category.id}`}
                   >
@@ -509,7 +616,10 @@ export default function MaterialsPage() {
                       className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ${
                         selectedMedium === category.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                       }`}
-                      onClick={() => setSelectedMedium(selectedMedium === category.id ? null : category.id)}
+                      onClick={() => {
+                        setSelectedMedium(selectedMedium === category.id ? null : category.id);
+                        setSelectedSmall(null);
+                      }}
                       data-testid={`medium-category-${category.id}`}
                     >
                       <span className="truncate">{category.name}</span>
@@ -536,7 +646,63 @@ export default function MaterialsPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-8">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center justify-between">
+              소분류
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                disabled={!selectedMedium}
+                onClick={() => handleOpenSmallCategoryDialog()}
+                data-testid="button-add-small-category"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-2">
+            <ScrollArea className="h-[400px]">
+              {!selectedMedium ? (
+                <p className="text-sm text-muted-foreground text-center py-4">중분류를 선택해주세요</p>
+              ) : filteredSmallCategories.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">소분류가 없습니다</p>
+              ) : (
+                <div className="space-y-1">
+                  {filteredSmallCategories.map(category => (
+                    <div
+                      key={category.id}
+                      className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ${
+                        selectedSmall === category.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                      onClick={() => setSelectedSmall(selectedSmall === category.id ? null : category.id)}
+                      data-testid={`small-category-${category.id}`}
+                    >
+                      <span className="truncate">{category.name}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-6 w-6">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenSmallCategoryDialog(category); }}>
+                            <Pencil className="h-4 w-4 mr-2" /> 수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteCategory("small", category.id, category.name); }} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" /> 삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-6">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               <span>재료 목록 ({filteredMaterials.length}개)</span>
@@ -571,6 +737,7 @@ export default function MaterialsPage() {
                     <th className="px-3 py-2 text-left">타입</th>
                     <th className="px-3 py-2 text-left">대분류</th>
                     <th className="px-3 py-2 text-left">중분류</th>
+                    <th className="px-3 py-2 text-left">소분류</th>
                     <th className="px-3 py-2 text-left">재료코드</th>
                     <th className="px-3 py-2 text-left">재료명</th>
                     <th className="px-3 py-2 text-right">현재재고</th>
@@ -595,6 +762,7 @@ export default function MaterialsPage() {
                         <td className="px-3 py-2">{materialTypeLabels[material.materialType as MaterialType]}</td>
                         <td className="px-3 py-2">{getLargeCategoryName(material.largeCategoryId)}</td>
                         <td className="px-3 py-2">{getMediumCategoryName(material.mediumCategoryId)}</td>
+                        <td className="px-3 py-2">{getSmallCategoryName(material.smallCategoryId)}</td>
                         <td className="px-3 py-2 font-mono">{material.materialCode}</td>
                         <td className="px-3 py-2">{material.materialName}</td>
                         <td className="px-3 py-2 text-right">{material.currentStock.toFixed(1)}</td>
@@ -608,7 +776,7 @@ export default function MaterialsPage() {
                   })}
                   {filteredMaterials.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={9} className="text-center py-8 text-muted-foreground">
                         재료가 없습니다.
                       </td>
                     </tr>
@@ -674,6 +842,39 @@ export default function MaterialsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={smallCategoryDialogOpen} onOpenChange={setSmallCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{smallCategoryEditId ? "소분류 수정" : "소분류 추가"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>대분류</Label>
+              <Input value={getLargeCategoryName(selectedLarge || "")} disabled />
+            </div>
+            <div>
+              <Label>중분류</Label>
+              <Input value={getMediumCategoryName(selectedMedium || "")} disabled />
+            </div>
+            <div>
+              <Label>소분류명</Label>
+              <Input
+                value={smallCategoryName}
+                onChange={(e) => setSmallCategoryName(e.target.value)}
+                placeholder="예: 고급, 일반, 저가"
+                data-testid="input-small-category-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSmallCategoryDialogOpen(false)}>취소</Button>
+            <Button onClick={handleSaveSmallCategory} disabled={!smallCategoryName.trim()}>
+              {smallCategoryEditId ? "저장" : "추가"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={materialDialogOpen} onOpenChange={setMaterialDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -708,12 +909,26 @@ export default function MaterialsPage() {
             </div>
             <div>
               <Label>중분류</Label>
-              <Select value={materialMediumCategoryId} onValueChange={setMaterialMediumCategoryId} disabled={!materialLargeCategoryId}>
+              <Select value={materialMediumCategoryId} onValueChange={(v) => { setMaterialMediumCategoryId(v); setMaterialSmallCategoryId(""); }} disabled={!materialLargeCategoryId}>
                 <SelectTrigger data-testid="select-material-medium-category">
                   <SelectValue placeholder="중분류 선택" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableMediumCategories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>소분류 (선택)</Label>
+              <Select value={materialSmallCategoryId} onValueChange={setMaterialSmallCategoryId} disabled={!materialMediumCategoryId}>
+                <SelectTrigger data-testid="select-material-small-category">
+                  <SelectValue placeholder="소분류 선택 (선택사항)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">없음</SelectItem>
+                  {availableSmallCategories.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -769,13 +984,19 @@ export default function MaterialsPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{deleteCategoryType === "large" ? "대분류" : "중분류"} 삭제</AlertDialogTitle>
+            <AlertDialogTitle>{deleteCategoryType === "large" ? "대분류" : deleteCategoryType === "medium" ? "중분류" : "소분류"} 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteCategoryName}" {deleteCategoryType === "large" ? "대분류" : "중분류"}를 삭제하시겠습니까?
+              "{deleteCategoryName}" {deleteCategoryType === "large" ? "대분류" : deleteCategoryType === "medium" ? "중분류" : "소분류"}를 삭제하시겠습니까?
               {deleteCategoryType === "large" && (
                 <>
                   <br /><br />
-                  <span className="text-destructive font-medium">하위 중분류와 재료도 함께 삭제됩니다.</span>
+                  <span className="text-destructive font-medium">하위 중분류, 소분류와 재료도 함께 삭제됩니다.</span>
+                </>
+              )}
+              {deleteCategoryType === "medium" && (
+                <>
+                  <br /><br />
+                  <span className="text-destructive font-medium">하위 소분류와 재료도 함께 삭제됩니다.</span>
                 </>
               )}
             </AlertDialogDescription>
