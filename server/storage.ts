@@ -157,6 +157,7 @@ export interface IStorage {
   getProductMappingByCode(productCode: string): Promise<ProductMapping | undefined>;
   createProductMapping(data: InsertProductMapping): Promise<ProductMapping>;
   updateProductMapping(id: string, data: Partial<InsertProductMapping>): Promise<ProductMapping | undefined>;
+  updateProductMappingByCode(productCode: string, data: Partial<InsertProductMapping>): Promise<ProductMapping | undefined>;
   deleteProductMapping(productCode: string): Promise<boolean>;
   bulkCreateProductMappings(data: InsertProductMapping[]): Promise<ProductMapping[]>;
 
@@ -1096,6 +1097,14 @@ export class DatabaseStorage implements IStorage {
     const [mapping] = await db.update(productMappings)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(productMappings.id, id))
+      .returning();
+    return mapping;
+  }
+
+  async updateProductMappingByCode(productCode: string, data: Partial<InsertProductMapping>): Promise<ProductMapping | undefined> {
+    const [mapping] = await db.update(productMappings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(productMappings.productCode, productCode))
       .returning();
     return mapping;
   }

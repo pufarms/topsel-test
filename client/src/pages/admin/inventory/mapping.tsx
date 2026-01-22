@@ -245,12 +245,6 @@ export default function ProductMappingPage() {
       const res = await apiRequest("POST", "/api/product-mappings", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings/available-products"] });
-      toast({ title: "상품이 추가되었습니다" });
-      resetProductForm();
-    },
     onError: (error: any) => {
       toast({ title: "오류", description: error.message, variant: "destructive" });
     },
@@ -297,6 +291,16 @@ export default function ProductMappingPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
       toast({ title: "재료 매핑이 저장되었습니다" });
       resetProductForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "오류", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateProductMappingMutation = useMutation({
+    mutationFn: async (data: { productCode: string; productName: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string }) => {
+      const res = await apiRequest("PUT", `/api/product-mappings/${data.productCode}`, data);
+      return res.json();
     },
     onError: (error: any) => {
       toast({ title: "오류", description: error.message, variant: "destructive" });
@@ -395,8 +399,40 @@ export default function ProductMappingPage() {
     ));
   };
 
-  const handleSaveMaterials = () => {
-    saveMaterialsMutation.mutate({ productCode: editProductCode, materials: editMaterials });
+  const handleSaveMaterials = async () => {
+    try {
+      if (productDialogMode === "add") {
+        // 등록 모드: 먼저 상품 매핑을 생성하고, 그 다음 재료를 저장
+        await addProductMutation.mutateAsync({
+          productCode: editProductCode,
+          productName: editProductName,
+          categoryLarge: editCategoryLarge || undefined,
+          categoryMedium: editCategoryMedium || undefined,
+          categorySmall: editCategorySmall || undefined,
+        });
+        // 재료가 있으면 저장
+        if (editMaterials.length > 0) {
+          await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
+          toast({ title: "상품이 추가되었습니다" });
+          resetProductForm();
+        }
+      } else {
+        // 수정 모드: 상품 매핑 업데이트 후 재료 저장
+        await updateProductMappingMutation.mutateAsync({
+          productCode: editProductCode,
+          productName: editProductName,
+          categoryLarge: editCategoryLarge || undefined,
+          categoryMedium: editCategoryMedium || undefined,
+          categorySmall: editCategorySmall || undefined,
+        });
+        // 재료 저장
+        await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+      }
+    } catch (error: any) {
+      toast({ title: "오류", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleDeleteProduct = (productCode: string) => {

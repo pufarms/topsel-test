@@ -2399,6 +2399,33 @@ export async function registerRoutes(
     return res.json({ success: true, created: created.length, errors });
   });
 
+  // 상품 매핑 수정 (카테고리, 사용유무, 메모 등)
+  app.put("/api/product-mappings/:productCode", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { productCode } = req.params;
+    const { productName, categoryLarge, categoryMedium, categorySmall } = req.body;
+    
+    const existing = await storage.getProductMappingByCode(productCode);
+    if (!existing) {
+      return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
+    }
+    
+    const updated = await storage.updateProductMappingByCode(productCode, {
+      productName: productName || existing.productName,
+      categoryLarge: categoryLarge !== undefined ? categoryLarge : existing.categoryLarge,
+      categoryMedium: categoryMedium !== undefined ? categoryMedium : existing.categoryMedium,
+      categorySmall: categorySmall !== undefined ? categorySmall : existing.categorySmall,
+    });
+    
+    return res.json(updated);
+  });
+
   // 상품 매핑 삭제
   app.delete("/api/product-mappings/:productCode", async (req, res) => {
     if (!req.session.userId) {
