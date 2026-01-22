@@ -168,8 +168,12 @@ import { PageHeader, StatCard, FilterSection, DataTable } from "@/components/adm
 
 이 웹사이트의 모든 엑셀 업로드 기능은 다음 패턴을 따라야 합니다:
 
+### 지원 파일 형식
+- **.xlsx**: Excel 2007+ 형식 (권장, 양식 다운로드 시 기본 형식)
+- **.xls**: Excel 97-2003 형식 (호환 지원)
+
 ### 프론트엔드 (클라이언트)
-1. **파일 입력**: `accept=".xlsx,.xls"` 설정
+1. **파일 입력**: `accept=".xlsx,.xls"` 설정 (두 형식 모두 허용)
 2. **파일 전송**: FormData로 서버에 파일 직접 전송 (클라이언트에서 파싱하지 않음)
 3. **업로드 뮤테이션**:
 ```tsx
