@@ -21,6 +21,7 @@ export default function MaterialsPage() {
   const [selectedLarge, setSelectedLarge] = useState<string | null>(null);
   const [selectedMedium, setSelectedMedium] = useState<string | null>(null);
   const [selectedSmall, setSelectedSmall] = useState<string | null>(null);
+  const [selectedMaterialType, setSelectedMaterialType] = useState<MaterialType | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [largeCategoryDialogOpen, setLargeCategoryDialogOpen] = useState(false);
@@ -80,16 +81,23 @@ export default function MaterialsPage() {
     : [];
 
   const filteredMaterials = (() => {
+    let result = allMaterials;
+    
+    // 카테고리 필터
     if (selectedSmall) {
-      return allMaterials.filter(m => m.smallCategoryId === selectedSmall);
+      result = result.filter(m => m.smallCategoryId === selectedSmall);
+    } else if (selectedMedium) {
+      result = result.filter(m => m.mediumCategoryId === selectedMedium);
+    } else if (selectedLarge) {
+      result = result.filter(m => m.largeCategoryId === selectedLarge);
     }
-    if (selectedMedium) {
-      return allMaterials.filter(m => m.mediumCategoryId === selectedMedium);
+    
+    // 재료타입 필터
+    if (selectedMaterialType) {
+      result = result.filter(m => m.materialType === selectedMaterialType);
     }
-    if (selectedLarge) {
-      return allMaterials.filter(m => m.largeCategoryId === selectedLarge);
-    }
-    return allMaterials;
+    
+    return result;
   })();
 
   const createLargeCategoryMutation = useMutation({
@@ -535,186 +543,181 @@ export default function MaterialsPage() {
         </div>
       </div>
 
-      <div className="space-y-6">
-        {/* 카테고리 관리 섹션 */}
-        <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3">카테고리 관리</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center justify-between">
-                  대분류
-                  <Button size="sm" variant="ghost" onClick={() => handleOpenLargeCategoryDialog()} data-testid="button-add-large-category">
-                    <Plus className="h-4 w-4" />
+      <div className="space-y-4">
+        {/* 카테고리 필터 섹션 - 컴팩트 레이아웃 */}
+        <Card className="p-3">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">카테고리 필터</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSelectedLarge(null);
+                  setSelectedMedium(null);
+                  setSelectedSmall(null);
+                  setSelectedMaterialType(null);
+                }}
+                data-testid="button-reset-filters"
+              >
+                필터 초기화
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* 대분류 필터 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">대분류</Label>
+                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => handleOpenLargeCategoryDialog()} data-testid="button-add-large-category">
+                    <Plus className="h-3 w-3" />
                   </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                <ScrollArea className="h-[250px]">
-                  <div className="space-y-1">
-                    {largeCategories.map(category => (
-                      <div
-                        key={category.id}
-                        className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ${
-                          selectedLarge === category.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                        }`}
-                        onClick={() => {
-                          setSelectedLarge(selectedLarge === category.id ? null : category.id);
-                          setSelectedMedium(null);
-                          setSelectedSmall(null);
-                        }}
-                        data-testid={`large-category-${category.id}`}
-                      >
-                        <span className="truncate">{category.name}</span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button size="icon" variant="ghost" className="h-6 w-6">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenLargeCategoryDialog(category); }}>
-                              <Pencil className="h-4 w-4 mr-2" /> 수정
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteCategory("large", category.id, category.name); }} className="text-destructive">
-                              <Trash2 className="h-4 w-4 mr-2" /> 삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                </div>
+                <Select
+                  value={selectedLarge || "all"}
+                  onValueChange={(value) => {
+                    setSelectedLarge(value === "all" ? null : value);
+                    setSelectedMedium(null);
+                    setSelectedSmall(null);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-sm" data-testid="select-large-category">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {largeCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{cat.name}</span>
+                        </div>
+                      </SelectItem>
                     ))}
-                    {largeCategories.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">대분류가 없습니다</p>
-                    )}
+                  </SelectContent>
+                </Select>
+                {selectedLarge && (
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => handleOpenLargeCategoryDialog(largeCategories.find(c => c.id === selectedLarge))}>
+                      <Pencil className="h-3 w-3 mr-1" />수정
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive" onClick={() => handleDeleteCategory("large", selectedLarge, getLargeCategoryName(selectedLarge))}>
+                      <Trash2 className="h-3 w-3 mr-1" />삭제
+                    </Button>
                   </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                )}
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center justify-between">
-                  중분류
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    disabled={!selectedLarge}
-                    onClick={() => handleOpenMediumCategoryDialog()}
-                    data-testid="button-add-medium-category"
-                  >
-                    <Plus className="h-4 w-4" />
+              {/* 중분류 필터 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">중분류</Label>
+                  <Button size="icon" variant="ghost" className="h-5 w-5" disabled={!selectedLarge} onClick={() => handleOpenMediumCategoryDialog()} data-testid="button-add-medium-category">
+                    <Plus className="h-3 w-3" />
                   </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                <ScrollArea className="h-[250px]">
-                  {!selectedLarge ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">대분류를 선택해주세요</p>
-                  ) : filteredMediumCategories.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">중분류가 없습니다</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {filteredMediumCategories.map(category => (
-                        <div
-                          key={category.id}
-                          className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ${
-                            selectedMedium === category.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                          }`}
-                          onClick={() => {
-                            setSelectedMedium(selectedMedium === category.id ? null : category.id);
-                            setSelectedSmall(null);
-                          }}
-                          data-testid={`medium-category-${category.id}`}
-                        >
-                          <span className="truncate">{category.name}</span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-6 w-6">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenMediumCategoryDialog(category); }}>
-                                <Pencil className="h-4 w-4 mr-2" /> 수정
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteCategory("medium", category.id, category.name); }} className="text-destructive">
-                                <Trash2 className="h-4 w-4 mr-2" /> 삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                </div>
+                <Select
+                  value={selectedMedium || "all"}
+                  onValueChange={(value) => {
+                    setSelectedMedium(value === "all" ? null : value);
+                    setSelectedSmall(null);
+                  }}
+                  disabled={!selectedLarge}
+                >
+                  <SelectTrigger className="h-8 text-sm" data-testid="select-medium-category">
+                    <SelectValue placeholder={selectedLarge ? "전체" : "대분류 선택"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {filteredMediumCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedMedium && (
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => handleOpenMediumCategoryDialog(mediumCategories.find(c => c.id === selectedMedium))}>
+                      <Pencil className="h-3 w-3 mr-1" />수정
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive" onClick={() => handleDeleteCategory("medium", selectedMedium, getMediumCategoryName(selectedMedium))}>
+                      <Trash2 className="h-3 w-3 mr-1" />삭제
+                    </Button>
+                  </div>
+                )}
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center justify-between">
-                  소분류
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    disabled={!selectedMedium}
-                    onClick={() => handleOpenSmallCategoryDialog()}
-                    data-testid="button-add-small-category"
-                  >
-                    <Plus className="h-4 w-4" />
+              {/* 소분류 필터 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">소분류</Label>
+                  <Button size="icon" variant="ghost" className="h-5 w-5" disabled={!selectedMedium} onClick={() => handleOpenSmallCategoryDialog()} data-testid="button-add-small-category">
+                    <Plus className="h-3 w-3" />
                   </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                <ScrollArea className="h-[250px]">
-                  {!selectedMedium ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">중분류를 선택해주세요</p>
-                  ) : filteredSmallCategories.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">소분류가 없습니다</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {filteredSmallCategories.map(category => (
-                        <div
-                          key={category.id}
-                          className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm ${
-                            selectedSmall === category.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                          }`}
-                          onClick={() => setSelectedSmall(selectedSmall === category.id ? null : category.id)}
-                          data-testid={`small-category-${category.id}`}
-                        >
-                          <span className="truncate">{category.name}</span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-6 w-6">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenSmallCategoryDialog(category); }}>
-                                <Pencil className="h-4 w-4 mr-2" /> 수정
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteCategory("small", category.id, category.name); }} className="text-destructive">
-                                <Trash2 className="h-4 w-4 mr-2" /> 삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                </div>
+                <Select
+                  value={selectedSmall || "all"}
+                  onValueChange={(value) => setSelectedSmall(value === "all" ? null : value)}
+                  disabled={!selectedMedium}
+                >
+                  <SelectTrigger className="h-8 text-sm" data-testid="select-small-category">
+                    <SelectValue placeholder={selectedMedium ? "전체" : "중분류 선택"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {filteredSmallCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedSmall && (
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => handleOpenSmallCategoryDialog(smallCategories.find(c => c.id === selectedSmall))}>
+                      <Pencil className="h-3 w-3 mr-1" />수정
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive" onClick={() => handleDeleteCategory("small", selectedSmall, getSmallCategoryName(selectedSmall))}>
+                      <Trash2 className="h-3 w-3 mr-1" />삭제
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* 재료타입 필터 */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">재료타입</Label>
+                <Select
+                  value={selectedMaterialType || "all"}
+                  onValueChange={(value) => setSelectedMaterialType(value === "all" ? null : value as MaterialType)}
+                >
+                  <SelectTrigger className="h-8 text-sm" data-testid="select-material-type-filter">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    <SelectItem value="raw">원재료</SelectItem>
+                    <SelectItem value="semi">반재료</SelectItem>
+                    <SelectItem value="sub">부재료</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
-        </div>
+        </Card>
 
         {/* 재료 목록 섹션 */}
         <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3">재료 목록 ({filteredMaterials.length}개)</h3>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center justify-between gap-2">
-                <span>선택된 필터: {selectedLarge ? getLargeCategoryName(selectedLarge) : "전체"} {selectedMedium ? `> ${getMediumCategoryName(selectedMedium)}` : ""} {selectedSmall ? `> ${getSmallCategoryName(selectedSmall)}` : ""}</span>
+              <CardTitle className="text-sm font-medium flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-muted-foreground">
+                  재료 목록 ({filteredMaterials.length}개)
+                  {(selectedLarge || selectedMaterialType) && (
+                    <span className="ml-2 text-xs">
+                      | 필터: {selectedMaterialType ? materialTypeLabels[selectedMaterialType] : ""}
+                      {selectedMaterialType && selectedLarge ? " / " : ""}
+                      {selectedLarge ? getLargeCategoryName(selectedLarge) : ""}
+                      {selectedMedium ? ` > ${getMediumCategoryName(selectedMedium)}` : ""}
+                      {selectedSmall ? ` > ${getSmallCategoryName(selectedSmall)}` : ""}
+                    </span>
+                  )}
+                </span>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => handleOpenMaterialDialog()} data-testid="button-add-material">
                     <Plus className="h-4 w-4 mr-1" /> 재료 등록
