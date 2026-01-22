@@ -1788,5 +1788,373 @@ export async function registerRoutes(
     });
   });
 
+  // ========================================
+  // 재료 대분류 API (Material Categories Large)
+  // ========================================
+
+  app.get("/api/material-categories/large", async (req, res) => {
+    const categories = await storage.getAllMaterialCategoriesLarge();
+    return res.json(categories);
+  });
+
+  app.post("/api/material-categories/large", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { name, sortOrder } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "대분류명을 입력해주세요" });
+    }
+    const existing = await storage.getMaterialCategoryLargeByName(name);
+    if (existing) {
+      return res.status(400).json({ message: "이미 존재하는 대분류명입니다" });
+    }
+    const category = await storage.createMaterialCategoryLarge({ name, sortOrder: sortOrder || 0 });
+    return res.json(category);
+  });
+
+  app.put("/api/material-categories/large/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { name, sortOrder } = req.body;
+    const updated = await storage.updateMaterialCategoryLarge(req.params.id, { name, sortOrder });
+    if (!updated) {
+      return res.status(404).json({ message: "대분류를 찾을 수 없습니다" });
+    }
+    return res.json(updated);
+  });
+
+  app.delete("/api/material-categories/large/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const mediumCategories = await storage.getMaterialCategoriesMediumByLarge(req.params.id);
+    if (mediumCategories.length > 0) {
+      return res.status(400).json({ message: "하위 중분류가 존재합니다. 먼저 중분류를 삭제해주세요." });
+    }
+    const deleted = await storage.deleteMaterialCategoryLarge(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "대분류를 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "대분류가 삭제되었습니다." });
+  });
+
+  // ========================================
+  // 재료 중분류 API (Material Categories Medium)
+  // ========================================
+
+  app.get("/api/material-categories/medium", async (req, res) => {
+    const { largeCategoryId } = req.query;
+    if (largeCategoryId && typeof largeCategoryId === "string") {
+      const categories = await storage.getMaterialCategoriesMediumByLarge(largeCategoryId);
+      return res.json(categories);
+    }
+    const categories = await storage.getAllMaterialCategoriesMedium();
+    return res.json(categories);
+  });
+
+  app.post("/api/material-categories/medium", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { largeCategoryId, name, sortOrder } = req.body;
+    if (!largeCategoryId || !name) {
+      return res.status(400).json({ message: "대분류와 중분류명을 입력해주세요" });
+    }
+    const existing = await storage.getMaterialCategoryMediumByName(largeCategoryId, name);
+    if (existing) {
+      return res.status(400).json({ message: "동일한 대분류에 이미 존재하는 중분류명입니다" });
+    }
+    const category = await storage.createMaterialCategoryMedium({ largeCategoryId, name, sortOrder: sortOrder || 0 });
+    return res.json(category);
+  });
+
+  app.put("/api/material-categories/medium/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { name, sortOrder } = req.body;
+    const updated = await storage.updateMaterialCategoryMedium(req.params.id, { name, sortOrder });
+    if (!updated) {
+      return res.status(404).json({ message: "중분류를 찾을 수 없습니다" });
+    }
+    return res.json(updated);
+  });
+
+  app.delete("/api/material-categories/medium/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const materials = await storage.getMaterialsByCategory(undefined, req.params.id);
+    if (materials.length > 0) {
+      return res.status(400).json({ message: "해당 중분류에 재료가 존재합니다. 먼저 재료를 삭제해주세요." });
+    }
+    const deleted = await storage.deleteMaterialCategoryMedium(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "중분류를 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "중분류가 삭제되었습니다." });
+  });
+
+  // ========================================
+  // 재료 API (Materials)
+  // ========================================
+
+  app.get("/api/materials", async (req, res) => {
+    const { largeCategoryId, mediumCategoryId } = req.query;
+    const materials = await storage.getMaterialsByCategory(
+      largeCategoryId as string | undefined,
+      mediumCategoryId as string | undefined
+    );
+    return res.json(materials);
+  });
+
+  app.get("/api/materials/next-code/:type", async (req, res) => {
+    const code = await storage.getNextMaterialCode(req.params.type);
+    return res.json({ code });
+  });
+
+  app.post("/api/materials", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { materialType, largeCategoryId, mediumCategoryId, materialCode, materialName, currentStock } = req.body;
+    if (!materialType || !largeCategoryId || !mediumCategoryId || !materialName) {
+      return res.status(400).json({ message: "필수 필드를 입력해주세요" });
+    }
+    let code = materialCode;
+    if (!code) {
+      code = await storage.getNextMaterialCode(materialType);
+    }
+    const existingCode = await storage.getMaterialByCode(code);
+    if (existingCode) {
+      return res.status(400).json({ message: `이미 존재하는 재료코드입니다: ${code}` });
+    }
+    const material = await storage.createMaterial({
+      materialType,
+      largeCategoryId,
+      mediumCategoryId,
+      materialCode: code,
+      materialName,
+      currentStock: currentStock || 0,
+    });
+    return res.json(material);
+  });
+
+  app.put("/api/materials/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { materialType, largeCategoryId, mediumCategoryId, materialName } = req.body;
+    const updated = await storage.updateMaterial(req.params.id, {
+      materialType,
+      largeCategoryId,
+      mediumCategoryId,
+      materialName,
+    });
+    if (!updated) {
+      return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
+    }
+    return res.json(updated);
+  });
+
+  app.patch("/api/materials/:id/stock", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { adjustment, reason } = req.body;
+    if (typeof adjustment !== "number") {
+      return res.status(400).json({ message: "재고 조정량이 필요합니다" });
+    }
+    const material = await storage.getMaterial(req.params.id);
+    if (!material) {
+      return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
+    }
+    const newStock = material.currentStock + adjustment;
+    const updated = await storage.updateMaterial(req.params.id, { currentStock: newStock });
+    return res.json(updated);
+  });
+
+  app.delete("/api/materials/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "삭제할 재료 ID 목록이 필요합니다" });
+    }
+    const deleted = await storage.bulkDeleteMaterials(ids);
+    return res.json({ success: true, message: `${deleted}개 재료가 삭제되었습니다.`, deleted });
+  });
+
+  app.delete("/api/materials/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const deleted = await storage.deleteMaterial(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "재료가 삭제되었습니다." });
+  });
+
+  // 재료 양식 다운로드
+  app.get("/api/materials/template", (req, res) => {
+    const headers = ["재료타입", "대분류", "중분류", "재료코드", "재료명", "초기재고"];
+    const sampleData = [
+      ["원재료", "사과", "부사", "R001", "부사 정품 4다이(원물)", "0"],
+      ["반재료", "사과", "부사", "S001", "부사 상2번(선별)", "0"],
+      ["부재료", "부재료", "박스", "B001", "3kg 선물박스", "0"],
+    ];
+    
+    let csvContent = "\uFEFF";
+    csvContent += headers.join(",") + "\n";
+    sampleData.forEach(row => {
+      csvContent += row.join(",") + "\n";
+    });
+    
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=material_template.csv");
+    return res.send(csvContent);
+  });
+
+  // 재료 엑셀 일괄 등록
+  app.post("/api/materials/upload", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { rows } = req.body;
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({ message: "유효한 데이터가 없습니다" });
+    }
+
+    const errors: string[] = [];
+    const validRows: any[] = [];
+    let newLargeCategories = 0;
+    let newMediumCategories = 0;
+
+    const materialTypeMap: Record<string, string> = {
+      "원재료": "raw",
+      "반재료": "semi",
+      "부재료": "sub",
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+
+      if (!row.재료타입 || !row.대분류 || !row.중분류 || !row.재료명) {
+        errors.push(`행 ${rowNum}: 필수값 누락`);
+        continue;
+      }
+
+      const materialType = materialTypeMap[row.재료타입];
+      if (!materialType) {
+        errors.push(`행 ${rowNum}: 재료타입이 올바르지 않습니다 (원재료/반재료/부재료)`);
+        continue;
+      }
+
+      if (row.재료코드) {
+        const existing = await storage.getMaterialByCode(row.재료코드);
+        if (existing) {
+          errors.push(`행 ${rowNum}: 재료코드 [${row.재료코드}] 이미 존재`);
+          continue;
+        }
+      }
+
+      validRows.push({ ...row, materialType, rowNum });
+    }
+
+    let created = 0;
+    for (const row of validRows) {
+      let largeCategory = await storage.getMaterialCategoryLargeByName(row.대분류);
+      if (!largeCategory) {
+        largeCategory = await storage.createMaterialCategoryLarge({ name: row.대분류, sortOrder: 0 });
+        newLargeCategories++;
+      }
+
+      let mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, row.중분류);
+      if (!mediumCategory) {
+        mediumCategory = await storage.createMaterialCategoryMedium({ 
+          largeCategoryId: largeCategory.id, 
+          name: row.중분류, 
+          sortOrder: 0 
+        });
+        newMediumCategories++;
+      }
+
+      const code = row.재료코드 || await storage.getNextMaterialCode(row.materialType);
+      
+      await storage.createMaterial({
+        materialType: row.materialType,
+        largeCategoryId: largeCategory.id,
+        mediumCategoryId: mediumCategory.id,
+        materialCode: code,
+        materialName: row.재료명,
+        currentStock: parseFloat(row.초기재고) || 0,
+      });
+      created++;
+    }
+
+    return res.json({
+      success: true,
+      message: `${created}개 재료가 등록되었습니다.`,
+      created,
+      newLargeCategories,
+      newMediumCategories,
+      errors,
+    });
+  });
+
   return httpServer;
 }

@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type Material, type InsertMaterial, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materials } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -111,6 +111,34 @@ export interface IStorage {
   resumeCurrentProducts(ids: string[]): Promise<number>;
   deleteCurrentProduct(id: string): Promise<boolean>;
   bulkDeleteCurrentProducts(ids: string[]): Promise<number>;
+
+  // Material Category Large methods (재료 대분류)
+  getAllMaterialCategoriesLarge(): Promise<MaterialCategoryLarge[]>;
+  getMaterialCategoryLarge(id: string): Promise<MaterialCategoryLarge | undefined>;
+  getMaterialCategoryLargeByName(name: string): Promise<MaterialCategoryLarge | undefined>;
+  createMaterialCategoryLarge(data: InsertMaterialCategoryLarge): Promise<MaterialCategoryLarge>;
+  updateMaterialCategoryLarge(id: string, data: Partial<InsertMaterialCategoryLarge>): Promise<MaterialCategoryLarge | undefined>;
+  deleteMaterialCategoryLarge(id: string): Promise<boolean>;
+
+  // Material Category Medium methods (재료 중분류)
+  getAllMaterialCategoriesMedium(): Promise<MaterialCategoryMedium[]>;
+  getMaterialCategoriesMediumByLarge(largeCategoryId: string): Promise<MaterialCategoryMedium[]>;
+  getMaterialCategoryMedium(id: string): Promise<MaterialCategoryMedium | undefined>;
+  getMaterialCategoryMediumByName(largeCategoryId: string, name: string): Promise<MaterialCategoryMedium | undefined>;
+  createMaterialCategoryMedium(data: InsertMaterialCategoryMedium): Promise<MaterialCategoryMedium>;
+  updateMaterialCategoryMedium(id: string, data: Partial<InsertMaterialCategoryMedium>): Promise<MaterialCategoryMedium | undefined>;
+  deleteMaterialCategoryMedium(id: string): Promise<boolean>;
+
+  // Material methods (재료)
+  getAllMaterials(): Promise<Material[]>;
+  getMaterialsByCategory(largeCategoryId?: string, mediumCategoryId?: string): Promise<Material[]>;
+  getMaterial(id: string): Promise<Material | undefined>;
+  getMaterialByCode(code: string): Promise<Material | undefined>;
+  createMaterial(data: InsertMaterial): Promise<Material>;
+  updateMaterial(id: string, data: Partial<InsertMaterial>): Promise<Material | undefined>;
+  deleteMaterial(id: string): Promise<boolean>;
+  bulkDeleteMaterials(ids: string[]): Promise<number>;
+  getNextMaterialCode(type: string): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -820,6 +848,148 @@ export class DatabaseStorage implements IStorage {
   async bulkDeleteCurrentProducts(ids: string[]): Promise<number> {
     const result = await db.delete(currentProducts).where(inArray(currentProducts.id, ids)).returning();
     return result.length;
+  }
+
+  // Material Category Large methods (재료 대분류)
+  async getAllMaterialCategoriesLarge(): Promise<MaterialCategoryLarge[]> {
+    return db.select().from(materialCategoriesLarge).orderBy(materialCategoriesLarge.sortOrder);
+  }
+
+  async getMaterialCategoryLarge(id: string): Promise<MaterialCategoryLarge | undefined> {
+    const [category] = await db.select().from(materialCategoriesLarge).where(eq(materialCategoriesLarge.id, id));
+    return category;
+  }
+
+  async getMaterialCategoryLargeByName(name: string): Promise<MaterialCategoryLarge | undefined> {
+    const [category] = await db.select().from(materialCategoriesLarge).where(eq(materialCategoriesLarge.name, name));
+    return category;
+  }
+
+  async createMaterialCategoryLarge(data: InsertMaterialCategoryLarge): Promise<MaterialCategoryLarge> {
+    const [category] = await db.insert(materialCategoriesLarge).values(data).returning();
+    return category;
+  }
+
+  async updateMaterialCategoryLarge(id: string, data: Partial<InsertMaterialCategoryLarge>): Promise<MaterialCategoryLarge | undefined> {
+    const [category] = await db.update(materialCategoriesLarge)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(materialCategoriesLarge.id, id))
+      .returning();
+    return category;
+  }
+
+  async deleteMaterialCategoryLarge(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(materialCategoriesLarge).where(eq(materialCategoriesLarge.id, id)).returning();
+    return !!deleted;
+  }
+
+  // Material Category Medium methods (재료 중분류)
+  async getAllMaterialCategoriesMedium(): Promise<MaterialCategoryMedium[]> {
+    return db.select().from(materialCategoriesMedium).orderBy(materialCategoriesMedium.sortOrder);
+  }
+
+  async getMaterialCategoriesMediumByLarge(largeCategoryId: string): Promise<MaterialCategoryMedium[]> {
+    return db.select().from(materialCategoriesMedium)
+      .where(eq(materialCategoriesMedium.largeCategoryId, largeCategoryId))
+      .orderBy(materialCategoriesMedium.sortOrder);
+  }
+
+  async getMaterialCategoryMedium(id: string): Promise<MaterialCategoryMedium | undefined> {
+    const [category] = await db.select().from(materialCategoriesMedium).where(eq(materialCategoriesMedium.id, id));
+    return category;
+  }
+
+  async getMaterialCategoryMediumByName(largeCategoryId: string, name: string): Promise<MaterialCategoryMedium | undefined> {
+    const [category] = await db.select().from(materialCategoriesMedium)
+      .where(and(
+        eq(materialCategoriesMedium.largeCategoryId, largeCategoryId),
+        eq(materialCategoriesMedium.name, name)
+      ));
+    return category;
+  }
+
+  async createMaterialCategoryMedium(data: InsertMaterialCategoryMedium): Promise<MaterialCategoryMedium> {
+    const [category] = await db.insert(materialCategoriesMedium).values(data).returning();
+    return category;
+  }
+
+  async updateMaterialCategoryMedium(id: string, data: Partial<InsertMaterialCategoryMedium>): Promise<MaterialCategoryMedium | undefined> {
+    const [category] = await db.update(materialCategoriesMedium)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(materialCategoriesMedium.id, id))
+      .returning();
+    return category;
+  }
+
+  async deleteMaterialCategoryMedium(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(materialCategoriesMedium).where(eq(materialCategoriesMedium.id, id)).returning();
+    return !!deleted;
+  }
+
+  // Material methods (재료)
+  async getAllMaterials(): Promise<Material[]> {
+    return db.select().from(materials).orderBy(desc(materials.createdAt));
+  }
+
+  async getMaterialsByCategory(largeCategoryId?: string, mediumCategoryId?: string): Promise<Material[]> {
+    if (mediumCategoryId) {
+      return db.select().from(materials)
+        .where(eq(materials.mediumCategoryId, mediumCategoryId))
+        .orderBy(desc(materials.createdAt));
+    }
+    if (largeCategoryId) {
+      return db.select().from(materials)
+        .where(eq(materials.largeCategoryId, largeCategoryId))
+        .orderBy(desc(materials.createdAt));
+    }
+    return this.getAllMaterials();
+  }
+
+  async getMaterial(id: string): Promise<Material | undefined> {
+    const [material] = await db.select().from(materials).where(eq(materials.id, id));
+    return material;
+  }
+
+  async getMaterialByCode(code: string): Promise<Material | undefined> {
+    const [material] = await db.select().from(materials).where(eq(materials.materialCode, code));
+    return material;
+  }
+
+  async createMaterial(data: InsertMaterial): Promise<Material> {
+    const [material] = await db.insert(materials).values(data).returning();
+    return material;
+  }
+
+  async updateMaterial(id: string, data: Partial<InsertMaterial>): Promise<Material | undefined> {
+    const [material] = await db.update(materials)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(materials.id, id))
+      .returning();
+    return material;
+  }
+
+  async deleteMaterial(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(materials).where(eq(materials.id, id)).returning();
+    return !!deleted;
+  }
+
+  async bulkDeleteMaterials(ids: string[]): Promise<number> {
+    const result = await db.delete(materials).where(inArray(materials.id, ids)).returning();
+    return result.length;
+  }
+
+  async getNextMaterialCode(type: string): Promise<string> {
+    const prefix = type === "raw" ? "R" : type === "semi" ? "S" : "B";
+    const allMaterials = await db.select().from(materials).where(eq(materials.materialType, type));
+    const maxNum = allMaterials.reduce((max, m) => {
+      const match = m.materialCode.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        return num > max ? num : max;
+      }
+      return max;
+    }, 0);
+    return `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
   }
 }
 
