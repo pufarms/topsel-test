@@ -54,6 +54,9 @@ Main tables:
 7. **partner_products**: id (UUID), partnerId (FK), productId (FK) - Many-to-many relationship
 8. **members**: id (UUID), username (unique), password, grade (PENDING/ASSOCIATE/START/DRIVING/TOP), companyName, businessNumber, businessAddress, representative, phone, managerName, managerPhone, email, deposit, point, status (활성/비활성), memo, approvedAt, approvedBy, createdAt, updatedAt
 9. **member_logs**: id (UUID), memberId (FK), adminId (FK), action, beforeData (JSON), afterData (JSON), createdAt - 회원 변경 이력
+12. **material_categories_large**: id (UUID), name (unique), sortOrder, createdAt, updatedAt - 재료 대분류
+13. **material_categories_medium**: id (UUID), largeCategoryId (FK), name, sortOrder, createdAt, updatedAt - 재료 중분류
+14. **materials**: id (UUID), materialType (raw/semi/sub), largeCategoryId (FK), mediumCategoryId (FK), materialCode (unique, R001/S001/B001 형식), materialName, currentStock, createdAt, updatedAt - 재료
 
 ### Authentication Flow
 - Session-based authentication stored server-side
@@ -74,6 +77,20 @@ Main tables:
   - 현재 공급가 상품: /admin/products/current
   - 공급 중지 상품: /admin/products/suspended
 - **API 보안**: 모든 mutation 엔드포인트에 관리자 권한 검사 (403 반환)
+
+### Inventory Management (재고관리 - 관리자 전용)
+- **접근 권한**: SUPER_ADMIN, ADMIN만 접근 가능
+- **라우트**: /admin/inventory/* (AdminRoute로 보호)
+- **페이지**:
+  - 재료 관리: /admin/inventory/materials (3단 레이아웃: 대분류/중분류/재료)
+  - 상품 매핑: /admin/inventory/mapping (준비 중)
+  - 재고 현황: /admin/inventory/status (준비 중)
+  - 입고 관리: /admin/inventory/receiving (준비 중)
+  - 재고 이력: /admin/inventory/history (준비 중)
+- **재료타입**: raw(원재료/R코드), semi(반재료/S코드), sub(부재료/B코드)
+- **자동 코드 생성**: 재료코드 미입력 시 자동 생성 (R001, R002... 등)
+- **재고 불변성**: 재료 수정 시 재고 변경 불가 (입고 관리에서만 변경)
+- **CSV 일괄 업로드**: 양식 다운로드 후 CSV 업로드로 재료 일괄 등록
 
 ### Admin Sidebar Responsive Behavior
 - **Mobile (< 768px)**: Sidebar hidden, hamburger menu toggles overlay
