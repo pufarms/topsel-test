@@ -922,12 +922,12 @@ export default function MaterialsPage() {
             </div>
             <div>
               <Label>소분류 (선택)</Label>
-              <Select value={materialSmallCategoryId} onValueChange={setMaterialSmallCategoryId} disabled={!materialMediumCategoryId}>
+              <Select value={materialSmallCategoryId || "none"} onValueChange={(v) => setMaterialSmallCategoryId(v === "none" ? "" : v)} disabled={!materialMediumCategoryId}>
                 <SelectTrigger data-testid="select-material-small-category">
                   <SelectValue placeholder="소분류 선택 (선택사항)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">없음</SelectItem>
+                  <SelectItem value="none">없음</SelectItem>
                   {availableSmallCategories.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
