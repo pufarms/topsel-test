@@ -90,7 +90,7 @@ Main tables:
 - **재료타입**: raw(원재료/R코드), semi(반재료/S코드), sub(부재료/B코드)
 - **자동 코드 생성**: 재료코드 미입력 시 자동 생성 (R001, R002... 등)
 - **재고 불변성**: 재료 수정 시 재고 변경 불가 (입고 관리에서만 변경)
-- **CSV 일괄 업로드**: 양식 다운로드 후 CSV 업로드로 재료 일괄 등록
+- **엑셀 일괄 업로드**: 양식 다운로드(.xlsx) 후 엑셀 업로드로 재료 일괄 등록
 
 ### Admin Sidebar Responsive Behavior
 - **Mobile (< 768px)**: Sidebar hidden, hamburger menu toggles overlay
@@ -163,6 +163,58 @@ import { PageHeader, StatCard, FilterSection, DataTable } from "@/components/adm
   <DataTable columns={columns} data={data} keyField="id" />
 </div>
 ```
+
+## 엑셀 업로드 표준 패턴
+
+이 웹사이트의 모든 엑셀 업로드 기능은 다음 패턴을 따라야 합니다:
+
+### 프론트엔드 (클라이언트)
+1. **파일 입력**: `accept=".xlsx,.xls"` 설정
+2. **파일 전송**: FormData로 서버에 파일 직접 전송 (클라이언트에서 파싱하지 않음)
+3. **업로드 뮤테이션**:
+```tsx
+const uploadMutation = useMutation({
+  mutationFn: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/endpoint/upload", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error((await res.json()).message);
+    return res.json();
+  },
+});
+```
+
+### 백엔드 (서버)
+1. **multer 미들웨어**: 메모리 스토리지 사용
+```ts
+const excelUpload = multer({ storage: multer.memoryStorage() });
+app.post("/api/endpoint/upload", excelUpload.single("file"), async (req, res) => { ... });
+```
+2. **xlsx 라이브러리**: 서버에서 엑셀 파싱
+```ts
+const XLSX = await import("xlsx");
+const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+const sheet = workbook.Sheets[workbook.SheetNames[0]];
+const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+```
+3. **양식 다운로드**: xlsx 라이브러리로 엑셀 파일 생성
+```ts
+const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, "시트명");
+const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+res.setHeader("Content-Disposition", "attachment; filename=template.xlsx");
+return res.send(buffer);
+```
+
+### 적용된 페이지
+- 상품등록 (공급가 계산): /admin/products/registration
+- 재료 관리: /admin/inventory/materials
 
 ## TODO: 미구현 기능
 ### 이메일 발송 기능

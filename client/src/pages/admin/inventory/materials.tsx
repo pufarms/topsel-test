@@ -46,9 +46,8 @@ export default function MaterialsPage() {
 
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadData, setUploadData] = useState<any[]>([]);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [uploadErrorsDialogOpen, setUploadErrorsDialogOpen] = useState(false);
+  const [uploadErrors, setUploadErrors] = useState<{ row: number; error: string }[]>([]);
 
   const { data: largeCategories = [] } = useQuery<MaterialCategoryLarge[]>({
     queryKey: ["/api/material-categories/large"],
@@ -229,22 +228,35 @@ export default function MaterialsPage() {
   });
 
   const uploadMaterialsMutation = useMutation({
-    mutationFn: async (rows: any[]) => {
-      const res = await apiRequest("POST", "/api/materials/upload", { rows });
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/materials/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "업로드 실패");
+      }
       return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       queryClient.invalidateQueries({ queryKey: ["/api/material-categories/large"] });
       queryClient.invalidateQueries({ queryKey: ["/api/material-categories/medium"] });
-      setUploadDialogOpen(false);
-      setUploadData([]);
-      setUploadErrors([]);
+      
       let message = data.message;
       if (data.newLargeCategories > 0 || data.newMediumCategories > 0) {
         message += ` (신규 대분류 ${data.newLargeCategories}개, 중분류 ${data.newMediumCategories}개 생성)`;
       }
       toast({ title: message });
+      
+      if (data.errors && data.errors.length > 0) {
+        setUploadErrors(data.errors);
+        setUploadErrorsDialogOpen(true);
+      }
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "오류", description: error.message });
@@ -374,38 +386,7 @@ export default function MaterialsPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split("\n").filter(line => line.trim());
-      if (lines.length < 2) {
-        toast({ variant: "destructive", title: "오류", description: "유효한 데이터가 없습니다." });
-        return;
-      }
-
-      const headers = lines[0].split(",").map(h => h.trim().replace(/^\uFEFF/, ""));
-      const rows: any[] = [];
-      const errors: string[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(",").map(v => v.trim());
-        if (values.length < 5) {
-          errors.push(`행 ${i + 1}: 컬럼 수 부족`);
-          continue;
-        }
-        const row: any = {};
-        headers.forEach((h, idx) => {
-          row[h] = values[idx] || "";
-        });
-        rows.push(row);
-      }
-
-      setUploadData(rows);
-      setUploadErrors(errors);
-      setUploadDialogOpen(true);
-    };
-    reader.readAsText(file);
+    uploadMaterialsMutation.mutate(file);
     e.target.value = "";
   };
 
@@ -433,12 +414,17 @@ export default function MaterialsPage() {
             <Download className="h-4 w-4 mr-2" /> 양식 다운로드
           </Button>
           <label>
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild disabled={uploadMaterialsMutation.isPending}>
               <span>
-                <Upload className="h-4 w-4 mr-2" /> CSV 일괄등록
+                {uploadMaterialsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                엑셀 일괄등록
               </span>
             </Button>
-            <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} data-testid="input-file-upload" />
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} data-testid="input-file-upload" />
           </label>
         </div>
       </div>
@@ -826,32 +812,22 @@ export default function MaterialsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog open={uploadErrorsDialogOpen} onOpenChange={setUploadErrorsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>업로드 결과</DialogTitle>
+            <DialogTitle>업로드 오류</DialogTitle>
             <DialogDescription>
-              전체: {uploadData.length}행 / 등록 가능: {uploadData.length - uploadErrors.length}행 / 오류: {uploadErrors.length}행
+              일부 행은 등록되지 않았습니다. ({uploadErrors.length}개 오류)
             </DialogDescription>
           </DialogHeader>
-          {uploadErrors.length > 0 && (
-            <div className="bg-destructive/10 p-3 rounded-md max-h-40 overflow-auto">
-              <p className="text-sm font-medium text-destructive mb-2">오류 목록</p>
-              {uploadErrors.map((err, i) => (
-                <p key={i} className="text-sm text-destructive">{err}</p>
-              ))}
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">오류가 있는 행은 제외하고 등록됩니다.</p>
+          <div className="bg-destructive/10 p-3 rounded-md max-h-60 overflow-auto">
+            <p className="text-sm font-medium text-destructive mb-2">오류 목록</p>
+            {uploadErrors.map((err, i) => (
+              <p key={i} className="text-sm text-destructive">행 {err.row}: {err.error}</p>
+            ))}
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>취소</Button>
-            <Button 
-              onClick={() => uploadMaterialsMutation.mutate(uploadData)}
-              disabled={uploadData.length === uploadErrors.length || uploadMaterialsMutation.isPending}
-            >
-              {uploadMaterialsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {uploadData.length - uploadErrors.length}개 등록하기
-            </Button>
+            <Button onClick={() => setUploadErrorsDialogOpen(false)}>확인</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

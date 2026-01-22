@@ -2043,28 +2043,47 @@ export async function registerRoutes(
     return res.json({ success: true, message: "재료가 삭제되었습니다." });
   });
 
-  // 재료 양식 다운로드
-  app.get("/api/materials/template", (req, res) => {
-    const headers = ["재료타입", "대분류", "중분류", "재료코드", "재료명", "초기재고"];
-    const sampleData = [
-      ["원재료", "사과", "부사", "R001", "부사 정품 4다이(원물)", "0"],
-      ["반재료", "사과", "부사", "S001", "부사 상2번(선별)", "0"],
-      ["부재료", "부재료", "박스", "B001", "3kg 선물박스", "0"],
-    ];
-    
-    let csvContent = "\uFEFF";
-    csvContent += headers.join(",") + "\n";
-    sampleData.forEach(row => {
-      csvContent += row.join(",") + "\n";
-    });
-    
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=material_template.csv");
-    return res.send(csvContent);
+  // 재료 양식 다운로드 (엑셀 형식)
+  app.get("/api/materials/template", async (req, res) => {
+    try {
+      const XLSX = await import("xlsx");
+      
+      const headers = ["재료타입", "대분류", "중분류", "재료코드", "재료명", "초기재고"];
+      const sampleData = [
+        ["원재료", "사과", "부사", "R001", "부사 정품 4다이(원물)", 0],
+        ["원재료", "사과", "부사", "R002", "부사 상2번(원물)", 0],
+        ["반재료", "사과", "부사", "S001", "부사 상2번(선별)", 0],
+        ["부재료", "부재료", "박스", "B001", "3kg 선물박스", 0],
+      ];
+      
+      const wsData = [headers, ...sampleData];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      ws["!cols"] = [
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 10 },
+        { wch: 30 },
+        { wch: 10 },
+      ];
+      
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "재료등록");
+      
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=material_template.xlsx");
+      return res.send(buffer);
+    } catch (error) {
+      return res.status(500).json({ message: "템플릿 생성 중 오류가 발생했습니다" });
+    }
   });
 
   // 재료 엑셀 일괄 등록
-  app.post("/api/materials/upload", async (req, res) => {
+  const materialExcelUpload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/materials/upload", materialExcelUpload.single("file"), async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -2072,88 +2091,92 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    
-    const { rows } = req.body;
-    if (!rows || !Array.isArray(rows)) {
-      return res.status(400).json({ message: "유효한 데이터가 없습니다" });
+    if (!req.file) {
+      return res.status(400).json({ message: "파일이 없습니다" });
     }
+    
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
 
-    const errors: string[] = [];
-    const validRows: any[] = [];
-    let newLargeCategories = 0;
-    let newMediumCategories = 0;
+      const errors: { row: number; error: string }[] = [];
+      let created = 0;
+      let newLargeCategories = 0;
+      let newMediumCategories = 0;
 
-    const materialTypeMap: Record<string, string> = {
-      "원재료": "raw",
-      "반재료": "semi",
-      "부재료": "sub",
-    };
+      const materialTypeMap: Record<string, string> = {
+        "원재료": "raw",
+        "반재료": "semi",
+        "부재료": "sub",
+      };
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNum = i + 2;
-
-      if (!row.재료타입 || !row.대분류 || !row.중분류 || !row.재료명) {
-        errors.push(`행 ${rowNum}: 필수값 누락`);
-        continue;
-      }
-
-      const materialType = materialTypeMap[row.재료타입];
-      if (!materialType) {
-        errors.push(`행 ${rowNum}: 재료타입이 올바르지 않습니다 (원재료/반재료/부재료)`);
-        continue;
-      }
-
-      if (row.재료코드) {
-        const existing = await storage.getMaterialByCode(row.재료코드);
-        if (existing) {
-          errors.push(`행 ${rowNum}: 재료코드 [${row.재료코드}] 이미 존재`);
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length < 5) continue;
+        
+        const [재료타입, 대분류, 중분류, 재료코드, 재료명, 초기재고] = row;
+        
+        if (!재료타입 || !대분류 || !중분류 || !재료명) {
+          errors.push({ row: i + 1, error: "필수값 누락 (재료타입, 대분류, 중분류, 재료명)" });
           continue;
         }
-      }
 
-      validRows.push({ ...row, materialType, rowNum });
-    }
+        const materialType = materialTypeMap[String(재료타입)];
+        if (!materialType) {
+          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입}` });
+          continue;
+        }
 
-    let created = 0;
-    for (const row of validRows) {
-      let largeCategory = await storage.getMaterialCategoryLargeByName(row.대분류);
-      if (!largeCategory) {
-        largeCategory = await storage.createMaterialCategoryLarge({ name: row.대분류, sortOrder: 0 });
-        newLargeCategories++;
-      }
+        if (재료코드) {
+          const existing = await storage.getMaterialByCode(String(재료코드));
+          if (existing) {
+            errors.push({ row: i + 1, error: `재료코드 중복: ${재료코드}` });
+            continue;
+          }
+        }
 
-      let mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, row.중분류);
-      if (!mediumCategory) {
-        mediumCategory = await storage.createMaterialCategoryMedium({ 
-          largeCategoryId: largeCategory.id, 
-          name: row.중분류, 
-          sortOrder: 0 
+        let largeCategory = await storage.getMaterialCategoryLargeByName(String(대분류));
+        if (!largeCategory) {
+          largeCategory = await storage.createMaterialCategoryLarge({ name: String(대분류), sortOrder: 0 });
+          newLargeCategories++;
+        }
+
+        let mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, String(중분류));
+        if (!mediumCategory) {
+          mediumCategory = await storage.createMaterialCategoryMedium({ 
+            largeCategoryId: largeCategory.id, 
+            name: String(중분류), 
+            sortOrder: 0 
+          });
+          newMediumCategories++;
+        }
+
+        const code = 재료코드 ? String(재료코드) : await storage.getNextMaterialCode(materialType);
+        
+        await storage.createMaterial({
+          materialType,
+          largeCategoryId: largeCategory.id,
+          mediumCategoryId: mediumCategory.id,
+          materialCode: code,
+          materialName: String(재료명),
+          currentStock: parseFloat(String(초기재고 || 0)) || 0,
         });
-        newMediumCategories++;
+        created++;
       }
 
-      const code = row.재료코드 || await storage.getNextMaterialCode(row.materialType);
-      
-      await storage.createMaterial({
-        materialType: row.materialType,
-        largeCategoryId: largeCategory.id,
-        mediumCategoryId: mediumCategory.id,
-        materialCode: code,
-        materialName: row.재료명,
-        currentStock: parseFloat(row.초기재고) || 0,
+      return res.json({
+        success: true,
+        message: `${created}개 재료가 등록되었습니다.`,
+        created,
+        newLargeCategories,
+        newMediumCategories,
+        errors,
       });
-      created++;
+    } catch (error) {
+      return res.status(400).json({ message: "엑셀 파일 처리 중 오류가 발생했습니다" });
     }
-
-    return res.json({
-      success: true,
-      message: `${created}개 재료가 등록되었습니다.`,
-      created,
-      newLargeCategories,
-      newMediumCategories,
-      errors,
-    });
   });
 
   return httpServer;
