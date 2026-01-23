@@ -149,10 +149,14 @@ export default function ProductMappingPage() {
     return categories.filter(c => c.level === "small" && c.parentId === selectedMediumCategory.id);
   }, [categories, filterCategoryMedium, selectedMediumCategory]);
 
+  // State to track if we need to open a specific product from URL
+  const [pendingProductCodeFromUrl, setPendingProductCodeFromUrl] = useState<string | null>(null);
+
   // Parse URL parameter for unmapped products and auto-add them
   useEffect(() => {
     const url = new URL(window.location.href);
     const unmappedParam = url.searchParams.get("unmapped");
+    const productCodeParam = url.searchParams.get("productCode");
     
     if (unmappedParam) {
       try {
@@ -167,7 +171,28 @@ export default function ProductMappingPage() {
         console.error("Failed to parse unmapped products from URL:", e);
       }
     }
+    
+    // Handle productCode parameter to open edit modal for a specific product
+    if (productCodeParam) {
+      setPendingProductCodeFromUrl(decodeURIComponent(productCodeParam));
+      // Clear the URL parameter
+      url.searchParams.delete("productCode");
+      url.searchParams.delete("mode");
+      url.searchParams.delete("returnTo");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, []);
+  
+  // Open edit modal when product code from URL is found in mappings
+  useEffect(() => {
+    if (pendingProductCodeFromUrl && !isLoading) {
+      const foundMapping = productMappings.find(m => m.productCode === pendingProductCodeFromUrl);
+      if (foundMapping) {
+        handleOpenEditMapping(foundMapping);
+      }
+      setPendingProductCodeFromUrl(null);
+    }
+  }, [pendingProductCodeFromUrl, productMappings, isLoading]);
 
   // Auto-add unmapped products when they are parsed from URL
   useEffect(() => {

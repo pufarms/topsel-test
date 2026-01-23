@@ -2525,7 +2525,18 @@ export async function registerRoutes(
     }
     
     const result = await storage.replaceProductMaterialMappings(productCode, validMaterials);
-    return res.json({ success: true, materials: result });
+    
+    // Update mappingStatus in product_mappings table
+    const newMappingStatus = validMaterials.length > 0 ? "complete" : "incomplete";
+    await storage.updateProductMappingByCode(productCode, { mappingStatus: newMappingStatus });
+    
+    // Also update mappingStatus in product_registrations table (source data)
+    const productReg = await storage.getProductRegistrationByCode(productCode);
+    if (productReg) {
+      await storage.updateProductRegistration(productReg.id, { mappingStatus: newMappingStatus });
+    }
+    
+    return res.json({ success: true, materials: result, mappingStatus: newMappingStatus });
   });
 
   // 상품 매핑 엑셀 업로드
