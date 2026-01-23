@@ -2546,6 +2546,21 @@ export async function registerRoutes(
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
     const { productCode } = req.params;
+    
+    // Check if product is in nextWeekProducts or currentProducts (protected)
+    const nextWeekProducts = await storage.getNextWeekProducts();
+    const currentProducts = await storage.getCurrentProducts();
+    const inNextWeek = nextWeekProducts.some(p => p.productCode === productCode);
+    const inCurrent = currentProducts.some(p => p.productCode === productCode);
+    
+    if (inNextWeek && inCurrent) {
+      return res.status(400).json({ message: "차주예상공급가 및 현재공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+    } else if (inNextWeek) {
+      return res.status(400).json({ message: "차주예상공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+    } else if (inCurrent) {
+      return res.status(400).json({ message: "현재공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+    }
+    
     const deleted = await storage.deleteProductMapping(productCode);
     if (!deleted) {
       return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
@@ -2586,6 +2601,22 @@ export async function registerRoutes(
     
     if (!materials || !Array.isArray(materials)) {
       return res.status(400).json({ message: "materials 배열이 필요합니다" });
+    }
+    
+    // Check if trying to unmap (empty materials) a protected product
+    if (materials.length === 0) {
+      const nextWeekProducts = await storage.getNextWeekProducts();
+      const currentProducts = await storage.getCurrentProducts();
+      const inNextWeek = nextWeekProducts.some(p => p.productCode === productCode);
+      const inCurrent = currentProducts.some(p => p.productCode === productCode);
+      
+      if (inNextWeek && inCurrent) {
+        return res.status(400).json({ message: "차주예상공급가 및 현재공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+      } else if (inNextWeek) {
+        return res.status(400).json({ message: "차주예상공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+      } else if (inCurrent) {
+        return res.status(400).json({ message: "현재공급가 상품입니다. 변경이나 삭제가 불가합니다." });
+      }
     }
     
     const validMaterials = [];
