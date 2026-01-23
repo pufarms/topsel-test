@@ -1319,10 +1319,10 @@ export default function ProductRegistrationPage() {
           <Button 
             variant="outline"
             onClick={() => openSendConfirmDialog("selected")} 
-            disabled={selectedIds.length === 0 || isSending} 
+            disabled={selectedIds.length === 0 || isSending || isCheckingMapping} 
             data-testid="button-send-selected"
           >
-            {isSending && sendMode === "selected" ? (
+            {(isSending || isCheckingMapping) && sendMode === "selected" ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <Send className="h-4 w-4 mr-2" />
@@ -1331,10 +1331,10 @@ export default function ProductRegistrationPage() {
           </Button>
           <Button 
             onClick={() => openSendConfirmDialog("all")} 
-            disabled={products.length === 0 || isSending} 
+            disabled={products.length === 0 || isSending || isCheckingMapping} 
             data-testid="button-send-all"
           >
-            {isSending && sendMode === "all" ? (
+            {(isSending || isCheckingMapping) && sendMode === "all" ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <Send className="h-4 w-4 mr-2" />
@@ -1430,6 +1430,64 @@ export default function ProductRegistrationPage() {
             <AlertDialogAction onClick={handleConfirmSend} data-testid="button-confirm-send">
               <Send className="h-4 w-4 mr-2" />
               전송
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unmapped Products Dialog */}
+      <AlertDialog open={mappingCheckDialogOpen} onOpenChange={setMappingCheckDialogOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              상품 매핑 필요
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  다음 {unmappedProducts.length}개 상품이 재고관리에서 매핑되지 않았습니다.
+                  상품을 차주 예상공급가로 전송하기 전에 먼저 상품 매핑을 완료해주세요.
+                </p>
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-3 rounded-md text-sm">
+                  <div className="font-medium mb-2 text-orange-700 dark:text-orange-300">매핑되지 않은 상품 ({unmappedProducts.length}개)</div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {unmappedProducts.slice(0, 10).map((p, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                        <span className="text-xs font-mono">{p.productCode}</span>
+                        <span className="text-muted-foreground">-</span>
+                        <span className="text-xs truncate">{p.productName}</span>
+                      </div>
+                    ))}
+                    {unmappedProducts.length > 10 && (
+                      <div className="text-xs text-muted-foreground pt-1">
+                        ... 외 {unmappedProducts.length - 10}개
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  "상품 매핑으로 이동" 버튼을 클릭하여 매핑을 완료한 후 다시 전송해주세요.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-mapping-dialog">취소</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                setMappingCheckDialogOpen(false);
+                toast({
+                  title: "상품 매핑 페이지로 이동합니다",
+                  description: `${unmappedProducts.length}개 상품의 매핑이 필요합니다.`,
+                });
+                setLocation("/admin/inventory/mapping");
+              }}
+              className="bg-orange-500 hover:bg-orange-600"
+              data-testid="button-go-to-mapping"
+            >
+              <Link2 className="h-4 w-4 mr-2" />
+              상품 매핑으로 이동
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
