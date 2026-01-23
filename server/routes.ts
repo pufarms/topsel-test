@@ -2548,8 +2548,8 @@ export async function registerRoutes(
     const { productCode } = req.params;
     
     // Check if product is in nextWeekProducts or currentProducts (protected)
-    const nextWeekProducts = await storage.getNextWeekProducts();
-    const currentProducts = await storage.getCurrentProducts();
+    const nextWeekProducts = await storage.getAllNextWeekProducts();
+    const currentProducts = await storage.getAllCurrentProducts();
     const inNextWeek = nextWeekProducts.some(p => p.productCode === productCode);
     const inCurrent = currentProducts.some(p => p.productCode === productCode);
     
@@ -2605,8 +2605,8 @@ export async function registerRoutes(
     
     // Check if trying to unmap (empty materials) a protected product
     if (materials.length === 0) {
-      const nextWeekProducts = await storage.getNextWeekProducts();
-      const currentProducts = await storage.getCurrentProducts();
+      const nextWeekProducts = await storage.getAllNextWeekProducts();
+      const currentProducts = await storage.getAllCurrentProducts();
       const inNextWeek = nextWeekProducts.some(p => p.productCode === productCode);
       const inCurrent = currentProducts.some(p => p.productCode === productCode);
       
