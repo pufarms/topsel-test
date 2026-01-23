@@ -2635,5 +2635,279 @@ export async function registerRoutes(
     }
   });
 
+  // ===== 공급상품 재고 관리 API =====
+
+  // 재고가 있는 상품 목록 조회
+  app.get("/api/product-stocks", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const stocks = await storage.getProductStocksWithStock();
+    return res.json(stocks);
+  });
+
+  // 전체 상품 재고 목록 조회 (입고/조정 시 검색용)
+  app.get("/api/product-stocks/all", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const stocks = await storage.getAllProductStocks();
+    return res.json(stocks);
+  });
+
+  // 상품 매핑과 재고 정보 결합 조회
+  app.get("/api/product-stocks/with-mappings", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const mappings = await storage.getAllProductMappings();
+    const stocks = await storage.getAllProductStocks();
+    
+    const stockMap = new Map(stocks.map(s => [s.productCode, s.currentStock]));
+    
+    const result = mappings.map(m => ({
+      ...m,
+      currentStock: stockMap.get(m.productCode) || 0,
+    }));
+    
+    return res.json(result);
+  });
+
+  // 입고 등록
+  app.post("/api/product-stocks/stock-in", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { productCode, productName, quantity, note } = req.body;
+    
+    if (!productCode || typeof quantity !== "number" || quantity <= 0) {
+      return res.status(400).json({ message: "상품코드와 수량은 필수입니다" });
+    }
+    
+    const mapping = await storage.getProductMappingByCode(productCode);
+    if (!mapping) {
+      return res.status(400).json({ message: "상품 매핑에 등록되지 않은 상품입니다" });
+    }
+    
+    await storage.increaseProductStock(productCode, Math.floor(quantity), productName || mapping.productName);
+    
+    await storage.createStockHistory({
+      type: "product",
+      actionType: "in",
+      productCode,
+      quantity: Math.floor(quantity),
+      note: note || null,
+      adminId: user.id,
+      adminName: user.name,
+    });
+    
+    return res.json({ success: true, message: "입고가 완료되었습니다" });
+  });
+
+  // 재고 조정
+  app.post("/api/product-stocks/adjust", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { productCode, adjustType, quantity, reason, note } = req.body;
+    
+    if (!productCode || !adjustType || typeof quantity !== "number" || quantity <= 0) {
+      return res.status(400).json({ message: "필수 정보가 누락되었습니다" });
+    }
+    
+    const stock = await storage.getProductStock(productCode);
+    const currentStock = stock?.currentStock || 0;
+    
+    if (adjustType === "decrease" && quantity > currentStock) {
+      return res.status(400).json({ message: "현재 재고보다 많은 수량을 감소할 수 없습니다" });
+    }
+    
+    if (adjustType === "increase") {
+      const mapping = await storage.getProductMappingByCode(productCode);
+      await storage.increaseProductStock(productCode, Math.floor(quantity), mapping?.productName);
+    } else {
+      await storage.decreaseProductStock(productCode, Math.floor(quantity));
+    }
+    
+    await storage.createStockHistory({
+      type: "product",
+      actionType: "adjust",
+      productCode,
+      quantity: adjustType === "increase" ? Math.floor(quantity) : -Math.floor(quantity),
+      reason: reason || null,
+      note: note || null,
+      adminId: user.id,
+      adminName: user.name,
+    });
+    
+    return res.json({ success: true, message: "재고 조정이 완료되었습니다" });
+  });
+
+  // 공급상품 입고 양식 다운로드
+  app.get("/api/product-stocks/template", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    
+    const wsData = [
+      ["상품코드", "상품명", "입고수량", "비고"],
+      ["A001", "부사 3kg 선물세트", 10, ""],
+      ["A002", "부사 5kg 가정용", 5, ""],
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    ws["!cols"] = [
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 30 },
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, "공급상품 입고");
+    
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=product_stock_template.xlsx");
+    return res.send(buffer);
+  });
+
+  // 엑셀 일괄 입고
+  app.post("/api/product-stocks/upload", upload.single("file"), async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ message: "파일이 없습니다" });
+    }
+    
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
+      
+      if (rows.length < 2) {
+        return res.status(400).json({ message: "데이터가 없습니다" });
+      }
+      
+      const successItems: { productCode: string; productName: string; quantity: number }[] = [];
+      const errors: string[] = [];
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        const productCode = String(row[0] || "").trim();
+        const productName = String(row[1] || "").trim();
+        const quantityRaw = row[2];
+        const note = String(row[3] || "").trim();
+        
+        if (!productCode) {
+          errors.push(`행 ${i + 1}: 상품코드 누락`);
+          continue;
+        }
+        
+        const quantity = parseInt(String(quantityRaw));
+        if (isNaN(quantity) || quantity <= 0) {
+          errors.push(`행 ${i + 1}: 입고수량은 양의 정수만 가능합니다`);
+          continue;
+        }
+        
+        const mapping = await storage.getProductMappingByCode(productCode);
+        if (!mapping) {
+          errors.push(`행 ${i + 1}: 상품코드 [${productCode}]가 상품 매핑에 존재하지 않습니다`);
+          continue;
+        }
+        
+        successItems.push({
+          productCode,
+          productName: mapping.productName,
+          quantity,
+        });
+      }
+      
+      return res.json({
+        success: true,
+        successItems,
+        errors,
+      });
+    } catch (error) {
+      return res.status(400).json({ message: "엑셀 파일 처리 중 오류가 발생했습니다" });
+    }
+  });
+
+  // 엑셀 업로드 확정
+  app.post("/api/product-stocks/upload/confirm", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { items } = req.body as { items: { productCode: string; productName: string; quantity: number }[] };
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "입고할 항목이 없습니다" });
+    }
+    
+    let successCount = 0;
+    
+    for (const item of items) {
+      await storage.increaseProductStock(item.productCode, item.quantity, item.productName);
+      await storage.createStockHistory({
+        type: "product",
+        actionType: "in",
+        productCode: item.productCode,
+        quantity: item.quantity,
+        note: "엑셀 일괄 입고",
+        adminId: user.id,
+        adminName: user.name,
+      });
+      successCount++;
+    }
+    
+    return res.json({
+      success: true,
+      message: `${successCount}개 상품이 입고되었습니다`,
+      count: successCount,
+    });
+  });
+
   return httpServer;
 }
