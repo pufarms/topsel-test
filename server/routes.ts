@@ -2145,8 +2145,23 @@ export async function registerRoutes(
     if (!material) {
       return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
     }
-    const newStock = material.currentStock + adjustment;
+    const beforeStock = material.currentStock;
+    const newStock = beforeStock + adjustment;
     const updated = await storage.updateMaterial(req.params.id, { currentStock: newStock });
+    
+    await storage.createStockHistory({
+      stockType: "material",
+      actionType: adjustment > 0 ? "in" : adjustment < 0 ? "out" : "adjust",
+      itemCode: material.materialCode,
+      itemName: material.materialName,
+      quantity: adjustment,
+      beforeStock,
+      afterStock: newStock,
+      reason: reason || (adjustment > 0 ? "입고" : adjustment < 0 ? "출고" : "조정"),
+      adminId: user.id,
+      source: "manual",
+    });
+    
     return res.json(updated);
   });
 
@@ -3085,6 +3100,113 @@ export async function registerRoutes(
     });
     
     return res.json({ success: true, message: "재고가 삭제되었습니다" });
+  });
+
+  // Stock History API (재고 이력)
+  app.get("/api/stock-history", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { stockType, actionType, source, adminId, startDate, endDate, keyword } = req.query;
+    
+    const params: {
+      stockType?: string;
+      actionType?: string;
+      source?: string;
+      adminId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      keyword?: string;
+    } = {};
+    
+    if (stockType && typeof stockType === "string") params.stockType = stockType;
+    if (actionType && typeof actionType === "string") params.actionType = actionType;
+    if (source && typeof source === "string") params.source = source;
+    if (adminId && typeof adminId === "string") params.adminId = adminId;
+    if (startDate && typeof startDate === "string") params.startDate = new Date(startDate);
+    if (endDate && typeof endDate === "string") params.endDate = new Date(endDate);
+    if (keyword && typeof keyword === "string") params.keyword = keyword;
+    
+    const history = await storage.getFilteredStockHistory(params);
+    return res.json(history);
+  });
+
+  app.get("/api/stock-history/admins", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const admins = await storage.getStockHistoryAdmins();
+    return res.json(admins);
+  });
+
+  app.get("/api/stock-history/download", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { stockType, actionType, source, adminId, startDate, endDate, keyword } = req.query;
+    
+    const params: {
+      stockType?: string;
+      actionType?: string;
+      source?: string;
+      adminId?: string;
+      startDate?: Date;
+      endDate?: Date;
+      keyword?: string;
+    } = {};
+    
+    if (stockType && typeof stockType === "string") params.stockType = stockType;
+    if (actionType && typeof actionType === "string") params.actionType = actionType;
+    if (source && typeof source === "string") params.source = source;
+    if (adminId && typeof adminId === "string") params.adminId = adminId;
+    if (startDate && typeof startDate === "string") params.startDate = new Date(startDate);
+    if (endDate && typeof endDate === "string") params.endDate = new Date(endDate);
+    if (keyword && typeof keyword === "string") params.keyword = keyword;
+    
+    const history = await storage.getFilteredStockHistory(params);
+    
+    const workbook = XLSX.utils.book_new();
+    const data = history.map((h) => ({
+      "번호": h.id,
+      "구분": h.stockType === "product" ? "공급상품" : h.stockType === "material" ? "원재료" : h.stockType,
+      "유형": h.actionType === "in" ? "입고" : h.actionType === "out" ? "출고" : h.actionType === "adjust" ? "조정" : h.actionType,
+      "코드": h.itemCode,
+      "상품/재료명": h.itemName,
+      "수량": h.quantity,
+      "변경전": h.beforeStock,
+      "변경후": h.afterStock,
+      "사유": h.reason || "",
+      "비고": h.note || "",
+      "출처": h.source === "manual" ? "수동" : h.source === "order" ? "주문연동" : h.source,
+      "주문ID": h.orderId || "",
+      "담당자": h.adminId,
+      "일시": h.createdAt ? new Date(h.createdAt).toLocaleString("ko-KR") : "",
+    }));
+    
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "재고이력");
+    
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    
+    const today = new Date().toISOString().split("T")[0];
+    res.setHeader("Content-Disposition", `attachment; filename=stock_history_${today}.xlsx`);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return res.send(buffer);
   });
 
   return httpServer;
