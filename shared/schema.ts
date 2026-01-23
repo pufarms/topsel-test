@@ -657,3 +657,57 @@ export const insertProductMaterialMappingSchema = createInsertSchema(productMate
 
 export type InsertProductMaterialMapping = z.infer<typeof insertProductMaterialMappingSchema>;
 export type ProductMaterialMapping = typeof productMaterialMappings.$inferSelect;
+
+// 공급상품 재고 테이블
+export const productStocks = pgTable("product_stocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productCode: text("product_code").notNull().unique(),
+  productName: text("product_name").notNull(),
+  currentStock: integer("current_stock").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductStockSchema = createInsertSchema(productStocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
+export type ProductStock = typeof productStocks.$inferSelect;
+
+// 재고 이력 유형
+export const stockHistoryTypes = ["product", "material"] as const;
+export type StockHistoryType = typeof stockHistoryTypes[number];
+
+// 재고 이력 액션 유형
+export const stockActionTypes = ["in", "out", "adjust"] as const;
+export type StockActionType = typeof stockActionTypes[number];
+
+// 재고 조정 사유
+export const adjustReasons = ["파손", "오차 수정", "폐기", "기타"] as const;
+export type AdjustReason = typeof adjustReasons[number];
+
+// 재고 이력 테이블
+export const stockHistory = pgTable("stock_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // product | material
+  actionType: text("action_type").notNull(), // in | out | adjust
+  productCode: text("product_code"),
+  materialCode: text("material_code"),
+  quantity: integer("quantity").notNull(), // +/- 수량
+  reason: text("reason"), // 조정 사유
+  note: text("note"),
+  adminId: varchar("admin_id").notNull(),
+  adminName: text("admin_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStockHistorySchema = createInsertSchema(stockHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStockHistory = z.infer<typeof insertStockHistorySchema>;
+export type StockHistory = typeof stockHistory.$inferSelect;
