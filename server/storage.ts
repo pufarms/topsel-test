@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
+import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { createHash } from "crypto";
 
@@ -179,9 +179,18 @@ export interface IStorage {
 
   // Stock History methods (재고 이력)
   createStockHistory(data: InsertStockHistory): Promise<StockHistory>;
-  getStockHistoryByProduct(productCode: string): Promise<StockHistory[]>;
-  getStockHistoryByMaterial(materialCode: string): Promise<StockHistory[]>;
+  getStockHistoryByItemCode(itemCode: string): Promise<StockHistory[]>;
   getAllStockHistory(): Promise<StockHistory[]>;
+  getFilteredStockHistory(params: {
+    stockType?: string;
+    actionType?: string;
+    source?: string;
+    adminId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    keyword?: string;
+  }): Promise<StockHistory[]>;
+  getStockHistoryAdmins(): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1244,21 +1253,74 @@ export class DatabaseStorage implements IStorage {
     return history;
   }
 
-  async getStockHistoryByProduct(productCode: string): Promise<StockHistory[]> {
+  async getStockHistoryByItemCode(itemCode: string): Promise<StockHistory[]> {
     return db.select().from(stockHistory)
-      .where(eq(stockHistory.productCode, productCode))
-      .orderBy(desc(stockHistory.createdAt));
-  }
-
-  async getStockHistoryByMaterial(materialCode: string): Promise<StockHistory[]> {
-    return db.select().from(stockHistory)
-      .where(eq(stockHistory.materialCode, materialCode))
+      .where(eq(stockHistory.itemCode, itemCode))
       .orderBy(desc(stockHistory.createdAt));
   }
 
   async getAllStockHistory(): Promise<StockHistory[]> {
     return db.select().from(stockHistory)
       .orderBy(desc(stockHistory.createdAt));
+  }
+
+  async getFilteredStockHistory(params: {
+    stockType?: string;
+    actionType?: string;
+    source?: string;
+    adminId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    keyword?: string;
+  }): Promise<StockHistory[]> {
+    const conditions = [];
+    
+    if (params.stockType && params.stockType !== "all") {
+      conditions.push(eq(stockHistory.stockType, params.stockType));
+    }
+    if (params.actionType && params.actionType !== "all") {
+      conditions.push(eq(stockHistory.actionType, params.actionType));
+    }
+    if (params.source && params.source !== "all") {
+      conditions.push(eq(stockHistory.source, params.source));
+    }
+    if (params.adminId && params.adminId !== "all") {
+      conditions.push(eq(stockHistory.adminId, params.adminId));
+    }
+    if (params.startDate) {
+      conditions.push(gte(stockHistory.createdAt, params.startDate));
+    }
+    if (params.endDate) {
+      const endOfDay = new Date(params.endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      conditions.push(lte(stockHistory.createdAt, endOfDay));
+    }
+    if (params.keyword) {
+      const keyword = `%${params.keyword}%`;
+      conditions.push(
+        or(
+          like(stockHistory.itemCode, keyword),
+          like(stockHistory.itemName, keyword),
+          like(stockHistory.orderId, keyword)
+        )
+      );
+    }
+    
+    if (conditions.length === 0) {
+      return db.select().from(stockHistory)
+        .orderBy(desc(stockHistory.createdAt));
+    }
+    
+    return db.select().from(stockHistory)
+      .where(and(...conditions))
+      .orderBy(desc(stockHistory.createdAt));
+  }
+
+  async getStockHistoryAdmins(): Promise<string[]> {
+    const results = await db.selectDistinct({ adminId: stockHistory.adminId })
+      .from(stockHistory)
+      .orderBy(stockHistory.adminId);
+    return results.map(r => r.adminId);
   }
 }
 
