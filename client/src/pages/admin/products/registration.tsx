@@ -254,25 +254,36 @@ export default function ProductRegistrationPage() {
     }
   }, [urlParamsProcessed, products, tempProducts, toast]);
 
-  // Sort products: incomplete prices at top
+  // Count missing prices for a product
+  const countMissingPrices = (p: ProductRow): number => {
+    let count = 0;
+    if (p.startPrice == null || p.startPrice === 0) count++;
+    if (p.drivingPrice == null || p.drivingPrice === 0) count++;
+    if (p.topPrice == null || p.topPrice === 0) count++;
+    return count;
+  };
+
+  // Get missing price labels for a product
+  const getMissingPriceLabels = (p: ProductRow): string[] => {
+    const missing: string[] = [];
+    if (p.startPrice == null || p.startPrice === 0) missing.push("S공급가");
+    if (p.drivingPrice == null || p.drivingPrice === 0) missing.push("D공급가");
+    if (p.topPrice == null || p.topPrice === 0) missing.push("T공급가");
+    return missing;
+  };
+
+  // Sort products: more missing prices first (3 → 2 → 1 → 0)
   const sortProductsByPriceCompletion = (data: ProductRow[]): ProductRow[] => {
     return [...data].sort((a, b) => {
-      const aIncomplete = a.startPrice == null || a.startPrice === 0 ||
-                          a.drivingPrice == null || a.drivingPrice === 0 ||
-                          a.topPrice == null || a.topPrice === 0;
-      const bIncomplete = b.startPrice == null || b.startPrice === 0 ||
-                          b.drivingPrice == null || b.drivingPrice === 0 ||
-                          b.topPrice == null || b.topPrice === 0;
-      
-      // New items always first (before incomplete)
+      // New items always first
       if (a.isNew && !b.isNew) return -1;
       if (!a.isNew && b.isNew) return 1;
       
-      // Then incomplete items
-      if (aIncomplete && !bIncomplete) return -1;
-      if (!aIncomplete && bIncomplete) return 1;
+      // Sort by number of missing prices (more missing = higher priority)
+      const aMissing = countMissingPrices(a);
+      const bMissing = countMissingPrices(b);
       
-      return 0;
+      return bMissing - aMissing; // Descending: 3 missing first, then 2, then 1, then 0
     });
   };
 
@@ -906,18 +917,25 @@ export default function ProductRegistrationPage() {
       return;
     }
 
-    // Check if all products have valid prices
-    const invalidProducts = targetProducts.filter(p => 
-      p.startPrice === null || p.startPrice === 0 ||
-      p.drivingPrice === null || p.drivingPrice === 0 ||
-      p.topPrice === null || p.topPrice === 0
-    );
+    // Check if all products have valid prices (S, D, T all required)
+    const invalidProducts = targetProducts.filter(p => countMissingPrices(p) > 0);
     
     if (invalidProducts.length > 0) {
+      // Build detailed error message showing which prices are missing
+      const errorDetails = invalidProducts.slice(0, 5).map(p => {
+        const missingLabels = getMissingPriceLabels(p);
+        return `• ${p.productCode || "(코드없음)"}: ${missingLabels.join(", ")} 누락`;
+      }).join("\n");
+      
+      const moreText = invalidProducts.length > 5 
+        ? `\n... 외 ${invalidProducts.length - 5}건 더 있음` 
+        : "";
+      
       toast({
         variant: "destructive",
-        title: "전송 불가",
-        description: `${invalidProducts.length}개의 상품에 공급가가 계산되지 않았습니다. 마진율을 입력해주세요.`,
+        title: "전송 불가 - 공급가 누락",
+        description: `${invalidProducts.length}개의 상품에 공급가가 누락되었습니다.\n\n${errorDetails}${moreText}\n\n모든 상품에 S/D/T 공급가가 입력되어야 전송 가능합니다.`,
+        duration: 10000,
       });
       return;
     }
