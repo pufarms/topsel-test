@@ -165,6 +165,9 @@ export default function ProductRegistrationPage() {
   const [unmappedProducts, setUnmappedProducts] = useState<{ productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[]>([]);
   const [isCheckingMapping, setIsCheckingMapping] = useState(false);
   
+  // Track products already sent to next week
+  const [nextWeekProductCodes, setNextWeekProductCodes] = useState<Set<string>>(new Set());
+  
   const [location, setLocation] = useLocation();
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
 
@@ -416,17 +419,24 @@ export default function ProductRegistrationPage() {
 
   const searchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/product-registrations?status=active&_t=${Date.now()}`, {
-        cache: 'no-store'
-      });
-      return res.json();
+      const [registrationsRes, nextWeekRes] = await Promise.all([
+        fetch(`/api/product-registrations?status=active&_t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/next-week-products?_t=${Date.now()}`, { cache: 'no-store' })
+      ]);
+      const registrations = await registrationsRes.json();
+      const nextWeekProducts = await nextWeekRes.json();
+      return { registrations, nextWeekProducts };
     },
-    onSuccess: (data: ProductRegistration[]) => {
-      const allData = [...tempProducts, ...data.filter(d => !tempProducts.some(t => t.id === d.id))];
+    onSuccess: (data: { registrations: ProductRegistration[]; nextWeekProducts: { productCode: string }[] }) => {
+      const allData = [...tempProducts, ...data.registrations.filter(d => !tempProducts.some(t => t.id === d.id))];
       const filtered = applyFilters(allData);
       const sorted = sortProductsByPriceCompletion(filtered);
       setProducts(sorted);
       setSelectedIds([]);
+      
+      // Update next week product codes set
+      const nextWeekCodes = new Set(data.nextWeekProducts.map(p => p.productCode));
+      setNextWeekProductCodes(nextWeekCodes);
     },
   });
 
@@ -1027,6 +1037,14 @@ export default function ProductRegistrationPage() {
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/next-week-products"] });
+      
+      // Update next week product codes immediately
+      const sentCodes = productsToSend.map(p => p.productCode).filter(Boolean);
+      setNextWeekProductCodes(prev => {
+        const newSet = new Set(Array.from(prev));
+        sentCodes.forEach(code => newSet.add(code));
+        return newSet;
+      });
 
       if (result.newProducts && result.newProducts.length > 0) {
         setNewProductsList(result.newProducts);
@@ -1424,7 +1442,14 @@ export default function ProductRegistrationPage() {
                     />
                   </td>
                   <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.productCode, false)}`} style={{ width: columnWidths.productCode }}>
-                    <input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                    <div className="flex items-center gap-1">
+                      <input value={p.productCode} onChange={e => handleCellChange(idx, "productCode", e.target.value)} className="flex-1 min-w-0 px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                      {p.productCode && nextWeekProductCodes.has(p.productCode) && (
+                        <Badge variant="default" className="text-[9px] px-1 py-0 h-4 bg-green-500 hover:bg-green-600 shrink-0">
+                          차주
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.productName, false)}`} style={{ width: columnWidths.productName }}>
                     <input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
