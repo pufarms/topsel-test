@@ -1030,6 +1030,62 @@ export default function ProductRegistrationPage() {
     }
   };
 
+  // 리스트 다운로드 기능
+  const handleDownloadList = () => {
+    if (products.length === 0) {
+      toast({ variant: "destructive", title: "다운로드 오류", description: "다운로드할 상품이 없습니다." });
+      return;
+    }
+
+    const headers = [
+      "대분류", "중분류", "소분류", "중량", "상품코드", "상품명", "원상품", "기준가", "로스율%", "기준중량",
+      "개별단가", "원상품합계", "박스비", "자재비", "아웃박스", "보자기", "작업비", "택배비", "총원가",
+      "S마진율", "S마진", "S공급가", "D마진율", "D마진", "D공급가", "T마진율", "T마진", "T공급가", "매핑상태"
+    ];
+
+    const rows = products.map(p => [
+      p.categoryLarge || "",
+      p.categoryMedium || "",
+      p.categorySmall || "",
+      p.weight || "",
+      p.productCode || "",
+      p.productName || "",
+      p.sourceProduct || "",
+      p.sourcePrice ?? "",
+      p.lossRate ?? "",
+      p.sourceWeight ?? "",
+      p.unitPrice ?? "",
+      p.sourceProductTotal ?? "",
+      p.boxCost ?? "",
+      p.materialCost ?? "",
+      p.outerBoxCost ?? "",
+      p.wrappingCost ?? "",
+      p.laborCost ?? "",
+      p.shippingCost ?? "",
+      p.totalCost ?? "",
+      p.startMarginRate ?? "",
+      p.startMargin ?? "",
+      p.startPrice ?? "",
+      p.drivingMarginRate ?? "",
+      p.drivingMargin ?? "",
+      p.drivingPrice ?? "",
+      p.topMarginRate ?? "",
+      p.topMargin ?? "",
+      p.topPrice ?? "",
+      p.mappingStatus === "complete" ? "매핑완료" : "미매핑"
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "상품목록");
+    
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `상품목록_${dateStr}.xlsx`);
+    
+    toast({ title: "다운로드 완료", description: `${products.length}개 상품이 다운로드되었습니다.` });
+  };
+
   return (
     <div className="space-y-3 p-4">
       <PageHeader
@@ -1208,6 +1264,10 @@ export default function ProductRegistrationPage() {
             <Button size="sm" onClick={handleBulkApply} disabled={bulkUpdateMutation.isPending} className="h-7 text-xs" data-testid="button-bulk-apply">
               {bulkUpdateMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
               선택한 상품에 일괄 적용
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleDownloadList} className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-download-list">
+              <Download className="h-3 w-3 mr-1" />
+              리스트 다운로드
             </Button>
           </div>
         </CardContent>
