@@ -546,7 +546,10 @@ export default function ProductMappingPage() {
         });
         // 재료가 있으면 저장
         if (editMaterials.length > 0) {
-          await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+          const result = await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+          if (!result.ok) {
+            return; // 에러는 onSuccess에서 처리됨
+          }
         } else {
           queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
           toast({ title: "상품이 추가되었습니다" });
@@ -563,7 +566,10 @@ export default function ProductMappingPage() {
           usageStatus: editUsageStatus === "사용" ? "Y" : "N",
         });
         // 재료 저장
-        await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+        const result = await saveMaterialsMutation.mutateAsync({ productCode: editProductCode, materials: editMaterials });
+        if (!result.ok) {
+          return; // 에러는 onSuccess에서 처리됨
+        }
       }
     } catch (error: any) {
       toast({ title: "오류", description: error.message, variant: "destructive" });
