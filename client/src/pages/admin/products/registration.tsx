@@ -52,7 +52,7 @@ const HEADER_LABELS: Record<string, string> = {
   sourceWeight: "기준중량", unitPrice: "개별단가", sourceProductTotal: "원상품합계", boxCost: "박스비", materialCost: "자재비",
   outerBoxCost: "아웃박스", wrappingCost: "보자기", laborCost: "작업비", shippingCost: "택배비", totalCost: "총원가",
   startMarginRate: "S마진율", startMargin: "S마진", startPrice: "S공급가", drivingMarginRate: "D마진율", drivingMargin: "D마진",
-  drivingPrice: "D공급가", topMarginRate: "T마진율", topMargin: "T마진", topPrice: "T공급가", mappingStatus: "매핑상태", save: "저장"
+  drivingPrice: "D공급가", topMarginRate: "T마진율", topMargin: "T마진", topPrice: "T공급가", mappingStatus: "매핑", save: "저장"
 };
 
 const calculateColumnWidth = (key: string, data: ProductRow[]): number => {
@@ -1135,6 +1135,7 @@ export default function ProductRegistrationPage() {
                   { key: "topMarginRate", label: "T마진율", align: "right", bgColor: "#fee2e2" },
                   { key: "topMargin", label: "T마진", align: "right", bgColor: "#fee2e2" },
                   { key: "topPrice", label: "T공급가", align: "right", bgColor: "#fee2e2", bold: true },
+                  { key: "mappingStatus", label: "매핑", align: "center", bgColor: "" },
                   { key: "save", label: "저장", align: "center", bgColor: "" },
                 ].map((col) => (
                   <th 
@@ -1283,7 +1284,7 @@ export default function ProductRegistrationPage() {
                         className="h-6 px-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         data-testid={`button-mapping-view-${p.id}`}
                       >
-                        완료
+                        매핑완료
                       </Button>
                     ) : (
                       <Button 
@@ -1293,7 +1294,7 @@ export default function ProductRegistrationPage() {
                         className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                         data-testid={`button-mapping-edit-${p.id}`}
                       >
-                        미완료
+                        미매핑
                       </Button>
                     )}
                   </td>
