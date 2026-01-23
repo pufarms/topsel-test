@@ -410,6 +410,8 @@ export const productRegistrations = pgTable("product_registrations", {
   topPrice: integer("top_price"),
   topMargin: integer("top_margin"),
   
+  mappingStatus: text("mapping_status").notNull().default("incomplete"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

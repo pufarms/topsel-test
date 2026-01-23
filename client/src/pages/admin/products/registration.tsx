@@ -34,7 +34,7 @@ const COLUMN_KEYS = [
   "sourceProduct", "sourcePrice", "lossRate", "sourceWeight", "unitPrice", "sourceProductTotal",
   "boxCost", "materialCost", "outerBoxCost", "wrappingCost", "laborCost", "shippingCost", "totalCost",
   "startMarginRate", "startMargin", "startPrice", "drivingMarginRate", "drivingMargin", "drivingPrice",
-  "topMarginRate", "topMargin", "topPrice", "save"
+  "topMarginRate", "topMargin", "topPrice", "mappingStatus", "save"
 ] as const;
 
 const MIN_COLUMN_WIDTHS: Record<string, number> = {
@@ -43,7 +43,7 @@ const MIN_COLUMN_WIDTHS: Record<string, number> = {
   sourceWeight: 50, unitPrice: 60, sourceProductTotal: 70, boxCost: 50, materialCost: 50,
   outerBoxCost: 55, wrappingCost: 50, laborCost: 50, shippingCost: 50, totalCost: 60,
   startMarginRate: 50, startMargin: 55, startPrice: 60, drivingMarginRate: 50, drivingMargin: 55,
-  drivingPrice: 60, topMarginRate: 50, topMargin: 55, topPrice: 60, save: 45
+  drivingPrice: 60, topMarginRate: 50, topMargin: 55, topPrice: 60, mappingStatus: 75, save: 45
 };
 
 const HEADER_LABELS: Record<string, string> = {
@@ -52,7 +52,7 @@ const HEADER_LABELS: Record<string, string> = {
   sourceWeight: "기준중량", unitPrice: "개별단가", sourceProductTotal: "원상품합계", boxCost: "박스비", materialCost: "자재비",
   outerBoxCost: "아웃박스", wrappingCost: "보자기", laborCost: "작업비", shippingCost: "택배비", totalCost: "총원가",
   startMarginRate: "S마진율", startMargin: "S마진", startPrice: "S공급가", drivingMarginRate: "D마진율", drivingMargin: "D마진",
-  drivingPrice: "D공급가", topMarginRate: "T마진율", topMargin: "T마진", topPrice: "T공급가", save: "저장"
+  drivingPrice: "D공급가", topMarginRate: "T마진율", topMargin: "T마진", topPrice: "T공급가", mappingStatus: "매핑상태", save: "저장"
 };
 
 const calculateColumnWidth = (key: string, data: ProductRow[]): number => {
@@ -581,6 +581,7 @@ export default function ProductRegistrationPage() {
       topMarginRate: null,
       topPrice: null,
       topMargin: null,
+      mappingStatus: "incomplete",
       createdAt: new Date(),
       updatedAt: new Date(),
       isNew: true,
@@ -694,6 +695,12 @@ export default function ProductRegistrationPage() {
       // Auto-save for existing products (debounced 500ms)
       debouncedAutoSave(p.id, p);
     }
+  };
+
+  // Navigate to product mapping page with product code
+  const handleGoToMapping = (productCode: string, mode: "view" | "edit") => {
+    const returnTo = "/admin/products/registration";
+    setLocation(`/admin/inventory/mapping?productCode=${encodeURIComponent(productCode)}&mode=${mode}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   const handleSaveRow = async (index: number) => {
@@ -1265,6 +1272,31 @@ export default function ProductRegistrationPage() {
                   </td>
                   <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-right overflow-hidden text-ellipsis" style={{ width: columnWidths.topMargin, backgroundColor: "#fee2e2" }}>{formatNumber(p.topMargin)}</td>
                   <td className="px-2 py-1 border border-gray-300 dark:border-gray-600 text-right font-bold overflow-hidden text-ellipsis" style={{ width: columnWidths.topPrice, backgroundColor: "#fee2e2" }}>{formatNumber(p.topPrice)}</td>
+                  <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 text-center overflow-hidden" style={{ width: columnWidths.mappingStatus }}>
+                    {p.isNew ? (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    ) : p.mappingStatus === "complete" ? (
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => handleGoToMapping(p.productCode, "view")} 
+                        className="h-6 px-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        data-testid={`button-mapping-view-${p.id}`}
+                      >
+                        완료
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => handleGoToMapping(p.productCode, "edit")} 
+                        className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        data-testid={`button-mapping-edit-${p.id}`}
+                      >
+                        미완료
+                      </Button>
+                    )}
+                  </td>
                   <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 text-center overflow-hidden" style={{ width: columnWidths.save }}>
                     <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} className="h-6 w-6 p-0" data-testid={`button-save-${p.id}`}>
                       <Save className="h-3 w-3" />
@@ -1274,7 +1306,7 @@ export default function ProductRegistrationPage() {
               );})}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={29} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={30} className="text-center py-8 text-muted-foreground">
                     상품을 검색하거나 엑셀을 업로드하세요
                   </td>
                 </tr>
