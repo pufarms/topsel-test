@@ -917,27 +917,50 @@ export default function ProductRegistrationPage() {
       return;
     }
 
-    // Check if all products have valid prices (S, D, T all required)
-    const invalidProducts = targetProducts.filter(p => countMissingPrices(p) > 0);
+    // Check if products have at least 1 valid price (block only if all 3 are missing)
+    const completelyInvalidProducts = targetProducts.filter(p => countMissingPrices(p) === 3);
     
-    if (invalidProducts.length > 0) {
-      // Build detailed error message showing which prices are missing
-      const errorDetails = invalidProducts.slice(0, 5).map(p => {
-        const missingLabels = getMissingPriceLabels(p);
-        return `• ${p.productCode || "(코드없음)"}: ${missingLabels.join(", ")} 누락`;
+    if (completelyInvalidProducts.length > 0) {
+      // Block: products with NO prices at all
+      const errorDetails = completelyInvalidProducts.slice(0, 5).map(p => {
+        return `• ${p.productCode || "(코드없음)"}: S/D/T 공급가 모두 누락`;
       }).join("\n");
       
-      const moreText = invalidProducts.length > 5 
-        ? `\n... 외 ${invalidProducts.length - 5}건 더 있음` 
+      const moreText = completelyInvalidProducts.length > 5 
+        ? `\n... 외 ${completelyInvalidProducts.length - 5}건 더 있음` 
         : "";
       
       toast({
         variant: "destructive",
-        title: "전송 불가 - 공급가 누락",
-        description: `${invalidProducts.length}개의 상품에 공급가가 누락되었습니다.\n\n${errorDetails}${moreText}\n\n모든 상품에 S/D/T 공급가가 입력되어야 전송 가능합니다.`,
+        title: "전송 불가 - 공급가 없음",
+        description: `${completelyInvalidProducts.length}개의 상품에 공급가가 전혀 없습니다.\n\n${errorDetails}${moreText}\n\n최소 1개 이상의 공급가(S/D/T)가 입력되어야 전송 가능합니다.`,
         duration: 10000,
       });
       return;
+    }
+
+    // Warn about partially missing prices (but allow sending)
+    const partiallyInvalidProducts = targetProducts.filter(p => {
+      const missing = countMissingPrices(p);
+      return missing > 0 && missing < 3;
+    });
+    
+    if (partiallyInvalidProducts.length > 0) {
+      const warningDetails = partiallyInvalidProducts.slice(0, 5).map(p => {
+        const missingLabels = getMissingPriceLabels(p);
+        return `• ${p.productCode || "(코드없음)"}: ${missingLabels.join(", ")} 누락`;
+      }).join("\n");
+      
+      const moreText = partiallyInvalidProducts.length > 5 
+        ? `\n... 외 ${partiallyInvalidProducts.length - 5}건 더 있음` 
+        : "";
+      
+      toast({
+        title: "공급가 일부 누락 안내",
+        description: `${partiallyInvalidProducts.length}개의 상품에 일부 공급가가 누락되었습니다.\n\n${warningDetails}${moreText}`,
+        duration: 8000,
+      });
+      // Continue with sending (don't return)
     }
 
     // Check mapping status before sending
