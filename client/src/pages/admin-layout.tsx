@@ -70,10 +70,9 @@ const menuItems: MenuItem[] = [
     label: "재고관리", 
     icon: <Warehouse className="h-5 w-5" />,
     children: [
-      { id: "inventory-materials", label: "재료 관리", path: "/admin/inventory/materials" },
+      { id: "inventory-materials", label: "원재료 관리", path: "/admin/inventory/materials" },
       { id: "inventory-mapping", label: "상품 매핑", path: "/admin/inventory/mapping" },
-      { id: "inventory-stock", label: "재고 현황", path: "/admin/inventory/stock" },
-      { id: "inventory-receiving", label: "입고 관리", path: "/admin/inventory/receiving" },
+      { id: "inventory-stock", label: "공급상품 재고 관리", path: "/admin/inventory/stock" },
       { id: "inventory-history", label: "재고 이력", path: "/admin/inventory/history" },
     ]
   },

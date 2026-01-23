@@ -520,7 +520,7 @@ export default function MaterialsPage() {
     <div className="space-y-4 p-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">재료 관리</h1>
+          <h1 className="text-xl md:text-2xl font-bold">원재료 관리</h1>
           <p className="text-sm text-muted-foreground">원재료, 반재료, 부재료의 카테고리와 재료를 관리합니다.</p>
         </div>
         <div className="flex gap-2">
