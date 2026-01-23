@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
@@ -158,6 +159,13 @@ export default function ProductRegistrationPage() {
   const [sendConfirmDialogOpen, setSendConfirmDialogOpen] = useState(false);
   const [sendMode, setSendMode] = useState<"all" | "selected">("all");
   const [productsToSend, setProductsToSend] = useState<ProductRow[]>([]);
+  
+  // Mapping check dialog state
+  const [mappingCheckDialogOpen, setMappingCheckDialogOpen] = useState(false);
+  const [unmappedProducts, setUnmappedProducts] = useState<{ productCode: string; productName: string }[]>([]);
+  const [isCheckingMapping, setIsCheckingMapping] = useState(false);
+  
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (products.length === 0) return;
@@ -779,7 +787,7 @@ export default function ProductRegistrationPage() {
   };
 
   // Open confirmation dialog for sending to next week
-  const openSendConfirmDialog = (mode: "all" | "selected") => {
+  const openSendConfirmDialog = async (mode: "all" | "selected") => {
     const targetProducts = mode === "all" ? products : products.filter(p => selectedIds.includes(p.id));
     
     if (targetProducts.length === 0) {
@@ -817,6 +825,33 @@ export default function ProductRegistrationPage() {
       });
       return;
     }
+
+    // Check mapping status before sending
+    setIsCheckingMapping(true);
+    try {
+      const productCodes = targetProducts.map(p => p.productCode).filter(Boolean);
+      const res = await apiRequest("POST", "/api/product-registrations/check-mapping", { productCodes });
+      const result = await res.json();
+      
+      if (!result.allMapped && result.unmappedProducts.length > 0) {
+        // Show unmapped products dialog
+        setUnmappedProducts(result.unmappedProducts);
+        setSendMode(mode);
+        setProductsToSend(targetProducts);
+        setMappingCheckDialogOpen(true);
+        setIsCheckingMapping(false);
+        return;
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "매핑 확인 오류",
+        description: "상품 매핑 상태를 확인하는 중 오류가 발생했습니다.",
+      });
+      setIsCheckingMapping(false);
+      return;
+    }
+    setIsCheckingMapping(false);
 
     // Set the mode and products to send, then open confirmation dialog
     setSendMode(mode);
