@@ -271,15 +271,27 @@ export default function ProductMappingPage() {
       return matchesSearch && matchesCategoryLarge && matchesCategoryMedium && matchesCategorySmall;
     });
 
-    if (sortOption === "code_asc") {
-      result = [...result].sort((a, b) => a.productCode.localeCompare(b.productCode));
-    } else if (sortOption === "code_desc") {
-      result = [...result].sort((a, b) => b.productCode.localeCompare(a.productCode));
-    } else if (sortOption === "name_asc") {
-      result = [...result].sort((a, b) => a.productName.localeCompare(b.productName));
-    } else if (sortOption === "name_desc") {
-      result = [...result].sort((a, b) => b.productName.localeCompare(a.productName));
-    }
+    // 기본 정렬: 미저장(재료 없음) 상품이 맨 위로
+    result = [...result].sort((a, b) => {
+      const aHasMaterials = a.materials && a.materials.length > 0;
+      const bHasMaterials = b.materials && b.materials.length > 0;
+      
+      // 미저장 상품 우선 (재료 없는 상품이 먼저)
+      if (!aHasMaterials && bHasMaterials) return -1;
+      if (aHasMaterials && !bHasMaterials) return 1;
+      
+      // 동일 저장상태 내에서 추가 정렬 옵션 적용
+      if (sortOption === "code_asc") {
+        return a.productCode.localeCompare(b.productCode);
+      } else if (sortOption === "code_desc") {
+        return b.productCode.localeCompare(a.productCode);
+      } else if (sortOption === "name_asc") {
+        return a.productName.localeCompare(b.productName);
+      } else if (sortOption === "name_desc") {
+        return b.productName.localeCompare(a.productName);
+      }
+      return 0;
+    });
 
     return result;
   }, [productMappings, searchQuery, sortOption, filterCategoryLarge, filterCategoryMedium, filterCategorySmall]);
