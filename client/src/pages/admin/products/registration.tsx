@@ -919,9 +919,10 @@ export default function ProductRegistrationPage() {
 
     // Check if products have at least 1 valid price (block only if all 3 are missing)
     const completelyInvalidProducts = targetProducts.filter(p => countMissingPrices(p) === 3);
+    const validProducts = targetProducts.filter(p => countMissingPrices(p) < 3);
     
     if (completelyInvalidProducts.length > 0) {
-      // Block: products with NO prices at all
+      // Show warning about products without prices
       const errorDetails = completelyInvalidProducts.slice(0, 5).map(p => {
         return `• ${p.productCode || "(코드없음)"}: S/D/T 공급가 모두 누락`;
       }).join("\n");
@@ -932,15 +933,28 @@ export default function ProductRegistrationPage() {
       
       toast({
         variant: "destructive",
-        title: "전송 불가 - 공급가 없음",
-        description: `${completelyInvalidProducts.length}개의 상품에 공급가가 전혀 없습니다.\n\n${errorDetails}${moreText}\n\n최소 1개 이상의 공급가(S/D/T)가 입력되어야 전송 가능합니다.`,
-        duration: 10000,
+        title: "일부 상품 전송 제외",
+        description: `${completelyInvalidProducts.length}개의 상품은 공급가가 없어 전송에서 제외됩니다.\n\n${errorDetails}${moreText}`,
+        duration: 8000,
       });
-      return;
+      
+      // If no valid products remain, stop here
+      if (validProducts.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "전송 불가",
+          description: "전송 가능한 상품이 없습니다. 최소 1개 이상의 공급가(S/D/T)가 입력되어야 합니다.",
+          duration: 8000,
+        });
+        return;
+      }
     }
+    
+    // Use only valid products from here on
+    const productsToProcess = validProducts;
 
     // Warn about partially missing prices (but allow sending)
-    const partiallyInvalidProducts = targetProducts.filter(p => {
+    const partiallyInvalidProducts = productsToProcess.filter(p => {
       const missing = countMissingPrices(p);
       return missing > 0 && missing < 3;
     });
@@ -966,7 +980,7 @@ export default function ProductRegistrationPage() {
     // Check mapping status before sending
     setIsCheckingMapping(true);
     try {
-      const productCodes = targetProducts.map(p => p.productCode).filter(Boolean);
+      const productCodes = productsToProcess.map(p => p.productCode).filter(Boolean);
       const res = await apiRequest("POST", "/api/product-registrations/check-mapping", { productCodes });
       const result = await res.json();
       
@@ -974,7 +988,7 @@ export default function ProductRegistrationPage() {
         // Show unmapped products dialog
         setUnmappedProducts(result.unmappedProducts);
         setSendMode(mode);
-        setProductsToSend(targetProducts);
+        setProductsToSend(productsToProcess);
         setMappingCheckDialogOpen(true);
         setIsCheckingMapping(false);
         return;
@@ -992,7 +1006,7 @@ export default function ProductRegistrationPage() {
 
     // Set the mode and products to send, then open confirmation dialog
     setSendMode(mode);
-    setProductsToSend(targetProducts);
+    setProductsToSend(productsToProcess);
     setSendConfirmDialogOpen(true);
   };
 
