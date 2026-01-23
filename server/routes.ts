@@ -1240,6 +1240,12 @@ export async function registerRoutes(
     return res.json(pr);
   });
 
+  // Check if product exists in product_registrations by code
+  app.get("/api/product-registrations/check-by-code/:productCode", async (req, res) => {
+    const pr = await storage.getProductRegistrationByCode(req.params.productCode);
+    return res.json({ exists: !!pr, product: pr || null });
+  });
+
   app.post("/api/product-registrations", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });

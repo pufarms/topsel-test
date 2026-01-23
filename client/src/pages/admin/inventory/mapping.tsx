@@ -96,6 +96,10 @@ export default function ProductMappingPage() {
   
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   
+  // 상품등록 미등록 경고 다이얼로그
+  const [notRegisteredDialogOpen, setNotRegisteredDialogOpen] = useState(false);
+  const [notRegisteredProductCode, setNotRegisteredProductCode] = useState("");
+  
   const [uploadResultDialogOpen, setUploadResultDialogOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ totalProducts: number; productOnlyCount: number; productWithMappingCount: number; errors: string[] } | null>(null);
 
@@ -490,6 +494,19 @@ export default function ProductMappingPage() {
     
     try {
       if (productDialogMode === "add") {
+        // 상품등록(공급가계산) 연계 체크 (필수!)
+        const checkRes = await fetch(`/api/product-registrations/check-by-code/${encodeURIComponent(editProductCode)}`, {
+          credentials: "include"
+        });
+        const checkData = await checkRes.json();
+        
+        if (!checkData.exists) {
+          // 상품등록에 없음 → 경고 다이얼로그 표시
+          setNotRegisteredProductCode(editProductCode);
+          setNotRegisteredDialogOpen(true);
+          return;
+        }
+        
         // 등록 모드: 먼저 상품 매핑을 생성하고, 그 다음 재료를 저장
         await addProductMutation.mutateAsync({
           productCode: editProductCode,
@@ -1354,6 +1371,31 @@ export default function ProductMappingPage() {
               data-testid="button-confirm-bulk-delete"
             >
               삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={notRegisteredDialogOpen} onOpenChange={setNotRegisteredDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-600">등록되지 않은 상품</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line">
+              상품코드 "{notRegisteredProductCode}"는 상품등록(공급가계산)에 등록되지 않은 상품입니다.{"\n\n"}
+              상품등록 후 상품매핑과 재고등록이 가능합니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setNotRegisteredDialogOpen(false);
+                resetProductForm();
+                setLocation("/admin/products/registration");
+              }}
+              data-testid="button-go-to-registration"
+            >
+              상품등록으로 이동
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
