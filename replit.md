@@ -56,10 +56,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Inventory Management (Admin Only)
 - Role-based access control for SUPER_ADMIN and ADMIN.
-- Features include material management (4-level category structure), product mapping, and future modules for stock status, receiving, and history.
+- Features include material management (4-level category structure), product mapping, stock status, and stock history tracking.
 - Materials have types (raw, semi, sub) and support automatic code generation.
 - Strict rules for stock immutability and deletion constraints on categories.
 - Supports bulk upload of materials via Excel.
+
+### Stock History Tracking
+- Comprehensive tracking of all stock changes (공급상품 and 원재료)
+- Records: stockType, actionType (in/out/adjust), itemCode, itemName, quantity, beforeStock, afterStock, reason, note, adminId, source, orderId
+- Automatic history recording on: product stock-in, stock adjustment, stock deletion, material stock adjustment
+- Source field supports: "manual" (현재 사용), "order" (주문 연동 대비)
+- API endpoints: GET /api/stock-history (with filters), GET /api/stock-history/admins, GET /api/stock-history/download
+- Frontend: Filter by stockType, actionType, source, adminId, date range, keyword search; pagination; Excel download
 
 ### Product Mapping
 - Enables mapping products to necessary materials (raw, semi, sub) for inventory integration.
