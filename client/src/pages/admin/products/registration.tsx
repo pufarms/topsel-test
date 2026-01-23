@@ -1076,9 +1076,11 @@ export default function ProductRegistrationPage() {
     }
   };
 
-  // 리스트 다운로드 기능
+  // 리스트 다운로드 기능 (필터링 적용)
   const handleDownloadList = () => {
-    if (products.length === 0) {
+    const filteredProducts = applyFilters(products);
+    
+    if (filteredProducts.length === 0) {
       toast({ variant: "destructive", title: "다운로드 오류", description: "다운로드할 상품이 없습니다." });
       return;
     }
@@ -1089,7 +1091,7 @@ export default function ProductRegistrationPage() {
       "S마진율", "S마진", "S공급가", "D마진율", "D마진", "D공급가", "T마진율", "T마진", "T공급가", "매핑상태"
     ];
 
-    const rows = products.map(p => [
+    const rows = filteredProducts.map(p => [
       p.categoryLarge || "",
       p.categoryMedium || "",
       p.categorySmall || "",
@@ -1129,7 +1131,7 @@ export default function ProductRegistrationPage() {
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     XLSX.writeFile(wb, `상품목록_${dateStr}.xlsx`);
     
-    toast({ title: "다운로드 완료", description: `${products.length}개 상품이 다운로드되었습니다.` });
+    toast({ title: "다운로드 완료", description: `${filteredProducts.length}개 상품이 다운로드되었습니다.` });
   };
 
   return (
