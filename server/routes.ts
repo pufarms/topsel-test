@@ -1452,19 +1452,27 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품코드 목록이 필요합니다" });
     }
     
-    const unmappedProducts: { productCode: string; productName: string }[] = [];
+    const unmappedProducts: { productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[] = [];
     const mappedProducts: { productCode: string; productName: string }[] = [];
+    
+    // Get all registrations once for efficiency
+    const registrations = await storage.getAllProductRegistrations();
     
     for (const productCode of productCodes) {
       const mapping = await storage.getProductMappingByCode(productCode);
       
-      // Find product name from product_registrations
-      const registrations = await storage.getAllProductRegistrations();
+      // Find product from product_registrations
       const registration = registrations.find(r => r.productCode === productCode);
       const productName = registration?.productName || productCode;
       
       if (!mapping || mapping.mappingStatus !== "complete") {
-        unmappedProducts.push({ productCode, productName });
+        unmappedProducts.push({ 
+          productCode, 
+          productName,
+          categoryLarge: registration?.categoryLarge || null,
+          categoryMedium: registration?.categoryMedium || null,
+          categorySmall: registration?.categorySmall || null,
+        });
       } else {
         mappedProducts.push({ productCode, productName });
       }

@@ -162,7 +162,7 @@ export default function ProductRegistrationPage() {
   
   // Mapping check dialog state
   const [mappingCheckDialogOpen, setMappingCheckDialogOpen] = useState(false);
-  const [unmappedProducts, setUnmappedProducts] = useState<{ productCode: string; productName: string }[]>([]);
+  const [unmappedProducts, setUnmappedProducts] = useState<{ productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[]>([]);
   const [isCheckingMapping, setIsCheckingMapping] = useState(false);
   
   const [, setLocation] = useLocation();

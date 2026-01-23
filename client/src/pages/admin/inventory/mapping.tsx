@@ -60,7 +60,7 @@ export default function ProductMappingPage() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [unmappedProductsFromUrl, setUnmappedProductsFromUrl] = useState<{ productCode: string; productName: string }[] | null>(null);
+  const [unmappedProductsFromUrl, setUnmappedProductsFromUrl] = useState<{ productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[] | null>(null);
   const [sortOption, setSortOption] = useState("default");
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,7 +103,7 @@ export default function ProductMappingPage() {
     queryKey: ["/api/product-mappings"],
   });
 
-  const { data: availableProducts = [] } = useQuery<{ productCode: string; productName: string }[]>({
+  const { data: availableProducts = [] } = useQuery<{ productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[]>({
     queryKey: ["/api/product-mappings/available-products"],
   });
 
@@ -160,7 +160,7 @@ export default function ProductMappingPage() {
     
     if (unmappedParam) {
       try {
-        const products = JSON.parse(decodeURIComponent(unmappedParam)) as { productCode: string; productName: string }[];
+        const products = JSON.parse(decodeURIComponent(unmappedParam)) as { productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[];
         if (products && products.length > 0) {
           setUnmappedProductsFromUrl(products);
           // Clear the URL parameter to prevent re-adding on refresh
@@ -330,7 +330,7 @@ export default function ProductMappingPage() {
   });
 
   const bulkAddProductMutation = useMutation({
-    mutationFn: async (products: { productCode: string; productName: string }[]) => {
+    mutationFn: async (products: { productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[]) => {
       const res = await apiRequest("POST", "/api/product-mappings/bulk", { products });
       return res.json();
     },
