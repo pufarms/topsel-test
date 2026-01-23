@@ -1705,12 +1705,39 @@ export default function ProductRegistrationPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   "상품 매핑으로 이동" 버튼을 클릭하여 매핑을 완료한 후 다시 전송해주세요.
+                  또는 "매핑된 상품만 전송" 버튼으로 매핑이 완료된 상품만 먼저 전송할 수 있습니다.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel data-testid="button-cancel-mapping-dialog">취소</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                // Filter out unmapped products and proceed with mapped ones only
+                const unmappedCodes = new Set(unmappedProducts.map(p => p.productCode));
+                const mappedProducts = productsToSend.filter(p => !unmappedCodes.has(p.productCode));
+                
+                if (mappedProducts.length === 0) {
+                  toast({
+                    variant: "destructive",
+                    title: "전송 가능한 상품 없음",
+                    description: "모든 상품이 매핑되지 않았습니다. 먼저 상품 매핑을 완료해주세요.",
+                  });
+                  setMappingCheckDialogOpen(false);
+                  return;
+                }
+                
+                setMappingCheckDialogOpen(false);
+                setProductsToSend(mappedProducts);
+                setSendConfirmDialogOpen(true);
+              }}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-send-mapped-only"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              매핑된 상품만 전송 ({productsToSend.length - unmappedProducts.length}개)
+            </AlertDialogAction>
             <AlertDialogAction 
               onClick={() => {
                 setMappingCheckDialogOpen(false);
