@@ -1442,6 +1442,42 @@ export async function registerRoutes(
     return res.json({ newProducts, existingProducts, invalidProducts });
   });
 
+  // Check mapping status for products before sending to next week
+  app.post("/api/product-registrations/check-mapping", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const { productCodes } = req.body;
+    if (!productCodes || !Array.isArray(productCodes)) {
+      return res.status(400).json({ message: "상품코드 목록이 필요합니다" });
+    }
+    
+    const unmappedProducts: { productCode: string; productName: string }[] = [];
+    const mappedProducts: { productCode: string; productName: string }[] = [];
+    
+    for (const productCode of productCodes) {
+      const mapping = await storage.getProductMappingByCode(productCode);
+      
+      // Find product name from product_registrations
+      const registrations = await storage.getAllProductRegistrations();
+      const registration = registrations.find(r => r.productCode === productCode);
+      const productName = registration?.productName || productCode;
+      
+      if (!mapping || mapping.mappingStatus !== "complete") {
+        unmappedProducts.push({ productCode, productName });
+      } else {
+        mappedProducts.push({ productCode, productName });
+      }
+    }
+    
+    return res.json({
+      allMapped: unmappedProducts.length === 0,
+      unmappedProducts,
+      mappedProducts,
+      totalChecked: productCodes.length,
+    });
+  });
+
   app.post("/api/product-registrations/send-to-next-week", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
