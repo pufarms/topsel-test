@@ -400,6 +400,15 @@ export default function ProductMappingPage() {
   };
 
   const handleSaveMaterials = async () => {
+    if (!editCategoryLarge || !editCategoryMedium || !editCategorySmall) {
+      toast({ 
+        title: "카테고리 필수", 
+        description: "대분류, 중분류, 소분류 카테고리를 모두 선택해야 합니다.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     try {
       if (productDialogMode === "add") {
         // 등록 모드: 먼저 상품 매핑을 생성하고, 그 다음 재료를 저장

@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Download, Upload, Loader2, Search, RotateCcw, Package, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Download, Upload, Loader2, Search, RotateCcw, Package, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { ProductMapping, Category } from "@shared/schema";
 
 interface ProductMappingWithStock extends ProductMapping {
@@ -52,6 +53,9 @@ export default function ProductStockPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadResultDialogOpen, setUploadResultDialogOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ successItems: { productCode: string; productName: string; quantity: number }[]; errors: string[] } | null>(null);
+  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteProductCode, setDeleteProductCode] = useState("");
 
   const { data: productsWithStock = [], isLoading } = useQuery<ProductMappingWithStock[]>({
     queryKey: ["/api/product-stocks/with-mappings"],
@@ -125,6 +129,32 @@ export default function ProductStockPage() {
       toast({ title: "입고 확정 실패", description: error.message, variant: "destructive" });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (productCode: string) => {
+      return apiRequest("DELETE", `/api/product-stocks/${productCode}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stocks/with-mappings"] });
+      toast({ title: "재고가 삭제되었습니다" });
+      setDeleteDialogOpen(false);
+      setDeleteProductCode("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "삭제 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDeleteClick = (productCode: string) => {
+    setDeleteProductCode(productCode);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteProductCode) {
+      deleteMutation.mutate(deleteProductCode);
+    }
+  };
 
   const largeCategories = useMemo(() => 
     categories.filter(c => c.level === "large"), [categories]);
@@ -513,6 +543,9 @@ export default function ProductStockPage() {
                           <Button size="sm" variant="outline" onClick={() => openAdjustDialog(product)} data-testid={`button-adjust-${product.productCode}`}>
                             조정
                           </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(product.productCode)} data-testid={`button-delete-${product.productCode}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -548,6 +581,9 @@ export default function ProductStockPage() {
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => openAdjustDialog(product)}>
                       조정
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(product.productCode)}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </Card>
@@ -938,6 +974,28 @@ export default function ProductStockPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>재고 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 상품의 재고 정보를 삭제하시겠습니까? 삭제된 재고는 복구할 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

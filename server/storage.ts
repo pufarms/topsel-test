@@ -166,6 +166,22 @@ export interface IStorage {
   createProductMaterialMapping(data: InsertProductMaterialMapping): Promise<ProductMaterialMapping>;
   deleteProductMaterialMappingsByProduct(productCode: string): Promise<number>;
   replaceProductMaterialMappings(productCode: string, mappings: Omit<InsertProductMaterialMapping, "productCode">[]): Promise<ProductMaterialMapping[]>;
+
+  // Product Stock methods (재고 관리)
+  getAllProductStocks(): Promise<ProductStock[]>;
+  getProductStocksWithStock(): Promise<ProductStock[]>;
+  getProductStock(productCode: string): Promise<ProductStock | undefined>;
+  createProductStock(data: InsertProductStock): Promise<ProductStock>;
+  updateProductStock(productCode: string, currentStock: number): Promise<ProductStock | undefined>;
+  increaseProductStock(productCode: string, quantity: number, productName?: string): Promise<ProductStock>;
+  decreaseProductStock(productCode: string, quantity: number): Promise<ProductStock | undefined>;
+  deleteProductStock(productCode: string): Promise<void>;
+
+  // Stock History methods (재고 이력)
+  createStockHistory(data: InsertStockHistory): Promise<StockHistory>;
+  getStockHistoryByProduct(productCode: string): Promise<StockHistory[]>;
+  getStockHistoryByMaterial(materialCode: string): Promise<StockHistory[]>;
+  getAllStockHistory(): Promise<StockHistory[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1211,6 +1227,10 @@ export class DatabaseStorage implements IStorage {
     if (!existing) return undefined;
     const newStock = Math.max(0, existing.currentStock - quantity);
     return this.updateProductStock(productCode, newStock);
+  }
+
+  async deleteProductStock(productCode: string): Promise<void> {
+    await db.delete(productStocks).where(eq(productStocks.productCode, productCode));
   }
 
   // Stock History methods

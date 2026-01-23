@@ -2909,5 +2909,37 @@ export async function registerRoutes(
     });
   });
 
+  app.delete("/api/product-stocks/:productCode", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const { productCode } = req.params;
+    
+    const stock = await storage.getProductStock(productCode);
+    if (!stock) {
+      return res.status(404).json({ message: "재고 정보를 찾을 수 없습니다" });
+    }
+    
+    await storage.deleteProductStock(productCode);
+    
+    await storage.createStockHistory({
+      type: "product",
+      actionType: "out",
+      productCode,
+      quantity: -(stock.currentStock),
+      reason: "삭제",
+      note: "재고 삭제",
+      adminId: user.id,
+      adminName: user.name,
+    });
+    
+    return res.json({ success: true, message: "재고가 삭제되었습니다" });
+  });
+
   return httpServer;
 }
