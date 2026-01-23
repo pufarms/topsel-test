@@ -483,9 +483,50 @@ export default function ProductRegistrationPage() {
     const existingRowIds = selectedIds.filter(id => !id.startsWith("new-"));
 
     if (newRowIds.length > 0) {
+      const recalculateRow = (p: ProductRow): ProductRow => {
+        const merged = { ...p, ...data };
+        
+        // Recalculate derived values
+        const sourcePrice = merged.sourcePrice || 0;
+        const lossRate = merged.lossRate || 0;
+        const sourceWeight = merged.sourceWeight || 1;
+        const weight = parseFloat(merged.weight) || 0;
+        const unitPrice = sourceWeight > 0 ? Math.round((sourcePrice * (1 + lossRate / 100)) / sourceWeight) : 0;
+        const sourceProductTotal = Math.round(weight * unitPrice);
+        
+        const totalCost = sourceProductTotal + (merged.boxCost || 0) + (merged.materialCost || 0) + (merged.outerBoxCost || 0) + (merged.wrappingCost || 0) + (merged.laborCost || 0) + (merged.shippingCost || 0);
+        
+        merged.unitPrice = unitPrice;
+        merged.sourceProductTotal = sourceProductTotal;
+        merged.totalCost = totalCost;
+        
+        if (merged.startMarginRate != null) {
+          merged.startPrice = Math.round(totalCost * (1 + merged.startMarginRate / 100));
+          merged.startMargin = merged.startPrice - totalCost;
+        }
+        if (merged.drivingMarginRate != null) {
+          merged.drivingPrice = Math.round(totalCost * (1 + merged.drivingMarginRate / 100));
+          merged.drivingMargin = merged.drivingPrice - totalCost;
+        }
+        if (merged.topMarginRate != null) {
+          merged.topPrice = Math.round(totalCost * (1 + merged.topMarginRate / 100));
+          merged.topMargin = merged.topPrice - totalCost;
+        }
+        
+        return merged;
+      };
+      
       setProducts(prev => prev.map(p => {
         if (newRowIds.includes(p.id)) {
-          return { ...p, ...data };
+          return recalculateRow(p);
+        }
+        return p;
+      }));
+      
+      // Also update tempProducts to stay in sync
+      setTempProducts(prev => prev.map(p => {
+        if (newRowIds.includes(p.id)) {
+          return recalculateRow(p);
         }
         return p;
       }));
