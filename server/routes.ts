@@ -2399,6 +2399,13 @@ export async function registerRoutes(
     if (!productCode || !productName) {
       return res.status(400).json({ message: "상품코드와 상품명은 필수입니다" });
     }
+    
+    // 상품등록(공급가계산) 연계 체크 - 등록되지 않은 상품은 매핑 불가
+    const registration = await storage.getProductRegistrationByCode(productCode);
+    if (!registration) {
+      return res.status(400).json({ message: "상품등록(공급가계산)에 등록되지 않은 상품입니다. 상품등록 후 매핑이 가능합니다." });
+    }
+    
     const existing = await storage.getProductMappingByCode(productCode);
     if (existing) {
       return res.status(400).json({ message: "이미 존재하는 상품코드입니다" });
