@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -53,9 +54,11 @@ const DEFAULT_COLUMN_WIDTHS: ColumnWidth = {
 
 export default function ProductMappingPage() {
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
   const uploadInputRef = useRef<HTMLInputElement>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [unmappedProductsFromUrl, setUnmappedProductsFromUrl] = useState<{ productCode: string; productName: string }[] | null>(null);
   const [sortOption, setSortOption] = useState("default");
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -143,6 +146,55 @@ export default function ProductMappingPage() {
     if (!selectedMediumCategory) return [];
     return categories.filter(c => c.level === "small" && c.parentId === selectedMediumCategory.id);
   }, [categories, filterCategoryMedium, selectedMediumCategory]);
+
+  // Parse URL parameter for unmapped products and auto-add them
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const unmappedParam = url.searchParams.get("unmapped");
+    
+    if (unmappedParam) {
+      try {
+        const products = JSON.parse(decodeURIComponent(unmappedParam)) as { productCode: string; productName: string }[];
+        if (products && products.length > 0) {
+          setUnmappedProductsFromUrl(products);
+          // Clear the URL parameter to prevent re-adding on refresh
+          url.searchParams.delete("unmapped");
+          window.history.replaceState({}, "", url.toString());
+        }
+      } catch (e) {
+        console.error("Failed to parse unmapped products from URL:", e);
+      }
+    }
+  }, []);
+
+  // Auto-add unmapped products when they are parsed from URL
+  useEffect(() => {
+    if (unmappedProductsFromUrl && unmappedProductsFromUrl.length > 0 && !isLoading) {
+      // Filter out products that already exist in productMappings
+      const existingCodes = new Set(productMappings.map(p => p.productCode));
+      const newProducts = unmappedProductsFromUrl.filter(p => !existingCodes.has(p.productCode));
+      
+      if (newProducts.length > 0) {
+        // Use bulk add mutation to add all products
+        bulkAddProductMutation.mutate(newProducts, {
+          onSuccess: () => {
+            toast({
+              title: "매핑 필요 상품이 추가되었습니다",
+              description: `${newProducts.length}개 상품이 목록에 추가되었습니다. 재료 매핑을 완료해주세요.`,
+            });
+            setUnmappedProductsFromUrl(null);
+          },
+        });
+      } else {
+        // All products already exist
+        toast({
+          title: "상품이 이미 존재합니다",
+          description: `${unmappedProductsFromUrl.length}개 상품이 이미 목록에 있습니다. 재료 매핑을 완료해주세요.`,
+        });
+        setUnmappedProductsFromUrl(null);
+      }
+    }
+  }, [unmappedProductsFromUrl, productMappings, isLoading]);
 
   const editSelectedLargeCategory = useMemo(() => 
     largeCategories.find(lc => lc.name === editCategoryLarge), [largeCategories, editCategoryLarge]);

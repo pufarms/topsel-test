@@ -1481,7 +1481,9 @@ export default function ProductRegistrationPage() {
                   title: "상품 매핑 페이지로 이동합니다",
                   description: `${unmappedProducts.length}개 상품의 매핑이 필요합니다.`,
                 });
-                setLocation("/admin/inventory/mapping");
+                // Pass unmapped products via URL parameter
+                const productsParam = encodeURIComponent(JSON.stringify(unmappedProducts));
+                setLocation(`/admin/inventory/mapping?unmapped=${productsParam}`);
               }}
               className="bg-orange-500 hover:bg-orange-600"
               data-testid="button-go-to-mapping"
