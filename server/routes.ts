@@ -2829,16 +2829,21 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품 매핑에 등록되지 않은 상품입니다" });
     }
     
+    const beforeStock = (await storage.getProductStock(productCode))?.currentStock || 0;
     await storage.increaseProductStock(productCode, Math.floor(quantity), productName || mapping.productName);
+    const afterStock = beforeStock + Math.floor(quantity);
     
     await storage.createStockHistory({
-      type: "product",
+      stockType: "product",
       actionType: "in",
-      productCode,
+      itemCode: productCode,
+      itemName: productName || mapping.productName,
       quantity: Math.floor(quantity),
+      beforeStock,
+      afterStock,
       note: note || null,
       adminId: user.id,
-      adminName: user.name,
+      source: "manual",
     });
     
     return res.json({ success: true, message: "입고가 완료되었습니다" });
@@ -2867,22 +2872,31 @@ export async function registerRoutes(
       return res.status(400).json({ message: "현재 재고보다 많은 수량을 감소할 수 없습니다" });
     }
     
+    const mapping = await storage.getProductMappingByCode(productCode);
+    const beforeStock = currentStock;
+    
     if (adjustType === "increase") {
-      const mapping = await storage.getProductMappingByCode(productCode);
       await storage.increaseProductStock(productCode, Math.floor(quantity), mapping?.productName);
     } else {
       await storage.decreaseProductStock(productCode, Math.floor(quantity));
     }
     
+    const afterStock = adjustType === "increase" 
+      ? beforeStock + Math.floor(quantity) 
+      : beforeStock - Math.floor(quantity);
+    
     await storage.createStockHistory({
-      type: "product",
+      stockType: "product",
       actionType: "adjust",
-      productCode,
+      itemCode: productCode,
+      itemName: mapping?.productName || productCode,
       quantity: adjustType === "increase" ? Math.floor(quantity) : -Math.floor(quantity),
+      beforeStock,
+      afterStock,
       reason: reason || null,
       note: note || null,
       adminId: user.id,
-      adminName: user.name,
+      source: "manual",
     });
     
     return res.json({ success: true, message: "재고 조정이 완료되었습니다" });
@@ -3011,15 +3025,21 @@ export async function registerRoutes(
     let successCount = 0;
     
     for (const item of items) {
+      const beforeStock = (await storage.getProductStock(item.productCode))?.currentStock || 0;
       await storage.increaseProductStock(item.productCode, item.quantity, item.productName);
+      const afterStock = beforeStock + item.quantity;
+      
       await storage.createStockHistory({
-        type: "product",
+        stockType: "product",
         actionType: "in",
-        productCode: item.productCode,
+        itemCode: item.productCode,
+        itemName: item.productName,
         quantity: item.quantity,
+        beforeStock,
+        afterStock,
         note: "엑셀 일괄 입고",
         adminId: user.id,
-        adminName: user.name,
+        source: "manual",
       });
       successCount++;
     }
@@ -3047,17 +3067,21 @@ export async function registerRoutes(
       return res.status(404).json({ message: "재고 정보를 찾을 수 없습니다" });
     }
     
+    const beforeStock = stock.currentStock;
     await storage.deleteProductStock(productCode);
     
     await storage.createStockHistory({
-      type: "product",
+      stockType: "product",
       actionType: "out",
-      productCode,
-      quantity: -(stock.currentStock),
+      itemCode: productCode,
+      itemName: stock.productName,
+      quantity: -(beforeStock),
+      beforeStock,
+      afterStock: 0,
       reason: "삭제",
       note: "재고 삭제",
       adminId: user.id,
-      adminName: user.name,
+      source: "manual",
     });
     
     return res.json({ success: true, message: "재고가 삭제되었습니다" });

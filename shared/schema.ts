@@ -680,13 +680,17 @@ export const insertProductStockSchema = createInsertSchema(productStocks).omit({
 export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
 export type ProductStock = typeof productStocks.$inferSelect;
 
-// 재고 이력 유형
-export const stockHistoryTypes = ["product", "material"] as const;
+// 재고 이력 유형 (공급상품/원재료/반재료/부재료)
+export const stockHistoryTypes = ["product", "raw", "semi", "sub"] as const;
 export type StockHistoryType = typeof stockHistoryTypes[number];
 
 // 재고 이력 액션 유형
 export const stockActionTypes = ["in", "out", "adjust"] as const;
 export type StockActionType = typeof stockActionTypes[number];
+
+// 재고 이력 처리방식 (수동/자동-주문연동)
+export const stockSourceTypes = ["manual", "order"] as const;
+export type StockSourceType = typeof stockSourceTypes[number];
 
 // 재고 조정 사유
 export const adjustReasons = ["파손", "오차 수정", "폐기", "기타"] as const;
@@ -695,15 +699,18 @@ export type AdjustReason = typeof adjustReasons[number];
 // 재고 이력 테이블
 export const stockHistory = pgTable("stock_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  type: text("type").notNull(), // product | material
+  stockType: text("stock_type").notNull(), // product | raw | semi | sub
   actionType: text("action_type").notNull(), // in | out | adjust
-  productCode: text("product_code"),
-  materialCode: text("material_code"),
+  itemCode: text("item_code").notNull(), // 상품코드 또는 재료코드
+  itemName: text("item_name").notNull(), // 상품명 또는 재료명
   quantity: integer("quantity").notNull(), // +/- 수량
+  beforeStock: integer("before_stock"), // 변경 전 재고
+  afterStock: integer("after_stock"), // 변경 후 재고
   reason: text("reason"), // 조정 사유
-  note: text("note"),
-  adminId: varchar("admin_id").notNull(),
-  adminName: text("admin_name"),
+  note: text("note"), // 비고
+  adminId: varchar("admin_id").notNull(), // 담당자 ID
+  source: text("source").notNull().default("manual"), // 처리방식: manual | order
+  orderId: text("order_id"), // 주문번호 (미래 연동용)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
