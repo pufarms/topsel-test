@@ -363,8 +363,12 @@ export default function ProductMappingPage() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productCode: string) => {
-      const res = await apiRequest("DELETE", `/api/product-mappings/${productCode}`);
-      return res.json();
+      const res = await fetch(`/api/product-mappings/${productCode}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "삭제에 실패했습니다");
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
@@ -373,14 +377,24 @@ export default function ProductMappingPage() {
       setDeleteDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "오류", description: error.message, variant: "destructive" });
+      setDeleteDialogOpen(false);
+      toast({ title: "삭제 불가", description: error.message, variant: "destructive" });
     },
   });
 
   const saveMaterialsMutation = useMutation({
     mutationFn: async ({ productCode, materials }: { productCode: string; materials: { materialCode: string; materialName: string; materialType: string; quantity: number }[] }) => {
-      const res = await apiRequest("PUT", `/api/product-mappings/${productCode}/materials`, { materials });
-      return res.json();
+      const res = await fetch(`/api/product-mappings/${productCode}/materials`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ materials }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "저장에 실패했습니다");
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
@@ -388,7 +402,7 @@ export default function ProductMappingPage() {
       resetProductForm();
     },
     onError: (error: any) => {
-      toast({ title: "오류", description: error.message, variant: "destructive" });
+      toast({ title: "저장 불가", description: error.message, variant: "destructive" });
     },
   });
 
