@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Download, Upload, Loader2, Search, RotateCcw, Package, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { ProductMapping, Category } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 interface ProductMappingWithStock extends ProductMapping {
   currentStock: number;
@@ -227,6 +228,34 @@ export default function ProductStockPage() {
   }, [filteredProducts, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  const handleDownloadList = () => {
+    if (filteredProducts.length === 0) {
+      toast({ title: "다운로드 실패", description: "다운로드할 상품이 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["상품코드", "상품명", "대분류", "중분류", "소분류", "사용여부", "매핑상태", "현재재고"];
+    const rows = filteredProducts.map(p => [
+      p.productCode || "",
+      p.productName || "",
+      p.categoryLarge || "",
+      p.categoryMedium || "",
+      p.categorySmall || "",
+      p.usageStatus === "Y" ? "사용" : "미사용",
+      p.mappingStatus === "complete" ? "완료" : "미완료",
+      p.currentStock ?? 0,
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, "공급상품재고");
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `공급상품재고_${dateStr}.xlsx`);
+    toast({ title: "다운로드 완료", description: `${filteredProducts.length}개 상품이 다운로드되었습니다.` });
+  };
 
   const searchableProducts = useMemo(() => {
     let filtered = productsWithStock;
@@ -487,12 +516,15 @@ export default function ProductStockPage() {
       </Card>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button onClick={() => openStockInDialog()} data-testid="button-stock-in">
             <Plus className="h-4 w-4 mr-1" /> 입고 등록
           </Button>
           <Button variant="outline" onClick={() => openAdjustDialog()} data-testid="button-adjust">
             <Package className="h-4 w-4 mr-1" /> 재고 조정
+          </Button>
+          <Button variant="outline" onClick={handleDownloadList} data-testid="button-download-list">
+            <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
           </Button>
         </div>
         <div className="text-sm text-muted-foreground">

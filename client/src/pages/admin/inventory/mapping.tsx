@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical, Filter, Link2 } from "lucide-react";
 import { PageHeader } from "@/components/admin";
 import type { ProductMapping, ProductMaterialMapping, Material, Category } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 interface ProductMappingWithMaterials extends ProductMapping {
   materials: ProductMaterialMapping[];
@@ -624,6 +625,44 @@ export default function ProductMappingPage() {
     window.location.href = "/api/product-mappings/template";
   };
 
+  const handleDownloadList = () => {
+    if (filteredAndSortedMappings.length === 0) {
+      toast({ title: "다운로드 실패", description: "다운로드할 상품매핑이 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["상품코드", "상품명", "대분류", "중분류", "소분류", "사용여부", "매핑상태", "재료1", "수량1", "재료2", "수량2", "재료3", "수량3", "재료4", "수량4"];
+    const rows = filteredAndSortedMappings.map(m => {
+      const mats = m.materials || [];
+      return [
+        m.productCode || "",
+        m.productName || "",
+        m.categoryLarge || "",
+        m.categoryMedium || "",
+        m.categorySmall || "",
+        m.usageStatus === "Y" ? "사용" : "미사용",
+        m.mappingStatus === "complete" ? "완료" : "미완료",
+        mats[0]?.materialName || "",
+        mats[0]?.quantity || "",
+        mats[1]?.materialName || "",
+        mats[1]?.quantity || "",
+        mats[2]?.materialName || "",
+        mats[2]?.quantity || "",
+        mats[3]?.materialName || "",
+        mats[3]?.quantity || "",
+      ];
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, "상품매핑");
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `상품매핑_${dateStr}.xlsx`);
+    toast({ title: "다운로드 완료", description: `${filteredAndSortedMappings.length}개 상품매핑이 다운로드되었습니다.` });
+  };
+
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -694,6 +733,10 @@ export default function ProductMappingPage() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadList} data-testid="button-download-list">
+                  <Download className="w-4 h-4 mr-1" />
+                  엑셀 다운로드
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
                   <Download className="w-4 h-4 mr-1" />
                   양식 다운로드

@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, MoreHorizontal, Pencil, Trash2, Download, Upload, Loader2 } from "lucide-react";
 import type { MaterialCategoryLarge, MaterialCategoryMedium, MaterialCategorySmall, Material, MaterialType } from "@shared/schema";
 import { materialTypeLabels } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 export default function MaterialsPage() {
   const { toast } = useToast();
@@ -472,6 +473,33 @@ export default function MaterialsPage() {
     }
   };
 
+  const handleDownloadList = () => {
+    if (filteredMaterials.length === 0) {
+      toast({ title: "다운로드 실패", description: "다운로드할 원재료가 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["재료타입", "대분류", "중분류", "소분류", "재료코드", "재료명", "현재재고"];
+    const rows = filteredMaterials.map(m => [
+      materialTypeLabels[m.materialType as MaterialType] || m.materialType,
+      largeCategories.find(c => c.id === m.largeCategoryId)?.name || "",
+      mediumCategories.find(c => c.id === m.mediumCategoryId)?.name || "",
+      smallCategories.find(c => c.id === m.smallCategoryId)?.name || "",
+      m.materialCode || "",
+      m.materialName || "",
+      m.currentStock ?? 0,
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, "원재료목록");
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `원재료목록_${dateStr}.xlsx`);
+    toast({ title: "다운로드 완료", description: `${filteredMaterials.length}개 원재료가 다운로드되었습니다.` });
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(filteredMaterials.map(m => m.id));
@@ -730,6 +758,9 @@ export default function MaterialsPage() {
                     data-testid="button-delete-selected"
                   >
                     <Trash2 className="h-4 w-4 mr-1" /> 선택 삭제
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleDownloadList} data-testid="button-download-list">
+                    <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
                   </Button>
                 </div>
               </CardTitle>
