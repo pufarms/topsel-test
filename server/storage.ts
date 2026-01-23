@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -1158,6 +1158,82 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productMappings.productCode, productCode));
     
     return result;
+  }
+
+  // Product Stock methods
+  async getAllProductStocks(): Promise<ProductStock[]> {
+    return db.select().from(productStocks).orderBy(desc(productStocks.updatedAt));
+  }
+
+  async getProductStocksWithStock(): Promise<ProductStock[]> {
+    const { gt } = await import("drizzle-orm");
+    return db.select().from(productStocks)
+      .where(gt(productStocks.currentStock, 0))
+      .orderBy(desc(productStocks.updatedAt));
+  }
+
+  async getProductStock(productCode: string): Promise<ProductStock | undefined> {
+    const [stock] = await db.select().from(productStocks)
+      .where(eq(productStocks.productCode, productCode));
+    return stock;
+  }
+
+  async createProductStock(data: InsertProductStock): Promise<ProductStock> {
+    const [stock] = await db.insert(productStocks).values(data).returning();
+    return stock;
+  }
+
+  async updateProductStock(productCode: string, currentStock: number): Promise<ProductStock | undefined> {
+    const [updated] = await db.update(productStocks)
+      .set({ currentStock, updatedAt: new Date() })
+      .where(eq(productStocks.productCode, productCode))
+      .returning();
+    return updated;
+  }
+
+  async increaseProductStock(productCode: string, quantity: number, productName?: string): Promise<ProductStock> {
+    const existing = await this.getProductStock(productCode);
+    if (existing) {
+      const newStock = existing.currentStock + quantity;
+      const updated = await this.updateProductStock(productCode, newStock);
+      return updated!;
+    } else {
+      return this.createProductStock({
+        productCode,
+        productName: productName || productCode,
+        currentStock: quantity,
+      });
+    }
+  }
+
+  async decreaseProductStock(productCode: string, quantity: number): Promise<ProductStock | undefined> {
+    const existing = await this.getProductStock(productCode);
+    if (!existing) return undefined;
+    const newStock = Math.max(0, existing.currentStock - quantity);
+    return this.updateProductStock(productCode, newStock);
+  }
+
+  // Stock History methods
+  async createStockHistory(data: InsertStockHistory): Promise<StockHistory> {
+    const [history] = await db.insert(stockHistory).values(data).returning();
+    return history;
+  }
+
+  async getStockHistoryByProduct(productCode: string): Promise<StockHistory[]> {
+    return db.select().from(stockHistory)
+      .where(eq(stockHistory.productCode, productCode))
+      .orderBy(desc(stockHistory.createdAt));
+  }
+
+  async getStockHistoryByMaterial(materialCode: string): Promise<StockHistory[]> {
+    return db.select().from(stockHistory)
+      .where(eq(stockHistory.materialCode, materialCode))
+      .orderBy(desc(stockHistory.createdAt));
+  }
+
+  async getAllStockHistory(): Promise<StockHistory[]> {
+    return db.select().from(stockHistory)
+      .orderBy(desc(stockHistory.createdAt));
   }
 }
 
