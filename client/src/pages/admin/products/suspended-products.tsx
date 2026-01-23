@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, RotateCcw, Play, Trash2, StopCircle } from "lucide-react";
+import { Loader2, RotateCcw, Play, Trash2, StopCircle, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
 import type { CurrentProduct, Category } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 const MIN_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 40, categoryLarge: 70, categoryMedium: 70, categorySmall: 70, weight: 60,
@@ -166,6 +167,34 @@ export default function SuspendedProductsPage() {
     return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
   };
 
+  const handleDownload = () => {
+    if (filteredProducts.length === 0) {
+      toast({ title: "다운로드 실패", description: "다운로드할 상품이 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명", "중지일", "중지사유"];
+    const rows = filteredProducts.map(p => [
+      p.categoryLarge || "",
+      p.categoryMedium || "",
+      p.categorySmall || "",
+      p.weight || "",
+      p.productCode || "",
+      p.productName || "",
+      formatDate(p.suspendedAt),
+      p.suspendReason || "",
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, "공급중지상품");
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `공급중지상품_${dateStr}.xlsx`);
+    toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -224,6 +253,9 @@ export default function SuspendedProductsPage() {
         </Button>
         <Button variant="destructive" onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
           <Trash2 className="h-4 w-4 mr-1" /> 선택 삭제
+        </Button>
+        <Button variant="outline" onClick={handleDownload} data-testid="button-download-excel">
+          <Download className="h-4 w-4 mr-1" /> 엑셀 다운로드
         </Button>
       </div>
 
