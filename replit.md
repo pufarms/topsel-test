@@ -72,6 +72,7 @@ Preferred communication style: Simple, everyday language.
 - Supports material selection, quantity input, and full replacement saving for mappings.
 - Automatic status updates (complete/incomplete) based on material assignments.
 - Includes Excel template download and bulk upload functionality for products and materials.
+- **Mapping Check Before Send**: When sending products to "차주 예상공급가 상품", the system checks if products are mapped. Unmapped products trigger a dialog prompting navigation to the mapping page.
 
 ### Admin Design System
 - Standardized components (PageHeader, StatCard, FilterSection, DataTable, MobileCard) for consistent UI.
