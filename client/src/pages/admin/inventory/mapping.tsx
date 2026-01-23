@@ -33,6 +33,7 @@ interface ColumnWidth {
   mat4Name: number;
   mat4Qty: number;
   status: number;
+  saveStatus: number;
   actions: number;
 }
 
@@ -49,6 +50,7 @@ const DEFAULT_COLUMN_WIDTHS: ColumnWidth = {
   mat4Name: 140,
   mat4Qty: 50,
   status: 70,
+  saveStatus: 70,
   actions: 80,
 };
 
@@ -760,7 +762,8 @@ export default function ProductMappingPage() {
                     <ResizeHandle column="mat4Name" />
                   </div>
                   <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.mat4Qty }}>수량</div>
-                  <div className={`${headerCellClass}`} style={{ width: columnWidths.status }}></div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.status }}>사용유무</div>
+                  <div className={`${headerCellClass} text-center`} style={{ width: columnWidths.saveStatus }}>저장상태</div>
                   <div className={`${headerCellClass}`} style={{ width: columnWidths.actions }}></div>
                 </div>
               </div>
@@ -811,6 +814,13 @@ export default function ProductMappingPage() {
                         <span className={mapping.usageStatus === "Y" ? "text-green-600" : "text-muted-foreground"}>
                           {mapping.usageStatus === "Y" ? "사용" : "미사용"}
                         </span>
+                      </div>
+                      <div className={`${cellClass} text-center`} style={{ width: columnWidths.saveStatus }}>
+                        {mapping.materials && mapping.materials.length > 0 ? (
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">저장</span>
+                        ) : (
+                          <span className="text-red-600 dark:text-red-400 font-medium">미저장</span>
+                        )}
                       </div>
                       <div className={`${cellClass} text-center`} style={{ width: columnWidths.actions }}>
                         <div className="flex justify-center gap-0.5">
@@ -871,9 +881,17 @@ export default function ProductMappingPage() {
                               <div className="text-xs text-muted-foreground">매핑된 재료 없음</div>
                             )}
                           </div>
-                          <Badge variant={mapping.usageStatus === "Y" ? "default" : "secondary"} className="mt-1 text-xs h-5">
-                            {mapping.usageStatus === "Y" ? "사용" : "미사용"}
-                          </Badge>
+                          <div className="flex gap-1 mt-1">
+                            <Badge variant={mapping.usageStatus === "Y" ? "default" : "secondary"} className="text-xs h-5">
+                              {mapping.usageStatus === "Y" ? "사용" : "미사용"}
+                            </Badge>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs h-5 ${mapping.materials && mapping.materials.length > 0 ? "text-blue-600 border-blue-600" : "text-red-600 border-red-600"}`}
+                            >
+                              {mapping.materials && mapping.materials.length > 0 ? "저장" : "미저장"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     </div>
