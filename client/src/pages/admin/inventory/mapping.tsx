@@ -365,20 +365,21 @@ export default function ProductMappingPage() {
     mutationFn: async (productCode: string) => {
       const res = await fetch(`/api/product-mappings/${productCode}`, { method: "DELETE", credentials: "include" });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "삭제에 실패했습니다");
+      return { ok: res.ok, data, message: data.message };
+    },
+    onSuccess: (result) => {
+      setDeleteDialogOpen(false);
+      if (result.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/product-mappings/available-products"] });
+        toast({ title: "상품이 삭제되었습니다" });
+      } else {
+        toast({ title: "삭제 불가", description: result.message || "삭제에 실패했습니다", variant: "destructive" });
       }
-      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings/available-products"] });
-      toast({ title: "상품이 삭제되었습니다" });
+    onError: () => {
       setDeleteDialogOpen(false);
-    },
-    onError: (error: any) => {
-      setDeleteDialogOpen(false);
-      toast({ title: "삭제 불가", description: error.message, variant: "destructive" });
+      toast({ title: "오류", description: "네트워크 오류가 발생했습니다", variant: "destructive" });
     },
   });
 
@@ -391,18 +392,19 @@ export default function ProductMappingPage() {
         body: JSON.stringify({ materials }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "저장에 실패했습니다");
+      return { ok: res.ok, data, message: data.message };
+    },
+    onSuccess: (result) => {
+      if (result.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
+        toast({ title: "재료 매핑이 저장되었습니다" });
+        resetProductForm();
+      } else {
+        toast({ title: "저장 불가", description: result.message || "저장에 실패했습니다", variant: "destructive" });
       }
-      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
-      toast({ title: "재료 매핑이 저장되었습니다" });
-      resetProductForm();
-    },
-    onError: (error: any) => {
-      toast({ title: "저장 불가", description: error.message, variant: "destructive" });
+    onError: () => {
+      toast({ title: "오류", description: "네트워크 오류가 발생했습니다", variant: "destructive" });
     },
   });
 
@@ -574,11 +576,41 @@ export default function ProductMappingPage() {
   };
 
   const handleBulkDelete = async () => {
+    const protectedProducts: string[] = [];
+    const deletedProducts: string[] = [];
+    
     for (const productCode of selectedIds) {
-      await deleteProductMutation.mutateAsync(productCode);
+      const result = await deleteProductMutation.mutateAsync(productCode);
+      if (result.ok) {
+        deletedProducts.push(productCode);
+      } else {
+        protectedProducts.push(productCode);
+      }
     }
-    setSelectedIds([]);
+    
     setBulkDeleteDialogOpen(false);
+    setSelectedIds([]);
+    
+    if (deletedProducts.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/product-mappings/available-products"] });
+    }
+    
+    if (protectedProducts.length > 0 && deletedProducts.length > 0) {
+      toast({ 
+        title: "일부 삭제 완료", 
+        description: `${deletedProducts.length}개 삭제, ${protectedProducts.length}개는 차주/현재 공급가 상품으로 삭제 불가`,
+        variant: "default"
+      });
+    } else if (protectedProducts.length > 0) {
+      toast({ 
+        title: "삭제 불가", 
+        description: `선택한 ${protectedProducts.length}개 상품은 차주/현재 공급가 상품으로 삭제가 불가합니다`,
+        variant: "destructive"
+      });
+    } else if (deletedProducts.length > 0) {
+      toast({ title: `${deletedProducts.length}개 상품이 삭제되었습니다` });
+    }
   };
 
   const handleDownloadTemplate = () => {
