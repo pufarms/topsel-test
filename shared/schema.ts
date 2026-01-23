@@ -646,6 +646,7 @@ export const productMaterialMappings = pgTable("product_material_mappings", {
   productCode: text("product_code").notNull(),
   materialCode: text("material_code").notNull(),
   materialName: text("material_name").notNull(),
+  materialType: text("material_type").notNull().default("raw"),
   quantity: real("quantity").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

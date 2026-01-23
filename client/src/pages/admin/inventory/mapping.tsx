@@ -378,7 +378,7 @@ export default function ProductMappingPage() {
   });
 
   const saveMaterialsMutation = useMutation({
-    mutationFn: async ({ productCode, materials }: { productCode: string; materials: { materialCode: string; materialName: string; quantity: number }[] }) => {
+    mutationFn: async ({ productCode, materials }: { productCode: string; materials: { materialCode: string; materialName: string; materialType: string; quantity: number }[] }) => {
       const res = await apiRequest("PUT", `/api/product-mappings/${productCode}/materials`, { materials });
       return res.json();
     },
@@ -595,9 +595,20 @@ export default function ProductMappingPage() {
     }
   };
 
+  const getMaterialTypeLabel = (type: string): string => {
+    switch (type) {
+      case "raw": return "원재료";
+      case "semi": return "반재료";
+      case "sub": return "부재료";
+      default: return "원재료";
+    }
+  };
+
   const getMaterialInfo = (materials: ProductMaterialMapping[], index: number) => {
     const mat = materials[index];
-    return mat ? { name: mat.materialName, qty: mat.quantity } : { name: "", qty: "" };
+    if (!mat) return { name: "", qty: "" };
+    const typeLabel = getMaterialTypeLabel(mat.materialType || "raw");
+    return { name: `${typeLabel}/ ${mat.materialName}`, qty: mat.quantity };
   };
 
   const ResizeHandle = ({ column }: { column: keyof ColumnWidth }) => (
@@ -928,7 +939,7 @@ export default function ProductMappingPage() {
                           <div className="mt-1 space-y-0.5">
                             {mapping.materials.slice(0, 4).map((mat, idx) => (
                               <div key={mat.materialCode} className="text-xs text-muted-foreground">
-                                원재료{idx + 1}: {mat.materialName} ({mat.quantity})
+                                재료{idx + 1}: {getMaterialTypeLabel(mat.materialType || "raw")}/ {mat.materialName} ({mat.quantity})
                               </div>
                             ))}
                             {mapping.materials.length === 0 && (

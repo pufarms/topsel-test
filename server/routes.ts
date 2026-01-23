@@ -2581,6 +2581,7 @@ export async function registerRoutes(
       validMaterials.push({
         materialCode: m.materialCode,
         materialName: m.materialName,
+        materialType: m.materialType || "raw",
         quantity: parseFloat(m.quantity),
       });
     }
