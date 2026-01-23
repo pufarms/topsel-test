@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical, Filter } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical, Filter, Link2 } from "lucide-react";
+import { PageHeader } from "@/components/admin";
 import type { ProductMapping, ProductMaterialMapping, Material, Category } from "@shared/schema";
 
 interface ProductMappingWithMaterials extends ProductMapping {
@@ -674,145 +675,155 @@ export default function ProductMappingPage() {
   const headerCellClass = "border border-border/50 px-1.5 py-1 text-xs font-medium relative";
 
   return (
-    <div className="space-y-2 p-2" data-testid="page-product-mapping">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">총</span>
-            <span className="text-sm font-bold text-primary">{filteredAndSortedMappings.length}건</span>
-            <span className="text-xs text-muted-foreground ml-2">
-              ({currentPage} Page / Tot {totalPages || 1} Page)
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleDownloadTemplate} data-testid="button-download-template">
-              <Download className="w-3 h-3 mr-1" />
-              양식 다운로드
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
-              {uploadMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}
-              업로드
-            </Button>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleUpload}
-              className="hidden"
-              data-testid="input-upload-file"
-            />
-            <Button size="sm" className="h-7 text-xs" onClick={handleOpenAddProduct} data-testid="button-add-product">
-              <Plus className="w-3 h-3 mr-1" />
-              추가
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-3 p-4" data-testid="page-product-mapping">
+      <PageHeader
+        title="상품매핑"
+        description="공급상품과 원재료를 연결하여 재고관리에 활용합니다."
+        icon={Link2}
+      />
 
-        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-          <div className="flex items-center gap-1 flex-wrap">
-            <Filter className="w-3 h-3 text-muted-foreground" />
-            <Select 
-              value={filterCategoryLarge} 
-              onValueChange={(v) => {
-                setFilterCategoryLarge(v);
-                setFilterCategoryMedium("all");
-                setFilterCategorySmall("all");
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-large">
-                <SelectValue placeholder="대분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">대분류 전체</SelectItem>
-                {largeCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select 
-              value={filterCategoryMedium} 
-              onValueChange={(v) => {
-                setFilterCategoryMedium(v);
-                setFilterCategorySmall("all");
-                setCurrentPage(1);
-              }}
-              disabled={filterCategoryLarge === "all"}
-            >
-              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-medium">
-                <SelectValue placeholder="중분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">중분류 전체</SelectItem>
-                {mediumCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select 
-              value={filterCategorySmall} 
-              onValueChange={(v) => {
-                setFilterCategorySmall(v);
-                setCurrentPage(1);
-              }}
-              disabled={filterCategoryMedium === "all"}
-            >
-              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-category-small">
-                <SelectValue placeholder="소분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">소분류 전체</SelectItem>
-                {smallCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Label className="text-xs whitespace-nowrap ml-2">판매상품명</Label>
-            <Input
-              placeholder="검색"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-32 h-7 text-xs"
-              data-testid="input-search"
-            />
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSearchQuery("")}>
-              <Search className="w-3 h-3" />
-            </Button>
-            {selectedIds.length > 0 && (
-              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
-                삭제하기
-              </Button>
-            )}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">총</span>
+                <span className="text-lg font-bold text-primary">{filteredAndSortedMappings.length}건</span>
+                <span className="text-sm text-muted-foreground ml-2">
+                  ({currentPage} Page / Tot {totalPages || 1} Page)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
+                  <Download className="w-4 h-4 mr-1" />
+                  양식 다운로드
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()} disabled={uploadMutation.isPending} data-testid="button-upload-excel">
+                  {uploadMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                  업로드
+                </Button>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleUpload}
+                  className="hidden"
+                  data-testid="input-upload-file"
+                />
+                <Button size="sm" onClick={handleOpenAddProduct} data-testid="button-add-product">
+                  <Plus className="w-4 h-4 mr-1" />
+                  추가
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <Select 
+                  value={filterCategoryLarge} 
+                  onValueChange={(v) => {
+                    setFilterCategoryLarge(v);
+                    setFilterCategoryMedium("all");
+                    setFilterCategorySmall("all");
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-28 h-9" data-testid="select-category-large">
+                    <SelectValue placeholder="대분류" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">대분류 전체</SelectItem>
+                    {largeCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select 
+                  value={filterCategoryMedium} 
+                  onValueChange={(v) => {
+                    setFilterCategoryMedium(v);
+                    setFilterCategorySmall("all");
+                    setCurrentPage(1);
+                  }}
+                  disabled={filterCategoryLarge === "all"}
+                >
+                  <SelectTrigger className="w-28 h-9" data-testid="select-category-medium">
+                    <SelectValue placeholder="중분류" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">중분류 전체</SelectItem>
+                    {mediumCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select 
+                  value={filterCategorySmall} 
+                  onValueChange={(v) => {
+                    setFilterCategorySmall(v);
+                    setCurrentPage(1);
+                  }}
+                  disabled={filterCategoryMedium === "all"}
+                >
+                  <SelectTrigger className="w-28 h-9" data-testid="select-category-small">
+                    <SelectValue placeholder="소분류" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">소분류 전체</SelectItem>
+                    {smallCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Label className="text-sm whitespace-nowrap ml-3">판매상품명</Label>
+                <Input
+                  placeholder="검색"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-40 h-9"
+                  data-testid="input-search"
+                />
+                <Button variant="outline" size="sm" className="h-9" onClick={() => setSearchQuery("")}>
+                  <Search className="w-4 h-4" />
+                </Button>
+                {selectedIds.length > 0 && (
+                  <Button variant="destructive" size="sm" className="h-9" onClick={() => setBulkDeleteDialogOpen(true)} data-testid="button-bulk-delete">
+                    삭제하기
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 sm:ml-auto">
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger className="w-32 h-9" data-testid="select-sort">
+                    <SelectValue placeholder="정렬" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">정렬_기본</SelectItem>
+                    <SelectItem value="code_asc">코드↑</SelectItem>
+                    <SelectItem value="code_desc">코드↓</SelectItem>
+                    <SelectItem value="name_asc">상품명↑</SelectItem>
+                    <SelectItem value="name_desc">상품명↓</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-24 h-9" data-testid="select-items-per-page">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20개</SelectItem>
+                    <SelectItem value="50">50개</SelectItem>
+                    <SelectItem value="100">100개</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:ml-auto">
-            <Select value={sortOption} onValueChange={setSortOption}>
-              <SelectTrigger className="w-28 h-7 text-xs" data-testid="select-sort">
-                <SelectValue placeholder="정렬" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">정렬_기본</SelectItem>
-                <SelectItem value="code_asc">코드↑</SelectItem>
-                <SelectItem value="code_desc">코드↓</SelectItem>
-                <SelectItem value="name_asc">상품명↑</SelectItem>
-                <SelectItem value="name_desc">상품명↓</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
-              <SelectTrigger className="w-24 h-7 text-xs" data-testid="select-items-per-page">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="20">20개</SelectItem>
-                <SelectItem value="50">50개</SelectItem>
-                <SelectItem value="100">100개</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">
