@@ -74,6 +74,15 @@ export default function NextWeekProductsPage() {
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
+  
+  // Fetch current products to show "현재" badge
+  const { data: currentProducts = [] } = useQuery<{ productCode: string }[]>({
+    queryKey: ["/api/current-products"],
+  });
+  
+  const currentProductCodes = useMemo(() => {
+    return new Set(currentProducts.map(p => p.productCode));
+  }, [currentProducts]);
 
   const checkNewMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -422,7 +431,16 @@ export default function NextWeekProductsPage() {
                             col === "categoryMedium" ? product.categoryMedium :
                             col === "categorySmall" ? product.categorySmall :
                             col === "weight" ? product.weight :
-                            col === "productCode" ? product.productCode :
+                            col === "productCode" ? (
+                              <div className="flex items-center gap-1">
+                                <span>{product.productCode}</span>
+                                {currentProductCodes.has(product.productCode) && (
+                                  <Badge variant="default" className="text-[9px] px-1 py-0 h-4 bg-green-500 hover:bg-green-600 shrink-0">
+                                    현재
+                                  </Badge>
+                                )}
+                              </div>
+                            ) :
                             col === "productName" ? product.productName :
                             col === "startPrice" ? product.startPrice?.toLocaleString() :
                             col === "drivingPrice" ? product.drivingPrice?.toLocaleString() :
