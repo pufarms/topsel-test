@@ -1391,7 +1391,9 @@ export default function ProductMappingPage() {
               onClick={() => {
                 setNotRegisteredDialogOpen(false);
                 resetProductForm();
-                setLocation("/admin/products/registration");
+                const params = new URLSearchParams();
+                params.set("newProductCode", notRegisteredProductCode);
+                setLocation(`/admin/products/registration?${params.toString()}`);
               }}
               data-testid="button-go-to-registration"
             >

@@ -165,7 +165,8 @@ export default function ProductRegistrationPage() {
   const [unmappedProducts, setUnmappedProducts] = useState<{ productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[]>([]);
   const [isCheckingMapping, setIsCheckingMapping] = useState(false);
   
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
 
   useEffect(() => {
     if (products.length === 0) return;
@@ -187,6 +188,93 @@ export default function ProductRegistrationPage() {
       setColumnWidths(newWidths);
     }
   }, [products, manuallyResizedColumns]);
+
+  // Handle URL params for new product from mapping page
+  useEffect(() => {
+    if (urlParamsProcessed) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const newProductCode = urlParams.get("newProductCode");
+    
+    if (newProductCode) {
+      // Check if this product code already exists in the list
+      const existsInList = products.some(p => p.productCode === newProductCode) || 
+                          tempProducts.some(p => p.productCode === newProductCode);
+      
+      if (!existsInList) {
+        const newRow: ProductRow = {
+          id: `new-${Date.now()}`,
+          status: "active",
+          categoryLarge: null,
+          categoryMedium: null,
+          categorySmall: null,
+          weight: "",
+          productCode: newProductCode,
+          productName: "",
+          sourceProduct: null,
+          sourcePrice: null,
+          lossRate: 0,
+          sourceWeight: null,
+          unitPrice: null,
+          sourceProductTotal: null,
+          boxCost: 0,
+          materialCost: 0,
+          outerBoxCost: 0,
+          wrappingCost: 0,
+          laborCost: 0,
+          shippingCost: 0,
+          totalCost: null,
+          startMarginRate: null,
+          startPrice: null,
+          startMargin: null,
+          drivingMarginRate: null,
+          drivingPrice: null,
+          drivingMargin: null,
+          topMarginRate: null,
+          topPrice: null,
+          topMargin: null,
+          mappingStatus: "incomplete",
+          suspendedAt: null,
+          suspendReason: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isNew: true,
+        };
+        setProducts(prev => [newRow, ...prev]);
+        setTempProducts(prev => [newRow, ...prev]);
+        toast({ 
+          title: "신규 상품 추가됨", 
+          description: `상품코드 "${newProductCode}"가 등록 목록에 추가되었습니다.` 
+        });
+      }
+      
+      // Clear URL params after processing
+      window.history.replaceState({}, "", window.location.pathname);
+      setUrlParamsProcessed(true);
+    }
+  }, [urlParamsProcessed, products, tempProducts, toast]);
+
+  // Sort products: incomplete prices at top
+  const sortProductsByPriceCompletion = (data: ProductRow[]): ProductRow[] => {
+    return [...data].sort((a, b) => {
+      const aIncomplete = a.startPrice == null || a.startPrice === 0 ||
+                          a.drivingPrice == null || a.drivingPrice === 0 ||
+                          a.topPrice == null || a.topPrice === 0;
+      const bIncomplete = b.startPrice == null || b.startPrice === 0 ||
+                          b.drivingPrice == null || b.drivingPrice === 0 ||
+                          b.topPrice == null || b.topPrice === 0;
+      
+      // New items always first (before incomplete)
+      if (a.isNew && !b.isNew) return -1;
+      if (!a.isNew && b.isNew) return 1;
+      
+      // Then incomplete items
+      if (aIncomplete && !bIncomplete) return -1;
+      if (!aIncomplete && bIncomplete) return 1;
+      
+      return 0;
+    });
+  };
 
   const handleResizeStart = useCallback((e: React.MouseEvent, key: string) => {
     e.preventDefault();
@@ -325,7 +413,8 @@ export default function ProductRegistrationPage() {
     onSuccess: (data: ProductRegistration[]) => {
       const allData = [...tempProducts, ...data.filter(d => !tempProducts.some(t => t.id === d.id))];
       const filtered = applyFilters(allData);
-      setProducts(filtered);
+      const sorted = sortProductsByPriceCompletion(filtered);
+      setProducts(sorted);
       setSelectedIds([]);
     },
   });
