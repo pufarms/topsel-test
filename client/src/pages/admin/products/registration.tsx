@@ -808,9 +808,23 @@ export default function ProductRegistrationPage() {
   };
 
   // Navigate to product mapping page with product code
-  const handleGoToMapping = (productCode: string, mode: "view" | "edit") => {
+  const handleGoToMapping = (product: ProductRow, mode: "view" | "edit") => {
     const returnTo = "/admin/products/registration";
-    setLocation(`/admin/inventory/mapping?productCode=${encodeURIComponent(productCode)}&mode=${mode}&returnTo=${encodeURIComponent(returnTo)}`);
+    if (mode === "view") {
+      // 매핑완료 상품: productCode만 전달
+      setLocation(`/admin/inventory/mapping?productCode=${encodeURIComponent(product.productCode)}&mode=${mode}&returnTo=${encodeURIComponent(returnTo)}`);
+    } else {
+      // 미매핑 상품: 전체 상품 정보를 unmapped 파라미터로 전달
+      const unmappedProduct = {
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+      };
+      const productsParam = encodeURIComponent(JSON.stringify([unmappedProduct]));
+      setLocation(`/admin/inventory/mapping?unmapped=${productsParam}&returnTo=${encodeURIComponent(returnTo)}`);
+    }
   };
 
   const handleSaveRow = async (index: number) => {
@@ -1509,7 +1523,7 @@ export default function ProductRegistrationPage() {
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        onClick={() => handleGoToMapping(p.productCode, "view")} 
+                        onClick={() => handleGoToMapping(p, "view")} 
                         className="h-6 px-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         data-testid={`button-mapping-view-${p.id}`}
                       >
@@ -1519,7 +1533,7 @@ export default function ProductRegistrationPage() {
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        onClick={() => handleGoToMapping(p.productCode, "edit")} 
+                        onClick={() => handleGoToMapping(p, "edit")} 
                         className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                         data-testid={`button-mapping-edit-${p.id}`}
                       >
