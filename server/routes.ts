@@ -1377,6 +1377,15 @@ export async function registerRoutes(
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
     }
+    
+    // Delete related product mappings before deleting registrations
+    for (const id of ids) {
+      const registration = await storage.getProductRegistration(id);
+      if (registration) {
+        await storage.deleteProductMapping(registration.productCode);
+      }
+    }
+    
     const deleted = await storage.bulkDeleteProductRegistrations(ids);
     return res.json({ deleted, message: "삭제되었습니다" });
   });
@@ -1385,6 +1394,14 @@ export async function registerRoutes(
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+    
+    // Get the product code before deletion to clean up related mappings
+    const registration = await storage.getProductRegistration(req.params.id);
+    if (registration) {
+      // Delete related product mapping if exists
+      await storage.deleteProductMapping(registration.productCode);
+    }
+    
     await storage.deleteProductRegistration(req.params.id);
     return res.json({ message: "삭제되었습니다" });
   });
@@ -2419,6 +2436,10 @@ export async function registerRoutes(
       usageStatus: usageStatus || "Y",
       mappingStatus: "incomplete",
     });
+    
+    // Sync mappingStatus to product_registrations (source data)
+    await storage.updateProductRegistration(registration.id, { mappingStatus: "incomplete" });
+    
     return res.json(mapping);
   });
 
@@ -2442,6 +2463,14 @@ export async function registerRoutes(
         errors.push(`상품코드 또는 상품명 누락`);
         continue;
       }
+      
+      // 상품등록(공급가계산) 연계 체크 - 등록되지 않은 상품은 매핑 불가
+      const registration = await storage.getProductRegistrationByCode(p.productCode);
+      if (!registration) {
+        errors.push(`상품등록에 없는 상품코드: ${p.productCode}`);
+        continue;
+      }
+      
       const existing = await storage.getProductMappingByCode(p.productCode);
       if (existing) {
         errors.push(`이미 존재하는 상품코드: ${p.productCode}`);
@@ -2455,6 +2484,10 @@ export async function registerRoutes(
         productName: p.productName,
         mappingStatus: "incomplete",
       });
+      
+      // Sync mappingStatus to product_registrations
+      await storage.updateProductRegistration(registration.id, { mappingStatus: "incomplete" });
+      
       created.push(mapping);
     }
     return res.json({ success: true, created: created.length, errors });
@@ -2661,7 +2694,15 @@ export async function registerRoutes(
       let productWithMappingCount = 0;
       
       for (const [productCode, data] of Object.entries(productGroups)) {
+        // 상품등록(공급가계산) 연계 체크 - 등록되지 않은 상품은 매핑 불가
+        const registration = await storage.getProductRegistrationByCode(productCode);
+        if (!registration) {
+          errors.push(`상품등록에 없는 상품코드: ${productCode}`);
+          continue;
+        }
+        
         const existing = await storage.getProductMappingByCode(productCode);
+        const newMappingStatus = data.materials.length > 0 ? "complete" : "incomplete";
         
         if (existing) {
           // 기존 상품 업데이트
@@ -2671,11 +2712,14 @@ export async function registerRoutes(
             categoryMedium: data.categoryMedium || null,
             categorySmall: data.categorySmall || null,
             usageStatus: data.usageStatus,
+            mappingStatus: newMappingStatus,
           });
           if (data.materials.length > 0) {
             await storage.replaceProductMaterialMappings(productCode, data.materials);
             productWithMappingCount++;
           }
+          // Sync mappingStatus to product_registrations
+          await storage.updateProductRegistration(registration.id, { mappingStatus: newMappingStatus });
         } else {
           await storage.createProductMapping({
             productCode,
@@ -2684,7 +2728,7 @@ export async function registerRoutes(
             categoryMedium: data.categoryMedium || null,
             categorySmall: data.categorySmall || null,
             usageStatus: data.usageStatus,
-            mappingStatus: data.materials.length > 0 ? "complete" : "incomplete",
+            mappingStatus: newMappingStatus,
           });
           
           if (data.materials.length > 0) {
@@ -2693,6 +2737,8 @@ export async function registerRoutes(
           } else {
             productOnlyCount++;
           }
+          // Sync mappingStatus to product_registrations
+          await storage.updateProductRegistration(registration.id, { mappingStatus: newMappingStatus });
         }
       }
       
