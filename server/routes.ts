@@ -2502,6 +2502,13 @@ export async function registerRoutes(
     if (!deleted) {
       return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
     }
+    
+    // Sync mappingStatus to product_registrations (source data)
+    const productReg = await storage.getProductRegistrationByCode(productCode);
+    if (productReg) {
+      await storage.updateProductRegistration(productReg.id, { mappingStatus: "incomplete" });
+    }
+    
     return res.json({ success: true, message: "매핑 정보가 삭제되었습니다" });
   });
 
