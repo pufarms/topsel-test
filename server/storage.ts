@@ -678,7 +678,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProductRegistration(id: string, data: any): Promise<ProductRegistration | undefined> {
-    const calculated = this.calculateProductFields(data);
+    // Merge with existing data to preserve fields not being updated
+    const existing = await this.getProductRegistration(id);
+    if (!existing) return undefined;
+    
+    const merged = { ...existing, ...data };
+    const calculated = this.calculateProductFields(merged);
     const [pr] = await db.update(productRegistrations).set({ ...data, ...calculated, updatedAt: new Date() }).where(eq(productRegistrations.id, id)).returning();
     return pr;
   }
