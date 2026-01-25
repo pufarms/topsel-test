@@ -30,6 +30,8 @@ import StockStatusPage from "@/pages/admin/inventory/stock";
 import ReceivingPage from "@/pages/admin/inventory/receiving";
 import InventoryHistoryPage from "@/pages/admin/inventory/history";
 import SiteSettingsPage from "@/pages/admin/settings/site-settings";
+import PagesManagement from "@/pages/admin/pages";
+import PublicPreviewPage from "@/pages/public-preview";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -67,6 +69,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/public-preview" component={PublicPreviewPage} />
       
       <Route path="/admin">
         <AdminRoute><AdminDashboard /></AdminRoute>
@@ -126,7 +129,7 @@ function Router() {
         <AdminRoute><PlaceholderPage title="쿠폰관리" description="쿠폰을 관리합니다" /></AdminRoute>
       </Route>
       <Route path="/admin/pages">
-        <AdminRoute><PlaceholderPage title="페이지관리" description="페이지를 관리합니다" /></AdminRoute>
+        <AdminRoute><PagesManagement /></AdminRoute>
       </Route>
       <Route path="/admin/settings/site">
         <AdminRoute><SiteSettingsPage /></AdminRoute>
