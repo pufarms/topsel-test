@@ -114,14 +114,24 @@ interface SectionProps {
 function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   const description = data.text || data.description || "";
+  const hasBackgroundImage = data.backgroundType === "image" && data.backgroundImage;
   
   return (
     <section
-      className={`relative py-16 md:py-24 bg-gradient-to-br from-primary/10 to-primary/5 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
+      className={`relative py-16 md:py-24 ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
       onClick={onClick}
       data-testid="section-hero"
     >
-      <div className="container mx-auto px-4 text-center">
+      {hasBackgroundImage && (
+        <>
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${data.backgroundImage})` }}
+          />
+          <div className="absolute inset-0 bg-black/50" />
+        </>
+      )}
+      <div className={`container mx-auto px-4 text-center relative z-10 ${hasBackgroundImage ? "text-white" : ""}`}>
         {data.imageUrl && (
           <div className="mb-8">
             <EditableImage

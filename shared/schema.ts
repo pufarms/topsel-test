@@ -815,11 +815,16 @@ export interface PageSection {
     title?: string;
     subtitle?: string;
     text?: string;
+    description?: string;
     imageUrl?: string;
     imageAlt?: string;
     buttonText?: string;
     buttonLink?: string;
+    secondaryButtonText?: string;
+    secondaryButtonLink?: string;
     backgroundColor?: string;
+    backgroundType?: 'gradient' | 'image' | 'color';
+    backgroundImage?: string;
     textColor?: string;
     items?: Array<{
       id: string;
