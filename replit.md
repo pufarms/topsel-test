@@ -148,7 +148,11 @@ Preferred communication style: Simple, everyday language.
 - **PublicHeader Logic**: All menus displayed on right side, filtered by login status
 
 ### Page Management (Admin)
-- **Database Table**: `pages` stores page definitions with categories, access levels, and settings
+- **Database Table**: `pages` stores page definitions with categories, access levels, settings, and content (JSONB)
+- **CMS Content System**: JSON 기반 동적 콘텐츠 관리
+  - **content** 필드: JSONB 타입으로 sections 배열과 meta 정보 저장
+  - **9가지 섹션 타입**: hero(히어로), heading(제목), text(텍스트), image(이미지), button(버튼), divider(구분선), cards(카드 그리드), features(기능 소개), cta(행동유도)
+  - **편집 워크플로우**: 설정 탭(페이지 기본정보) → 콘텐츠 탭(비주얼 에디터) → 미리보기 탭(실시간 렌더링)
 - **Page Categories (8)**:
   1. 기본페이지: 로그인, 로그아웃, 회원가입, 이용약관, 개인정보처리방침, 개인정보 제3자 동의
   2. 메인/서브페이지: 메인 페이지, 서브페이지
@@ -161,13 +165,22 @@ Preferred communication style: Simple, everyday language.
 - **Access Levels**: all (전체 공개), ASSOCIATE (준회원 이상), START (Start회원 이상), DRIVING (Driving회원 이상), TOP (Top회원 전용)
 - **API Endpoints**:
   - `GET /api/pages`: Admin-only, all pages
+  - `GET /api/pages/by-path`: Public, get page by path for dynamic rendering
   - `POST /api/pages`: Create new page (with Zod validation)
-  - `PUT /api/pages/:id`: Update page (with Zod validation)
+  - `PUT /api/pages/:id`: Update page settings (with Zod validation)
+  - `PATCH /api/pages/:id/content`: Update page content (JSONB)
   - `DELETE /api/pages/:id`: Delete page (system pages cannot be deleted)
   - `POST /api/pages/seed`: SUPER_ADMIN only, create default pages
 - **UI Features**:
   - List view grouped by 8 categories with collapsible sections
   - Each page shows name, path, status badge, access level badge, system flag
+  - **비주얼 콘텐츠 에디터**: 드래그&드롭 없이 섹션 추가/편집/삭제/순서 변경
+  - **실시간 미리보기**: 편집 중 실시간으로 페이지 렌더링 확인
+- **동적 페이지 렌더링**: `/:path*` catch-all 라우트로 DB 기반 페이지 렌더링
+- **Key Components**:
+  - `PageContentEditor`: 비주얼 콘텐츠 에디터 컴포넌트
+  - `DynamicPageRenderer`: 페이지 섹션 렌더링 컴포넌트
+  - `DynamicPage`: 공개 페이지용 catch-all 라우트 컴포넌트
   - Add/Edit/Delete pages with category, access level, and status selection
   - Search functionality across all pages
   - System pages (isSystem="true") cannot be deleted
