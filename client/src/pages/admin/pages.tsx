@@ -315,9 +315,9 @@ export default function PagesManagement() {
     };
   };
 
-  // Apply inline edit to content data
+  // Apply inline edit to content data and save directly to database
   const applyInlineEdit = () => {
-    if (!contentData || !contentData.sections) return;
+    if (!contentData || !contentData.sections || !editDialog.page) return;
     
     const saveValue = inlineEditDialog.fieldType === 'text'
       ? inlineEditValue.replace(/\n/g, '<br>')
@@ -360,9 +360,16 @@ export default function PagesManagement() {
       return section;
     });
     
-    setContentData({ ...contentData, sections: updatedSections });
+    const updatedContent = { ...contentData, sections: updatedSections };
+    setContentData(updatedContent);
     setInlineEditDialog({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
-    toast({ title: "수정 완료", description: "변경사항이 적용되었습니다. 콘텐츠 저장을 클릭하세요." });
+    
+    // Save directly to database
+    updateContentMutation.mutate({ 
+      id: editDialog.page.id, 
+      content: updatedContent, 
+      path: editDialog.page.path 
+    });
   };
 
   const getFullUrl = (path: string) => {
@@ -911,21 +918,6 @@ export default function PagesManagement() {
             <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
               취소
             </Button>
-            {(editTab === "code" || editTab === "preview") && (
-              <Button 
-                variant="secondary"
-                onClick={() => {
-                  if (editDialog.page && contentData) {
-                    updateContentMutation.mutate({ id: editDialog.page.id, content: contentData, path: editDialog.page.path });
-                  }
-                }}
-                disabled={updateContentMutation.isPending}
-                data-testid="button-save-content"
-              >
-                {updateContentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                콘텐츠 저장
-              </Button>
-            )}
             <Button 
               onClick={() => editDialog.page && updateMutation.mutate({ id: editDialog.page.id, data: formData })}
               disabled={updateMutation.isPending || !formData.name || !formData.path}
@@ -1015,8 +1007,13 @@ export default function PagesManagement() {
             >
               취소
             </Button>
-            <Button onClick={applyInlineEdit} data-testid="button-apply-inline-edit">
-              적용
+            <Button 
+              onClick={applyInlineEdit} 
+              disabled={updateContentMutation.isPending}
+              data-testid="button-apply-inline-edit"
+            >
+              {updateContentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              콘텐츠 저장
             </Button>
           </DialogFooter>
         </DialogContent>
