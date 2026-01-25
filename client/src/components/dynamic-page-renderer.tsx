@@ -166,7 +166,10 @@ interface EditableIconProps {
 }
 
 function EditableIcon({ iconName, sectionId, fieldPath, isEditing, onEdit, className = "" }: EditableIconProps) {
-  const icon = iconMap[iconName] || <Star className="w-6 h-6" />;
+  const isUrl = iconName && (iconName.startsWith('http') || iconName.startsWith('/'));
+  const icon = isUrl 
+    ? <img src={iconName} alt="아이콘" className="w-6 h-6 object-contain" />
+    : (iconMap[iconName] || <Star className="w-6 h-6" />);
   
   if (!isEditing || !onEdit) {
     return <div className={className}>{icon}</div>;
@@ -177,7 +180,7 @@ function EditableIcon({ iconName, sectionId, fieldPath, isEditing, onEdit, class
       className={`${className} relative group cursor-pointer hover:bg-primary/20 rounded-full transition-colors`}
       onClick={(e) => {
         e.stopPropagation();
-        onEdit(sectionId, fieldPath, iconName || 'Star', 'icon');
+        onEdit(sectionId, fieldPath, iconName || '', 'icon');
       }}
       data-testid={`editable-icon-${sectionId}-${fieldPath}`}
     >

@@ -166,6 +166,17 @@ export default function PagesManagement() {
     queryKey: ["/api/pages"],
   });
 
+  // Fetch icons from gallery
+  const { data: galleryIcons = [] } = useQuery<{ id: string; publicUrl: string; filename: string }[]>({
+    queryKey: ["/api/admin/images", "아이콘"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/images?category=아이콘");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: inlineEditDialog.fieldType === 'icon',
+  });
+
   // Seed pages mutation
   const seedMutation = useMutation({
     mutationFn: async () => {
@@ -1000,30 +1011,38 @@ export default function PagesManagement() {
               </div>
             ) : inlineEditDialog.fieldType === 'icon' ? (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">현재 선택: <strong>{inlineEditValue}</strong></p>
-                <div className="grid grid-cols-5 gap-2">
-                  {availableIcons.map((iconName) => (
-                    <Button
-                      key={iconName}
-                      variant={inlineEditValue === iconName ? "default" : "outline"}
-                      size="icon"
-                      className="h-12 w-12"
-                      onClick={() => setInlineEditValue(iconName)}
-                      data-testid={`icon-select-${iconName}`}
-                    >
-                      {iconName === 'Star' && <Star className="w-5 h-5" />}
-                      {iconName === 'Heart' && <Heart className="w-5 h-5" />}
-                      {iconName === 'Shield' && <Shield className="w-5 h-5" />}
-                      {iconName === 'Zap' && <Zap className="w-5 h-5" />}
-                      {iconName === 'Award' && <Award className="w-5 h-5" />}
-                      {iconName === 'CheckCircle' && <CheckCircle className="w-5 h-5" />}
-                      {iconName === 'Gift' && <Gift className="w-5 h-5" />}
-                      {iconName === 'Users' && <Users className="w-5 h-5" />}
-                      {iconName === 'TrendingUp' && <TrendingUp className="w-5 h-5" />}
-                      {iconName === 'Package' && <Package className="w-5 h-5" />}
-                    </Button>
-                  ))}
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  현재 선택: {inlineEditValue && (
+                    <img src={inlineEditValue} alt="선택된 아이콘" className="inline-block w-6 h-6 ml-2" />
+                  )}
+                </p>
+                {galleryIcons.length > 0 ? (
+                  <ScrollArea className="h-[200px]">
+                    <div className="grid grid-cols-5 gap-2 p-1">
+                      {galleryIcons.map((icon) => (
+                        <div
+                          key={icon.id}
+                          className={`cursor-pointer border-2 rounded-lg p-2 hover:border-primary transition-colors ${
+                            inlineEditValue === icon.publicUrl ? 'border-primary bg-primary/10' : 'border-transparent'
+                          }`}
+                          onClick={() => setInlineEditValue(icon.publicUrl)}
+                          data-testid={`icon-select-${icon.id}`}
+                        >
+                          <img 
+                            src={icon.publicUrl} 
+                            alt={icon.filename} 
+                            className="w-10 h-10 object-contain mx-auto"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>등록된 아이콘이 없습니다.</p>
+                    <p className="text-sm mt-2">이미지 갤러리에서 "아이콘" 카테고리에 이미지를 업로드하세요.</p>
+                  </div>
+                )}
               </div>
             ) : (
               <Textarea
