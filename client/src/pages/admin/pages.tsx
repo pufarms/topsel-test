@@ -79,6 +79,7 @@ import {
   pageCategories, 
   pageAccessLevels, 
   pageAccessLevelLabels,
+  imageCategories,
   type Page, 
   type PageCategory, 
   type PageAccessLevel,
@@ -146,6 +147,7 @@ export default function PagesManagement() {
     fieldType: 'text' | 'image' | 'icon';
   }>({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
+  const [imageGalleryCategory, setImageGalleryCategory] = useState<string>('all');
 
   // Form state for add/edit
   const [formData, setFormData] = useState({
@@ -175,6 +177,20 @@ export default function PagesManagement() {
       return res.json();
     },
     enabled: inlineEditDialog.fieldType === 'icon',
+  });
+
+  // Fetch images from gallery for image picker
+  const { data: galleryImages = [] } = useQuery<{ id: string; publicUrl: string; filename: string; category: string }[]>({
+    queryKey: ["/api/admin/images", imageGalleryCategory],
+    queryFn: async () => {
+      const url = imageGalleryCategory === 'all' 
+        ? "/api/admin/images" 
+        : `/api/admin/images?category=${encodeURIComponent(imageGalleryCategory)}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: inlineEditDialog.fieldType === 'image',
   });
 
   // Seed pages mutation
@@ -984,9 +1000,9 @@ export default function PagesManagement() {
             </DialogTitle>
             <DialogDescription>
               {inlineEditDialog.fieldType === 'image' 
-                ? '새 이미지 URL을 입력하세요' 
+                ? '이미지 갤러리에서 이미지를 선택하세요' 
                 : inlineEditDialog.fieldType === 'icon'
-                ? '사용할 아이콘을 선택하세요'
+                ? '아이콘 갤러리에서 아이콘을 선택하세요'
                 : '텍스트를 수정하세요'}
             </DialogDescription>
           </DialogHeader>
@@ -998,16 +1014,55 @@ export default function PagesManagement() {
                     <img 
                       src={inlineEditValue} 
                       alt="현재 이미지" 
-                      className="max-w-full h-auto max-h-[200px] mx-auto rounded"
+                      className="max-w-full h-auto max-h-[150px] mx-auto rounded"
                     />
                   </div>
                 )}
-                <Input 
-                  value={inlineEditValue}
-                  onChange={(e) => setInlineEditValue(e.target.value)}
-                  placeholder="이미지 URL 입력..."
-                  data-testid="input-inline-image-url"
-                />
+                <div className="flex items-center gap-2">
+                  <Label className="whitespace-nowrap">카테고리:</Label>
+                  <Select value={imageGalleryCategory} onValueChange={setImageGalleryCategory}>
+                    <SelectTrigger className="w-32" data-testid="select-image-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      {imageCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground ml-auto">
+                    {galleryImages.length}개 이미지
+                  </span>
+                </div>
+                {galleryImages.length > 0 ? (
+                  <ScrollArea className="h-[250px] border rounded-lg p-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      {galleryImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className={`cursor-pointer border-2 rounded-lg p-1 hover:border-primary transition-colors ${
+                            inlineEditValue === img.publicUrl ? 'border-primary bg-primary/10' : 'border-transparent'
+                          }`}
+                          onClick={() => setInlineEditValue(img.publicUrl)}
+                          data-testid={`image-select-${img.id}`}
+                        >
+                          <img 
+                            src={img.publicUrl} 
+                            alt={img.filename} 
+                            className="w-full h-20 object-cover rounded"
+                          />
+                          <p className="text-xs text-center mt-1 truncate">{img.filename}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                    <p>등록된 이미지가 없습니다.</p>
+                    <p className="text-sm mt-2">이미지 갤러리에서 이미지를 업로드하세요.</p>
+                  </div>
+                )}
               </div>
             ) : inlineEditDialog.fieldType === 'icon' ? (
               <div className="space-y-4">
