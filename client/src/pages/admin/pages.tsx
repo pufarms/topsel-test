@@ -10,7 +10,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageContentEditor } from "@/components/admin/page-content-editor";
-import { DynamicPageRenderer } from "@/components/dynamic-page-renderer";
+import { DynamicPageRenderer, availableIcons } from "@/components/dynamic-page-renderer";
 import { 
   Eye, 
   Settings, 
@@ -50,7 +50,12 @@ import {
   Loader2,
   RefreshCw,
   Monitor,
-  Code
+  Code,
+  Star,
+  Heart,
+  Zap,
+  Award,
+  TrendingUp
 } from "lucide-react";
 import {
   Dialog,
@@ -138,7 +143,7 @@ export default function PagesManagement() {
     sectionId: string;
     fieldPath: string;
     currentValue: string;
-    fieldType: 'text' | 'image';
+    fieldType: 'text' | 'image' | 'icon';
   }>({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
 
@@ -272,7 +277,7 @@ export default function PagesManagement() {
   };
   
   // Handle inline field editing from preview tab
-  const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => {
+  const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => {
     const editValue = fieldType === 'text' 
       ? currentValue.replace(/<br\s*\/?>/gi, '\n')
       : currentValue;
@@ -963,11 +968,14 @@ export default function PagesManagement() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : '텍스트 편집'}
+              {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : 
+               inlineEditDialog.fieldType === 'icon' ? '아이콘 변경' : '텍스트 편집'}
             </DialogTitle>
             <DialogDescription>
               {inlineEditDialog.fieldType === 'image' 
                 ? '새 이미지 URL을 입력하세요' 
+                : inlineEditDialog.fieldType === 'icon'
+                ? '사용할 아이콘을 선택하세요'
                 : '텍스트를 수정하세요'}
             </DialogDescription>
           </DialogHeader>
@@ -989,6 +997,33 @@ export default function PagesManagement() {
                   placeholder="이미지 URL 입력..."
                   data-testid="input-inline-image-url"
                 />
+              </div>
+            ) : inlineEditDialog.fieldType === 'icon' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">현재 선택: <strong>{inlineEditValue}</strong></p>
+                <div className="grid grid-cols-5 gap-2">
+                  {availableIcons.map((iconName) => (
+                    <Button
+                      key={iconName}
+                      variant={inlineEditValue === iconName ? "default" : "outline"}
+                      size="icon"
+                      className="h-12 w-12"
+                      onClick={() => setInlineEditValue(iconName)}
+                      data-testid={`icon-select-${iconName}`}
+                    >
+                      {iconName === 'Star' && <Star className="w-5 h-5" />}
+                      {iconName === 'Heart' && <Heart className="w-5 h-5" />}
+                      {iconName === 'Shield' && <Shield className="w-5 h-5" />}
+                      {iconName === 'Zap' && <Zap className="w-5 h-5" />}
+                      {iconName === 'Award' && <Award className="w-5 h-5" />}
+                      {iconName === 'CheckCircle' && <CheckCircle className="w-5 h-5" />}
+                      {iconName === 'Gift' && <Gift className="w-5 h-5" />}
+                      {iconName === 'Users' && <Users className="w-5 h-5" />}
+                      {iconName === 'TrendingUp' && <TrendingUp className="w-5 h-5" />}
+                      {iconName === 'Package' && <Package className="w-5 h-5" />}
+                    </Button>
+                  ))}
+                </div>
               </div>
             ) : (
               <Textarea

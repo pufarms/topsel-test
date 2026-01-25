@@ -19,16 +19,16 @@ interface DynamicPageRendererProps {
   content: PageContent | null;
   isEditing?: boolean;
   onSectionClick?: (section: PageSection) => void;
-  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => void;
 }
 
 interface EditableFieldProps {
   value: string;
   sectionId: string;
   fieldPath: string;
-  fieldType: 'text' | 'image';
+  fieldType: 'text' | 'image' | 'icon';
   isEditing?: boolean;
-  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
   className?: string;
   as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
   children?: React.ReactNode;
@@ -70,7 +70,7 @@ interface EditableImageProps {
   sectionId: string;
   fieldPath: string;
   isEditing?: boolean;
-  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
   className?: string;
 }
 
@@ -104,7 +104,7 @@ interface EditableButtonProps {
   sectionId: string;
   fieldPath: string;
   isEditing?: boolean;
-  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
   variant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
@@ -154,12 +154,47 @@ const iconMap: Record<string, React.ReactNode> = {
   Package: <Package className="w-6 h-6" />,
 };
 
+export const availableIcons = Object.keys(iconMap);
+
+interface EditableIconProps {
+  iconName: string;
+  sectionId: string;
+  fieldPath: string;
+  isEditing?: boolean;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
+  className?: string;
+}
+
+function EditableIcon({ iconName, sectionId, fieldPath, isEditing, onEdit, className = "" }: EditableIconProps) {
+  const icon = iconMap[iconName] || <Star className="w-6 h-6" />;
+  
+  if (!isEditing || !onEdit) {
+    return <div className={className}>{icon}</div>;
+  }
+  
+  return (
+    <div 
+      className={`${className} relative group cursor-pointer hover:bg-primary/20 rounded-full transition-colors`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit(sectionId, fieldPath, iconName || 'Star', 'icon');
+      }}
+      data-testid={`editable-icon-${sectionId}-${fieldPath}`}
+    >
+      {icon}
+      <span className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground text-xs px-1 py-0.5 rounded transition-opacity z-10">
+        아이콘
+      </span>
+    </div>
+  );
+}
+
 interface SectionProps {
   data: PageSection["data"];
   sectionId: string;
   isEditing?: boolean;
   onClick?: () => void;
-  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => void;
 }
 
 function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
@@ -529,7 +564,13 @@ function FeaturesSection({ data, sectionId, isEditing, onClick, onFieldEdit }: S
           {data.items?.map((item, index) => (
             <div key={item.id || index} className="text-center p-6">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
-                {item.icon && iconMap[item.icon] ? iconMap[item.icon] : <Star className="w-6 h-6" />}
+                <EditableIcon
+                  iconName={item.icon || 'Star'}
+                  sectionId={sectionId}
+                  fieldPath={`items.${index}.icon`}
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                />
               </div>
               <EditableField
                 value={item.title || ""}
