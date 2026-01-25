@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageContentEditor } from "@/components/admin/page-content-editor";
+import { DynamicPageRenderer } from "@/components/dynamic-page-renderer";
 import { 
   Eye, 
   Settings, 
@@ -45,7 +48,8 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Monitor
 } from "lucide-react";
 import {
   Dialog,
@@ -64,13 +68,15 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   pageCategories, 
   pageAccessLevels, 
   pageAccessLevelLabels,
   type Page, 
   type PageCategory, 
-  type PageAccessLevel 
+  type PageAccessLevel,
+  type PageContent
 } from "@shared/schema";
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -122,6 +128,8 @@ export default function PagesManagement() {
   const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [addDialog, setAddDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
+  const [previewDialog, setPreviewDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
+  const [editTab, setEditTab] = useState<string>("settings");
 
   // Form state for add/edit
   const [formData, setFormData] = useState({
@@ -133,6 +141,9 @@ export default function PagesManagement() {
     status: "draft",
     icon: "",
   });
+  
+  // Content state for editing
+  const [contentData, setContentData] = useState<PageContent | null>(null);
 
   // Fetch pages
   const { data: pages = [], isLoading, refetch } = useQuery<Page[]>({
@@ -188,6 +199,21 @@ export default function PagesManagement() {
     },
   });
 
+  // Update content mutation
+  const updateContentMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: PageContent }) => {
+      const res = await apiRequest("PATCH", `/api/pages/${id}/content`, { content });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      toast({ title: "콘텐츠가 저장되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "콘텐츠 저장에 실패했습니다", variant: "destructive" });
+    },
+  });
+
   // Delete page mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -214,6 +240,8 @@ export default function PagesManagement() {
       status: "draft",
       icon: "",
     });
+    setContentData(null);
+    setEditTab("settings");
   };
 
   const openEditDialog = (page: Page) => {
@@ -226,6 +254,8 @@ export default function PagesManagement() {
       status: page.status,
       icon: page.icon || "",
     });
+    setContentData(page.content || { sections: [] });
+    setEditTab("settings");
     setEditDialog({ open: true, page });
   };
 
@@ -581,101 +611,165 @@ export default function PagesManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Page Dialog */}
-      <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, page: open ? editDialog.page : null })}>
-        <DialogContent className="max-w-md">
+      {/* Edit Page Dialog with Tabs */}
+      <Dialog open={editDialog.open} onOpenChange={(open) => { setEditDialog({ open, page: open ? editDialog.page : null }); if (!open) resetForm(); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>페이지 수정</DialogTitle>
-            <DialogDescription>페이지 정보를 수정합니다.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5" />
+              페이지 수정: {editDialog.page?.name}
+            </DialogTitle>
+            <DialogDescription>페이지 설정과 콘텐츠를 수정합니다.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>페이지 이름</Label>
-              <Input 
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="페이지 이름"
-                data-testid="input-edit-page-name"
-              />
-            </div>
-            <div>
-              <Label>경로 (URL)</Label>
-              <Input 
-                value={formData.path}
-                onChange={(e) => setFormData({ ...formData, path: e.target.value })}
-                placeholder="/example-page"
-                data-testid="input-edit-page-path"
-              />
-            </div>
-            <div>
-              <Label>설명</Label>
-              <Textarea 
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="페이지 설명"
-                data-testid="input-edit-page-description"
-              />
-            </div>
-            <div>
-              <Label>카테고리</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
-              >
-                <SelectTrigger data-testid="select-edit-page-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageCategories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>접근권한</Label>
-              <Select 
-                value={formData.accessLevel} 
-                onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
-              >
-                <SelectTrigger data-testid="select-edit-page-access">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageAccessLevels.map((level) => (
-                    <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>상태</Label>
-              <Select 
-                value={formData.status} 
-                onValueChange={(v) => setFormData({ ...formData, status: v })}
-              >
-                <SelectTrigger data-testid="select-edit-page-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">활성</SelectItem>
-                  <SelectItem value="draft">준비중</SelectItem>
-                  <SelectItem value="hidden">숨김</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
+          
+          <Tabs value={editTab} onValueChange={setEditTab} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="settings" data-testid="tab-settings">
+                <Settings className="w-4 h-4 mr-2" />
+                설정
+              </TabsTrigger>
+              <TabsTrigger value="content" data-testid="tab-content">
+                <Layout className="w-4 h-4 mr-2" />
+                콘텐츠
+              </TabsTrigger>
+              <TabsTrigger value="preview" data-testid="tab-preview">
+                <Monitor className="w-4 h-4 mr-2" />
+                미리보기
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="settings" className="flex-1 overflow-auto mt-4">
+              <div className="space-y-4 pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>페이지 이름</Label>
+                    <Input 
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="페이지 이름"
+                      data-testid="input-edit-page-name"
+                    />
+                  </div>
+                  <div>
+                    <Label>경로 (URL)</Label>
+                    <Input 
+                      value={formData.path}
+                      onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                      placeholder="/example-page"
+                      data-testid="input-edit-page-path"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>설명</Label>
+                  <Textarea 
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="페이지 설명"
+                    data-testid="input-edit-page-description"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>카테고리</Label>
+                    <Select 
+                      value={formData.category} 
+                      onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
+                    >
+                      <SelectTrigger data-testid="select-edit-page-category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pageCategories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>접근권한</Label>
+                    <Select 
+                      value={formData.accessLevel} 
+                      onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
+                    >
+                      <SelectTrigger data-testid="select-edit-page-access">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pageAccessLevels.map((level) => (
+                          <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>상태</Label>
+                    <Select 
+                      value={formData.status} 
+                      onValueChange={(v) => setFormData({ ...formData, status: v })}
+                    >
+                      <SelectTrigger data-testid="select-edit-page-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">활성</SelectItem>
+                        <SelectItem value="draft">준비중</SelectItem>
+                        <SelectItem value="hidden">숨김</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="content" className="flex-1 overflow-auto mt-4">
+              <ScrollArea className="h-[400px] pr-4">
+                <PageContentEditor 
+                  content={contentData}
+                  onChange={(newContent) => setContentData(newContent)}
+                />
+              </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
+              <div className="border rounded-lg overflow-hidden bg-background">
+                <div className="bg-muted px-4 py-2 border-b flex items-center gap-2">
+                  <Monitor className="w-4 h-4" />
+                  <span className="text-sm font-medium">페이지 미리보기</span>
+                </div>
+                <ScrollArea className="h-[400px]">
+                  <DynamicPageRenderer content={contentData} />
+                </ScrollArea>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter className="mt-4 pt-4 border-t">
             <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
               취소
             </Button>
+            {editTab === "content" && (
+              <Button 
+                variant="secondary"
+                onClick={() => {
+                  if (editDialog.page && contentData) {
+                    updateContentMutation.mutate({ id: editDialog.page.id, content: contentData });
+                  }
+                }}
+                disabled={updateContentMutation.isPending}
+                data-testid="button-save-content"
+              >
+                {updateContentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                콘텐츠 저장
+              </Button>
+            )}
             <Button 
               onClick={() => editDialog.page && updateMutation.mutate({ id: editDialog.page.id, data: formData })}
               disabled={updateMutation.isPending || !formData.name || !formData.path}
               data-testid="button-save-edit-page"
             >
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              저장
+              설정 저장
             </Button>
           </DialogFooter>
         </DialogContent>
