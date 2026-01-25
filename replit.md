@@ -108,8 +108,14 @@ Preferred communication style: Simple, everyday language.
   - `PublicLayout`: Wrapper component with header + content + footer
 - **Hook**: `useSiteSettings` with `usePublicSiteSettings()`, `useAdminSiteSettings()`, `useUpdateSiteSettings()`
 
-### Header Menu Management (Site Settings - 메뉴 탭)
-- **Database Table**: `headerMenus` stores menu items with name, path, sortOrder, isVisible, openInNewTab
+### Header Menu Management (Site Settings - 헤더 탭)
+- **Database Table**: `headerMenus` stores menu items with name, path, sortOrder, isVisible, openInNewTab, menuType, systemKey, showWhenLoggedIn, showWhenLoggedOut
+- **Menu Types**:
+  - `custom`: 사용자 정의 메뉴 (관리자가 추가)
+  - `system`: 시스템 메뉴 (login, logout, register, cart, mypage)
+- **Conditional Visibility**: 
+  - `showWhenLoggedIn`: 로그인 사용자에게 표시 여부
+  - `showWhenLoggedOut`: 비로그인 사용자에게 표시 여부
 - **API Endpoints**:
   - `GET /api/header-menus/public`: Public endpoint for visible menus ordered by sortOrder
   - `GET /api/header-menus`: Admin-only, all menus
@@ -117,13 +123,17 @@ Preferred communication style: Simple, everyday language.
   - `PUT /api/header-menus/:id`: Update menu
   - `DELETE /api/header-menus/:id`: Delete menu
   - `PUT /api/header-menus/order/update`: Bulk update menu order
+  - `POST /api/header-menus/seed`: SUPER_ADMIN only, create default system menus
 - **Features**:
   - Add/Edit/Delete menus with name and path
   - Drag-style ordering via up/down arrows
   - Visibility toggle (show/hide menus on public site)
+  - Login-based conditional display (로그인/비로그인 시 표시)
+  - System menu seed button (로그인, 로그아웃, 회원가입, 장바구니, 마이페이지)
   - "Open in new tab" option for external links
   - Responsive design with desktop/mobile views in PublicHeader
-- **Hooks**: `usePublicHeaderMenus()`, `useAdminHeaderMenus()`, `useCreateHeaderMenu()`, `useUpdateHeaderMenu()`, `useDeleteHeaderMenu()`, `useUpdateHeaderMenuOrder()`
+- **Hooks**: `usePublicHeaderMenus()`, `useAdminHeaderMenus()`, `useCreateHeaderMenu()`, `useUpdateHeaderMenu()`, `useDeleteHeaderMenu()`, `useUpdateHeaderMenuOrder()`, `useSeedHeaderMenus()`
+- **PublicHeader Logic**: All menus displayed on right side, filtered by login status
 
 ## External Dependencies
 

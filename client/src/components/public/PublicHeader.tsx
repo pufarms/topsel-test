@@ -33,7 +33,7 @@ export function PublicHeader() {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("POST", "/api/logout", {});
+      await apiRequest("POST", "/api/auth/logout", {});
       setUser(null);
       toast({ title: "로그아웃 완료", description: "성공적으로 로그아웃되었습니다." });
       navigate("/");
