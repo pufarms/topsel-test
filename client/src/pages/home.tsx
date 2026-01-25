@@ -27,6 +27,8 @@ export default function Home() {
     retry: false,
   });
 
+  const hasHeroBanner = page?.content?.sections?.[0]?.type === "hero";
+
   if (isLoading) {
     return (
       <PublicLayout>
@@ -38,7 +40,7 @@ export default function Home() {
   }
 
   return (
-    <PublicLayout>
+    <PublicLayout transparentHeader={hasHeroBanner} hasHeroBanner={hasHeroBanner}>
       <div className="min-h-[400px]" data-testid="home-page">
         {page?.content ? (
           <DynamicPageRenderer content={page.content} />

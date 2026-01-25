@@ -31,6 +31,8 @@ export default function DynamicPage() {
     retry: false,
   });
 
+  const hasHeroBanner = page?.content?.sections?.[0]?.type === "hero";
+
   if (isLoading) {
     return (
       <PublicLayout>
@@ -64,7 +66,7 @@ export default function DynamicPage() {
   }
 
   return (
-    <PublicLayout>
+    <PublicLayout transparentHeader={hasHeroBanner} hasHeroBanner={hasHeroBanner}>
       <div className="min-h-[400px]" data-testid={`dynamic-page-${page.id}`}>
         {page.content ? (
           <DynamicPageRenderer content={page.content} />
