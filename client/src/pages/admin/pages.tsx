@@ -287,8 +287,10 @@ export default function PagesManagement() {
   const applyInlineEdit = () => {
     if (!contentData || !contentData.sections) return;
     
-    const updatedSections = contentData.sections.map((section: any) => {
-      if (section.id === inlineEditDialog.sectionId) {
+    const updatedSections = contentData.sections.map((section: any, index: number) => {
+      // Match by section.id if it exists, otherwise match by generated index-based ID
+      const sectionIdentifier = section.id || `section-${index}`;
+      if (sectionIdentifier === inlineEditDialog.sectionId) {
         // Update the field in the section (handle both flat and nested structures)
         if (section.data) {
           return {
