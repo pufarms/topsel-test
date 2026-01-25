@@ -101,12 +101,29 @@ Preferred communication style: Simple, everyday language.
   - `GET /api/site-settings`: Admin-only, all settings
   - `PUT /api/site-settings/bulk`: Admin-only, bulk update
   - `POST /api/site-settings/seed`: SUPER_ADMIN only, create initial settings
-- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 푸터)
+- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 메뉴, 푸터)
 - **Public Components**: 
-  - `PublicHeader`: Dynamic header from settings (logo, login/register/cart buttons)
+  - `PublicHeader`: Dynamic header from settings (logo, dynamic menus, login/register/cart buttons)
   - `PublicFooter`: Dynamic footer from settings (company info, copyright, links)
   - `PublicLayout`: Wrapper component with header + content + footer
 - **Hook**: `useSiteSettings` with `usePublicSiteSettings()`, `useAdminSiteSettings()`, `useUpdateSiteSettings()`
+
+### Header Menu Management (Site Settings - 메뉴 탭)
+- **Database Table**: `headerMenus` stores menu items with name, path, sortOrder, isVisible, openInNewTab
+- **API Endpoints**:
+  - `GET /api/header-menus/public`: Public endpoint for visible menus ordered by sortOrder
+  - `GET /api/header-menus`: Admin-only, all menus
+  - `POST /api/header-menus`: Create new menu
+  - `PUT /api/header-menus/:id`: Update menu
+  - `DELETE /api/header-menus/:id`: Delete menu
+  - `PUT /api/header-menus/order/update`: Bulk update menu order
+- **Features**:
+  - Add/Edit/Delete menus with name and path
+  - Drag-style ordering via up/down arrows
+  - Visibility toggle (show/hide menus on public site)
+  - "Open in new tab" option for external links
+  - Responsive design with desktop/mobile views in PublicHeader
+- **Hooks**: `usePublicHeaderMenus()`, `useAdminHeaderMenus()`, `useCreateHeaderMenu()`, `useUpdateHeaderMenu()`, `useDeleteHeaderMenu()`, `useUpdateHeaderMenuOrder()`
 
 ## External Dependencies
 

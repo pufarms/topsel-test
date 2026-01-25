@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -198,6 +198,15 @@ export interface IStorage {
   getPublicSiteSettings(): Promise<SiteSetting[]>;
   updateSiteSettings(settings: Record<string, string>): Promise<void>;
   seedSiteSettings(): Promise<void>;
+
+  // Header Menu methods
+  getAllHeaderMenus(): Promise<HeaderMenu[]>;
+  getVisibleHeaderMenus(): Promise<HeaderMenu[]>;
+  getHeaderMenu(id: string): Promise<HeaderMenu | undefined>;
+  createHeaderMenu(data: InsertHeaderMenu): Promise<HeaderMenu>;
+  updateHeaderMenu(id: string, data: Partial<InsertHeaderMenu>): Promise<HeaderMenu | undefined>;
+  deleteHeaderMenu(id: string): Promise<boolean>;
+  updateHeaderMenuOrder(menus: { id: string; sortOrder: number }[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1392,6 +1401,48 @@ export class DatabaseStorage implements IStorage {
 
     for (const setting of initialSettings) {
       await db.insert(siteSettings).values(setting);
+    }
+  }
+
+  // ==================== Header Menus ====================
+  async getAllHeaderMenus(): Promise<HeaderMenu[]> {
+    return db.select().from(headerMenus).orderBy(headerMenus.sortOrder);
+  }
+
+  async getVisibleHeaderMenus(): Promise<HeaderMenu[]> {
+    return db.select().from(headerMenus)
+      .where(eq(headerMenus.isVisible, "true"))
+      .orderBy(headerMenus.sortOrder);
+  }
+
+  async getHeaderMenu(id: string): Promise<HeaderMenu | undefined> {
+    const [menu] = await db.select().from(headerMenus).where(eq(headerMenus.id, id));
+    return menu;
+  }
+
+  async createHeaderMenu(data: InsertHeaderMenu): Promise<HeaderMenu> {
+    const [menu] = await db.insert(headerMenus).values(data).returning();
+    return menu;
+  }
+
+  async updateHeaderMenu(id: string, data: Partial<InsertHeaderMenu>): Promise<HeaderMenu | undefined> {
+    const [menu] = await db.update(headerMenus)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(headerMenus.id, id))
+      .returning();
+    return menu;
+  }
+
+  async deleteHeaderMenu(id: string): Promise<boolean> {
+    const result = await db.delete(headerMenus).where(eq(headerMenus.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async updateHeaderMenuOrder(menus: { id: string; sortOrder: number }[]): Promise<void> {
+    for (const menu of menus) {
+      await db.update(headerMenus)
+        .set({ sortOrder: menu.sortOrder, updatedAt: new Date() })
+        .where(eq(headerMenus.id, menu.id));
     }
   }
 }

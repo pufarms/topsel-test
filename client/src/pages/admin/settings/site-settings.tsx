@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap } from "@/hooks/use-site-settings";
+import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap, useAdminHeaderMenus, useCreateHeaderMenu, useUpdateHeaderMenu, useDeleteHeaderMenu, useUpdateHeaderMenuOrder } from "@/hooks/use-site-settings";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, RefreshCw, Settings, Globe, Layout } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
+import type { HeaderMenu } from "@shared/schema";
 
 export default function SiteSettingsPage() {
   const { toast } = useToast();
@@ -129,7 +132,7 @@ export default function SiteSettingsPage() {
           </div>
 
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
+            <TabsList className="grid w-full grid-cols-4 max-w-lg">
               <TabsTrigger value="general" data-testid="tab-general">
                 <Globe className="w-4 h-4 mr-2" />
                 일반
@@ -137,6 +140,10 @@ export default function SiteSettingsPage() {
               <TabsTrigger value="header" data-testid="tab-header">
                 <Layout className="w-4 h-4 mr-2" />
                 헤더
+              </TabsTrigger>
+              <TabsTrigger value="menu" data-testid="tab-menu">
+                <Menu className="w-4 h-4 mr-2" />
+                메뉴
               </TabsTrigger>
               <TabsTrigger value="footer" data-testid="tab-footer">
                 <Layout className="w-4 h-4 mr-2 rotate-180" />
@@ -247,6 +254,10 @@ export default function SiteSettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="menu" className="mt-6">
+              <MenuManagement />
             </TabsContent>
 
             <TabsContent value="footer" className="mt-6">
@@ -370,5 +381,282 @@ export default function SiteSettingsPage() {
         </>
       )}
     </div>
+  );
+}
+
+function MenuManagement() {
+  const { toast } = useToast();
+  const { data: menus, isLoading, refetch } = useAdminHeaderMenus();
+  const createMutation = useCreateHeaderMenu();
+  const updateMutation = useUpdateHeaderMenu();
+  const deleteMutation = useDeleteHeaderMenu();
+  const orderMutation = useUpdateHeaderMenuOrder();
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMenu, setEditingMenu] = useState<HeaderMenu | null>(null);
+  const [formData, setFormData] = useState({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
+
+  const resetForm = () => {
+    setFormData({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
+    setEditingMenu(null);
+  };
+
+  const handleOpenDialog = (menu?: HeaderMenu) => {
+    if (menu) {
+      setEditingMenu(menu);
+      setFormData({
+        name: menu.name,
+        path: menu.path,
+        isVisible: menu.isVisible || "true",
+        openInNewTab: menu.openInNewTab || "false",
+      });
+    } else {
+      resetForm();
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveMenu = async () => {
+    if (!formData.name || !formData.path) {
+      toast({ title: "입력 오류", description: "메뉴명과 연결페이지는 필수입니다.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      if (editingMenu) {
+        await updateMutation.mutateAsync({ id: editingMenu.id, ...formData });
+        toast({ title: "수정 완료", description: "메뉴가 수정되었습니다." });
+      } else {
+        const maxOrder = menus?.reduce((max, m) => Math.max(max, m.sortOrder || 0), 0) || 0;
+        await createMutation.mutateAsync({ ...formData, sortOrder: maxOrder + 1 });
+        toast({ title: "추가 완료", description: "메뉴가 추가되었습니다." });
+      }
+      setIsDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      toast({ title: "저장 실패", description: "메뉴 저장 중 오류가 발생했습니다.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteMenu = async (id: string) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast({ title: "삭제 완료", description: "메뉴가 삭제되었습니다." });
+    } catch (error) {
+      toast({ title: "삭제 실패", description: "메뉴 삭제 중 오류가 발생했습니다.", variant: "destructive" });
+    }
+  };
+
+  const handleMoveUp = async (index: number) => {
+    if (!menus || index === 0) return;
+    
+    const newMenus = [...menus];
+    [newMenus[index], newMenus[index - 1]] = [newMenus[index - 1], newMenus[index]];
+    
+    const orderUpdates = newMenus.map((m, i) => ({ id: m.id, sortOrder: i }));
+    
+    try {
+      await orderMutation.mutateAsync(orderUpdates);
+      await refetch();
+    } catch (error) {
+      toast({ title: "순서 변경 실패", variant: "destructive" });
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (!menus || index === menus.length - 1) return;
+    
+    const newMenus = [...menus];
+    [newMenus[index], newMenus[index + 1]] = [newMenus[index + 1], newMenus[index]];
+    
+    const orderUpdates = newMenus.map((m, i) => ({ id: m.id, sortOrder: i }));
+    
+    try {
+      await orderMutation.mutateAsync(orderUpdates);
+      await refetch();
+    } catch (error) {
+      toast({ title: "순서 변경 실패", variant: "destructive" });
+    }
+  };
+
+  const handleToggleVisibility = async (menu: HeaderMenu) => {
+    try {
+      await updateMutation.mutateAsync({
+        id: menu.id,
+        isVisible: menu.isVisible === "true" ? "false" : "true",
+      });
+    } catch (error) {
+      toast({ title: "변경 실패", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle>메뉴 관리</CardTitle>
+            <CardDescription>헤더에 표시할 메뉴를 관리합니다.</CardDescription>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => handleOpenDialog()} data-testid="button-add-menu">
+                <Plus className="w-4 h-4 mr-2" />
+                메뉴 추가
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingMenu ? "메뉴 수정" : "메뉴 추가"}</DialogTitle>
+                <DialogDescription>
+                  헤더에 표시할 메뉴 정보를 입력하세요.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="menu-name">메뉴명</Label>
+                  <Input
+                    id="menu-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="예: 상품소개"
+                    data-testid="input-menu-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menu-path">연결페이지 (URL)</Label>
+                  <Input
+                    id="menu-path"
+                    value={formData.path}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, path: e.target.value }))}
+                    placeholder="예: /products"
+                    data-testid="input-menu-path"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-md border">
+                  <Label htmlFor="menu-visible" className="cursor-pointer">표시 여부</Label>
+                  <Switch
+                    id="menu-visible"
+                    checked={formData.isVisible === "true"}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isVisible: checked ? "true" : "false" }))}
+                    data-testid="switch-menu-visible"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-md border">
+                  <Label htmlFor="menu-newtab" className="cursor-pointer">새 탭에서 열기</Label>
+                  <Switch
+                    id="menu-newtab"
+                    checked={formData.openInNewTab === "true"}
+                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, openInNewTab: checked ? "true" : "false" }))}
+                    data-testid="switch-menu-newtab"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  취소
+                </Button>
+                <Button 
+                  onClick={handleSaveMenu} 
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  data-testid="button-save-menu"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  저장
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {(!menus || menus.length === 0) ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Menu className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>등록된 메뉴가 없습니다.</p>
+            <p className="text-sm mt-2">메뉴를 추가하여 헤더에 표시하세요.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {menus.map((menu, index) => (
+              <div 
+                key={menu.id} 
+                className={`flex items-center gap-3 p-3 rounded-md border ${menu.isVisible !== "true" ? "opacity-50 bg-muted/50" : ""}`}
+              >
+                <div className="flex flex-col gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    onClick={() => handleMoveUp(index)}
+                    disabled={index === 0 || orderMutation.isPending}
+                    data-testid={`button-move-up-${menu.id}`}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    onClick={() => handleMoveDown(index)}
+                    disabled={index === menus.length - 1 || orderMutation.isPending}
+                    data-testid={`button-move-down-${menu.id}`}
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{menu.name}</div>
+                  <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleVisibility(menu)}
+                    data-testid={`button-toggle-visibility-${menu.id}`}
+                  >
+                    {menu.isVisible === "true" ? (
+                      <Eye className="w-4 h-4" />
+                    ) : (
+                      <EyeOff className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleOpenDialog(menu)}
+                    data-testid={`button-edit-${menu.id}`}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteMenu(menu.id)}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`button-delete-${menu.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

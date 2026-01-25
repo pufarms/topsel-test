@@ -742,3 +742,24 @@ export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
 
 export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
 export type SiteSetting = typeof siteSettings.$inferSelect;
+
+// ==================== Header Menus ====================
+export const headerMenus = pgTable("header_menus", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 100 }).notNull(),
+  path: varchar("path", { length: 255 }).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isVisible: varchar("is_visible", { length: 10 }).default("true"),
+  openInNewTab: varchar("open_in_new_tab", { length: 10 }).default("false"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHeaderMenuSchema = createInsertSchema(headerMenus).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertHeaderMenu = z.infer<typeof insertHeaderMenuSchema>;
+export type HeaderMenu = typeof headerMenus.$inferSelect;

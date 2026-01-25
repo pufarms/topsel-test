@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { SiteSetting } from "@shared/schema";
+import type { SiteSetting, HeaderMenu } from "@shared/schema";
 
 export interface SiteSettingsMap {
   // Header
@@ -80,4 +80,71 @@ export function settingsToMap(settings: SiteSetting[]): Record<string, string> {
     acc[s.settingKey] = s.settingValue || "";
     return acc;
   }, {} as Record<string, string>);
+}
+
+// ==================== Header Menus ====================
+
+export function usePublicHeaderMenus() {
+  return useQuery<HeaderMenu[]>({
+    queryKey: ["/api/header-menus/public"],
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useAdminHeaderMenus() {
+  return useQuery<HeaderMenu[]>({
+    queryKey: ["/api/header-menus"],
+  });
+}
+
+export function useCreateHeaderMenu() {
+  return useMutation({
+    mutationFn: async (data: { name: string; path: string; sortOrder?: number; isVisible?: string; openInNewTab?: string }) => {
+      const res = await apiRequest("POST", "/api/header-menus", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus/public"] });
+    },
+  });
+}
+
+export function useUpdateHeaderMenu() {
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; name?: string; path?: string; sortOrder?: number; isVisible?: string; openInNewTab?: string }) => {
+      const res = await apiRequest("PUT", `/api/header-menus/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus/public"] });
+    },
+  });
+}
+
+export function useDeleteHeaderMenu() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/header-menus/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus/public"] });
+    },
+  });
+}
+
+export function useUpdateHeaderMenuOrder() {
+  return useMutation({
+    mutationFn: async (menus: { id: string; sortOrder: number }[]) => {
+      const res = await apiRequest("PUT", "/api/header-menus/order/update", { menus });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus/public"] });
+    },
+  });
 }

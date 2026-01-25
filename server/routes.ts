@@ -3355,5 +3355,151 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== 헤더 메뉴 API ====================
+  
+  // 공개 메뉴 목록 (인증 불필요)
+  app.get("/api/header-menus/public", async (req, res) => {
+    try {
+      const menus = await storage.getVisibleHeaderMenus();
+      res.json(menus);
+    } catch (error) {
+      console.error("Failed to fetch public menus:", error);
+      res.status(500).json({ error: "Failed to fetch menus" });
+    }
+  });
+
+  // 전체 메뉴 목록 (관리자용)
+  app.get("/api/header-menus", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const menus = await storage.getAllHeaderMenus();
+      res.json(menus);
+    } catch (error) {
+      console.error("Failed to fetch menus:", error);
+      res.status(500).json({ error: "Failed to fetch menus" });
+    }
+  });
+
+  // 메뉴 생성 (관리자용)
+  app.post("/api/header-menus", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const { name, path, sortOrder, isVisible, openInNewTab } = req.body;
+      
+      if (!name || !path) {
+        return res.status(400).json({ error: "메뉴명과 연결페이지는 필수입니다" });
+      }
+      
+      const menu = await storage.createHeaderMenu({
+        name,
+        path,
+        sortOrder: sortOrder || 0,
+        isVisible: isVisible || "true",
+        openInNewTab: openInNewTab || "false",
+      });
+      
+      res.json(menu);
+    } catch (error) {
+      console.error("Failed to create menu:", error);
+      res.status(500).json({ error: "Failed to create menu" });
+    }
+  });
+
+  // 메뉴 수정 (관리자용)
+  app.put("/api/header-menus/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const { name, path, sortOrder, isVisible, openInNewTab } = req.body;
+      
+      const menu = await storage.updateHeaderMenu(req.params.id, {
+        name,
+        path,
+        sortOrder,
+        isVisible,
+        openInNewTab,
+      });
+      
+      if (!menu) {
+        return res.status(404).json({ error: "메뉴를 찾을 수 없습니다" });
+      }
+      
+      res.json(menu);
+    } catch (error) {
+      console.error("Failed to update menu:", error);
+      res.status(500).json({ error: "Failed to update menu" });
+    }
+  });
+
+  // 메뉴 삭제 (관리자용)
+  app.delete("/api/header-menus/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const deleted = await storage.deleteHeaderMenu(req.params.id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "메뉴를 찾을 수 없습니다" });
+      }
+      
+      res.json({ success: true, message: "메뉴가 삭제되었습니다" });
+    } catch (error) {
+      console.error("Failed to delete menu:", error);
+      res.status(500).json({ error: "Failed to delete menu" });
+    }
+  });
+
+  // 메뉴 순서 변경 (관리자용)
+  app.put("/api/header-menus/order/update", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const { menus } = req.body;
+      
+      if (!Array.isArray(menus)) {
+        return res.status(400).json({ error: "잘못된 요청 형식입니다" });
+      }
+      
+      await storage.updateHeaderMenuOrder(menus);
+      
+      res.json({ success: true, message: "순서가 변경되었습니다" });
+    } catch (error) {
+      console.error("Failed to update menu order:", error);
+      res.status(500).json({ error: "Failed to update menu order" });
+    }
+  });
+
   return httpServer;
 }
