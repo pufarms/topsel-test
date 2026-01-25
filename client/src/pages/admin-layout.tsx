@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
-  const [openMenus, setOpenMenus] = useState<string[]>(["members", "products", "inventory", "settings"]);
+  const [openMenus, setOpenMenus] = useState<string[]>([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -209,7 +209,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           key={item.id}
           open={openMenus.includes(item.id)} 
           onOpenChange={() => toggleMenu(item.id)}
-          defaultOpen={true}
         >
           <CollapsibleTrigger asChild>
             <button
