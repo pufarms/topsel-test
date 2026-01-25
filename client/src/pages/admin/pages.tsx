@@ -283,6 +283,35 @@ export default function PagesManagement() {
     });
   };
   
+  // Helper function to set a nested value using a path like "items.0.title"
+  const setNestedValue = (obj: any, path: string, value: any): any => {
+    const keys = path.split('.');
+    if (keys.length === 1) {
+      return { ...obj, [keys[0]]: value };
+    }
+    
+    const [first, ...rest] = keys;
+    const restPath = rest.join('.');
+    
+    // Check if next key is a number (array index)
+    if (!isNaN(Number(rest[0]))) {
+      // Handle array
+      const arr = Array.isArray(obj[first]) ? [...obj[first]] : [];
+      const index = Number(rest[0]);
+      if (rest.length === 1) {
+        arr[index] = value;
+      } else {
+        arr[index] = setNestedValue(arr[index] || {}, rest.slice(1).join('.'), value);
+      }
+      return { ...obj, [first]: arr };
+    }
+    
+    return {
+      ...obj,
+      [first]: setNestedValue(obj[first] || {}, restPath, value),
+    };
+  };
+
   // Apply inline edit to content data
   const applyInlineEdit = () => {
     if (!contentData || !contentData.sections) return;
@@ -291,19 +320,33 @@ export default function PagesManagement() {
       // Match by section.id if it exists, otherwise match by generated index-based ID
       const sectionIdentifier = section.id || `section-${index}`;
       if (sectionIdentifier === inlineEditDialog.sectionId) {
-        // Update the field in the section (handle both flat and nested structures)
+        const fieldPath = inlineEditDialog.fieldPath;
+        
+        // Handle nested paths like "items.0.title" or "items.0.description"
+        if (fieldPath.includes('.')) {
+          if (section.data) {
+            return {
+              ...section,
+              data: setNestedValue(section.data, fieldPath, inlineEditValue),
+            };
+          } else {
+            return setNestedValue(section, fieldPath, inlineEditValue);
+          }
+        }
+        
+        // Handle flat paths
         if (section.data) {
           return {
             ...section,
             data: {
               ...section.data,
-              [inlineEditDialog.fieldPath]: inlineEditValue,
+              [fieldPath]: inlineEditValue,
             },
           };
         } else {
           return {
             ...section,
-            [inlineEditDialog.fieldPath]: inlineEditValue,
+            [fieldPath]: inlineEditValue,
           };
         }
       }
