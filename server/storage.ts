@@ -17,7 +17,9 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getAdminUsers(): Promise<User[]>;
   validatePassword(username: string, password: string): Promise<User | null>;
+  validateMemberPassword(username: string, password: string): Promise<Member | null>;
   updateLastLogin(userId: string): Promise<void>;
+  updateMemberLastLogin(memberId: string): Promise<void>;
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   
   getOrdersByUserId(userId: string): Promise<Order[]>;
@@ -266,8 +268,19 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async validateMemberPassword(username: string, password: string): Promise<Member | null> {
+    const member = await this.getMemberByUsername(username);
+    if (!member) return null;
+    if (member.password !== hashPassword(password)) return null;
+    return member;
+  }
+
   async updateLastLogin(userId: string): Promise<void> {
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updateMemberLastLogin(memberId: string): Promise<void> {
+    await db.update(members).set({ lastLoginAt: new Date() }).where(eq(members.id, memberId));
   }
 
   async updateUserTier(userId: string, tier: string): Promise<User | undefined> {

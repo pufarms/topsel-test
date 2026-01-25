@@ -11,6 +11,7 @@ import { uploadImage, deleteImage } from "./r2";
 declare module "express-session" {
   interface SessionData {
     userId: string;
+    userType: "user" | "member";
   }
 }
 
@@ -41,6 +42,18 @@ export async function registerRoutes(
       return res.status(401).json({ message: "Not authenticated" });
     }
 
+    // Check if it's a member session
+    if (req.session.userType === "member") {
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: "Member not found" });
+      }
+      const { password, ...memberWithoutPassword } = member;
+      return res.json({ ...memberWithoutPassword, role: "member" });
+    }
+
+    // Default to user
     const user = await storage.getUser(req.session.userId);
     if (!user) {
       req.session.destroy(() => {});
@@ -82,16 +95,37 @@ export async function registerRoutes(
     try {
       const data = loginSchema.parse(req.body);
       
+      // First try to authenticate as admin user
       const user = await storage.validatePassword(data.username, data.password);
-      if (!user) {
-        return res.status(401).json({ message: "아이디 또는 비밀번호가 올바르지 않습니다" });
+      if (user) {
+        await storage.updateLastLogin(user.id);
+        req.session.userId = user.id;
+        req.session.userType = "user";
+
+        const { password, ...userWithoutPassword } = user;
+        return res.json(userWithoutPassword);
       }
+      
+      // If not found in users, try members table
+      const member = await storage.validateMemberPassword(data.username, data.password);
+      if (member) {
+        // Check if member is approved and active
+        if (member.status !== "활성") {
+          return res.status(401).json({ message: "계정이 비활성화 상태입니다. 관리자에게 문의하세요." });
+        }
+        if (member.grade === "PENDING") {
+          return res.status(401).json({ message: "승인 대기 중인 계정입니다. 관리자 승인 후 이용 가능합니다." });
+        }
+        
+        await storage.updateMemberLastLogin(member.id);
+        req.session.userId = member.id;
+        req.session.userType = "member";
 
-      await storage.updateLastLogin(user.id);
-      req.session.userId = user.id;
-
-      const { password, ...userWithoutPassword } = user;
-      return res.json(userWithoutPassword);
+        const { password, ...memberWithoutPassword } = member;
+        return res.json({ ...memberWithoutPassword, role: "member" });
+      }
+      
+      return res.status(401).json({ message: "아이디 또는 비밀번호가 올바르지 않습니다" });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });

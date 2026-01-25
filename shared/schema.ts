@@ -267,6 +267,7 @@ export const members = pgTable("members", {
   memo: text("memo"),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -275,6 +276,7 @@ export const insertMemberSchema = createInsertSchema(members).omit({
   id: true,
   approvedAt: true,
   approvedBy: true,
+  lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
 });
