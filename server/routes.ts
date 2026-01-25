@@ -3240,5 +3240,120 @@ export async function registerRoutes(
     return res.send(buffer);
   });
 
+  // ==================== 사이트 설정 API ====================
+  
+  // 공개 설정 조회 (헤더/푸터용 - 인증 불필요)
+  app.get("/api/site-settings/public", async (req, res) => {
+    try {
+      const settings = await storage.getPublicSiteSettings();
+      
+      // key-value 형태로 변환
+      const result = settings.reduce((acc, setting) => {
+        let value: any = setting.settingValue;
+        if (setting.settingType === "boolean") {
+          value = setting.settingValue === "true";
+        } else if (setting.settingType === "number") {
+          value = Number(setting.settingValue);
+        } else if (setting.settingType === "json") {
+          try {
+            value = JSON.parse(setting.settingValue || "{}");
+          } catch {
+            value = {};
+          }
+        }
+        acc[setting.settingKey] = value;
+        return acc;
+      }, {} as Record<string, any>);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to fetch public settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // 전체 설정 조회 (관리자용)
+  app.get("/api/site-settings", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const settings = await storage.getAllSiteSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // 카테고리별 조회 (관리자용)
+  app.get("/api/site-settings/category/:category", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const settings = await storage.getSiteSettingsByCategory(req.params.category);
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to fetch settings by category:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // 일괄 수정 (관리자용)
+  app.put("/api/site-settings/bulk", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const { settings } = req.body;
+      
+      if (!settings || typeof settings !== "object") {
+        return res.status(400).json({ error: "Invalid settings format" });
+      }
+      
+      await storage.updateSiteSettings(settings);
+      
+      res.json({ success: true, message: "설정이 저장되었습니다." });
+    } catch (error) {
+      console.error("Failed to update settings:", error);
+      res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // 초기 설정 시드 (관리자용 - 수동 호출)
+  app.post("/api/site-settings/seed", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "SUPER_ADMIN 권한이 필요합니다" });
+    }
+    
+    try {
+      await storage.seedSiteSettings();
+      res.json({ success: true, message: "초기 설정이 생성되었습니다." });
+    } catch (error) {
+      console.error("Failed to seed settings:", error);
+      res.status(500).json({ error: "Failed to seed settings" });
+    }
+  });
+
   return httpServer;
 }

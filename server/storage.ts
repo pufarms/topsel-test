@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -191,6 +191,13 @@ export interface IStorage {
     keyword?: string;
   }): Promise<StockHistory[]>;
   getStockHistoryAdmins(): Promise<string[]>;
+
+  // Site Settings methods
+  getAllSiteSettings(): Promise<SiteSetting[]>;
+  getSiteSettingsByCategory(category: string): Promise<SiteSetting[]>;
+  getPublicSiteSettings(): Promise<SiteSetting[]>;
+  updateSiteSettings(settings: Record<string, string>): Promise<void>;
+  seedSiteSettings(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1321,6 +1328,71 @@ export class DatabaseStorage implements IStorage {
       .from(stockHistory)
       .orderBy(stockHistory.adminId);
     return results.map(r => r.adminId);
+  }
+
+  // ==================== Site Settings ====================
+  async getAllSiteSettings(): Promise<SiteSetting[]> {
+    return db.select().from(siteSettings).orderBy(siteSettings.category);
+  }
+
+  async getSiteSettingsByCategory(category: string): Promise<SiteSetting[]> {
+    return db.select().from(siteSettings).where(eq(siteSettings.category, category));
+  }
+
+  async getPublicSiteSettings(): Promise<SiteSetting[]> {
+    return db.select().from(siteSettings).where(
+      or(
+        eq(siteSettings.category, "header"),
+        eq(siteSettings.category, "footer"),
+        eq(siteSettings.category, "general")
+      )
+    );
+  }
+
+  async updateSiteSettings(settings: Record<string, string>): Promise<void> {
+    for (const [key, value] of Object.entries(settings)) {
+      await db.update(siteSettings)
+        .set({ 
+          settingValue: String(value),
+          updatedAt: new Date()
+        })
+        .where(eq(siteSettings.settingKey, key));
+    }
+  }
+
+  async seedSiteSettings(): Promise<void> {
+    const existingSettings = await db.select().from(siteSettings);
+    if (existingSettings.length > 0) {
+      return; // Already seeded
+    }
+
+    const initialSettings: InsertSiteSetting[] = [
+      // 헤더 설정
+      { settingKey: "header_logo_url", settingValue: "/logo.png", settingType: "string", category: "header", description: "헤더 로고 이미지 URL" },
+      { settingKey: "header_logo_alt", settingValue: "탑셀러", settingType: "string", category: "header", description: "로고 대체 텍스트" },
+      { settingKey: "header_show_login", settingValue: "true", settingType: "boolean", category: "header", description: "로그인 버튼 표시 여부" },
+      { settingKey: "header_show_register", settingValue: "true", settingType: "boolean", category: "header", description: "회원가입 버튼 표시 여부" },
+      { settingKey: "header_show_cart", settingValue: "true", settingType: "boolean", category: "header", description: "장바구니 버튼 표시 여부" },
+      
+      // 푸터 설정
+      { settingKey: "footer_company_name", settingValue: "현 농업회사법인 주식회사", settingType: "string", category: "footer", description: "회사명" },
+      { settingKey: "footer_ceo_name", settingValue: "", settingType: "string", category: "footer", description: "대표자명" },
+      { settingKey: "footer_biz_number", settingValue: "", settingType: "string", category: "footer", description: "사업자등록번호" },
+      { settingKey: "footer_address", settingValue: "", settingType: "string", category: "footer", description: "회사 주소" },
+      { settingKey: "footer_phone", settingValue: "", settingType: "string", category: "footer", description: "대표 전화번호" },
+      { settingKey: "footer_email", settingValue: "", settingType: "string", category: "footer", description: "대표 이메일" },
+      { settingKey: "footer_copyright", settingValue: "Copyright © 2025 TopSeller. All rights reserved.", settingType: "string", category: "footer", description: "저작권 문구" },
+      { settingKey: "footer_show_terms", settingValue: "true", settingType: "boolean", category: "footer", description: "이용약관 링크 표시" },
+      { settingKey: "footer_show_privacy", settingValue: "true", settingType: "boolean", category: "footer", description: "개인정보처리방침 링크 표시" },
+      
+      // 일반 설정
+      { settingKey: "site_name", settingValue: "탑셀러", settingType: "string", category: "general", description: "사이트 이름" },
+      { settingKey: "site_description", settingValue: "B2B 과일 도매 플랫폼", settingType: "string", category: "general", description: "사이트 설명" },
+    ];
+
+    for (const setting of initialSettings) {
+      await db.insert(siteSettings).values(setting);
+    }
   }
 }
 
