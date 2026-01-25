@@ -90,6 +90,49 @@ function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, clas
   );
 }
 
+interface EditableButtonProps {
+  text: string;
+  link: string;
+  sectionId: string;
+  fieldPath: string;
+  isEditing?: boolean;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  variant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
+}
+
+function EditableButton({ text, link, sectionId, fieldPath, isEditing, onEdit, variant = "default", size = "default", className = "" }: EditableButtonProps) {
+  if (!isEditing) {
+    return (
+      <Button asChild variant={variant} size={size} className={className}>
+        <Link href={link}>{text}</Link>
+      </Button>
+    );
+  }
+  
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      className={`${className} relative group hover:ring-2 hover:ring-primary/50`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onEdit) {
+          onEdit(sectionId, fieldPath, `${text}|${link}`, 'text');
+        }
+      }}
+      data-testid={`editable-button-${sectionId}-${fieldPath}`}
+    >
+      {text}
+      <span className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground text-xs px-1 py-0.5 rounded transition-opacity z-10">
+        버튼 편집
+      </span>
+    </Button>
+  );
+}
+
 const iconMap: Record<string, React.ReactNode> = {
   Star: <Star className="w-6 h-6" />,
   Heart: <Heart className="w-6 h-6" />,
@@ -196,14 +239,27 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
         )}
         <div className="flex flex-wrap gap-4 justify-center">
           {data.buttonText && data.buttonLink && (
-            <Button asChild size="lg">
-              <Link href={data.buttonLink}>{data.buttonText}</Link>
-            </Button>
+            <EditableButton
+              text={data.buttonText}
+              link={data.buttonLink}
+              sectionId={sectionId}
+              fieldPath="button"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              size="lg"
+            />
           )}
           {data.secondaryButtonText && data.secondaryButtonLink && (
-            <Button asChild size="lg" variant="outline">
-              <Link href={data.secondaryButtonLink}>{data.secondaryButtonText}</Link>
-            </Button>
+            <EditableButton
+              text={data.secondaryButtonText}
+              link={data.secondaryButtonLink}
+              sectionId={sectionId}
+              fieldPath="secondaryButton"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              size="lg"
+              variant="outline"
+            />
           )}
         </div>
       </div>
@@ -356,22 +412,51 @@ function CardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sect
             <Card key={item.id || index} className="hover-elevate">
               {item.imageUrl && (
                 <div className="aspect-video overflow-hidden rounded-t-lg">
-                  <img
+                  <EditableImage
                     src={item.imageUrl}
                     alt={item.title || "Card image"}
+                    sectionId={sectionId}
+                    fieldPath={`items.${index}.imageUrl`}
+                    isEditing={isEditing}
+                    onEdit={onFieldEdit}
                     className="w-full h-full object-cover"
                   />
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="text-lg">{item.title}</CardTitle>
+                <EditableField
+                  value={item.title || ""}
+                  sectionId={sectionId}
+                  fieldPath={`items.${index}.title`}
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="h3"
+                  className="text-lg font-semibold"
+                />
               </CardHeader>
               <CardContent>
-                <CardDescription>{item.description}</CardDescription>
+                <EditableField
+                  value={item.description || ""}
+                  sectionId={sectionId}
+                  fieldPath={`items.${index}.description`}
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="p"
+                  className="text-sm text-muted-foreground"
+                />
                 {item.link && (
-                  <Button asChild variant="ghost" className="px-0 mt-2 text-primary">
-                    <Link href={item.link}>자세히 보기</Link>
-                  </Button>
+                  <EditableButton
+                    text="자세히 보기"
+                    link={item.link}
+                    sectionId={sectionId}
+                    fieldPath={`items.${index}.link`}
+                    isEditing={isEditing}
+                    onEdit={onFieldEdit}
+                    variant="ghost"
+                    className="px-0 mt-2 text-primary"
+                  />
                 )}
               </CardContent>
             </Card>
@@ -438,8 +523,26 @@ function FeaturesSection({ data, sectionId, isEditing, onClick, onFieldEdit }: S
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
                 {item.icon && iconMap[item.icon] ? iconMap[item.icon] : <Star className="w-6 h-6" />}
               </div>
-              <h3 className="font-semibold mb-2">{item.title}</h3>
-              <p className="text-sm text-muted-foreground">{item.description}</p>
+              <EditableField
+                value={item.title || ""}
+                sectionId={sectionId}
+                fieldPath={`items.${index}.title`}
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="h3"
+                className="font-semibold mb-2"
+              />
+              <EditableField
+                value={item.description || ""}
+                sectionId={sectionId}
+                fieldPath={`items.${index}.description`}
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className="text-sm text-muted-foreground"
+              />
             </div>
           ))}
         </div>
@@ -484,14 +587,29 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
         )}
         <div className="flex flex-wrap gap-4 justify-center">
           {data.buttonText && data.buttonLink && (
-            <Button asChild variant="secondary" size="lg">
-              <Link href={data.buttonLink}>{data.buttonText}</Link>
-            </Button>
+            <EditableButton
+              text={data.buttonText}
+              link={data.buttonLink}
+              sectionId={sectionId}
+              fieldPath="button"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              variant="secondary"
+              size="lg"
+            />
           )}
           {data.secondaryButtonText && data.secondaryButtonLink && (
-            <Button asChild variant="outline" size="lg" className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10">
-              <Link href={data.secondaryButtonLink}>{data.secondaryButtonText}</Link>
-            </Button>
+            <EditableButton
+              text={data.secondaryButtonText}
+              link={data.secondaryButtonLink}
+              sectionId={sectionId}
+              fieldPath="secondaryButton"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              variant="outline"
+              size="lg"
+              className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10"
+            />
           )}
         </div>
       </div>
