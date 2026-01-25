@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Eye, 
   Settings, 
@@ -14,7 +15,9 @@ import {
   User, 
   Search,
   ExternalLink,
-  Layout
+  Layout,
+  Copy,
+  Check
 } from "lucide-react";
 
 interface PageInfo {
@@ -112,8 +115,33 @@ const pages: PageInfo[] = [
 ];
 
 export default function PagesManagement() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "public" | "member" | "admin">("all");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const getFullUrl = (path: string) => {
+    return `${window.location.origin}${path}`;
+  };
+
+  const copyToClipboard = async (pageId: string, path: string) => {
+    const fullUrl = getFullUrl(path);
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedId(pageId);
+      toast({
+        title: "복사 완료",
+        description: `${fullUrl}`,
+      });
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      toast({
+        title: "복사 실패",
+        description: "클립보드에 복사할 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredPages = pages.filter((page) => {
     const matchesSearch = 
@@ -234,9 +262,24 @@ export default function PagesManagement() {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium truncate">{page.name}</h3>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2 truncate">
-                        {page.path}
-                      </p>
+                      <div className="flex items-center gap-1 mb-2">
+                        <p className="text-sm text-muted-foreground truncate flex-1">
+                          {page.path}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => copyToClipboard(page.id, page.path)}
+                          data-testid={`button-copy-url-${page.id}`}
+                        >
+                          {copiedId === page.id ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground mb-3">
                         {page.description}
                       </p>
