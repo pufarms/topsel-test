@@ -185,6 +185,20 @@ export default function AdminGallery() {
     },
   });
 
+  const seedIconsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/images/seed-icons");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/images"] });
+      toast({ title: "기본 아이콘 생성 완료", description: data.message });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "아이콘 생성 실패" });
+    },
+  });
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -328,6 +342,20 @@ export default function AdminGallery() {
               </Select>
             )}
             <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => seedIconsMutation.mutate()}
+              disabled={seedIconsMutation.isPending}
+              data-testid="button-seed-icons"
+            >
+              {seedIconsMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              기본 아이콘 생성
+            </Button>
             <span className="text-sm text-muted-foreground">
               {filteredImages.length}개 이미지
             </span>
