@@ -560,6 +560,8 @@ export async function registerRoutes(
           subcategory: '기본',
           width: 64,
           height: 64,
+          fileSize: svgBuffer.length,
+          mimeType: 'image/svg+xml',
         });
         created++;
       }
