@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { HeaderMenu } from "@shared/schema";
 
@@ -132,7 +132,7 @@ export default function SiteSettingsPage() {
           </div>
 
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 max-w-lg">
+            <TabsList className="grid w-full grid-cols-3 max-w-md">
               <TabsTrigger value="general" data-testid="tab-general">
                 <Globe className="w-4 h-4 mr-2" />
                 일반
@@ -140,10 +140,6 @@ export default function SiteSettingsPage() {
               <TabsTrigger value="header" data-testid="tab-header">
                 <Layout className="w-4 h-4 mr-2" />
                 헤더
-              </TabsTrigger>
-              <TabsTrigger value="menu" data-testid="tab-menu">
-                <Menu className="w-4 h-4 mr-2" />
-                메뉴
               </TabsTrigger>
               <TabsTrigger value="footer" data-testid="tab-footer">
                 <Layout className="w-4 h-4 mr-2 rotate-180" />
@@ -214,50 +210,18 @@ export default function SiteSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium">버튼 표시 설정</h4>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="flex items-center justify-between p-3 rounded-md border">
-                        <Label htmlFor="header_show_login" className="cursor-pointer">
-                          로그인 버튼
-                        </Label>
-                        <Switch
-                          id="header_show_login"
-                          checked={formData.header_show_login === "true"}
-                          onCheckedChange={(checked) => handleSwitchChange("header_show_login", checked)}
-                          data-testid="switch-show-login"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-md border">
-                        <Label htmlFor="header_show_register" className="cursor-pointer">
-                          회원가입 버튼
-                        </Label>
-                        <Switch
-                          id="header_show_register"
-                          checked={formData.header_show_register === "true"}
-                          onCheckedChange={(checked) => handleSwitchChange("header_show_register", checked)}
-                          data-testid="switch-show-register"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-md border">
-                        <Label htmlFor="header_show_cart" className="cursor-pointer">
-                          장바구니 버튼
-                        </Label>
-                        <Switch
-                          id="header_show_cart"
-                          checked={formData.header_show_cart === "true"}
-                          onCheckedChange={(checked) => handleSwitchChange("header_show_cart", checked)}
-                          data-testid="switch-show-cart"
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="menu" className="mt-6">
-              <MenuManagement />
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>메뉴 관리</CardTitle>
+                  <CardDescription>헤더에 표시할 메뉴와 순서를 관리합니다.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MenuManagement />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="footer" className="mt-6">
@@ -384,6 +348,26 @@ export default function SiteSettingsPage() {
   );
 }
 
+interface SitePage {
+  id: string;
+  name: string;
+  path: string;
+  description: string;
+  type: "public" | "member" | "admin";
+}
+
+const SITE_PAGES: SitePage[] = [
+  { id: "home", name: "홈페이지", path: "/", description: "메인 랜딩 페이지", type: "public" },
+  { id: "login", name: "로그인", path: "/login", description: "회원 로그인 페이지", type: "public" },
+  { id: "register", name: "회원가입", path: "/register", description: "신규 회원 가입 페이지", type: "public" },
+  { id: "public-preview", name: "공개 레이아웃 미리보기", path: "/public-preview", description: "헤더/푸터 설정 미리보기", type: "public" },
+  { id: "dashboard", name: "회원 대시보드", path: "/dashboard", description: "회원 전용 대시보드", type: "member" },
+  { id: "cart", name: "장바구니", path: "/cart", description: "상품 장바구니 페이지", type: "member" },
+  { id: "mypage", name: "마이페이지", path: "/mypage", description: "회원 정보 및 주문 내역", type: "member" },
+  { id: "terms", name: "이용약관", path: "/terms", description: "서비스 이용약관", type: "public" },
+  { id: "privacy", name: "개인정보처리방침", path: "/privacy", description: "개인정보 처리방침", type: "public" },
+];
+
 function MenuManagement() {
   const { toast } = useToast();
   const { data: menus, isLoading, refetch } = useAdminHeaderMenus();
@@ -395,10 +379,20 @@ function MenuManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<HeaderMenu | null>(null);
   const [formData, setFormData] = useState({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
+  const [pageSearch, setPageSearch] = useState("");
+  const [showPageSelector, setShowPageSelector] = useState(false);
+
+  const filteredPages = SITE_PAGES.filter(page => 
+    page.name.toLowerCase().includes(pageSearch.toLowerCase()) ||
+    page.path.toLowerCase().includes(pageSearch.toLowerCase()) ||
+    page.description.toLowerCase().includes(pageSearch.toLowerCase())
+  );
 
   const resetForm = () => {
     setFormData({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
     setEditingMenu(null);
+    setPageSearch("");
+    setShowPageSelector(false);
   };
 
   const handleOpenDialog = (menu?: HeaderMenu) => {
@@ -414,6 +408,16 @@ function MenuManagement() {
       resetForm();
     }
     setIsDialogOpen(true);
+  };
+
+  const handleSelectPage = (page: SitePage) => {
+    setFormData(prev => ({
+      ...prev,
+      name: prev.name || page.name,
+      path: page.path,
+    }));
+    setShowPageSelector(false);
+    setPageSearch("");
   };
 
   const handleSaveMenu = async () => {
@@ -501,162 +505,232 @@ function MenuManagement() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle>메뉴 관리</CardTitle>
-            <CardDescription>헤더에 표시할 메뉴를 관리합니다.</CardDescription>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()} data-testid="button-add-menu">
-                <Plus className="w-4 h-4 mr-2" />
-                메뉴 추가
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingMenu ? "메뉴 수정" : "메뉴 추가"}</DialogTitle>
-                <DialogDescription>
-                  헤더에 표시할 메뉴 정보를 입력하세요.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="menu-name">메뉴명</Label>
-                  <Input
-                    id="menu-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="예: 상품소개"
-                    data-testid="input-menu-name"
-                  />
-                </div>
-                <div className="space-y-2">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          헤더에 표시할 메뉴를 추가하고 순서를 조정하세요.
+        </p>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button onClick={() => handleOpenDialog()} data-testid="button-add-menu">
+              <Plus className="w-4 h-4 mr-2" />
+              메뉴 추가
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingMenu ? "메뉴 수정" : "메뉴 추가"}</DialogTitle>
+              <DialogDescription>
+                헤더에 표시할 메뉴 정보를 입력하세요.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="menu-name">메뉴명</Label>
+                <Input
+                  id="menu-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="예: 상품소개"
+                  data-testid="input-menu-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <Label htmlFor="menu-path">연결페이지 (URL)</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-auto p-1 text-xs text-primary"
+                    onClick={() => setShowPageSelector(!showPageSelector)}
+                    data-testid="button-toggle-page-selector"
+                  >
+                    {showPageSelector ? "직접 입력" : "페이지 선택"}
+                  </Button>
+                </div>
+                
+                {showPageSelector ? (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="페이지 검색..."
+                        value={pageSearch}
+                        onChange={(e) => setPageSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-page-search"
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border rounded-md divide-y">
+                      {filteredPages.length === 0 ? (
+                        <div className="p-3 text-center text-sm text-muted-foreground">
+                          검색 결과가 없습니다.
+                        </div>
+                      ) : (
+                        filteredPages.map((page) => (
+                          <button
+                            key={page.id}
+                            type="button"
+                            className="w-full p-3 text-left hover:bg-muted transition-colors"
+                            onClick={() => handleSelectPage(page)}
+                            data-testid={`button-select-page-${page.id}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <div className="font-medium text-sm">{page.name}</div>
+                                <div className="text-xs text-muted-foreground">{page.path}</div>
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                page.type === "public" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
+                                page.type === "member" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" :
+                                "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                              }`}>
+                                {page.type === "public" ? "공개" : page.type === "member" ? "회원" : "관리자"}
+                              </span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : (
                   <Input
                     id="menu-path"
                     value={formData.path}
                     onChange={(e) => setFormData((prev) => ({ ...prev, path: e.target.value }))}
-                    placeholder="예: /products"
+                    placeholder="예: /products 또는 https://외부사이트.com"
                     data-testid="input-menu-path"
                   />
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-md border">
-                  <Label htmlFor="menu-visible" className="cursor-pointer">표시 여부</Label>
-                  <Switch
-                    id="menu-visible"
-                    checked={formData.isVisible === "true"}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isVisible: checked ? "true" : "false" }))}
-                    data-testid="switch-menu-visible"
-                  />
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-md border">
-                  <Label htmlFor="menu-newtab" className="cursor-pointer">새 탭에서 열기</Label>
-                  <Switch
-                    id="menu-newtab"
-                    checked={formData.openInNewTab === "true"}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, openInNewTab: checked ? "true" : "false" }))}
-                    data-testid="switch-menu-newtab"
-                  />
-                </div>
+                )}
+                {formData.path && (
+                  <p className="text-xs text-muted-foreground">
+                    선택된 경로: <span className="font-mono">{formData.path}</span>
+                  </p>
+                )}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  취소
+
+              <div className="flex items-center justify-between p-3 rounded-md border">
+                <Label htmlFor="menu-visible" className="cursor-pointer">표시 여부</Label>
+                <Switch
+                  id="menu-visible"
+                  checked={formData.isVisible === "true"}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isVisible: checked ? "true" : "false" }))}
+                  data-testid="switch-menu-visible"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-md border">
+                <div>
+                  <Label htmlFor="menu-newtab" className="cursor-pointer">새 탭에서 열기</Label>
+                  <p className="text-xs text-muted-foreground">외부 링크인 경우 권장</p>
+                </div>
+                <Switch
+                  id="menu-newtab"
+                  checked={formData.openInNewTab === "true"}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, openInNewTab: checked ? "true" : "false" }))}
+                  data-testid="switch-menu-newtab"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                취소
+              </Button>
+              <Button 
+                onClick={handleSaveMenu} 
+                disabled={createMutation.isPending || updateMutation.isPending}
+                data-testid="button-save-menu"
+              >
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                저장
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {(!menus || menus.length === 0) ? (
+        <div className="text-center py-8 text-muted-foreground border rounded-md border-dashed">
+          <Menu className="w-10 h-10 mx-auto mb-3 opacity-50" />
+          <p>등록된 메뉴가 없습니다.</p>
+          <p className="text-sm mt-1">메뉴를 추가하여 헤더에 표시하세요.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {menus.map((menu, index) => (
+            <div 
+              key={menu.id} 
+              className={`flex items-center gap-3 p-3 rounded-md border ${menu.isVisible !== "true" ? "opacity-50 bg-muted/50" : ""}`}
+            >
+              <div className="flex flex-col gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={() => handleMoveUp(index)}
+                  disabled={index === 0 || orderMutation.isPending}
+                  data-testid={`button-move-up-${menu.id}`}
+                >
+                  <ArrowUp className="w-4 h-4" />
                 </Button>
                 <Button 
-                  onClick={handleSaveMenu} 
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  data-testid="button-save-menu"
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={() => handleMoveDown(index)}
+                  disabled={index === menus.length - 1 || orderMutation.isPending}
+                  data-testid={`button-move-down-${menu.id}`}
                 >
-                  {(createMutation.isPending || updateMutation.isPending) && (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  )}
-                  저장
+                  <ArrowDown className="w-4 h-4" />
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {(!menus || menus.length === 0) ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Menu className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>등록된 메뉴가 없습니다.</p>
-            <p className="text-sm mt-2">메뉴를 추가하여 헤더에 표시하세요.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {menus.map((menu, index) => (
-              <div 
-                key={menu.id} 
-                className={`flex items-center gap-3 p-3 rounded-md border ${menu.isVisible !== "true" ? "opacity-50 bg-muted/50" : ""}`}
-              >
-                <div className="flex flex-col gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6"
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0 || orderMutation.isPending}
-                    data-testid={`button-move-up-${menu.id}`}
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6"
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === menus.length - 1 || orderMutation.isPending}
-                    data-testid={`button-move-down-${menu.id}`}
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{menu.name}</div>
-                  <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleToggleVisibility(menu)}
-                    data-testid={`button-toggle-visibility-${menu.id}`}
-                  >
-                    {menu.isVisible === "true" ? (
-                      <Eye className="w-4 h-4" />
-                    ) : (
-                      <EyeOff className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleOpenDialog(menu)}
-                    data-testid={`button-edit-${menu.id}`}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteMenu(menu.id)}
-                    disabled={deleteMutation.isPending}
-                    data-testid={`button-delete-${menu.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{menu.name}</div>
+                <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleToggleVisibility(menu)}
+                  title={menu.isVisible === "true" ? "숨기기" : "표시하기"}
+                  data-testid={`button-toggle-visibility-${menu.id}`}
+                >
+                  {menu.isVisible === "true" ? (
+                    <Eye className="w-4 h-4" />
+                  ) : (
+                    <EyeOff className="w-4 h-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleOpenDialog(menu)}
+                  title="수정"
+                  data-testid={`button-edit-${menu.id}`}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDeleteMenu(menu.id)}
+                  disabled={deleteMutation.isPending}
+                  title="삭제"
+                  data-testid={`button-delete-${menu.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

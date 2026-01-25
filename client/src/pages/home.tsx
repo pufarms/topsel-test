@@ -3,45 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Users, ShieldCheck, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { PublicLayout } from "@/components/public";
 
 export default function Home() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">주문관리</span>
-          </div>
-          <nav className="flex items-center gap-3">
-            {user ? (
-              <>
-                {(user.role === "SUPER_ADMIN" || user.role === "ADMIN") ? (
-                  <Link href="/admin">
-                    <Button data-testid="link-admin">관리자 페이지</Button>
-                  </Link>
-                ) : (
-                  <Link href="/dashboard">
-                    <Button data-testid="link-dashboard">대시보드</Button>
-                  </Link>
-                )}
-              </>
-            ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="outline" data-testid="link-login">로그인</Button>
-                </Link>
-                <Link href="/register">
-                  <Button data-testid="link-register">회원가입</Button>
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
-
+    <PublicLayout>
       <main className="container mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">주문관리 시스템</h1>
@@ -99,6 +67,6 @@ export default function Home() {
           </div>
         )}
       </main>
-    </div>
+    </PublicLayout>
   );
 }

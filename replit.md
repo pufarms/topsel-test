@@ -101,7 +101,7 @@ Preferred communication style: Simple, everyday language.
   - `GET /api/site-settings`: Admin-only, all settings
   - `PUT /api/site-settings/bulk`: Admin-only, bulk update
   - `POST /api/site-settings/seed`: SUPER_ADMIN only, create initial settings
-- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 메뉴, 푸터)
+- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 푸터) - 메뉴관리는 헤더 탭 안에 포함
 - **Public Components**: 
   - `PublicHeader`: Dynamic header from settings (logo, dynamic menus, login/register/cart buttons)
   - `PublicFooter`: Dynamic footer from settings (company info, copyright, links)
