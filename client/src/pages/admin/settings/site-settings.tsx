@@ -10,9 +10,12 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search } from "lucide-react";
+import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search, GripVertical } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { HeaderMenu } from "@shared/schema";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export default function SiteSettingsPage() {
   const { toast } = useToast();
@@ -511,6 +514,38 @@ function MenuManagement() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || !menus || active.id === over.id) return;
+    
+    const oldIndex = menus.findIndex((m) => m.id === active.id);
+    const newIndex = menus.findIndex((m) => m.id === over.id);
+    
+    if (oldIndex === -1 || newIndex === -1) return;
+    
+    const newMenus = arrayMove(menus, oldIndex, newIndex);
+    const orderUpdates = newMenus.map((m, i) => ({ id: m.id, sortOrder: i }));
+    
+    try {
+      await orderMutation.mutateAsync(orderUpdates);
+      await refetch();
+    } catch (error) {
+      toast({ title: "순서 변경 실패", variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -523,7 +558,7 @@ function MenuManagement() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <p className="text-sm text-muted-foreground">
-          헤더에 표시할 메뉴를 추가하고 순서를 조정하세요.
+          헤더에 표시할 메뉴를 추가하고 순서를 조정하세요. 드래그 또는 화살표로 순서 변경이 가능합니다.
         </p>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
@@ -720,87 +755,166 @@ function MenuManagement() {
           <p className="text-sm mt-1">메뉴를 추가하거나 시스템 메뉴를 생성하세요.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {menus.map((menu, index) => (
-            <div 
-              key={menu.id} 
-              className={`flex items-center gap-3 p-3 rounded-md border ${menu.isVisible !== "true" ? "opacity-50 bg-muted/50" : ""}`}
-            >
-              <div className="flex flex-col gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6"
-                  onClick={() => handleMoveUp(index)}
-                  disabled={index === 0 || orderMutation.isPending}
-                  data-testid={`button-move-up-${menu.id}`}
-                >
-                  <ArrowUp className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6"
-                  onClick={() => handleMoveDown(index)}
-                  disabled={index === menus.length - 1 || orderMutation.isPending}
-                  data-testid={`button-move-down-${menu.id}`}
-                >
-                  <ArrowDown className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">{menu.name}</span>
-                  {menu.menuType === "system" && (
-                    <Badge variant="secondary" className="text-xs">시스템</Badge>
-                  )}
-                  {menu.showWhenLoggedIn === "true" && menu.showWhenLoggedOut !== "true" && (
-                    <Badge variant="outline" className="text-xs">로그인</Badge>
-                  )}
-                  {menu.showWhenLoggedOut === "true" && menu.showWhenLoggedIn !== "true" && (
-                    <Badge variant="outline" className="text-xs">비로그인</Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleToggleVisibility(menu)}
-                  title={menu.isVisible === "true" ? "숨기기" : "표시하기"}
-                  data-testid={`button-toggle-visibility-${menu.id}`}
-                >
-                  {menu.isVisible === "true" ? (
-                    <Eye className="w-4 h-4" />
-                  ) : (
-                    <EyeOff className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleOpenDialog(menu)}
-                  title="수정"
-                  data-testid={`button-edit-${menu.id}`}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDeleteMenu(menu.id)}
-                  disabled={deleteMutation.isPending}
-                  title="삭제"
-                  data-testid={`button-delete-${menu.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={menus.map((m) => m.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {menus.map((menu, index) => (
+                <SortableMenuItem
+                  key={menu.id}
+                  menu={menu}
+                  index={index}
+                  totalMenus={menus.length}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                  onToggleVisibility={handleToggleVisibility}
+                  onEdit={handleOpenDialog}
+                  onDelete={handleDeleteMenu}
+                  isOrderPending={orderMutation.isPending}
+                  isDeletePending={deleteMutation.isPending}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
+    </div>
+  );
+}
+
+interface SortableMenuItemProps {
+  menu: HeaderMenu;
+  index: number;
+  totalMenus: number;
+  onMoveUp: (index: number) => void;
+  onMoveDown: (index: number) => void;
+  onToggleVisibility: (menu: HeaderMenu) => void;
+  onEdit: (menu: HeaderMenu) => void;
+  onDelete: (id: string) => void;
+  isOrderPending: boolean;
+  isDeletePending: boolean;
+}
+
+function SortableMenuItem({
+  menu,
+  index,
+  totalMenus,
+  onMoveUp,
+  onMoveDown,
+  onToggleVisibility,
+  onEdit,
+  onDelete,
+  isOrderPending,
+  isDeletePending,
+}: SortableMenuItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: menu.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-3 rounded-md border bg-background ${
+        menu.isVisible !== "true" ? "opacity-50 bg-muted/50" : ""
+      } ${isDragging ? "shadow-lg ring-2 ring-primary" : ""}`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+        title="드래그하여 순서 변경"
+      >
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={() => onMoveUp(index)}
+          disabled={index === 0 || isOrderPending}
+          data-testid={`button-move-up-${menu.id}`}
+        >
+          <ArrowUp className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={() => onMoveDown(index)}
+          disabled={index === totalMenus - 1 || isOrderPending}
+          data-testid={`button-move-down-${menu.id}`}
+        >
+          <ArrowDown className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">{menu.name}</span>
+          {menu.menuType === "system" && (
+            <Badge variant="secondary" className="text-xs">시스템</Badge>
+          )}
+          {menu.showWhenLoggedIn === "true" && menu.showWhenLoggedOut !== "true" && (
+            <Badge variant="outline" className="text-xs">로그인</Badge>
+          )}
+          {menu.showWhenLoggedOut === "true" && menu.showWhenLoggedIn !== "true" && (
+            <Badge variant="outline" className="text-xs">비로그인</Badge>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onToggleVisibility(menu)}
+          title={menu.isVisible === "true" ? "숨기기" : "표시하기"}
+          data-testid={`button-toggle-visibility-${menu.id}`}
+        >
+          {menu.isVisible === "true" ? (
+            <Eye className="w-4 h-4" />
+          ) : (
+            <EyeOff className="w-4 h-4" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onEdit(menu)}
+          title="수정"
+          data-testid={`button-edit-${menu.id}`}
+        >
+          <Edit className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onDelete(menu.id)}
+          disabled={isDeletePending}
+          title="삭제"
+          data-testid={`button-delete-${menu.id}`}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   );
 }
