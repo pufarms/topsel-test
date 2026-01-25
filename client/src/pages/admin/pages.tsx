@@ -201,12 +201,13 @@ export default function PagesManagement() {
 
   // Update content mutation
   const updateContentMutation = useMutation({
-    mutationFn: async ({ id, content }: { id: string; content: PageContent }) => {
+    mutationFn: async ({ id, content, path }: { id: string; content: PageContent; path: string }) => {
       const res = await apiRequest("PATCH", `/api/pages/${id}/content`, { content });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pages/by-path", variables.path] });
       toast({ title: "콘텐츠가 저장되었습니다" });
     },
     onError: () => {
@@ -753,7 +754,7 @@ export default function PagesManagement() {
                 variant="secondary"
                 onClick={() => {
                   if (editDialog.page && contentData) {
-                    updateContentMutation.mutate({ id: editDialog.page.id, content: contentData });
+                    updateContentMutation.mutate({ id: editDialog.page.id, content: contentData, path: editDialog.page.path });
                   }
                 }}
                 disabled={updateContentMutation.isPending}

@@ -33,6 +33,7 @@ import SiteSettingsPage from "@/pages/admin/settings/site-settings";
 import PagesManagement from "@/pages/admin/pages";
 import PublicPreviewPage from "@/pages/public-preview";
 import MyPage from "@/pages/mypage";
+import DynamicPage from "@/pages/dynamic-page";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -139,6 +140,9 @@ function Router() {
       <Route path="/admin/settings/gallery">
         <AdminRoute><AdminGallery /></AdminRoute>
       </Route>
+      
+      {/* Dynamic CMS pages - catch-all route */}
+      <Route path="/:path*" component={DynamicPage} />
       
       <Route component={NotFound} />
     </Switch>
