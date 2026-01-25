@@ -3512,7 +3512,7 @@ export async function registerRoutes(
     }
     
     try {
-      const existingMenus = await storage.getHeaderMenus();
+      const existingMenus = await storage.getAllHeaderMenus();
       const existingSystemKeys = existingMenus
         .filter(m => m.menuType === "system")
         .map(m => m.systemKey);
