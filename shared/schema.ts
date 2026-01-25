@@ -771,3 +771,57 @@ export const insertHeaderMenuSchema = createInsertSchema(headerMenus).omit({
 
 export type InsertHeaderMenu = z.infer<typeof insertHeaderMenuSchema>;
 export type HeaderMenu = typeof headerMenus.$inferSelect;
+
+// ==================== Page Management ====================
+// 페이지 카테고리
+export const pageCategories = [
+  "기본페이지",
+  "메인/서브페이지",
+  "회원마이페이지",
+  "주문관리페이지",
+  "통계관리페이지",
+  "가이드페이지",
+  "게시판관리페이지",
+  "기타페이지"
+] as const;
+export type PageCategory = typeof pageCategories[number];
+
+// 접근권한 레벨 (all = 모든 회원, 그 외는 해당 등급 이상)
+export const pageAccessLevels = ["all", "ASSOCIATE", "START", "DRIVING", "TOP"] as const;
+export type PageAccessLevel = typeof pageAccessLevels[number];
+
+export const pageAccessLevelLabels: Record<PageAccessLevel, string> = {
+  all: "전체 공개",
+  ASSOCIATE: "준회원 이상",
+  START: "Start회원 이상",
+  DRIVING: "Driving회원 이상",
+  TOP: "Top회원 전용",
+};
+
+// 페이지 상태
+export const pageStatuses = ["active", "draft", "hidden"] as const;
+export type PageStatus = typeof pageStatuses[number];
+
+export const pages = pgTable("pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 100 }).notNull(), // 페이지 이름
+  path: varchar("path", { length: 255 }).notNull(), // URL 경로
+  description: text("description"), // 설명
+  category: varchar("category", { length: 50 }).notNull(), // 8개 카테고리 중 하나
+  accessLevel: varchar("access_level", { length: 20 }).default("all").notNull(), // 접근권한
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, draft, hidden
+  sortOrder: integer("sort_order").default(0), // 정렬 순서
+  icon: varchar("icon", { length: 50 }), // 아이콘 이름 (lucide-react)
+  isSystem: varchar("is_system", { length: 10 }).default("false"), // 시스템 페이지 여부 (삭제 불가)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPageSchema = createInsertSchema(pages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPage = z.infer<typeof insertPageSchema>;
+export type Page = typeof pages.$inferSelect;

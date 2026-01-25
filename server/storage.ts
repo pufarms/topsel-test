@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -1456,6 +1456,100 @@ export class DatabaseStorage implements IStorage {
       await db.update(headerMenus)
         .set({ sortOrder: menu.sortOrder, updatedAt: new Date() })
         .where(eq(headerMenus.id, menu.id));
+    }
+  }
+
+  // ==================== Pages ====================
+  async getAllPages(): Promise<Page[]> {
+    return db.select().from(pages).orderBy(pages.category, pages.sortOrder);
+  }
+
+  async getPagesByCategory(category: string): Promise<Page[]> {
+    return db.select().from(pages)
+      .where(eq(pages.category, category))
+      .orderBy(pages.sortOrder);
+  }
+
+  async getPage(id: string): Promise<Page | undefined> {
+    const [page] = await db.select().from(pages).where(eq(pages.id, id));
+    return page;
+  }
+
+  async createPage(data: InsertPage): Promise<Page> {
+    const [page] = await db.insert(pages).values(data).returning();
+    return page;
+  }
+
+  async updatePage(id: string, data: Partial<InsertPage>): Promise<Page | undefined> {
+    const [page] = await db.update(pages)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(pages.id, id))
+      .returning();
+    return page;
+  }
+
+  async deletePage(id: string): Promise<boolean> {
+    // Check if system page (can't delete)
+    const existingPage = await this.getPage(id);
+    if (existingPage?.isSystem === "true") {
+      return false;
+    }
+    const result = await db.delete(pages).where(eq(pages.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async seedDefaultPages(): Promise<void> {
+    // Check if pages already exist
+    const existingPages = await db.select().from(pages);
+    if (existingPages.length > 0) {
+      return;
+    }
+
+    const defaultPages = [
+      // 1. 기본페이지
+      { name: "로그인", path: "/login", description: "회원 로그인 페이지", category: "기본페이지", accessLevel: "all", status: "active", sortOrder: 1, icon: "LogIn", isSystem: "true" },
+      { name: "로그아웃", path: "/logout", description: "로그아웃 처리", category: "기본페이지", accessLevel: "all", status: "active", sortOrder: 2, icon: "LogOut", isSystem: "true" },
+      { name: "회원가입", path: "/register", description: "신규 회원 가입 페이지", category: "기본페이지", accessLevel: "all", status: "active", sortOrder: 3, icon: "UserPlus", isSystem: "true" },
+      { name: "이용약관", path: "/terms", description: "서비스 이용약관", category: "기본페이지", accessLevel: "all", status: "draft", sortOrder: 4, icon: "FileText", isSystem: "true" },
+      { name: "개인정보처리방침", path: "/privacy", description: "개인정보 처리방침", category: "기본페이지", accessLevel: "all", status: "draft", sortOrder: 5, icon: "Shield", isSystem: "true" },
+      { name: "개인정보 제3자 동의", path: "/third-party-consent", description: "개인정보 제3자 제공 동의", category: "기본페이지", accessLevel: "all", status: "draft", sortOrder: 6, icon: "Users", isSystem: "true" },
+
+      // 2. 메인/서브페이지
+      { name: "메인 페이지", path: "/", description: "메인 랜딩 페이지", category: "메인/서브페이지", accessLevel: "all", status: "active", sortOrder: 1, icon: "Home", isSystem: "true" },
+      { name: "서브페이지", path: "/sub", description: "서브 페이지 (예정)", category: "메인/서브페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "Layout", isSystem: "false" },
+
+      // 3. 회원마이페이지
+      { name: "마이페이지 대시보드", path: "/dashboard", description: "회원 전용 대시보드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 1, icon: "LayoutDashboard", isSystem: "true" },
+      { name: "회원정보", path: "/mypage", description: "회원 정보 및 수정", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 2, icon: "User", isSystem: "true" },
+
+      // 4. 주문관리페이지
+      { name: "주문등록", path: "/orders/create", description: "새 주문 등록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 1, icon: "ShoppingCart", isSystem: "false" },
+      { name: "취소건 관리", path: "/orders/cancelled", description: "취소된 주문 관리", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 2, icon: "XCircle", isSystem: "false" },
+      { name: "운송장 다운로드", path: "/orders/shipping", description: "운송장 파일 다운로드", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 3, icon: "Download", isSystem: "false" },
+      { name: "배송중 리스트", path: "/orders/shipping-list", description: "배송 중인 주문 목록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 4, icon: "Truck", isSystem: "false" },
+      { name: "배송완료 리스트", path: "/orders/completed", description: "배송 완료된 주문 목록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 5, icon: "CheckCircle", isSystem: "false" },
+
+      // 5. 통계관리페이지
+      { name: "상품별 통계관리", path: "/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "START", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },
+      { name: "정산 관리", path: "/stats/settlement", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "START", status: "draft", sortOrder: 2, icon: "DollarSign", isSystem: "false" },
+
+      // 6. 가이드페이지
+      { name: "회원가입과 등급", path: "/guide/membership", description: "회원가입, 자격, 등급, 혜택 안내", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "BookOpen", isSystem: "false" },
+      { name: "주문/발주 관리", path: "/guide/orders", description: "주문발주 순서, 엑셀 일괄주문, 취소 관리", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "ClipboardList", isSystem: "false" },
+      { name: "상품", path: "/guide/products", description: "공급상품, 현재/차주공급가, 리스트 주요사항", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 3, icon: "Package", isSystem: "false" },
+      { name: "예치금/포인트 정산", path: "/guide/settlement", description: "예치금/포인트 정산, 충전, 세금계산서", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 4, icon: "Wallet", isSystem: "false" },
+      { name: "혜택과 지원", path: "/guide/benefits", description: "콘텐츠 제공, 지원금, 할인, 후불결제", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 5, icon: "Gift", isSystem: "false" },
+
+      // 7. 게시판관리페이지
+      { name: "일반 게시판", path: "/board/general", description: "일반 공개 게시판", category: "게시판관리페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "MessageSquare", isSystem: "false" },
+      { name: "회원전용 게시판", path: "/board/members", description: "회원 전용 게시판", category: "게시판관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 2, icon: "MessageCircle", isSystem: "false" },
+
+      // 8. 기타페이지
+      { name: "공개 레이아웃 미리보기", path: "/public-preview", description: "헤더/푸터 설정 미리보기 (테스트용)", category: "기타페이지", accessLevel: "all", status: "active", sortOrder: 1, icon: "Eye", isSystem: "false" },
+    ];
+
+    for (const page of defaultPages) {
+      await db.insert(pages).values(page);
     }
   }
 }
