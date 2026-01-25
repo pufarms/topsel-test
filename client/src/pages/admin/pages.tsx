@@ -679,14 +679,10 @@ export default function PagesManagement() {
           </DialogHeader>
           
           <Tabs value={editTab} onValueChange={setEditTab} className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="settings" data-testid="tab-settings">
                 <Settings className="w-4 h-4 mr-2" />
                 설정
-              </TabsTrigger>
-              <TabsTrigger value="content" data-testid="tab-content">
-                <Layout className="w-4 h-4 mr-2" />
-                콘텐츠
               </TabsTrigger>
               <TabsTrigger value="code" data-testid="tab-code">
                 <Code className="w-4 h-4 mr-2" />
@@ -694,7 +690,7 @@ export default function PagesManagement() {
               </TabsTrigger>
               <TabsTrigger value="preview" data-testid="tab-preview">
                 <Monitor className="w-4 h-4 mr-2" />
-                미리보기
+                뷰편집
               </TabsTrigger>
             </TabsList>
             
@@ -782,15 +778,6 @@ export default function PagesManagement() {
               </div>
             </TabsContent>
             
-            <TabsContent value="content" className="flex-1 overflow-auto mt-4">
-              <ScrollArea className="h-[400px] pr-4">
-                <PageContentEditor 
-                  content={contentData}
-                  onChange={(newContent) => setContentData(newContent)}
-                />
-              </ScrollArea>
-            </TabsContent>
-            
             <TabsContent value="code" className="flex-1 overflow-auto mt-4">
               <div className="space-y-4">
                 <div className="bg-muted px-4 py-2 rounded-t-lg flex items-center justify-between">
@@ -853,7 +840,7 @@ export default function PagesManagement() {
                 <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Monitor className="w-4 h-4" />
-                    <span className="text-sm font-medium">페이지 미리보기</span>
+                    <span className="text-sm font-medium">뷰 편집</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     텍스트나 이미지를 클릭하면 바로 편집할 수 있습니다
@@ -874,7 +861,7 @@ export default function PagesManagement() {
             <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
               취소
             </Button>
-            {(editTab === "content" || editTab === "code") && (
+            {(editTab === "code" || editTab === "preview") && (
               <Button 
                 variant="secondary"
                 onClick={() => {

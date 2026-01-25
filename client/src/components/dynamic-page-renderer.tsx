@@ -118,17 +118,30 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
   
   return (
     <section
-      className={`relative py-16 md:py-24 ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`relative py-16 md:py-24 ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-hero"
     >
       {hasBackgroundImage && (
         <>
           <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className={`absolute inset-0 bg-cover bg-center bg-no-repeat ${isEditing ? "cursor-pointer group" : ""}`}
             style={{ backgroundImage: `url(${data.backgroundImage})` }}
-          />
-          <div className="absolute inset-0 bg-black/50" />
+            onClick={(e) => {
+              if (isEditing && onFieldEdit) {
+                e.stopPropagation();
+                onFieldEdit(sectionId, "backgroundImage", data.backgroundImage || "", "image");
+              }
+            }}
+          >
+            {isEditing && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
+                <span className="bg-primary text-primary-foreground text-sm px-3 py-1 rounded">
+                  배경 이미지 변경
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="absolute inset-0 bg-black/50 pointer-events-none" />
         </>
       )}
       <div className={`container mx-auto px-4 text-center relative z-10 ${hasBackgroundImage ? "text-white" : ""}`}>
@@ -198,52 +211,71 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
   );
 }
 
-function HeadingSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function HeadingSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   const title = data.title || "";
   
   return (
     <div
-      className={`py-8 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-8 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-heading"
     >
-      <h2 className="text-2xl md:text-3xl font-bold text-center">{title}</h2>
+      <EditableField
+        value={title}
+        sectionId={sectionId}
+        fieldPath="title"
+        fieldType="text"
+        isEditing={isEditing}
+        onEdit={onFieldEdit}
+        as="h2"
+        className="text-2xl md:text-3xl font-bold text-center"
+      />
     </div>
   );
 }
 
-function TextSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function TextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   const text = data.text || data.description || "";
   
   return (
     <div
-      className={`py-6 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-6 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-text"
     >
       <div className="container mx-auto px-4">
-        <p className="text-base md:text-lg leading-relaxed whitespace-pre-wrap">{text}</p>
+        <EditableField
+          value={text}
+          sectionId={sectionId}
+          fieldPath="text"
+          fieldType="text"
+          isEditing={isEditing}
+          onEdit={onFieldEdit}
+          as="p"
+          className="text-base md:text-lg leading-relaxed whitespace-pre-wrap"
+        />
       </div>
     </div>
   );
 }
 
-function ImageSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function ImageSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   
   return (
     <div
-      className={`py-8 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-8 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-image"
     >
       <div className="container mx-auto px-4">
         {data.imageUrl ? (
-          <img
+          <EditableImage
             src={data.imageUrl}
             alt={data.imageAlt || "Image"}
+            sectionId={sectionId}
+            fieldPath="imageUrl"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
             className="max-w-full h-auto mx-auto rounded-lg"
           />
         ) : (
@@ -256,13 +288,12 @@ function ImageSection({ data, isEditing, onClick }: { data: PageSection["data"];
   );
 }
 
-function ButtonSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function ButtonSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   
   return (
     <div
-      className={`py-6 text-center ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-6 text-center ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-button"
     >
       <Button asChild>
@@ -272,11 +303,10 @@ function ButtonSection({ data, isEditing, onClick }: { data: PageSection["data"]
   );
 }
 
-function DividerSection({ isEditing, onClick }: { isEditing?: boolean; onClick?: () => void }) {
+function DividerSection({ sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   return (
     <div
-      className={`py-8 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-8 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-divider"
     >
       <hr className="border-t border-border" />
@@ -284,23 +314,40 @@ function DividerSection({ isEditing, onClick }: { isEditing?: boolean; onClick?:
   );
 }
 
-function CardsSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function CardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
   
   return (
     <section
-      className={`py-12 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-12 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-cards"
     >
       <div className="container mx-auto px-4">
         {(data.title || data.subtitle) && (
           <div className="text-center mb-8">
             {data.title && (
-              <p className="text-primary font-semibold mb-2">{data.title}</p>
+              <EditableField
+                value={data.title}
+                sectionId={sectionId}
+                fieldPath="title"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className="text-primary font-semibold mb-2"
+              />
             )}
             {data.subtitle && (
-              <h2 className="text-2xl md:text-3xl font-bold">{data.subtitle}</h2>
+              <EditableField
+                value={data.subtitle}
+                sectionId={sectionId}
+                fieldPath="subtitle"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="h2"
+                className="text-2xl md:text-3xl font-bold"
+              />
             )}
           </div>
         )}
@@ -335,27 +382,53 @@ function CardsSection({ data, isEditing, onClick }: { data: PageSection["data"];
   );
 }
 
-function FeaturesSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function FeaturesSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
-  const description = data.text || data.description;
+  const description = data.text || data.description || "";
   const itemCount = data.items?.length || 0;
   const gridCols = itemCount === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4";
   
   return (
     <section
-      className={`py-12 bg-muted/50 ${isEditing ? "cursor-pointer ring-2 ring-primary/50 ring-offset-2" : ""}`}
-      onClick={onClick}
+      className={`py-12 bg-muted/50 ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-features"
     >
       <div className="container mx-auto px-4">
         {data.title && (
           <div className="text-center mb-8">
-            <p className="text-primary font-semibold mb-2">{data.title}</p>
+            <EditableField
+              value={data.title}
+              sectionId={sectionId}
+              fieldPath="title"
+              fieldType="text"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              as="p"
+              className="text-primary font-semibold mb-2"
+            />
             {data.subtitle && (
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">{data.subtitle}</h2>
+              <EditableField
+                value={data.subtitle}
+                sectionId={sectionId}
+                fieldPath="subtitle"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="h2"
+                className="text-2xl md:text-3xl font-bold mb-2"
+              />
             )}
             {description && (
-              <p className="text-muted-foreground max-w-2xl mx-auto">{description}</p>
+              <EditableField
+                value={description}
+                sectionId={sectionId}
+                fieldPath="description"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className="text-muted-foreground max-w-2xl mx-auto"
+              />
             )}
           </div>
         )}
@@ -375,22 +448,39 @@ function FeaturesSection({ data, isEditing, onClick }: { data: PageSection["data
   );
 }
 
-function CTASection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
-  const description = data.text || data.description;
+  const description = data.text || data.description || "";
   
   return (
     <section
-      className={`py-16 bg-primary text-primary-foreground ${isEditing ? "cursor-pointer ring-2 ring-primary-foreground/50 ring-offset-2 ring-offset-primary" : ""}`}
-      onClick={onClick}
+      className={`py-16 bg-primary text-primary-foreground ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-cta"
     >
       <div className="container mx-auto px-4 text-center">
         {data.title && (
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">{data.title}</h2>
+          <EditableField
+            value={data.title}
+            sectionId={sectionId}
+            fieldPath="title"
+            fieldType="text"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
+            as="h2"
+            className="text-2xl md:text-3xl font-bold mb-4"
+          />
         )}
         {description && (
-          <p className="text-lg opacity-90 max-w-2xl mx-auto mb-8">{description}</p>
+          <EditableField
+            value={description}
+            sectionId={sectionId}
+            fieldPath="description"
+            fieldType="text"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
+            as="p"
+            className="text-lg opacity-90 max-w-2xl mx-auto mb-8"
+          />
         )}
         <div className="flex flex-wrap gap-4 justify-center">
           {data.buttonText && data.buttonLink && (
@@ -434,21 +524,21 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
           case "hero":
             return <HeroSection key={sectionId} {...commonProps} />;
           case "heading":
-            return <HeadingSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <HeadingSection key={sectionId} {...commonProps} />;
           case "text":
-            return <TextSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <TextSection key={sectionId} {...commonProps} />;
           case "image":
-            return <ImageSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <ImageSection key={sectionId} {...commonProps} />;
           case "button":
-            return <ButtonSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <ButtonSection key={sectionId} {...commonProps} />;
           case "divider":
-            return <DividerSection key={sectionId} isEditing={isEditing} onClick={handleClick} />;
+            return <DividerSection key={sectionId} {...commonProps} />;
           case "cards":
-            return <CardsSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <CardsSection key={sectionId} {...commonProps} />;
           case "features":
-            return <FeaturesSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <FeaturesSection key={sectionId} {...commonProps} />;
           case "cta":
-            return <CTASection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <CTASection key={sectionId} {...commonProps} />;
           default:
             return null;
         }
