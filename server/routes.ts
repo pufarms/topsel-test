@@ -3634,5 +3634,129 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Pages Management ====================
+  // Get all pages (admin only)
+  app.get("/api/pages", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const pages = await storage.getAllPages();
+      res.json(pages);
+    } catch (error) {
+      console.error("Failed to get pages:", error);
+      res.status(500).json({ error: "Failed to get pages" });
+    }
+  });
+
+  // Get page by ID (admin only)
+  app.get("/api/pages/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const page = await storage.getPage(req.params.id);
+      if (!page) {
+        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+      }
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to get page:", error);
+      res.status(500).json({ error: "Failed to get page" });
+    }
+  });
+
+  // Create page (admin only)
+  app.post("/api/pages", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const page = await storage.createPage(req.body);
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to create page:", error);
+      res.status(500).json({ error: "Failed to create page" });
+    }
+  });
+
+  // Update page (admin only)
+  app.put("/api/pages/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const page = await storage.updatePage(req.params.id, req.body);
+      if (!page) {
+        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+      }
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to update page:", error);
+      res.status(500).json({ error: "Failed to update page" });
+    }
+  });
+
+  // Delete page (admin only, cannot delete system pages)
+  app.delete("/api/pages/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const deleted = await storage.deletePage(req.params.id);
+      if (!deleted) {
+        return res.status(400).json({ message: "시스템 페이지는 삭제할 수 없습니다" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete page:", error);
+      res.status(500).json({ error: "Failed to delete page" });
+    }
+  });
+
+  // Seed default pages (SUPER_ADMIN only)
+  app.post("/api/pages/seed", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "SUPER_ADMIN 권한이 필요합니다" });
+    }
+    
+    try {
+      await storage.seedDefaultPages();
+      res.json({ success: true, message: "기본 페이지가 생성되었습니다" });
+    } catch (error) {
+      console.error("Failed to seed default pages:", error);
+      res.status(500).json({ error: "Failed to seed default pages" });
+    }
+  });
+
   return httpServer;
 }
