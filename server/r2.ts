@@ -29,7 +29,7 @@ function generateImageName(originalFilename: string): string {
   const yearLast2Digits = seoulTime.getFullYear().toString().slice(-2);
   const month = (seoulTime.getMonth() + 1).toString().padStart(2, '0');
   const day = seoulTime.getDate().toString().padStart(2, '0');
-  const seq = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+  const seq = (Math.floor(Math.random() * 99) + 1).toString().padStart(2, '0');
   
   const ext = originalFilename.includes('.') 
     ? originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase()
