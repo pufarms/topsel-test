@@ -24,9 +24,11 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
 function generateImageName(originalFilename: string): string {
   const now = new Date();
-  const yearLast2Digits = now.getFullYear().toString().slice(-2);
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
+  const seoulTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  
+  const yearLast2Digits = seoulTime.getFullYear().toString().slice(-2);
+  const month = (seoulTime.getMonth() + 1).toString().padStart(2, '0');
+  const day = seoulTime.getDate().toString().padStart(2, '0');
   const randomSeq = Math.floor(Math.random() * 100).toString().padStart(2, '0');
   const uniqueSuffix = Date.now().toString().slice(-3);
   
