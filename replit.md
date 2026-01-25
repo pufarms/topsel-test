@@ -93,6 +93,21 @@ Preferred communication style: Simple, everyday language.
 - Backend utilizes `multer` for memory storage and `xlsx` library for parsing.
 - Server-side generation of Excel files for template downloads.
 
+### Site Settings Management (Admin)
+- **Database Table**: `siteSettings` stores key-value pairs with type information (string, boolean, number, json)
+- **Categories**: header (로고, 버튼 표시), footer (회사정보, 링크), general (사이트명, 설명)
+- **API Endpoints**:
+  - `GET /api/site-settings/public`: Public endpoint for header/footer (no auth required)
+  - `GET /api/site-settings`: Admin-only, all settings
+  - `PUT /api/site-settings/bulk`: Admin-only, bulk update
+  - `POST /api/site-settings/seed`: SUPER_ADMIN only, create initial settings
+- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 푸터)
+- **Public Components**: 
+  - `PublicHeader`: Dynamic header from settings (logo, login/register/cart buttons)
+  - `PublicFooter`: Dynamic footer from settings (company info, copyright, links)
+  - `PublicLayout`: Wrapper component with header + content + footer
+- **Hook**: `useSiteSettings` with `usePublicSiteSettings()`, `useAdminSiteSettings()`, `useUpdateSiteSettings()`
+
 ## External Dependencies
 
 ### Database
