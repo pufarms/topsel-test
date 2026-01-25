@@ -721,3 +721,24 @@ export const insertStockHistorySchema = createInsertSchema(stockHistory).omit({
 
 export type InsertStockHistory = z.infer<typeof insertStockHistorySchema>;
 export type StockHistory = typeof stockHistory.$inferSelect;
+
+// ==================== 사이트 설정 ====================
+export const siteSettings = pgTable("site_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: varchar("setting_key", { length: 100 }).unique().notNull(),
+  settingValue: text("setting_value"),
+  settingType: varchar("setting_type", { length: 20 }).default("string"), // 'string', 'boolean', 'json', 'number'
+  category: varchar("category", { length: 50 }).default("general"), // 'header', 'footer', 'general'
+  description: varchar("description", { length: 200 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
+export type SiteSetting = typeof siteSettings.$inferSelect;
