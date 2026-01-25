@@ -226,7 +226,12 @@ export function PageContentEditor({ content, onChange, onImageUpload }: PageCont
         </Card>
       ) : (
         <div className="space-y-2">
-          {sections.map((section, index) => (
+          {sections.map((section, index) => {
+            // Support both flat (section.title) and nested (section.data.title) structures
+            const sectionData = section.data || section;
+            const sectionTitle = sectionData.title || sectionData.subtitle || "";
+            
+            return (
             <Card key={section.id} className="hover-elevate">
               <CardContent className="p-3 flex items-center gap-3">
                 <div className="text-muted-foreground">
@@ -235,9 +240,9 @@ export function PageContentEditor({ content, onChange, onImageUpload }: PageCont
                 <div className="flex-1 flex items-center gap-2">
                   {sectionTypeLabels[section.type].icon}
                   <span className="font-medium">{sectionTypeLabels[section.type].label}</span>
-                  {section.data.title && (
+                  {sectionTitle && (
                     <span className="text-sm text-muted-foreground truncate max-w-[200px]">
-                      - {section.data.title}
+                      - {sectionTitle}
                     </span>
                   )}
                 </div>
@@ -280,7 +285,8 @@ export function PageContentEditor({ content, onChange, onImageUpload }: PageCont
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
 
