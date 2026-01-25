@@ -29,6 +29,7 @@ import ProductMappingPage from "@/pages/admin/inventory/mapping";
 import StockStatusPage from "@/pages/admin/inventory/stock";
 import ReceivingPage from "@/pages/admin/inventory/receiving";
 import InventoryHistoryPage from "@/pages/admin/inventory/history";
+import SiteSettingsPage from "@/pages/admin/settings/site-settings";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -128,7 +129,7 @@ function Router() {
         <AdminRoute><PlaceholderPage title="페이지관리" description="페이지를 관리합니다" /></AdminRoute>
       </Route>
       <Route path="/admin/settings/site">
-        <AdminRoute><PlaceholderPage title="사이트 설정" description="사이트 기본 설정을 관리합니다" /></AdminRoute>
+        <AdminRoute><SiteSettingsPage /></AdminRoute>
       </Route>
       <Route path="/admin/settings/gallery">
         <AdminRoute><AdminGallery /></AdminRoute>
