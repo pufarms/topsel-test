@@ -3747,6 +3747,57 @@ export async function registerRoutes(
     }
   });
 
+  // Get page by path (public - for dynamic page rendering)
+  app.get("/api/pages/by-path", async (req, res) => {
+    try {
+      const path = req.query.path as string;
+      if (!path) {
+        return res.status(400).json({ message: "path 파라미터가 필요합니다" });
+      }
+      const allPages = await storage.getPages();
+      const page = allPages.find(p => p.path === path);
+      if (!page) {
+        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+      }
+      
+      // Check access level (for public pages, return content)
+      // Admin pages require authentication
+      if (page.status !== "active") {
+        if (!req.session.userId) {
+          return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+        }
+      }
+      
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to get page by path:", error);
+      res.status(500).json({ error: "Failed to get page" });
+    }
+  });
+
+  // Update page content (admin only)
+  app.patch("/api/pages/:id/content", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const { content } = req.body;
+      const page = await storage.updatePage(req.params.id, { content });
+      if (!page) {
+        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+      }
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to update page content:", error);
+      res.status(500).json({ error: "Failed to update page content" });
+    }
+  });
+
   // Seed default pages (SUPER_ADMIN only)
   app.post("/api/pages/seed", async (req, res) => {
     if (!req.session.userId) {
