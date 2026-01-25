@@ -47,7 +47,19 @@ Preferred communication style: Simple, everyday language.
 - `materials`, `material_categories_*`: Multi-level inventory management for raw, semi, and sub-materials with automatic code generation.
 - `product_mappings`, `product_material_mappings`: Links products to their required materials for inventory control.
 - `members`, `member_logs`: Member (partner) management and historical changes.
+  - Members can log in separately from admin users and access their own mypage.
+  - Member authentication checks: status="활성" and grade≠"PENDING"
 - `images`: Storage of various image types with categories and subcategories.
+
+### Member Mypage (Member Only)
+- **Route**: `/mypage` - Member self-service profile page
+- **API Endpoints**:
+  - `GET /api/member/profile`: Get current logged-in member's profile
+  - `PATCH /api/member/profile`: Update member's own profile
+- **Editable fields**: representative, businessAddress, phone, managerName, managerPhone, email, password
+- **Read-only fields**: companyName, businessNumber, username, grade, deposit, point
+- **Access control**: Only accessible when session.userType === "member"
+- **Data synchronization**: Admin and member both modify the same `members` table, ensuring real-time sync
 
 ### Product Management (Admin Only)
 - Role-based access control for SUPER_ADMIN and ADMIN.
