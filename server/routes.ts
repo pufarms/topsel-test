@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels } from "@shared/schema";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -3687,9 +3687,13 @@ export async function registerRoutes(
     }
     
     try {
-      const page = await storage.createPage(req.body);
+      const validatedData = insertPageSchema.parse(req.body);
+      const page = await storage.createPage(validatedData);
       res.json(page);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "유효하지 않은 데이터입니다", errors: error.errors });
+      }
       console.error("Failed to create page:", error);
       res.status(500).json({ error: "Failed to create page" });
     }
@@ -3706,12 +3710,16 @@ export async function registerRoutes(
     }
     
     try {
-      const page = await storage.updatePage(req.params.id, req.body);
+      const validatedData = insertPageSchema.partial().parse(req.body);
+      const page = await storage.updatePage(req.params.id, validatedData);
       if (!page) {
         return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
       }
       res.json(page);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "유효하지 않은 데이터입니다", errors: error.errors });
+      }
       console.error("Failed to update page:", error);
       res.status(500).json({ error: "Failed to update page" });
     }

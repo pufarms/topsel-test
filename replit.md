@@ -147,6 +147,31 @@ Preferred communication style: Simple, everyday language.
 - **Hooks**: `usePublicHeaderMenus()`, `useAdminHeaderMenus()`, `useCreateHeaderMenu()`, `useUpdateHeaderMenu()`, `useDeleteHeaderMenu()`, `useUpdateHeaderMenuOrder()`, `useSeedHeaderMenus()`
 - **PublicHeader Logic**: All menus displayed on right side, filtered by login status
 
+### Page Management (Admin)
+- **Database Table**: `pages` stores page definitions with categories, access levels, and settings
+- **Page Categories (8)**:
+  1. 기본페이지: 로그인, 로그아웃, 회원가입, 이용약관, 개인정보처리방침, 개인정보 제3자 동의
+  2. 메인/서브페이지: 메인 페이지, 서브페이지
+  3. 회원마이페이지: 마이페이지 대시보드, 회원정보
+  4. 주문관리페이지: 주문등록, 취소건 관리, 운송장 다운로드, 배송중/완료 리스트
+  5. 통계관리페이지: 상품별 통계관리, 정산 관리
+  6. 가이드페이지: 회원가입과 등급, 주문/발주 관리, 상품, 예치금/포인트 정산, 혜택과 지원
+  7. 게시판관리페이지: 일반 게시판, 회원전용 게시판
+  8. 기타페이지
+- **Access Levels**: all (전체 공개), ASSOCIATE (준회원 이상), START (Start회원 이상), DRIVING (Driving회원 이상), TOP (Top회원 전용)
+- **API Endpoints**:
+  - `GET /api/pages`: Admin-only, all pages
+  - `POST /api/pages`: Create new page (with Zod validation)
+  - `PUT /api/pages/:id`: Update page (with Zod validation)
+  - `DELETE /api/pages/:id`: Delete page (system pages cannot be deleted)
+  - `POST /api/pages/seed`: SUPER_ADMIN only, create default pages
+- **UI Features**:
+  - List view grouped by 8 categories with collapsible sections
+  - Each page shows name, path, status badge, access level badge, system flag
+  - Add/Edit/Delete pages with category, access level, and status selection
+  - Search functionality across all pages
+  - System pages (isSystem="true") cannot be deleted
+
 ## External Dependencies
 
 ### Database

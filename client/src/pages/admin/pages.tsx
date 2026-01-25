@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Eye, 
   Settings, 
@@ -17,108 +19,214 @@ import {
   ExternalLink,
   Layout,
   Copy,
-  Check
+  Check,
+  Plus,
+  Pencil,
+  Trash2,
+  LogIn,
+  LogOut,
+  UserPlus,
+  Shield,
+  Users,
+  LayoutDashboard,
+  XCircle,
+  Download,
+  Truck,
+  CheckCircle,
+  BarChart,
+  DollarSign,
+  BookOpen,
+  ClipboardList,
+  Package,
+  Wallet,
+  Gift,
+  MessageSquare,
+  MessageCircle,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  pageCategories, 
+  pageAccessLevels, 
+  pageAccessLevelLabels,
+  type Page, 
+  type PageCategory, 
+  type PageAccessLevel 
+} from "@shared/schema";
 
-interface PageInfo {
-  id: string;
-  name: string;
-  path: string;
-  description: string;
-  status: "active" | "draft" | "hidden";
-  type: "public" | "member" | "admin";
-  icon: React.ReactNode;
-}
+const iconMap: Record<string, React.ReactNode> = {
+  Home: <Home className="w-4 h-4" />,
+  LogIn: <LogIn className="w-4 h-4" />,
+  LogOut: <LogOut className="w-4 h-4" />,
+  UserPlus: <UserPlus className="w-4 h-4" />,
+  FileText: <FileText className="w-4 h-4" />,
+  Shield: <Shield className="w-4 h-4" />,
+  Users: <Users className="w-4 h-4" />,
+  Layout: <Layout className="w-4 h-4" />,
+  LayoutDashboard: <LayoutDashboard className="w-4 h-4" />,
+  User: <User className="w-4 h-4" />,
+  ShoppingCart: <ShoppingCart className="w-4 h-4" />,
+  XCircle: <XCircle className="w-4 h-4" />,
+  Download: <Download className="w-4 h-4" />,
+  Truck: <Truck className="w-4 h-4" />,
+  CheckCircle: <CheckCircle className="w-4 h-4" />,
+  BarChart: <BarChart className="w-4 h-4" />,
+  DollarSign: <DollarSign className="w-4 h-4" />,
+  BookOpen: <BookOpen className="w-4 h-4" />,
+  ClipboardList: <ClipboardList className="w-4 h-4" />,
+  Package: <Package className="w-4 h-4" />,
+  Wallet: <Wallet className="w-4 h-4" />,
+  Gift: <Gift className="w-4 h-4" />,
+  MessageSquare: <MessageSquare className="w-4 h-4" />,
+  MessageCircle: <MessageCircle className="w-4 h-4" />,
+  Eye: <Eye className="w-4 h-4" />,
+  Settings: <Settings className="w-4 h-4" />,
+};
 
-const pages: PageInfo[] = [
-  {
-    id: "home",
-    name: "홈페이지",
-    path: "/",
-    description: "메인 랜딩 페이지",
-    status: "active",
-    type: "public",
-    icon: <Home className="w-5 h-5" />,
-  },
-  {
-    id: "login",
-    name: "로그인",
-    path: "/login",
-    description: "회원 로그인 페이지",
-    status: "active",
-    type: "public",
-    icon: <User className="w-5 h-5" />,
-  },
-  {
-    id: "register",
-    name: "회원가입",
-    path: "/register",
-    description: "신규 회원 가입 페이지",
-    status: "active",
-    type: "public",
-    icon: <User className="w-5 h-5" />,
-  },
-  {
-    id: "public-preview",
-    name: "공개 레이아웃 미리보기",
-    path: "/public-preview",
-    description: "헤더/푸터 설정 미리보기 (테스트용)",
-    status: "active",
-    type: "public",
-    icon: <Layout className="w-5 h-5" />,
-  },
-  {
-    id: "dashboard",
-    name: "회원 대시보드",
-    path: "/dashboard",
-    description: "회원 전용 대시보드",
-    status: "active",
-    type: "member",
-    icon: <FileText className="w-5 h-5" />,
-  },
-  {
-    id: "cart",
-    name: "장바구니",
-    path: "/cart",
-    description: "상품 장바구니 페이지",
-    status: "draft",
-    type: "member",
-    icon: <ShoppingCart className="w-5 h-5" />,
-  },
-  {
-    id: "mypage",
-    name: "마이페이지",
-    path: "/mypage",
-    description: "회원 정보 및 주문 내역",
-    status: "draft",
-    type: "member",
-    icon: <User className="w-5 h-5" />,
-  },
-  {
-    id: "terms",
-    name: "이용약관",
-    path: "/terms",
-    description: "서비스 이용약관",
-    status: "draft",
-    type: "public",
-    icon: <FileText className="w-5 h-5" />,
-  },
-  {
-    id: "privacy",
-    name: "개인정보처리방침",
-    path: "/privacy",
-    description: "개인정보 처리방침",
-    status: "draft",
-    type: "public",
-    icon: <FileText className="w-5 h-5" />,
-  },
-];
+const getIcon = (iconName: string | null) => {
+  if (!iconName) return <FileText className="w-4 h-4" />;
+  return iconMap[iconName] || <FileText className="w-4 h-4" />;
+};
+
+const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+  active: { label: "활성", variant: "default" },
+  draft: { label: "준비중", variant: "secondary" },
+  hidden: { label: "숨김", variant: "outline" },
+};
 
 export default function PagesManagement() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "public" | "member" | "admin">("all");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(pageCategories));
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
+  const [addDialog, setAddDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
+
+  // Form state for add/edit
+  const [formData, setFormData] = useState({
+    name: "",
+    path: "",
+    description: "",
+    category: "기타페이지" as PageCategory,
+    accessLevel: "all" as PageAccessLevel,
+    status: "draft",
+    icon: "",
+  });
+
+  // Fetch pages
+  const { data: pages = [], isLoading, refetch } = useQuery<Page[]>({
+    queryKey: ["/api/pages"],
+  });
+
+  // Seed pages mutation
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/pages/seed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      toast({ title: "기본 페이지가 생성되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "페이지 생성에 실패했습니다", variant: "destructive" });
+    },
+  });
+
+  // Create page mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/pages", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      toast({ title: "페이지가 추가되었습니다" });
+      setAddDialog(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "오류", description: "페이지 추가에 실패했습니다", variant: "destructive" });
+    },
+  });
+
+  // Update page mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
+      const res = await apiRequest("PUT", `/api/pages/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      toast({ title: "페이지가 수정되었습니다" });
+      setEditDialog({ open: false, page: null });
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "오류", description: "페이지 수정에 실패했습니다", variant: "destructive" });
+    },
+  });
+
+  // Delete page mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/pages/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      toast({ title: "페이지가 삭제되었습니다" });
+      setDeleteDialog({ open: false, page: null });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "시스템 페이지는 삭제할 수 없습니다", variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      path: "",
+      description: "",
+      category: "기타페이지",
+      accessLevel: "all",
+      status: "draft",
+      icon: "",
+    });
+  };
+
+  const openEditDialog = (page: Page) => {
+    setFormData({
+      name: page.name,
+      path: page.path,
+      description: page.description || "",
+      category: page.category as PageCategory,
+      accessLevel: page.accessLevel as PageAccessLevel,
+      status: page.status,
+      icon: page.icon || "",
+    });
+    setEditDialog({ open: true, page });
+  };
 
   const getFullUrl = (path: string) => {
     return `${window.location.origin}${path}`;
@@ -143,42 +251,41 @@ export default function PagesManagement() {
     }
   };
 
-  const filteredPages = pages.filter((page) => {
-    const matchesSearch = 
-      page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      page.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      page.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === "all" || page.type === filterType;
-    return matchesSearch && matchesType;
-  });
-
-  const getStatusBadge = (status: PageInfo["status"]) => {
-    switch (status) {
-      case "active":
-        return <Badge variant="default">활성</Badge>;
-      case "draft":
-        return <Badge variant="secondary">준비중</Badge>;
-      case "hidden":
-        return <Badge variant="outline">숨김</Badge>;
+  const toggleCategory = (category: string) => {
+    const newSet = new Set(expandedCategories);
+    if (newSet.has(category)) {
+      newSet.delete(category);
+    } else {
+      newSet.add(category);
     }
+    setExpandedCategories(newSet);
   };
 
-  const getTypeBadge = (type: PageInfo["type"]) => {
-    switch (type) {
-      case "public":
-        return <Badge variant="outline">공개</Badge>;
-      case "member":
-        return <Badge variant="outline">회원전용</Badge>;
-      case "admin":
-        return <Badge variant="outline">관리자</Badge>;
-    }
-  };
+  // Group pages by category
+  const groupedPages = pageCategories.reduce((acc, category) => {
+    const categoryPages = pages.filter(
+      (page) => page.category === category &&
+      (page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       page.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       (page.description || "").toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    acc[category] = categoryPages;
+    return acc;
+  }, {} as Record<PageCategory, Page[]>);
+
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 lg:p-8 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       <PageHeader
         title="페이지 관리"
-        description="사이트 페이지 현황을 확인하고 관리합니다."
+        description="사이트 페이지를 카테고리별로 관리합니다."
       />
 
       <Card>
@@ -209,109 +316,370 @@ export default function PagesManagement() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle className="text-lg">페이지 목록</CardTitle>
-              <CardDescription>총 {filteredPages.length}개의 페이지</CardDescription>
+              <CardDescription>총 {pages.length}개의 페이지 (8개 카테고리)</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="검색..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-[200px]"
+                  className="pl-9 w-[180px]"
                   data-testid="input-search"
                 />
               </div>
+              {pages.length === 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => seedMutation.mutate()}
+                  disabled={seedMutation.isPending}
+                  data-testid="button-seed-pages"
+                >
+                  {seedMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  기본 페이지 생성
+                </Button>
+              )}
+              <Button onClick={() => setAddDialog(true)} data-testid="button-add-page">
+                <Plus className="w-4 h-4 mr-2" />
+                페이지 추가
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 mb-4 flex-wrap">
-            <Button 
-              variant={filterType === "all" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterType("all")}
-            >
-              전체
-            </Button>
-            <Button 
-              variant={filterType === "public" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterType("public")}
-            >
-              공개
-            </Button>
-            <Button 
-              variant={filterType === "member" ? "default" : "outline"} 
-              size="sm"
-              onClick={() => setFilterType("member")}
-            >
-              회원전용
-            </Button>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredPages.map((page) => (
-              <Card key={page.id} className="hover-elevate">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-md bg-muted">
-                      {page.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium truncate">{page.name}</h3>
-                      </div>
-                      <div className="flex items-center gap-1 mb-2">
-                        <p className="text-sm text-muted-foreground truncate flex-1">
-                          {page.path}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => copyToClipboard(page.id, page.path)}
-                          data-testid={`button-copy-url-${page.id}`}
-                        >
-                          {copiedId === page.id ? (
-                            <Check className="w-3 h-3 text-green-500" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {page.description}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {getStatusBadge(page.status)}
-                        {getTypeBadge(page.type)}
-                      </div>
-                    </div>
+        <CardContent className="space-y-4">
+          {pageCategories.map((category) => {
+            const categoryPages = groupedPages[category] || [];
+            const isExpanded = expandedCategories.has(category);
+            
+            return (
+              <div key={category} className="border rounded-lg overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between p-4 bg-muted/50 hover-elevate text-left"
+                  onClick={() => toggleCategory(category)}
+                  data-testid={`button-category-${category}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    <span className="font-medium">{category}</span>
+                    <Badge variant="secondary" className="ml-2">{categoryPages.length}</Badge>
                   </div>
-                  {page.status === "active" && (
-                    <div className="mt-3 pt-3 border-t">
-                      <Button variant="ghost" size="sm" className="w-full" asChild>
-                        <Link href={page.path}>
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          페이지 열기
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {filteredPages.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>검색 결과가 없습니다.</p>
-            </div>
-          )}
+                </button>
+                
+                {isExpanded && (
+                  <div className="divide-y">
+                    {categoryPages.length === 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground text-center">
+                        이 카테고리에 페이지가 없습니다
+                      </div>
+                    ) : (
+                      categoryPages.map((page) => (
+                        <div 
+                          key={page.id} 
+                          className="flex items-center justify-between p-4 hover:bg-muted/30 gap-4"
+                          data-testid={`page-row-${page.id}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="p-2 rounded-md bg-muted shrink-0">
+                              {getIcon(page.icon)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium truncate">{page.name}</span>
+                                <Badge variant={statusLabels[page.status]?.variant || "secondary"}>
+                                  {statusLabels[page.status]?.label || page.status}
+                                </Badge>
+                                <Badge variant="outline">
+                                  {pageAccessLevelLabels[page.accessLevel as PageAccessLevel] || page.accessLevel}
+                                </Badge>
+                                {page.isSystem === "true" && (
+                                  <Badge variant="outline" className="text-xs">시스템</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm text-muted-foreground truncate">{page.path}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 shrink-0"
+                                  onClick={() => copyToClipboard(page.id, page.path)}
+                                  data-testid={`button-copy-url-${page.id}`}
+                                >
+                                  {copiedId === page.id ? (
+                                    <Check className="w-3 h-3 text-green-500" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </Button>
+                              </div>
+                              {page.description && (
+                                <p className="text-xs text-muted-foreground mt-1 truncate">{page.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {page.status === "active" && (
+                              <Button variant="ghost" size="icon" asChild>
+                                <Link href={page.path}>
+                                  <ExternalLink className="w-4 h-4" />
+                                </Link>
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => openEditDialog(page)}
+                              data-testid={`button-edit-${page.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            {page.isSystem !== "true" && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => setDeleteDialog({ open: true, page })}
+                                data-testid={`button-delete-${page.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
+
+      {/* Add Page Dialog */}
+      <Dialog open={addDialog} onOpenChange={setAddDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>페이지 추가</DialogTitle>
+            <DialogDescription>새 페이지를 추가합니다.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>페이지 이름</Label>
+              <Input 
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="페이지 이름"
+                data-testid="input-page-name"
+              />
+            </div>
+            <div>
+              <Label>경로 (URL)</Label>
+              <Input 
+                value={formData.path}
+                onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                placeholder="/example-page"
+                data-testid="input-page-path"
+              />
+            </div>
+            <div>
+              <Label>설명</Label>
+              <Textarea 
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="페이지 설명"
+                data-testid="input-page-description"
+              />
+            </div>
+            <div>
+              <Label>카테고리</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
+              >
+                <SelectTrigger data-testid="select-page-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>접근권한</Label>
+              <Select 
+                value={formData.accessLevel} 
+                onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
+              >
+                <SelectTrigger data-testid="select-page-access">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageAccessLevels.map((level) => (
+                    <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>상태</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(v) => setFormData({ ...formData, status: v })}
+              >
+                <SelectTrigger data-testid="select-page-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">활성</SelectItem>
+                  <SelectItem value="draft">준비중</SelectItem>
+                  <SelectItem value="hidden">숨김</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddDialog(false); resetForm(); }}>
+              취소
+            </Button>
+            <Button 
+              onClick={() => createMutation.mutate(formData)}
+              disabled={createMutation.isPending || !formData.name || !formData.path}
+              data-testid="button-save-new-page"
+            >
+              {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              추가
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Page Dialog */}
+      <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, page: open ? editDialog.page : null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>페이지 수정</DialogTitle>
+            <DialogDescription>페이지 정보를 수정합니다.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>페이지 이름</Label>
+              <Input 
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="페이지 이름"
+                data-testid="input-edit-page-name"
+              />
+            </div>
+            <div>
+              <Label>경로 (URL)</Label>
+              <Input 
+                value={formData.path}
+                onChange={(e) => setFormData({ ...formData, path: e.target.value })}
+                placeholder="/example-page"
+                data-testid="input-edit-page-path"
+              />
+            </div>
+            <div>
+              <Label>설명</Label>
+              <Textarea 
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="페이지 설명"
+                data-testid="input-edit-page-description"
+              />
+            </div>
+            <div>
+              <Label>카테고리</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
+              >
+                <SelectTrigger data-testid="select-edit-page-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>접근권한</Label>
+              <Select 
+                value={formData.accessLevel} 
+                onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
+              >
+                <SelectTrigger data-testid="select-edit-page-access">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageAccessLevels.map((level) => (
+                    <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>상태</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(v) => setFormData({ ...formData, status: v })}
+              >
+                <SelectTrigger data-testid="select-edit-page-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">활성</SelectItem>
+                  <SelectItem value="draft">준비중</SelectItem>
+                  <SelectItem value="hidden">숨김</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
+              취소
+            </Button>
+            <Button 
+              onClick={() => editDialog.page && updateMutation.mutate({ id: editDialog.page.id, data: formData })}
+              disabled={updateMutation.isPending || !formData.name || !formData.path}
+              data-testid="button-save-edit-page"
+            >
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, page: open ? deleteDialog.page : null })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>페이지 삭제</DialogTitle>
+            <DialogDescription>
+              "{deleteDialog.page?.name}" 페이지를 삭제하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog({ open: false, page: null })}>
+              취소
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => deleteDialog.page && deleteMutation.mutate(deleteDialog.page.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
