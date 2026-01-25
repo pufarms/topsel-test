@@ -144,6 +144,68 @@ export async function registerRoutes(
     });
   });
 
+  // Member profile endpoints
+  app.get("/api/member/profile", async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    const member = await storage.getMember(req.session.userId);
+    if (!member) {
+      return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+    }
+
+    const { password, ...memberWithoutPassword } = member;
+    return res.json(memberWithoutPassword);
+  });
+
+  app.patch("/api/member/profile", async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    const member = await storage.getMember(req.session.userId);
+    if (!member) {
+      return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+    }
+
+    try {
+      const allowedFields = z.object({
+        representative: z.string().min(1).optional(),
+        businessAddress: z.string().optional(),
+        phone: z.string().min(1).optional(),
+        managerName: z.string().optional(),
+        managerPhone: z.string().optional(),
+        email: z.string().email().optional().or(z.literal("")),
+        password: z.string().min(6).optional().or(z.literal("")),
+      });
+
+      const data = allowedFields.parse(req.body);
+      const updateData: any = {};
+
+      if (data.representative) updateData.representative = data.representative;
+      if (data.businessAddress !== undefined) updateData.businessAddress = data.businessAddress;
+      if (data.phone) updateData.phone = data.phone;
+      if (data.managerName !== undefined) updateData.managerName = data.managerName;
+      if (data.managerPhone !== undefined) updateData.managerPhone = data.managerPhone;
+      if (data.email !== undefined) updateData.email = data.email;
+      if (data.password && data.password.length >= 6) updateData.password = data.password;
+
+      const updatedMember = await storage.updateMember(req.session.userId, updateData);
+      if (!updatedMember) {
+        return res.status(500).json({ message: "회원 정보 수정에 실패했습니다" });
+      }
+
+      const { password, ...memberWithoutPassword } = updatedMember;
+      return res.json(memberWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/orders", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
