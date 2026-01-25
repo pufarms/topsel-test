@@ -116,6 +116,7 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
 export default function PagesManagement() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(pageCategories));
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
@@ -261,17 +262,27 @@ export default function PagesManagement() {
     setExpandedCategories(newSet);
   };
 
+  // Filter by category and search term
+  const filteredPages = pages.filter((page) => {
+    const matchesCategory = categoryFilter === "all" || page.category === categoryFilter;
+    const matchesSearch = 
+      page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      page.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (page.description || "").toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
   // Group pages by category
   const groupedPages = pageCategories.reduce((acc, category) => {
-    const categoryPages = pages.filter(
-      (page) => page.category === category &&
-      (page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       page.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       (page.description || "").toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const categoryPages = filteredPages.filter((page) => page.category === category);
     acc[category] = categoryPages;
     return acc;
   }, {} as Record<PageCategory, Page[]>);
+  
+  // Categories to display (only selected or all)
+  const categoriesToShow = categoryFilter === "all" 
+    ? pageCategories 
+    : pageCategories.filter(cat => cat === categoryFilter);
 
   if (isLoading) {
     return (
@@ -316,9 +327,24 @@ export default function PagesManagement() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle className="text-lg">페이지 목록</CardTitle>
-              <CardDescription>총 {pages.length}개의 페이지 (8개 카테고리)</CardDescription>
+              <CardDescription>
+                {categoryFilter === "all" 
+                  ? `총 ${filteredPages.length}개의 페이지 (8개 카테고리)` 
+                  : `${categoryFilter}: ${filteredPages.length}개의 페이지`}
+              </CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
+                  <SelectValue placeholder="카테고리 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 카테고리</SelectItem>
+                  {pageCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -348,7 +374,7 @@ export default function PagesManagement() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {pageCategories.map((category) => {
+          {categoriesToShow.map((category) => {
             const categoryPages = groupedPages[category] || [];
             const isExpanded = expandedCategories.has(category);
             
