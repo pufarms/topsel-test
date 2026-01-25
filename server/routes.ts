@@ -3501,5 +3501,42 @@ export async function registerRoutes(
     }
   });
 
+  // Seed default system menus
+  app.post("/api/header-menus/seed", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "SUPER_ADMIN 권한이 필요합니다" });
+    }
+    
+    try {
+      const existingMenus = await storage.getHeaderMenus();
+      const existingSystemKeys = existingMenus
+        .filter(m => m.menuType === "system")
+        .map(m => m.systemKey);
+      
+      const systemMenus = [
+        { name: "로그인", path: "/login", menuType: "system", systemKey: "login", showWhenLoggedIn: "false", showWhenLoggedOut: "true", sortOrder: 100 },
+        { name: "회원가입", path: "/register", menuType: "system", systemKey: "register", showWhenLoggedIn: "false", showWhenLoggedOut: "true", sortOrder: 101 },
+        { name: "로그아웃", path: "/logout", menuType: "system", systemKey: "logout", showWhenLoggedIn: "true", showWhenLoggedOut: "false", sortOrder: 102 },
+        { name: "장바구니", path: "/cart", menuType: "system", systemKey: "cart", showWhenLoggedIn: "true", showWhenLoggedOut: "false", sortOrder: 103 },
+        { name: "마이페이지", path: "/mypage", menuType: "system", systemKey: "mypage", showWhenLoggedIn: "true", showWhenLoggedOut: "false", sortOrder: 104 },
+      ];
+      
+      const menusToCreate = systemMenus.filter(m => !existingSystemKeys.includes(m.systemKey));
+      
+      for (const menu of menusToCreate) {
+        await storage.createHeaderMenu(menu);
+      }
+      
+      res.json({ success: true, message: `${menusToCreate.length}개의 시스템 메뉴가 생성되었습니다` });
+    } catch (error) {
+      console.error("Failed to seed system menus:", error);
+      res.status(500).json({ error: "Failed to seed system menus" });
+    }
+  });
+
   return httpServer;
 }

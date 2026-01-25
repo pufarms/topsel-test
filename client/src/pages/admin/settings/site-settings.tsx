@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap, useAdminHeaderMenus, useCreateHeaderMenu, useUpdateHeaderMenu, useDeleteHeaderMenu, useUpdateHeaderMenuOrder } from "@/hooks/use-site-settings";
+import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap, useAdminHeaderMenus, useCreateHeaderMenu, useUpdateHeaderMenu, useDeleteHeaderMenu, useUpdateHeaderMenuOrder, useSeedHeaderMenus } from "@/hooks/use-site-settings";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { HeaderMenu } from "@shared/schema";
@@ -375,12 +376,24 @@ function MenuManagement() {
   const updateMutation = useUpdateHeaderMenu();
   const deleteMutation = useDeleteHeaderMenu();
   const orderMutation = useUpdateHeaderMenuOrder();
+  const seedMutation = useSeedHeaderMenus();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<HeaderMenu | null>(null);
-  const [formData, setFormData] = useState({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
+  const [formData, setFormData] = useState({ name: "", path: "", isVisible: "true", openInNewTab: "false", showWhenLoggedIn: "true", showWhenLoggedOut: "true" });
   const [pageSearch, setPageSearch] = useState("");
   const [showPageSelector, setShowPageSelector] = useState(false);
+  
+  const hasSystemMenus = menus?.some(m => m.menuType === "system");
+  
+  const handleSeedMenus = async () => {
+    try {
+      await seedMutation.mutateAsync();
+      toast({ title: "완료", description: "시스템 메뉴가 생성되었습니다." });
+    } catch (error) {
+      toast({ title: "실패", description: "시스템 메뉴 생성에 실패했습니다.", variant: "destructive" });
+    }
+  };
 
   const filteredPages = SITE_PAGES.filter(page => 
     page.name.toLowerCase().includes(pageSearch.toLowerCase()) ||
@@ -389,7 +402,7 @@ function MenuManagement() {
   );
 
   const resetForm = () => {
-    setFormData({ name: "", path: "", isVisible: "true", openInNewTab: "false" });
+    setFormData({ name: "", path: "", isVisible: "true", openInNewTab: "false", showWhenLoggedIn: "true", showWhenLoggedOut: "true" });
     setEditingMenu(null);
     setPageSearch("");
     setShowPageSelector(false);
@@ -403,6 +416,8 @@ function MenuManagement() {
         path: menu.path,
         isVisible: menu.isVisible || "true",
         openInNewTab: menu.openInNewTab || "false",
+        showWhenLoggedIn: menu.showWhenLoggedIn || "true",
+        showWhenLoggedOut: menu.showWhenLoggedOut || "true",
       });
     } else {
       resetForm();
@@ -624,6 +639,30 @@ function MenuManagement() {
               </div>
               <div className="flex items-center justify-between p-3 rounded-md border">
                 <div>
+                  <Label htmlFor="menu-logged-in" className="cursor-pointer">로그인 시 표시</Label>
+                  <p className="text-xs text-muted-foreground">로그인한 사용자에게 표시</p>
+                </div>
+                <Switch
+                  id="menu-logged-in"
+                  checked={formData.showWhenLoggedIn === "true"}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, showWhenLoggedIn: checked ? "true" : "false" }))}
+                  data-testid="switch-menu-logged-in"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-md border">
+                <div>
+                  <Label htmlFor="menu-logged-out" className="cursor-pointer">비로그인 시 표시</Label>
+                  <p className="text-xs text-muted-foreground">로그인하지 않은 사용자에게 표시</p>
+                </div>
+                <Switch
+                  id="menu-logged-out"
+                  checked={formData.showWhenLoggedOut === "true"}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, showWhenLoggedOut: checked ? "true" : "false" }))}
+                  data-testid="switch-menu-logged-out"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-md border">
+                <div>
                   <Label htmlFor="menu-newtab" className="cursor-pointer">새 탭에서 열기</Label>
                   <p className="text-xs text-muted-foreground">외부 링크인 경우 권장</p>
                 </div>
@@ -654,11 +693,31 @@ function MenuManagement() {
         </Dialog>
       </div>
 
+      {!hasSystemMenus && (
+        <div className="p-4 border rounded-md border-dashed bg-muted/30 mb-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-medium">시스템 메뉴 생성</p>
+              <p className="text-sm text-muted-foreground">로그인, 로그아웃, 회원가입, 장바구니, 마이페이지 메뉴를 자동으로 생성합니다.</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleSeedMenus}
+              disabled={seedMutation.isPending}
+              data-testid="button-seed-menus"
+            >
+              {seedMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              시스템 메뉴 생성
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {(!menus || menus.length === 0) ? (
         <div className="text-center py-8 text-muted-foreground border rounded-md border-dashed">
           <Menu className="w-10 h-10 mx-auto mb-3 opacity-50" />
           <p>등록된 메뉴가 없습니다.</p>
-          <p className="text-sm mt-1">메뉴를 추가하여 헤더에 표시하세요.</p>
+          <p className="text-sm mt-1">메뉴를 추가하거나 시스템 메뉴를 생성하세요.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -690,7 +749,18 @@ function MenuManagement() {
                 </Button>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium">{menu.name}</div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">{menu.name}</span>
+                  {menu.menuType === "system" && (
+                    <Badge variant="secondary" className="text-xs">시스템</Badge>
+                  )}
+                  {menu.showWhenLoggedIn === "true" && menu.showWhenLoggedOut !== "true" && (
+                    <Badge variant="outline" className="text-xs">로그인</Badge>
+                  )}
+                  {menu.showWhenLoggedOut === "true" && menu.showWhenLoggedIn !== "true" && (
+                    <Badge variant="outline" className="text-xs">비로그인</Badge>
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground truncate">{menu.path}</div>
               </div>
               <div className="flex items-center gap-1">

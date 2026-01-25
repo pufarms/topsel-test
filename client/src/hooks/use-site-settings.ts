@@ -148,3 +148,16 @@ export function useUpdateHeaderMenuOrder() {
     },
   });
 }
+
+export function useSeedHeaderMenus() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/header-menus/seed", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/header-menus/public"] });
+    },
+  });
+}

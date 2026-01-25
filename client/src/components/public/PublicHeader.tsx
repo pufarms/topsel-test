@@ -1,23 +1,108 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { usePublicSiteSettings, usePublicHeaderMenus } from "@/hooks/use-site-settings";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { User, ShoppingCart, LogIn, UserPlus, Menu } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { HeaderMenu } from "@shared/schema";
 
 export function PublicHeader() {
   const { data: settings } = usePublicSiteSettings();
   const { data: menus } = usePublicHeaderMenus();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const siteName = settings?.site_name || "탑셀러";
   const logoUrl = settings?.header_logo_url;
   const logoAlt = settings?.header_logo_alt || siteName;
-  const showLogin = settings?.header_show_login !== false;
-  const showRegister = settings?.header_show_register !== false;
-  const showCart = settings?.header_show_cart !== false;
+
+  const filteredMenus = menus?.filter((menu: HeaderMenu) => {
+    if (menu.isVisible !== "true") return false;
+    
+    if (user) {
+      return menu.showWhenLoggedIn === "true";
+    } else {
+      return menu.showWhenLoggedOut === "true";
+    }
+  }) || [];
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/logout", {});
+      setUser(null);
+      toast({ title: "로그아웃 완료", description: "성공적으로 로그아웃되었습니다." });
+      navigate("/");
+    } catch (error) {
+      toast({ title: "로그아웃 실패", variant: "destructive" });
+    }
+  };
+
+  const handleMenuClick = (menu: HeaderMenu) => {
+    if (menu.systemKey === "logout") {
+      handleLogout();
+      return true;
+    }
+    return false;
+  };
+
+  const renderMenuItem = (menu: HeaderMenu, isMobile: boolean = false) => {
+    if (menu.systemKey === "logout") {
+      return (
+        <Button
+          key={menu.id}
+          variant="ghost"
+          className={isMobile ? "justify-start w-full" : ""}
+          onClick={() => {
+            handleLogout();
+            if (isMobile) setMobileMenuOpen(false);
+          }}
+          data-testid={isMobile ? `mobile-menu-${menu.id}` : `link-menu-${menu.id}`}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          {menu.name}
+        </Button>
+      );
+    }
+
+    if (menu.openInNewTab === "true") {
+      return (
+        <a
+          key={menu.id}
+          href={menu.path}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={isMobile 
+            ? "text-sm font-medium px-4 py-2 rounded-md hover:bg-muted block"
+            : "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          }
+          onClick={() => isMobile && setMobileMenuOpen(false)}
+          data-testid={isMobile ? `mobile-menu-${menu.id}` : `link-menu-${menu.id}`}
+        >
+          {menu.name}
+        </a>
+      );
+    }
+
+    return (
+      <Link
+        key={menu.id}
+        href={menu.path}
+        className={isMobile 
+          ? "text-sm font-medium px-4 py-2 rounded-md hover:bg-muted block"
+          : "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        }
+        onClick={() => isMobile && setMobileMenuOpen(false)}
+        data-testid={isMobile ? `mobile-menu-${menu.id}` : `link-menu-${menu.id}`}
+      >
+        {menu.name}
+      </Link>
+    );
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -30,74 +115,10 @@ export function PublicHeader() {
               <span className="text-lg font-bold">{siteName}</span>
             )}
           </Link>
-
-          {menus && menus.length > 0 && (
-            <nav className="hidden md:flex items-center gap-4">
-              {menus.map((menu) => (
-                menu.openInNewTab === "true" ? (
-                  <a
-                    key={menu.id}
-                    href={menu.path}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid={`link-menu-${menu.id}`}
-                  >
-                    {menu.name}
-                  </a>
-                ) : (
-                  <Link
-                    key={menu.id}
-                    href={menu.path}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid={`link-menu-${menu.id}`}
-                  >
-                    {menu.name}
-                  </Link>
-                )
-              ))}
-            </nav>
-          )}
         </div>
 
         <nav className="hidden md:flex items-center gap-4">
-          {user ? (
-            <>
-              {showCart && (
-                <Button variant="ghost" size="icon" asChild data-testid="button-cart">
-                  <Link href="/cart">
-                    <ShoppingCart className="h-5 w-5" />
-                    <span className="sr-only">장바구니</span>
-                  </Link>
-                </Button>
-              )}
-              <Button variant="ghost" size="icon" asChild data-testid="button-profile">
-                <Link href="/mypage">
-                  <User className="h-5 w-5" />
-                  <span className="sr-only">마이페이지</span>
-                </Link>
-              </Button>
-            </>
-          ) : (
-            <>
-              {showLogin && (
-                <Button variant="ghost" asChild data-testid="button-login">
-                  <Link href="/login">
-                    <LogIn className="h-4 w-4 mr-2" />
-                    로그인
-                  </Link>
-                </Button>
-              )}
-              {showRegister && (
-                <Button asChild data-testid="button-register">
-                  <Link href="/register">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    회원가입
-                  </Link>
-                </Button>
-              )}
-            </>
-          )}
+          {filteredMenus.map((menu) => renderMenuItem(menu, false))}
         </nav>
 
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -108,93 +129,8 @@ export function PublicHeader() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[250px]">
-            <nav className="flex flex-col gap-4 mt-8">
-              {menus && menus.length > 0 && (
-                <>
-                  {menus.map((menu) => (
-                    menu.openInNewTab === "true" ? (
-                      <a
-                        key={menu.id}
-                        href={menu.path}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium px-4 py-2 rounded-md hover:bg-muted"
-                        onClick={() => setMobileMenuOpen(false)}
-                        data-testid={`mobile-menu-${menu.id}`}
-                      >
-                        {menu.name}
-                      </a>
-                    ) : (
-                      <Link
-                        key={menu.id}
-                        href={menu.path}
-                        className="text-sm font-medium px-4 py-2 rounded-md hover:bg-muted"
-                        onClick={() => setMobileMenuOpen(false)}
-                        data-testid={`mobile-menu-${menu.id}`}
-                      >
-                        {menu.name}
-                      </Link>
-                    )
-                  ))}
-                  <div className="border-t my-2" />
-                </>
-              )}
-              {user ? (
-                <>
-                  {showCart && (
-                    <Button 
-                      variant="ghost" 
-                      className="justify-start" 
-                      asChild
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link href="/cart">
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        장바구니
-                      </Link>
-                    </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    className="justify-start" 
-                    asChild
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Link href="/mypage">
-                      <User className="h-4 w-4 mr-2" />
-                      마이페이지
-                    </Link>
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {showLogin && (
-                    <Button 
-                      variant="ghost" 
-                      className="justify-start" 
-                      asChild
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link href="/login">
-                        <LogIn className="h-4 w-4 mr-2" />
-                        로그인
-                      </Link>
-                    </Button>
-                  )}
-                  {showRegister && (
-                    <Button 
-                      className="justify-start" 
-                      asChild
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link href="/register">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        회원가입
-                      </Link>
-                    </Button>
-                  )}
-                </>
-              )}
+            <nav className="flex flex-col gap-2 mt-8">
+              {filteredMenus.map((menu) => renderMenuItem(menu, true))}
             </nav>
           </SheetContent>
         </Sheet>

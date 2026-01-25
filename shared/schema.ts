@@ -744,13 +744,19 @@ export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
 export type SiteSetting = typeof siteSettings.$inferSelect;
 
 // ==================== Header Menus ====================
+// menuType: "system" (로그인, 로그아웃, 회원가입, 장바구니 등 시스템 메뉴) | "custom" (사용자 정의 메뉴)
+// systemKey: 시스템 메뉴 식별자 (login, logout, register, cart, mypage 등)
 export const headerMenus = pgTable("header_menus", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 100 }).notNull(),
   path: varchar("path", { length: 255 }).notNull(),
+  menuType: varchar("menu_type", { length: 20 }).default("custom"), // "system" | "custom"
+  systemKey: varchar("system_key", { length: 50 }), // login, logout, register, cart, mypage
   sortOrder: integer("sort_order").default(0),
   isVisible: varchar("is_visible", { length: 10 }).default("true"),
   openInNewTab: varchar("open_in_new_tab", { length: 10 }).default("false"),
+  showWhenLoggedIn: varchar("show_when_logged_in", { length: 10 }).default("true"), // 로그인 시 표시
+  showWhenLoggedOut: varchar("show_when_logged_out", { length: 10 }).default("true"), // 비로그인 시 표시
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
