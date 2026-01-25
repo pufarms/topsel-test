@@ -802,6 +802,46 @@ export const pageAccessLevelLabels: Record<PageAccessLevel, string> = {
 export const pageStatuses = ["active", "draft", "hidden"] as const;
 export type PageStatus = typeof pageStatuses[number];
 
+// 페이지 콘텐츠 섹션 타입
+export const pageSectionTypes = ["hero", "text", "image", "heading", "button", "divider", "cards", "features", "cta"] as const;
+export type PageSectionType = typeof pageSectionTypes[number];
+
+// 페이지 콘텐츠 섹션 인터페이스
+export interface PageSection {
+  id: string;
+  type: PageSectionType;
+  order: number;
+  data: {
+    title?: string;
+    subtitle?: string;
+    text?: string;
+    imageUrl?: string;
+    imageAlt?: string;
+    buttonText?: string;
+    buttonLink?: string;
+    backgroundColor?: string;
+    textColor?: string;
+    items?: Array<{
+      id: string;
+      title?: string;
+      description?: string;
+      imageUrl?: string;
+      icon?: string;
+      link?: string;
+    }>;
+  };
+}
+
+// 페이지 콘텐츠 구조
+export interface PageContent {
+  sections: PageSection[];
+  meta?: {
+    title?: string;
+    description?: string;
+    keywords?: string;
+  };
+}
+
 export const pages = pgTable("pages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 100 }).notNull(), // 페이지 이름
@@ -813,6 +853,7 @@ export const pages = pgTable("pages", {
   sortOrder: integer("sort_order").default(0), // 정렬 순서
   icon: varchar("icon", { length: 50 }), // 아이콘 이름 (lucide-react)
   isSystem: varchar("is_system", { length: 10 }).default("false"), // 시스템 페이지 여부 (삭제 불가)
+  content: jsonb("content").$type<PageContent>(), // 페이지 콘텐츠 (동적 섹션들)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
