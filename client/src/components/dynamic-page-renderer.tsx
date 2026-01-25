@@ -19,6 +19,75 @@ interface DynamicPageRendererProps {
   content: PageContent | null;
   isEditing?: boolean;
   onSectionClick?: (section: PageSection) => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => void;
+}
+
+interface EditableFieldProps {
+  value: string;
+  sectionId: string;
+  fieldPath: string;
+  fieldType: 'text' | 'image';
+  isEditing?: boolean;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  className?: string;
+  as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
+  children?: React.ReactNode;
+}
+
+function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEdit, className = "", as: Component = 'span', children }: EditableFieldProps) {
+  if (!isEditing || !onEdit) {
+    return <Component className={className}>{children || value}</Component>;
+  }
+  
+  return (
+    <Component 
+      className={`${className} relative group cursor-pointer hover:bg-primary/10 hover:outline hover:outline-2 hover:outline-primary/50 rounded transition-colors`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit(sectionId, fieldPath, value, fieldType);
+      }}
+      data-testid={`editable-${sectionId}-${fieldPath}`}
+    >
+      {children || value}
+      <span className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground text-xs px-1 py-0.5 rounded transition-opacity">
+        편집
+      </span>
+    </Component>
+  );
+}
+
+interface EditableImageProps {
+  src: string;
+  alt: string;
+  sectionId: string;
+  fieldPath: string;
+  isEditing?: boolean;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image') => void;
+  className?: string;
+}
+
+function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, className = "" }: EditableImageProps) {
+  if (!isEditing || !onEdit) {
+    return <img src={src} alt={alt} className={className} />;
+  }
+  
+  return (
+    <div 
+      className="relative group cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit(sectionId, fieldPath, src, 'image');
+      }}
+      data-testid={`editable-image-${sectionId}-${fieldPath}`}
+    >
+      <img src={src} alt={alt} className={`${className} group-hover:opacity-80 transition-opacity`} />
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity rounded">
+        <span className="bg-primary text-primary-foreground text-sm px-3 py-1 rounded">
+          이미지 변경
+        </span>
+      </div>
+    </div>
+  );
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -34,9 +103,17 @@ const iconMap: Record<string, React.ReactNode> = {
   Package: <Package className="w-6 h-6" />,
 };
 
-function HeroSection({ data, isEditing, onClick }: { data: PageSection["data"]; isEditing?: boolean; onClick?: () => void }) {
+interface SectionProps {
+  data: PageSection["data"];
+  sectionId: string;
+  isEditing?: boolean;
+  onClick?: () => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => void;
+}
+
+function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   if (!data) return null;
-  const description = data.text || data.description;
+  const description = data.text || data.description || "";
   
   return (
     <section
@@ -47,21 +124,52 @@ function HeroSection({ data, isEditing, onClick }: { data: PageSection["data"]; 
       <div className="container mx-auto px-4 text-center">
         {data.imageUrl && (
           <div className="mb-8">
-            <img
+            <EditableImage
               src={data.imageUrl}
               alt={data.imageAlt || "Hero image"}
+              sectionId={sectionId}
+              fieldPath="imageUrl"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
               className="max-w-full h-auto max-h-[300px] mx-auto rounded-lg object-cover"
             />
           </div>
         )}
         {data.title && (
-          <h1 className="text-3xl md:text-5xl font-bold mb-4">{data.title}</h1>
+          <EditableField
+            value={data.title}
+            sectionId={sectionId}
+            fieldPath="title"
+            fieldType="text"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
+            as="h1"
+            className="text-3xl md:text-5xl font-bold mb-4"
+          />
         )}
         {data.subtitle && (
-          <h2 className="text-xl md:text-2xl text-muted-foreground mb-4">{data.subtitle}</h2>
+          <EditableField
+            value={data.subtitle}
+            sectionId={sectionId}
+            fieldPath="subtitle"
+            fieldType="text"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
+            as="h2"
+            className="text-xl md:text-2xl text-muted-foreground mb-4"
+          />
         )}
         {description && (
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">{description}</p>
+          <EditableField
+            value={description}
+            sectionId={sectionId}
+            fieldPath="description"
+            fieldType="text"
+            isEditing={isEditing}
+            onEdit={onFieldEdit}
+            as="p"
+            className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8"
+          />
         )}
         <div className="flex flex-wrap gap-4 justify-center">
           {data.buttonText && data.buttonLink && (
@@ -291,7 +399,7 @@ function CTASection({ data, isEditing, onClick }: { data: PageSection["data"]; i
   );
 }
 
-export function DynamicPageRenderer({ content, isEditing, onSectionClick }: DynamicPageRendererProps) {
+export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit }: DynamicPageRendererProps) {
   if (!content || !content.sections || content.sections.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
@@ -309,25 +417,28 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick }: Dyna
         // Support both flat structure (section.title) and nested structure (section.data.title)
         const sectionData = section.data || section;
         
+        const sectionId = section.id || `section-${index}`;
+        const commonProps = { data: sectionData, sectionId, isEditing, onClick: handleClick, onFieldEdit };
+        
         switch (section.type) {
           case "hero":
-            return <HeroSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <HeroSection key={sectionId} {...commonProps} />;
           case "heading":
-            return <HeadingSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <HeadingSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "text":
-            return <TextSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <TextSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "image":
-            return <ImageSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <ImageSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "button":
-            return <ButtonSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <ButtonSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "divider":
-            return <DividerSection key={section.id || index} isEditing={isEditing} onClick={handleClick} />;
+            return <DividerSection key={sectionId} isEditing={isEditing} onClick={handleClick} />;
           case "cards":
-            return <CardsSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <CardsSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "features":
-            return <FeaturesSection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <FeaturesSection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           case "cta":
-            return <CTASection key={section.id || index} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
+            return <CTASection key={sectionId} data={sectionData} isEditing={isEditing} onClick={handleClick} />;
           default:
             return null;
         }

@@ -49,7 +49,8 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
-  Monitor
+  Monitor,
+  Code
 } from "lucide-react";
 import {
   Dialog,
@@ -130,6 +131,16 @@ export default function PagesManagement() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [previewDialog, setPreviewDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [editTab, setEditTab] = useState<string>("settings");
+  
+  // Inline field editing state
+  const [inlineEditDialog, setInlineEditDialog] = useState<{
+    open: boolean;
+    sectionId: string;
+    fieldPath: string;
+    currentValue: string;
+    fieldType: 'text' | 'image';
+  }>({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
+  const [inlineEditValue, setInlineEditValue] = useState<string>('');
 
   // Form state for add/edit
   const [formData, setFormData] = useState({
@@ -258,6 +269,48 @@ export default function PagesManagement() {
     setContentData(page.content || { sections: [] });
     setEditTab("settings");
     setEditDialog({ open: true, page });
+  };
+  
+  // Handle inline field editing from preview tab
+  const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => {
+    setInlineEditValue(currentValue);
+    setInlineEditDialog({
+      open: true,
+      sectionId,
+      fieldPath,
+      currentValue,
+      fieldType,
+    });
+  };
+  
+  // Apply inline edit to content data
+  const applyInlineEdit = () => {
+    if (!contentData || !contentData.sections) return;
+    
+    const updatedSections = contentData.sections.map((section: any) => {
+      if (section.id === inlineEditDialog.sectionId) {
+        // Update the field in the section (handle both flat and nested structures)
+        if (section.data) {
+          return {
+            ...section,
+            data: {
+              ...section.data,
+              [inlineEditDialog.fieldPath]: inlineEditValue,
+            },
+          };
+        } else {
+          return {
+            ...section,
+            [inlineEditDialog.fieldPath]: inlineEditValue,
+          };
+        }
+      }
+      return section;
+    });
+    
+    setContentData({ ...contentData, sections: updatedSections });
+    setInlineEditDialog({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
+    toast({ title: "수정 완료", description: "변경사항이 적용되었습니다. 콘텐츠 저장을 클릭하세요." });
   };
 
   const getFullUrl = (path: string) => {
@@ -624,7 +677,7 @@ export default function PagesManagement() {
           </DialogHeader>
           
           <Tabs value={editTab} onValueChange={setEditTab} className="flex-1 flex flex-col min-h-0">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="settings" data-testid="tab-settings">
                 <Settings className="w-4 h-4 mr-2" />
                 설정
@@ -632,6 +685,10 @@ export default function PagesManagement() {
               <TabsTrigger value="content" data-testid="tab-content">
                 <Layout className="w-4 h-4 mr-2" />
                 콘텐츠
+              </TabsTrigger>
+              <TabsTrigger value="code" data-testid="tab-code">
+                <Code className="w-4 h-4 mr-2" />
+                코드
               </TabsTrigger>
               <TabsTrigger value="preview" data-testid="tab-preview">
                 <Monitor className="w-4 h-4 mr-2" />
@@ -732,14 +789,80 @@ export default function PagesManagement() {
               </ScrollArea>
             </TabsContent>
             
+            <TabsContent value="code" className="flex-1 overflow-auto mt-4">
+              <div className="space-y-4">
+                <div className="bg-muted px-4 py-2 rounded-t-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Code className="w-4 h-4" />
+                    <span className="text-sm font-medium">페이지 콘텐츠 코드 (JSON)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        try {
+                          const formatted = JSON.stringify(contentData, null, 2);
+                          setContentData(JSON.parse(formatted));
+                          toast({ title: "코드 포맷 완료", description: "JSON 코드가 정렬되었습니다." });
+                        } catch (e) {
+                          toast({ title: "포맷 오류", description: "올바른 JSON 형식이 아닙니다.", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-format-code"
+                    >
+                      정렬
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(contentData, null, 2));
+                        toast({ title: "복사됨", description: "코드가 클립보드에 복사되었습니다." });
+                      }}
+                      data-testid="button-copy-code"
+                    >
+                      복사
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  className="font-mono text-sm h-[350px] resize-none"
+                  value={JSON.stringify(contentData, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      setContentData(parsed);
+                    } catch (err) {
+                      // Allow partial editing - will validate on save
+                    }
+                  }}
+                  placeholder='{"meta": {...}, "sections": [...]}'
+                  data-testid="textarea-code-editor"
+                />
+                <p className="text-sm text-muted-foreground">
+                  페이지 콘텐츠를 JSON 형식으로 직접 수정할 수 있습니다. 변경 후 "콘텐츠 저장" 버튼을 클릭하세요.
+                </p>
+              </div>
+            </TabsContent>
+            
             <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
               <div className="border rounded-lg overflow-hidden bg-background">
-                <div className="bg-muted px-4 py-2 border-b flex items-center gap-2">
-                  <Monitor className="w-4 h-4" />
-                  <span className="text-sm font-medium">페이지 미리보기</span>
+                <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4" />
+                    <span className="text-sm font-medium">페이지 미리보기</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    텍스트나 이미지를 클릭하면 바로 편집할 수 있습니다
+                  </p>
                 </div>
                 <ScrollArea className="h-[400px]">
-                  <DynamicPageRenderer content={contentData} />
+                  <DynamicPageRenderer 
+                    content={contentData} 
+                    isEditing={true}
+                    onFieldEdit={handleFieldEdit}
+                  />
                 </ScrollArea>
               </div>
             </TabsContent>
@@ -749,7 +872,7 @@ export default function PagesManagement() {
             <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
               취소
             </Button>
-            {editTab === "content" && (
+            {(editTab === "content" || editTab === "code") && (
               <Button 
                 variant="secondary"
                 onClick={() => {
@@ -797,6 +920,64 @@ export default function PagesManagement() {
             >
               {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Inline Field Edit Dialog */}
+      <Dialog open={inlineEditDialog.open} onOpenChange={(open) => {
+        if (!open) setInlineEditDialog({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : '텍스트 편집'}
+            </DialogTitle>
+            <DialogDescription>
+              {inlineEditDialog.fieldType === 'image' 
+                ? '새 이미지 URL을 입력하세요' 
+                : '텍스트를 수정하세요'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {inlineEditDialog.fieldType === 'image' ? (
+              <div className="space-y-4">
+                {inlineEditValue && (
+                  <div className="border rounded-lg p-2 bg-muted/50">
+                    <img 
+                      src={inlineEditValue} 
+                      alt="현재 이미지" 
+                      className="max-w-full h-auto max-h-[200px] mx-auto rounded"
+                    />
+                  </div>
+                )}
+                <Input 
+                  value={inlineEditValue}
+                  onChange={(e) => setInlineEditValue(e.target.value)}
+                  placeholder="이미지 URL 입력..."
+                  data-testid="input-inline-image-url"
+                />
+              </div>
+            ) : (
+              <Textarea
+                value={inlineEditValue}
+                onChange={(e) => setInlineEditValue(e.target.value)}
+                className="min-h-[150px]"
+                placeholder="텍스트 입력..."
+                data-testid="textarea-inline-text"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setInlineEditDialog({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' })}
+            >
+              취소
+            </Button>
+            <Button onClick={applyInlineEdit} data-testid="button-apply-inline-edit">
+              적용
             </Button>
           </DialogFooter>
         </DialogContent>
