@@ -273,7 +273,10 @@ export default function PagesManagement() {
   
   // Handle inline field editing from preview tab
   const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image') => {
-    setInlineEditValue(currentValue);
+    const editValue = fieldType === 'text' 
+      ? currentValue.replace(/<br\s*\/?>/gi, '\n')
+      : currentValue;
+    setInlineEditValue(editValue);
     setInlineEditDialog({
       open: true,
       sectionId,
@@ -316,6 +319,10 @@ export default function PagesManagement() {
   const applyInlineEdit = () => {
     if (!contentData || !contentData.sections) return;
     
+    const saveValue = inlineEditDialog.fieldType === 'text'
+      ? inlineEditValue.replace(/\n/g, '<br>')
+      : inlineEditValue;
+    
     const updatedSections = contentData.sections.map((section: any, index: number) => {
       // Match by section.id if it exists, otherwise match by generated index-based ID
       const sectionIdentifier = section.id || `section-${index}`;
@@ -327,10 +334,10 @@ export default function PagesManagement() {
           if (section.data) {
             return {
               ...section,
-              data: setNestedValue(section.data, fieldPath, inlineEditValue),
+              data: setNestedValue(section.data, fieldPath, saveValue),
             };
           } else {
-            return setNestedValue(section, fieldPath, inlineEditValue);
+            return setNestedValue(section, fieldPath, saveValue);
           }
         }
         
@@ -340,13 +347,13 @@ export default function PagesManagement() {
             ...section,
             data: {
               ...section.data,
-              [fieldPath]: inlineEditValue,
+              [fieldPath]: saveValue,
             },
           };
         } else {
           return {
             ...section,
-            [fieldPath]: inlineEditValue,
+            [fieldPath]: saveValue,
           };
         }
       }

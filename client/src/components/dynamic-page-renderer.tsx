@@ -35,8 +35,16 @@ interface EditableFieldProps {
 }
 
 function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEdit, className = "", as: Component = 'span', children }: EditableFieldProps) {
+  const renderContent = () => {
+    if (children) return children;
+    if (value && value.includes('<br>')) {
+      return <span dangerouslySetInnerHTML={{ __html: value }} />;
+    }
+    return value;
+  };
+
   if (!isEditing || !onEdit) {
-    return <Component className={className}>{children || value}</Component>;
+    return <Component className={className}>{renderContent()}</Component>;
   }
   
   return (
@@ -48,7 +56,7 @@ function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEd
       }}
       data-testid={`editable-${sectionId}-${fieldPath}`}
     >
-      {children || value}
+      {renderContent()}
       <span className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground text-xs px-1 py-0.5 rounded transition-opacity">
         편집
       </span>
