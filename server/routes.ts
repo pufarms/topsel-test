@@ -3654,6 +3654,35 @@ export async function registerRoutes(
     }
   });
 
+  // Get page by path (public - for dynamic page rendering)
+  // IMPORTANT: This route MUST be before /api/pages/:id to avoid being caught by the wildcard
+  app.get("/api/pages/by-path", async (req, res) => {
+    try {
+      const path = req.query.path as string;
+      if (!path) {
+        return res.status(400).json({ message: "path 파라미터가 필요합니다" });
+      }
+      const allPages = await storage.getAllPages();
+      const page = allPages.find(p => p.path === path);
+      if (!page) {
+        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+      }
+      
+      // Check access level (for public pages, return content)
+      // Non-active pages require authentication
+      if (page.status !== "active") {
+        if (!req.session.userId) {
+          return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+        }
+      }
+      
+      res.json(page);
+    } catch (error) {
+      console.error("Failed to get page by path:", error);
+      res.status(500).json({ error: "Failed to get page" });
+    }
+  });
+
   // Get page by ID (admin only)
   app.get("/api/pages/:id", async (req, res) => {
     if (!req.session.userId) {
@@ -3744,34 +3773,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to delete page:", error);
       res.status(500).json({ error: "Failed to delete page" });
-    }
-  });
-
-  // Get page by path (public - for dynamic page rendering)
-  app.get("/api/pages/by-path", async (req, res) => {
-    try {
-      const path = req.query.path as string;
-      if (!path) {
-        return res.status(400).json({ message: "path 파라미터가 필요합니다" });
-      }
-      const allPages = await storage.getPages();
-      const page = allPages.find(p => p.path === path);
-      if (!page) {
-        return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
-      }
-      
-      // Check access level (for public pages, return content)
-      // Admin pages require authentication
-      if (page.status !== "active") {
-        if (!req.session.userId) {
-          return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
-        }
-      }
-      
-      res.json(page);
-    } catch (error) {
-      console.error("Failed to get page by path:", error);
-      res.status(500).json({ error: "Failed to get page" });
     }
   });
 
