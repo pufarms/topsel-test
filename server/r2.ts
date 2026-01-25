@@ -22,14 +22,29 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || "topsel-images";
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
+function generateImageName(originalFilename: string): string {
+  const now = new Date();
+  const yearLast2Digits = now.getFullYear().toString().slice(-2);
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
+  const randomSeq = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+  const uniqueSuffix = Date.now().toString().slice(-3);
+  
+  const ext = originalFilename.includes('.') 
+    ? originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase()
+    : '.jpg';
+  
+  return `${yearLast2Digits}${month}${day}${randomSeq}${uniqueSuffix}${ext}`;
+}
+
 export async function uploadImage(
   buffer: Buffer,
   filename: string,
   mimeType: string,
   category: string
 ): Promise<{ storagePath: string; publicUrl: string }> {
-  const timestamp = Date.now();
-  const storagePath = `${category}/${timestamp}-${filename}`;
+  const newFilename = generateImageName(filename);
+  const storagePath = `${category}/${newFilename}`;
 
   await s3Client.send(
     new PutObjectCommand({
