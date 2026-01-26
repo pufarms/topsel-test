@@ -44,15 +44,24 @@ interface DynamicPageRendererProps {
   onElementPositionChange?: (sectionId: string, fieldPath: string, col: number, span: number) => void;
 }
 
-// PositionableElement - Wraps elements with 16-column grid positioning
+// PositionableElement - Wraps elements with drag-and-drop positioning
+interface DragContextData {
+  sectionId: string;
+  fieldPath: string;
+  currentCol: number;
+  currentSpan: number;
+}
+
+// Global drag context for sharing drag state
+let globalDragData: DragContextData | null = null;
+
 interface PositionableElementProps {
   sectionId: string;
   fieldPath: string;
   elementPositions?: Record<string, { col: number; span: number }>;
   isEditing?: boolean;
   onElementPositionChange?: (sectionId: string, fieldPath: string, col: number, span: number) => void;
-  selectedElement?: { sectionId: string; fieldPath: string } | null;
-  onElementSelect?: (element: { sectionId: string; fieldPath: string } | null) => void;
+  onDragStateChange?: (isDragging: boolean, data: DragContextData | null) => void;
   children: React.ReactNode;
   className?: string;
 }
@@ -63,13 +72,12 @@ function PositionableElement({
   elementPositions,
   isEditing,
   onElementPositionChange,
-  selectedElement,
-  onElementSelect,
+  onDragStateChange,
   children,
   className = ""
 }: PositionableElementProps) {
   const position = elementPositions?.[fieldPath] || { col: 1, span: 16 };
-  const isSelected = selectedElement?.sectionId === sectionId && selectedElement?.fieldPath === fieldPath;
+  const [isDragging, setIsDragging] = useState(false);
   
   const gridStyle: React.CSSProperties = {
     gridColumn: `${position.col} / span ${position.span}`,
@@ -83,40 +91,40 @@ function PositionableElement({
     );
   }
   
+  const handleDragStart = (e: React.DragEvent) => {
+    const dragData: DragContextData = {
+      sectionId,
+      fieldPath,
+      currentCol: position.col,
+      currentSpan: position.span
+    };
+    
+    setIsDragging(true);
+    globalDragData = dragData;
+    onDragStateChange?.(true, dragData);
+    
+    e.dataTransfer.setData('text/plain', JSON.stringify(dragData));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    globalDragData = null;
+    onDragStateChange?.(false, null);
+  };
+  
   return (
     <div 
       style={gridStyle} 
-      className={`${className} relative ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+      className={`${className} relative group cursor-move ${isDragging ? 'opacity-50 ring-2 ring-primary' : ''}`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
-      {/* Position toggle button */}
-      <Button
-        size="icon"
-        variant="outline"
-        className="absolute -top-3 -left-3 z-40 bg-background shadow-sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (isSelected) {
-            onElementSelect?.(null);
-          } else {
-            onElementSelect?.({ sectionId, fieldPath });
-          }
-        }}
-        title="위치 조정"
-      >
-        <Move className="w-4 h-4" />
-      </Button>
-      
-      {/* Element Position Toolbar when selected */}
-      {isSelected && onElementPositionChange && (
-        <ElementPositionToolbar
-          sectionId={sectionId}
-          fieldPath={fieldPath}
-          currentCol={position.col}
-          currentSpan={position.span}
-          onPositionChange={onElementPositionChange}
-          position={{ top: -120, left: 0 }}
-        />
-      )}
+      {/* Drag handle indicator */}
+      <div className="absolute -top-2 -left-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground rounded p-1 pointer-events-none">
+        <Move className="w-3 h-3" />
+      </div>
       
       {children}
     </div>
@@ -1059,11 +1067,59 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
   );
 }
 
+// Drag and Drop Grid Overlay - Shows 16 column drop zones
+interface DragDropGridOverlayProps {
+  isVisible: boolean;
+  onDrop: (col: number) => void;
+}
+
+function DragDropGridOverlay({ isVisible, onDrop }: DragDropGridOverlayProps) {
+  const [hoveredCol, setHoveredCol] = useState<number | null>(null);
+  const columns = Array.from({ length: 16 }, (_, i) => i + 1);
+  
+  if (!isVisible) return null;
+  
+  return (
+    <div className="absolute inset-0 z-30 pointer-events-auto">
+      <div className="container h-full py-20">
+        <div className="grid grid-cols-16 gap-2 h-full">
+          {columns.map((col) => (
+            <div
+              key={col}
+              className={`h-full border-2 border-dashed rounded transition-colors ${
+                hoveredCol === col 
+                  ? 'border-primary bg-primary/20' 
+                  : 'border-muted-foreground/30 bg-transparent'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setHoveredCol(col);
+              }}
+              onDragLeave={() => setHoveredCol(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setHoveredCol(null);
+                onDrop(col);
+              }}
+            >
+              <div className="h-full flex items-center justify-center text-xs text-muted-foreground opacity-50">
+                {col}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Hero Advanced Section with stats counter and promo badge
-function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange, onElementPositionChange, selectedElement, onElementSelect }: SectionProps) {
+function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange, onElementPositionChange }: Omit<SectionProps, 'selectedElement' | 'onElementSelect'>) {
   if (!data) return null;
   const stats = data.stats || [];
   const elementPositions = data.elementPositions || {};
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [dragData, setDragData] = useState<DragContextData | null>(null);
   
   // Get alignment values with defaults
   const contentAlign = data.contentAlign || 'center';
@@ -1102,6 +1158,54 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
     }
   };
   
+  // Callback for child elements to notify about drag state
+  const handleDragStateChange = (isDragging: boolean, data: DragContextData | null) => {
+    setIsDraggingOver(isDragging);
+    setDragData(data);
+  };
+  
+  // Handle drag events for the section
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Use globalDragData if local dragData is not set
+    if (!isDraggingOver && globalDragData) {
+      setIsDraggingOver(true);
+      setDragData(globalDragData);
+    }
+  };
+  
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (globalDragData) {
+      setIsDraggingOver(true);
+      setDragData(globalDragData);
+    }
+  };
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingOver(false);
+    }
+  };
+  
+  const handleDrop = (targetCol: number) => {
+    const data = dragData || globalDragData;
+    if (!data || !onElementPositionChange) return;
+    
+    // Clamp column position so col + span <= 17 (grid cols are 1-16)
+    const maxCol = 17 - data.currentSpan;
+    const clampedCol = Math.max(1, Math.min(targetCol, maxCol));
+    
+    onElementPositionChange(
+      data.sectionId,
+      data.fieldPath,
+      clampedCol,
+      data.currentSpan
+    );
+    setIsDraggingOver(false);
+    setDragData(null);
+  };
+  
   return (
     <section
       className={`relative min-h-screen flex ${getVerticalAlignClass()} overflow-hidden ${isEditing ? "cursor-pointer" : ""}`}
@@ -1113,7 +1217,18 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
         backgroundPosition: 'center',
       }}
       data-testid="section-hero-advanced"
+      onDragOver={isEditing ? handleDragOver : undefined}
+      onDragEnter={isEditing ? handleDragEnter : undefined}
+      onDragLeave={isEditing ? handleDragLeave : undefined}
     >
+      {/* Drag and Drop Grid Overlay */}
+      {isEditing && (
+        <DragDropGridOverlay
+          isVisible={isDraggingOver}
+          onDrop={handleDrop}
+        />
+      )}
+      
       {/* Position Toolbar for editing mode */}
       {isEditing && onPositionChange && (
         <PositionToolbar
@@ -1173,8 +1288,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
               elementPositions={elementPositions}
               isEditing={isEditing}
               onElementPositionChange={onElementPositionChange}
-              selectedElement={selectedElement}
-              onElementSelect={onElementSelect}
+              onDragStateChange={handleDragStateChange}
               className={getHorizontalAlignClass()}
             >
               <EditableField
@@ -1196,8 +1310,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
               elementPositions={elementPositions}
               isEditing={isEditing}
               onElementPositionChange={onElementPositionChange}
-              selectedElement={selectedElement}
-              onElementSelect={onElementSelect}
+              onDragStateChange={handleDragStateChange}
               className={getHorizontalAlignClass()}
             >
               <EditableField
@@ -1219,8 +1332,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
               elementPositions={elementPositions}
               isEditing={isEditing}
               onElementPositionChange={onElementPositionChange}
-              selectedElement={selectedElement}
-              onElementSelect={onElementSelect}
+              onDragStateChange={handleDragStateChange}
               className={getHorizontalAlignClass()}
             >
               <EditableField
@@ -1243,8 +1355,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
             elementPositions={elementPositions}
             isEditing={isEditing}
             onElementPositionChange={onElementPositionChange}
-            selectedElement={selectedElement}
-            onElementSelect={onElementSelect}
+            onDragStateChange={handleDragStateChange}
             className={`flex flex-wrap gap-4 ${getButtonJustifyClass()} mb-16`}
           >
             {data.buttonText && (
@@ -1281,8 +1392,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
               elementPositions={elementPositions}
               isEditing={isEditing}
               onElementPositionChange={onElementPositionChange}
-              selectedElement={selectedElement}
-              onElementSelect={onElementSelect}
+              onDragStateChange={handleDragStateChange}
               className={`${getStatsAlignClass()}`}
             >
               <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-xl">
