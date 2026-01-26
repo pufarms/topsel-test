@@ -72,7 +72,7 @@ function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEd
   
   return (
     <Component 
-      className={`${className} relative group cursor-pointer hover:bg-primary/10 hover:outline hover:outline-2 hover:outline-primary/50 rounded transition-colors`}
+      className={`${className} relative group cursor-pointer hover-elevate rounded`}
       style={style}
       onClick={(e) => {
         e.stopPropagation();
@@ -148,7 +148,7 @@ function EditableButton({ text, link, openInNewTab = false, sectionId, fieldPath
     <Button
       variant={variant}
       size={size}
-      className={`${className} relative group hover:ring-2 hover:ring-primary/50`}
+      className={`${className} relative group`}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -273,7 +273,7 @@ function EditableIcon({ iconName, sectionId, fieldPath, isEditing, onEdit, class
   
   return (
     <div 
-      className={`${className} relative group cursor-pointer hover:bg-primary/20 rounded-full transition-colors`}
+      className={`${className} relative group cursor-pointer hover-elevate rounded-full`}
       onClick={(e) => {
         e.stopPropagation();
         onEdit(sectionId, fieldPath, iconName || '', 'icon');
@@ -318,52 +318,58 @@ function PositionToolbar({ sectionId, currentAlign, currentVerticalAlign, onPosi
       
       {/* Horizontal Alignment */}
       <div className="flex gap-1">
-        <button
-          className={`p-1.5 rounded transition-colors ${currentAlign === 'left' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        <Button
+          size="icon"
+          variant={currentAlign === 'left' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, 'left', currentVerticalAlign)}
           title="왼쪽 정렬"
         >
           <AlignLeft className="w-4 h-4" />
-        </button>
-        <button
-          className={`p-1.5 rounded transition-colors ${currentAlign === 'center' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        </Button>
+        <Button
+          size="icon"
+          variant={currentAlign === 'center' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, 'center', currentVerticalAlign)}
           title="가운데 정렬"
         >
           <AlignCenter className="w-4 h-4" />
-        </button>
-        <button
-          className={`p-1.5 rounded transition-colors ${currentAlign === 'right' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        </Button>
+        <Button
+          size="icon"
+          variant={currentAlign === 'right' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, 'right', currentVerticalAlign)}
           title="오른쪽 정렬"
         >
           <AlignRight className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       {/* Vertical Alignment */}
       <div className="flex gap-1">
-        <button
-          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'top' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        <Button
+          size="icon"
+          variant={currentVerticalAlign === 'top' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, currentAlign, 'top')}
           title="상단 정렬"
         >
           <AlignVerticalJustifyStart className="w-4 h-4" />
-        </button>
-        <button
-          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'center' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        </Button>
+        <Button
+          size="icon"
+          variant={currentVerticalAlign === 'center' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, currentAlign, 'center')}
           title="중앙 정렬"
         >
           <AlignVerticalJustifyCenter className="w-4 h-4" />
-        </button>
-        <button
-          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'bottom' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+        </Button>
+        <Button
+          size="icon"
+          variant={currentVerticalAlign === 'bottom' ? 'default' : 'ghost'}
           onClick={() => onPositionChange(sectionId, currentAlign, 'bottom')}
           title="하단 정렬"
         >
           <AlignVerticalJustifyEnd className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -393,10 +399,18 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPosit
       default: return 'justify-center';
     }
   };
+
+  const getVerticalPaddingClass = () => {
+    switch (contentVerticalAlign) {
+      case 'top': return 'pt-8 pb-24';
+      case 'bottom': return 'pt-24 pb-8';
+      default: return 'py-16 md:py-24';
+    }
+  };
   
   return (
     <section
-      className={`relative py-16 md:py-24 ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer" : ""}`}
+      className={`relative min-h-[400px] flex ${contentVerticalAlign === 'top' ? 'items-start' : contentVerticalAlign === 'bottom' ? 'items-end' : 'items-center'} ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-hero"
     >
       {/* Position Toolbar for editing mode */}
@@ -432,7 +446,7 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPosit
           <div className="absolute inset-0 bg-black/50 pointer-events-none" />
         </>
       )}
-      <div className={`container mx-auto px-4 relative z-10 flex flex-col ${getAlignClass()} ${hasBackgroundImage ? "text-white" : ""}`}>
+      <div className={`container mx-auto px-4 ${getVerticalPaddingClass()} relative z-10 flex flex-col ${getAlignClass()} ${hasBackgroundImage ? "text-white" : ""}`}>
         {data.imageUrl && (
           <div className="mb-8">
             <EditableImage
@@ -863,7 +877,7 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
               onEdit={onFieldEdit}
               variant="outline"
               size="lg"
-              className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10"
+              className="border-primary-foreground/50 text-primary-foreground"
             />
           )}
         </div>
@@ -946,7 +960,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
           }}
           data-testid={`editable-image-${sectionId}-backgroundImage`}
         >
-          <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg hover:bg-primary/90 transition-colors">
+          <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg">
             <ImageIcon className="w-4 h-4" />
             <span className="text-sm font-medium">배경 이미지 변경</span>
           </div>
@@ -958,7 +972,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
         <div className={`absolute top-24 z-10 ${contentAlign === 'left' ? 'left-8' : contentAlign === 'right' ? 'right-8' : 'left-1/2 -translate-x-1/2'}`}>
           <a 
             href={data.promoBadgeLink || "#"}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors hover:opacity-90"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
             style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', color: 'white' }}
           >
             <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -1278,7 +1292,7 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
                   }}
                   data-testid={`editable-video-${sectionId}-${index}`}
                 >
-                  <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded shadow-lg hover:bg-primary/90 transition-colors">
+                  <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded shadow-lg">
                     <Video className="w-3 h-3" />
                     <span className="text-xs font-medium">편집</span>
                   </div>
@@ -1518,7 +1532,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
           {data.promoBadge && (
             <a 
               href={data.promoBadgeLink || "#"}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-6 transition-colors hover:opacity-90"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-6"
               style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
             >
               <PartyPopper className="w-4 h-4" />
@@ -1570,7 +1584,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
                 fieldPath="button"
                 isEditing={isEditing}
                 onEdit={onFieldEdit}
-                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90 bg-white text-primary"
+                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base bg-white text-primary"
               />
             )}
             {data.secondaryButtonText && (
@@ -1582,7 +1596,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
                 fieldPath="secondaryButton"
                 isEditing={isEditing}
                 onEdit={onFieldEdit}
-                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90 bg-transparent text-white border-2 border-white"
+                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base bg-transparent text-white border-2 border-white"
               />
             )}
           </div>
