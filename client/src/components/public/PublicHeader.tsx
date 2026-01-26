@@ -126,7 +126,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
         showTransparent ? '' : 'backdrop-blur-md'
       }`}
       style={{
-        backgroundColor: showTransparent ? 'transparent' : 'rgba(17, 24, 39, 0.85)',
+        backgroundColor: showTransparent ? 'transparent' : 'rgba(17, 24, 39, 0.7)',
         boxShadow: showTransparent ? 'none' : '0 1px 3px rgba(0,0,0,0.2)',
         borderBottom: showTransparent ? 'none' : '1px solid rgba(255,255,255,0.1)'
       }}
