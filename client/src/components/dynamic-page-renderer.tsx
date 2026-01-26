@@ -843,13 +843,50 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
 }
 
 // Hero Advanced Section with stats counter and promo badge
-function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
+function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange }: SectionProps) {
   if (!data) return null;
   const stats = data.stats || [];
   
+  // Get alignment values with defaults
+  const contentAlign = data.contentAlign || 'center';
+  const contentVerticalAlign = data.contentVerticalAlign || 'center';
+  
+  // Calculate alignment classes
+  const getHorizontalAlignClass = () => {
+    switch (contentAlign) {
+      case 'left': return 'items-start text-left';
+      case 'right': return 'items-end text-right';
+      default: return 'items-center text-center';
+    }
+  };
+  
+  const getVerticalAlignClass = () => {
+    switch (contentVerticalAlign) {
+      case 'top': return 'justify-start pt-32';
+      case 'bottom': return 'justify-end pb-32';
+      default: return 'justify-center';
+    }
+  };
+  
+  const getButtonJustifyClass = () => {
+    switch (contentAlign) {
+      case 'left': return 'justify-start';
+      case 'right': return 'justify-end';
+      default: return 'justify-center';
+    }
+  };
+  
+  const getStatsAlignClass = () => {
+    switch (contentAlign) {
+      case 'left': return 'mx-0';
+      case 'right': return 'ml-auto mr-0';
+      default: return 'mx-auto';
+    }
+  };
+  
   return (
     <section
-      className={`relative min-h-screen flex items-center justify-center overflow-hidden ${isEditing ? "cursor-pointer" : ""}`}
+      className={`relative min-h-screen flex ${getVerticalAlignClass()} overflow-hidden ${isEditing ? "cursor-pointer" : ""}`}
       style={{
         backgroundImage: data.backgroundImage 
           ? `linear-gradient(135deg, rgba(17, 24, 39, 0.85) 0%, rgba(17, 24, 39, 0.75) 100%), url('${data.backgroundImage}')`
@@ -859,6 +896,16 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
       }}
       data-testid="section-hero-advanced"
     >
+      {/* Position Toolbar for editing mode */}
+      {isEditing && onPositionChange && (
+        <PositionToolbar
+          sectionId={sectionId}
+          currentAlign={contentAlign}
+          currentVerticalAlign={contentVerticalAlign}
+          onPositionChange={onPositionChange}
+        />
+      )}
+
       {/* Background Image Editor */}
       {isEditing && onFieldEdit && (
         <div
@@ -876,9 +923,9 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
         </div>
       )}
 
-      {/* Promo Badge */}
+      {/* Promo Badge - positioned based on alignment */}
       {data.promoBadge && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10">
+        <div className={`absolute top-24 z-10 ${contentAlign === 'left' ? 'left-8' : contentAlign === 'right' ? 'right-8' : 'left-1/2 -translate-x-1/2'}`}>
           <a 
             href={data.promoBadgeLink || "#"}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors hover:opacity-90"
@@ -898,7 +945,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
         </div>
       )}
 
-      <div className="container text-center pt-32 pb-20">
+      <div className={`container flex flex-col ${getHorizontalAlignClass()} py-20`}>
         {data.title && (
           <EditableField
             value={data.title}
@@ -937,7 +984,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
         )}
 
         {/* CTA Buttons */}
-        <div className="flex flex-wrap gap-4 justify-center mb-16">
+        <div className={`flex flex-wrap gap-4 ${getButtonJustifyClass()} mb-16`}>
           {data.buttonText && (
             <EditableButton
               text={data.buttonText}
@@ -966,7 +1013,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
 
         {/* Stats Counter */}
         {stats.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-xl mx-auto">
+          <div className={`grid grid-cols-3 gap-4 sm:gap-8 max-w-xl ${getStatsAlignClass()}`}>
             {stats.map((stat: any, index: number) => (
               <StatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} />
             ))}
@@ -1540,7 +1587,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
   );
 }
 
-export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit }: DynamicPageRendererProps) {
+export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit, onPositionChange }: DynamicPageRendererProps) {
   if (!content || !content.sections || content.sections.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
@@ -1559,7 +1606,7 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
         const sectionData = section.data || section;
         
         const sectionId = section.id || `section-${index}`;
-        const commonProps = { data: sectionData, sectionId, isEditing, onClick: handleClick, onFieldEdit };
+        const commonProps = { data: sectionData, sectionId, isEditing, onClick: handleClick, onFieldEdit, onPositionChange };
         
         switch (section.type) {
           case "hero":

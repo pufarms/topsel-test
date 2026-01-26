@@ -329,6 +329,36 @@ export default function PagesManagement() {
     });
   };
   
+  // Handle position change from toolbar
+  const handlePositionChange = (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => {
+    if (!contentData || !contentData.sections || !editDialog.page) return;
+    
+    const updatedSections = contentData.sections.map((section: any, index: number) => {
+      const sectionIdentifier = section.id || `section-${index}`;
+      if (sectionIdentifier === sectionId) {
+        return {
+          ...section,
+          data: {
+            ...section.data,
+            contentAlign,
+            contentVerticalAlign,
+          },
+        };
+      }
+      return section;
+    });
+    
+    const updatedContent = { ...contentData, sections: updatedSections };
+    setContentData(updatedContent);
+    
+    // Auto-save position changes
+    updateContentMutation.mutate({ 
+      id: editDialog.page.id, 
+      content: updatedContent,
+      path: editDialog.page.path
+    });
+  };
+  
   // Helper function to set a nested value using a path like "items.0.title"
   const setNestedValue = (obj: any, path: string, value: any): any => {
     const keys = path.split('.');
@@ -990,6 +1020,7 @@ export default function PagesManagement() {
                     content={contentData} 
                     isEditing={true}
                     onFieldEdit={handleFieldEdit}
+                    onPositionChange={handlePositionChange}
                   />
                 </ScrollArea>
               </div>
