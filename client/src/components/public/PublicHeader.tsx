@@ -71,7 +71,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
           variant="ghost"
           className={isMobile 
             ? "justify-start w-full" 
-            : `transition-colors duration-300 ${showTransparent ? "text-white" : "text-foreground"}`
+            : "transition-colors duration-300 text-white"
           }
           onClick={() => {
             handleLogout();
@@ -94,7 +94,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
           rel="noopener noreferrer"
           className={isMobile 
             ? "text-sm font-medium px-4 py-2 rounded-md block text-foreground"
-            : `text-sm font-medium transition-colors duration-300 ${showTransparent ? "text-white" : "text-foreground"}`
+            : "text-sm font-medium transition-colors duration-300 text-white"
           }
           onClick={() => isMobile && setMobileMenuOpen(false)}
           data-testid={isMobile ? `mobile-menu-${menu.id}` : `link-menu-${menu.id}`}
@@ -110,7 +110,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
         href={menu.path}
         className={isMobile 
           ? "text-sm font-medium px-4 py-2 rounded-md block text-foreground"
-          : `text-sm font-medium transition-colors duration-300 ${showTransparent ? "text-white" : "text-foreground"}`
+          : "text-sm font-medium transition-colors duration-300 text-white"
         }
         onClick={() => isMobile && setMobileMenuOpen(false)}
         data-testid={isMobile ? `mobile-menu-${menu.id}` : `link-menu-${menu.id}`}
@@ -124,8 +124,8 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
     <header 
       className="fixed top-0 left-0 right-0 z-50 w-full"
       style={{
-        backgroundColor: showTransparent ? 'transparent' : 'hsl(var(--background))',
-        boxShadow: showTransparent ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+        backgroundColor: showTransparent ? 'transparent' : '#111827',
+        boxShadow: showTransparent ? 'none' : '0 1px 3px rgba(0,0,0,0.3)',
         transition: 'background-color 0.3s ease, box-shadow 0.3s ease'
       }}
     >
@@ -136,20 +136,10 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
               <img 
                 src={logoUrl} 
                 alt={logoAlt} 
-                className="h-8 w-auto"
-                style={{
-                  filter: showTransparent ? 'brightness(0) invert(1)' : 'none',
-                  transition: 'filter 0.3s ease'
-                }}
+                className="h-8 w-auto brightness-0 invert"
               />
             ) : (
-              <span 
-                className="text-lg font-bold"
-                style={{
-                  color: showTransparent ? 'white' : 'hsl(var(--foreground))',
-                  transition: 'color 0.3s ease'
-                }}
-              >
+              <span className="text-lg font-bold text-white">
                 {siteName}
               </span>
             )}
@@ -165,7 +155,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
             <Button 
               variant="ghost" 
               size="icon" 
-              className={`transition-colors duration-300 ${showTransparent ? "text-white" : "text-foreground"}`}
+              className="transition-colors duration-300 text-white"
               data-testid="button-mobile-menu"
             >
               <Menu className="h-5 w-5" />
