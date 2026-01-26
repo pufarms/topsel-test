@@ -260,8 +260,8 @@ export default function AdminGallery() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-4 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-4 border-b">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium whitespace-nowrap">업로드 카테고리:</span>
               <Select value={uploadCategory} onValueChange={(v) => { setUploadCategory(v); setUploadSubcategory(""); }}>
                 <SelectTrigger className="w-28" data-testid="select-upload-category">
@@ -286,33 +286,31 @@ export default function AdminGallery() {
                   </SelectContent>
                 </Select>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFileSelect}
-                data-testid="input-file"
-              />
-              <Button 
-                variant="default" 
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadMutation.isPending}
-                data-testid="button-upload"
-              >
-                {uploadMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                파일 업로드
-              </Button>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="input-file"
+            />
+            <Button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+              data-testid="button-upload"
+            >
+              {uploadMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              이미지 업로드
+            </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="text-sm font-medium">필터:</span>
             <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); setSelectedSubcategory("all"); }}>
               <SelectTrigger className="w-28" data-testid="select-filter-category">
