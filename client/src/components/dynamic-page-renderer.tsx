@@ -884,8 +884,8 @@ function StatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat:
 
 // Image + Text Section (side by side)
 function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
-  if (!data) return null;
   const anim = useScrollAnimation();
+  if (!data) return null;
   const isLight = data.theme !== 'dark';
   const imageFirst = data.layout !== 'text-image';
   
@@ -984,9 +984,9 @@ function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
 
 // Video Gallery Section
 function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
-  if (!data) return null;
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const anim = useScrollAnimation();
+  if (!data) return null;
   const videos = data.videos || [];
   
   return (
@@ -1053,7 +1053,7 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {videos.slice(0, 5).map((video: any, index: number) => (
             <div
-              key={video.id || index}
+              key={`${video.id}-${index}`}
               className={`${index >= 3 ? 'hidden lg:block' : ''} ${index >= 2 && index < 3 ? 'hidden sm:block' : ''}`}
             >
               <div 
@@ -1081,8 +1081,8 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
 
 // Stats Cards Section (for delivery system style)
 function StatsCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
-  if (!data) return null;
   const anim = useScrollAnimation();
+  if (!data) return null;
   const isLight = data.theme !== 'dark';
   const stats = data.stats || [];
   
@@ -1157,8 +1157,8 @@ function StatsCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }:
 
 // Icon Cards Section (for benefits style - 4 columns)
 function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
-  if (!data) return null;
   const anim = useScrollAnimation();
+  if (!data) return null;
   const isLight = data.theme !== 'dark';
   const items = data.items || [];
   
@@ -1255,8 +1255,8 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
 
 // CTA Advanced Section with gradient and benefits list
 function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
-  if (!data) return null;
   const anim = useScrollAnimation();
+  if (!data) return null;
   const benefits = data.benefits || [];
   
   return (

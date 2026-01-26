@@ -803,7 +803,7 @@ export const pageStatuses = ["active", "draft", "hidden"] as const;
 export type PageStatus = typeof pageStatuses[number];
 
 // 페이지 콘텐츠 섹션 타입
-export const pageSectionTypes = ["hero", "text", "image", "heading", "button", "divider", "cards", "features", "cta"] as const;
+export const pageSectionTypes = ["hero", "hero_advanced", "text", "image", "image_text", "text_image", "heading", "button", "divider", "cards", "features", "video_gallery", "stats_cards", "icon_cards", "cta", "cta_advanced"] as const;
 export type PageSectionType = typeof pageSectionTypes[number];
 
 // 페이지 콘텐츠 섹션 인터페이스
@@ -826,12 +826,37 @@ export interface PageSection {
     backgroundType?: 'gradient' | 'image' | 'color';
     backgroundImage?: string;
     textColor?: string;
-    items?: Array<{
+    // Advanced section fields
+    promoBadge?: string;
+    promoBadgeLink?: string;
+    theme?: 'light' | 'dark';
+    layout?: 'image-text' | 'text-image';
+    sectionTitle?: string;
+    sectionSubtitle?: string;
+    sectionDescription?: string;
+    paragraphs?: string[];
+    benefits?: string[];
+    // Stats for hero_advanced and stats_cards
+    stats?: Array<{
+      value: string;
+      suffix?: string;
+      label: string;
+      color?: string;
+    }>;
+    // Videos for video_gallery
+    videos?: Array<{
       id: string;
+      thumbnail?: string;
+    }>;
+    // Extended items for icon_cards
+    items?: Array<{
+      id?: string;
       title?: string;
       description?: string;
       imageUrl?: string;
       icon?: string;
+      iconBg?: string;
+      iconColor?: string;
       link?: string;
     }>;
   };
