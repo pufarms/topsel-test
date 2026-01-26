@@ -293,39 +293,39 @@
    TOPSEL DESIGN SYSTEM v2.0.0
    ============================================ */
 
-/* CSS Variables - Design System Colors */
+/* CSS Variables - Design System Colors (ts- prefix to avoid conflicts with Shadcn) */
 :root {
-  --primary: #5D7AF2;
-  --primary-hover: #4b63c7;
-  --navy: #111827;
-  --accent-orange: #FF6B00;
-  --accent-cyan: #22D3EE;
-  --accent-green: #10B981;
-  --badge-purple: #8B5CF6;
-  --white: #FFFFFF;
-  --gray-50: #F9FAFB;
-  --gray-100: #F3F4F6;
-  --gray-400: #9CA3AF;
-  --gray-600: #4B5563;
-  --gray-900: #111827;
-  --text-main: #1F2937;
-  --text-sub: #6B7280;
-  --ds-border: #E5E7EB;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
-  --container-max-width: 1200px;
-  --section-padding-xs: 60px 0;
-  --section-padding-md: 80px 0;
-  --section-padding-lg: 100px 0;
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-full: 50px;
-  --shadow-card: 0 10px 30px rgba(0,0,0,0.05);
-  --shadow-button: 0 4px 12px rgba(93,122,242,0.3);
-  --shadow-hover: 0 20px 40px rgba(0,0,0,0.1);
-  --transition-default: all 0.3s ease;
+  --ts-primary: #5D7AF2;
+  --ts-primary-hover: #4b63c7;
+  --ts-navy: #111827;
+  --ts-accent-orange: #FF6B00;
+  --ts-accent-cyan: #22D3EE;
+  --ts-accent-green: #10B981;
+  --ts-badge-purple: #8B5CF6;
+  --ts-white: #FFFFFF;
+  --ts-gray-50: #F9FAFB;
+  --ts-gray-100: #F3F4F6;
+  --ts-gray-400: #9CA3AF;
+  --ts-gray-600: #4B5563;
+  --ts-gray-900: #111827;
+  --ts-text-main: #1F2937;
+  --ts-text-sub: #6B7280;
+  --ts-border: #E5E7EB;
+  --ts-success: #10B981;
+  --ts-warning: #F59E0B;
+  --ts-error: #EF4444;
+  --ts-container-max-width: 1200px;
+  --ts-section-padding-xs: 60px 0;
+  --ts-section-padding-md: 80px 0;
+  --ts-section-padding-lg: 100px 0;
+  --ts-radius-sm: 6px;
+  --ts-radius-md: 12px;
+  --ts-radius-lg: 16px;
+  --ts-radius-full: 50px;
+  --ts-shadow-card: 0 10px 30px rgba(0,0,0,0.05);
+  --ts-shadow-button: 0 4px 12px rgba(93,122,242,0.3);
+  --ts-shadow-hover: 0 20px 40px rgba(0,0,0,0.1);
+  --ts-transition-default: all 0.3s ease;
 }
 
 /* Typography Classes */
@@ -333,25 +333,25 @@
   font-size: 32px;
   font-weight: 800;
   line-height: 1.2;
-  color: var(--navy);
+  color: var(--ts-navy);
 }
 
 .h2-section {
   font-size: 24px;
   font-weight: 800;
-  color: var(--navy);
+  color: var(--ts-navy);
 }
 
 .h3-card {
   font-size: 18px;
   font-weight: 700;
-  color: var(--text-main);
+  color: var(--ts-text-main);
 }
 
 .stat-number {
   font-size: 32px;
   font-weight: 800;
-  color: var(--accent-green);
+  color: var(--ts-accent-green);
 }
 
 .subtitle-label {
@@ -360,20 +360,20 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--primary);
+  color: var(--ts-primary);
 }
 
 .body-text {
   font-size: 14px;
   font-weight: 400;
-  color: var(--text-sub);
+  color: var(--ts-text-sub);
   line-height: 1.6;
 }
 
 .caption {
   font-size: 14px;
   font-weight: 400;
-  color: var(--gray-400);
+  color: var(--ts-gray-400);
 }
 
 /* Responsive Typography */
@@ -398,110 +398,110 @@
 }
 
 /* Container */
-.container {
+.ts-container {
   width: 100%;
-  max-width: var(--container-max-width);
+  max-width: var(--ts-container-max-width);
   margin: 0 auto;
   padding: 0 16px;
 }
 
 @media (min-width: 768px) {
-  .container { padding: 0 24px; }
+  .ts-container { padding: 0 24px; }
 }
 
 @media (min-width: 1024px) {
-  .container { padding: 0 40px; }
+  .ts-container { padding: 0 40px; }
 }
 
 /* Section Backgrounds */
-.section-light {
-  background-color: var(--white);
-  color: var(--text-main);
+.ts-section-light {
+  background-color: var(--ts-white);
+  color: var(--ts-text-main);
   padding: 60px 0;
 }
 
-.section-dark {
-  background-color: var(--navy);
-  color: var(--white);
+.ts-section-dark {
+  background-color: var(--ts-navy);
+  color: var(--ts-white);
   padding: 60px 0;
 }
 
 @media (min-width: 768px) {
-  .section-light,
-  .section-dark {
+  .ts-section-light,
+  .ts-section-dark {
     padding: 80px 0;
   }
 }
 
 @media (min-width: 1024px) {
-  .section-light,
-  .section-dark {
+  .ts-section-light,
+  .ts-section-dark {
     padding: 100px 0;
   }
 }
 
-/* Buttons */
-.btn {
+/* Topsel Buttons (ts-btn prefix to avoid conflict with Shadcn) */
+.ts-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 12px 32px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: var(--radius-md);
+  border-radius: var(--ts-radius-md);
   border: 2px solid transparent;
   cursor: pointer;
-  transition: var(--transition-default);
+  transition: var(--ts-transition-default);
   text-decoration: none;
 }
 
-.btn-primary {
-  background-color: var(--primary);
-  color: var(--white);
-  border-color: var(--primary);
-  box-shadow: var(--shadow-button);
+.ts-btn-primary {
+  background-color: var(--ts-primary);
+  color: var(--ts-white);
+  border-color: var(--ts-primary);
+  box-shadow: var(--ts-shadow-button);
 }
 
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
+.ts-btn-primary:hover {
+  background-color: var(--ts-primary-hover);
+  border-color: var(--ts-primary-hover);
   transform: translateY(-2px);
 }
 
-.btn-outline-white {
+.ts-btn-outline-white {
   background-color: transparent;
-  color: var(--white);
-  border-color: var(--white);
+  color: var(--ts-white);
+  border-color: var(--ts-white);
 }
 
-.btn-outline-white:hover {
+.ts-btn-outline-white:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Cards */
-.card {
-  background-color: var(--white);
-  border-radius: var(--radius-md);
+/* Topsel Cards (ts-card prefix to avoid conflict with Shadcn) */
+.ts-card {
+  background-color: var(--ts-white);
+  border-radius: var(--ts-radius-md);
   padding: 20px;
-  box-shadow: var(--shadow-card);
-  transition: var(--transition-default);
+  box-shadow: var(--ts-shadow-card);
+  transition: var(--ts-transition-default);
 }
 
-.card-dark {
+.ts-card-dark {
   background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 @media (min-width: 768px) {
-  .card {
+  .ts-card {
     padding: 24px;
   }
 }
 
 @media (min-width: 1024px) {
-  .card {
+  .ts-card {
     padding: 30px;
-    border-radius: var(--radius-lg);
+    border-radius: var(--ts-radius-lg);
   }
 }
 
@@ -535,22 +535,22 @@
 }
 
 /* Icon Box */
-.icon-box {
+.ts-icon-box {
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
+  border-radius: var(--ts-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 /* Image Rounded */
-.img-rounded {
-  border-radius: var(--radius-md);
+.ts-img-rounded {
+  border-radius: var(--ts-radius-md);
 }
 
 @media (min-width: 1024px) {
-  .img-rounded {
-    border-radius: var(--radius-lg);
+  .ts-img-rounded {
+    border-radius: var(--ts-radius-lg);
   }
 }

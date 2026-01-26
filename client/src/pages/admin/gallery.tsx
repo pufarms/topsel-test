@@ -263,31 +263,22 @@ export default function AdminGallery() {
         type="file"
         accept="image/*"
         multiple
-        style={{ display: 'none' }}
+        className="hidden"
         onChange={handleFileSelect}
         data-testid="input-file"
       />
-      <button 
+      <Button 
         onClick={() => fileInputRef.current?.click()}
         disabled={uploadMutation.isPending}
         data-testid="button-upload"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          backgroundColor: '#3b82f6',
-          color: 'white',
-          padding: '12px 24px',
-          borderRadius: '8px',
-          fontSize: '16px',
-          fontWeight: '600',
-          border: 'none',
-          cursor: 'pointer'
-        }}
       >
-        <Upload style={{ width: '20px', height: '20px' }} />
+        {uploadMutation.isPending ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Upload className="h-4 w-4 mr-2" />
+        )}
         이미지 업로드
-      </button>
+      </Button>
 
       <Card>
         <CardContent className="pt-6">

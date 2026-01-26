@@ -226,7 +226,7 @@ export default function Home() {
           <div className="flex flex-wrap gap-4 justify-center mb-16">
             <Link href="/register">
               <button 
-                className="btn btn-primary text-base px-8 py-3"
+                className="ts-btn ts-btn-primary text-base px-8 py-3"
                 data-testid="hero-cta-start"
               >
                 시작하기
@@ -234,7 +234,7 @@ export default function Home() {
             </Link>
             <Link href="/guide">
               <button 
-                className="btn btn-outline-white text-base px-8 py-3"
+                className="ts-btn ts-btn-outline-white text-base px-8 py-3"
                 data-testid="hero-cta-learn"
               >
                 서비스 둘러보기
@@ -286,7 +286,7 @@ export default function Home() {
 
       {/* Why Topsel Section */}
       <section 
-        className="section-light"
+        className="ts-section-light"
         data-testid="why-topsel-section"
       >
         <div className="container">
@@ -306,7 +306,7 @@ export default function Home() {
       </section>
 
       {/* Expert Partner Section */}
-      <section className="section-light" style={{ paddingTop: 0 }}>
+      <section className="ts-section-light" style={{ paddingTop: 0 }}>
         <div className="container">
           <div 
             ref={expertAnim.ref}
@@ -346,7 +346,7 @@ export default function Home() {
 
       {/* Customer Stories Section */}
       <section 
-        className="section-dark"
+        className="ts-section-dark"
         data-testid="customer-stories-section"
       >
         <div className="container">
@@ -399,7 +399,7 @@ export default function Home() {
       </section>
 
       {/* Supply & Management Section */}
-      <section className="section-light" data-testid="supply-section">
+      <section className="ts-section-light" data-testid="supply-section">
         <div className="container">
           <div 
             ref={supplyAnim.ref}
@@ -438,7 +438,7 @@ export default function Home() {
       </section>
 
       {/* Delivery System Section */}
-      <section className="section-dark" data-testid="delivery-section">
+      <section className="ts-section-dark" data-testid="delivery-section">
         <div className="container">
           <div 
             ref={deliveryAnim.ref}
@@ -487,7 +487,7 @@ export default function Home() {
       </section>
 
       {/* Platform Features Section */}
-      <section className="section-light" data-testid="platform-section">
+      <section className="ts-section-light" data-testid="platform-section">
         <div className="container">
           <div 
             ref={platformAnim.ref}
@@ -538,7 +538,7 @@ export default function Home() {
       </section>
 
       {/* Special Benefits Section */}
-      <section className="section-dark" data-testid="special-benefits-section">
+      <section className="ts-section-dark" data-testid="special-benefits-section">
         <div className="container">
           <div 
             ref={specialBenefitsAnim.ref}
@@ -599,7 +599,7 @@ export default function Home() {
       </section>
 
       {/* Custom Benefits Section */}
-      <section className="section-light" data-testid="custom-benefits-section">
+      <section className="ts-section-light" data-testid="custom-benefits-section">
         <div className="container">
           <div 
             ref={customBenefitsAnim.ref}
@@ -639,7 +639,7 @@ export default function Home() {
       </section>
 
       {/* Auto System Section */}
-      <section className="section-dark" data-testid="auto-system-section">
+      <section className="ts-section-dark" data-testid="auto-system-section">
         <div className="container">
           <div 
             ref={autoSystemAnim.ref}
