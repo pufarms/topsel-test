@@ -244,41 +244,39 @@ export default function AdminGallery() {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* 이미지 업로드 버튼 영역 */}
+      <div className="bg-blue-500 p-4 rounded-lg">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleFileSelect}
+          data-testid="input-file"
+        />
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadMutation.isPending}
+          data-testid="button-upload"
+          className="bg-white text-blue-600 font-bold py-3 px-6 rounded-lg text-lg"
+        >
+          {uploadMutation.isPending ? "업로드 중..." : "🔼 이미지 업로드 클릭"}
+        </button>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-xl md:text-2xl font-bold">이미지 갤러리</h1>
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleFileSelect}
-            data-testid="input-file"
-          />
-          <Button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadMutation.isPending}
-            data-testid="button-upload"
-          >
-            {uploadMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            이미지 업로드
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSubcategoryManager(true)}
-            data-testid="button-manage-subcategories"
-          >
-            <Settings2 className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">세부 카테고리 관리</span>
-            <span className="sm:hidden">관리</span>
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowSubcategoryManager(true)}
+          data-testid="button-manage-subcategories"
+        >
+          <Settings2 className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">세부 카테고리 관리</span>
+          <span className="sm:hidden">관리</span>
+        </Button>
       </div>
 
       <Card>
