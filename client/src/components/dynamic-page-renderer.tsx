@@ -40,26 +40,29 @@ interface EditableFieldProps {
   isEditing?: boolean;
   onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
   className?: string;
-  as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
+  as?: 'h1' | 'h2' | 'h3' | 'p' | 'span' | 'div';
   children?: React.ReactNode;
+  style?: React.CSSProperties;
 }
 
-function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEdit, className = "", as: Component = 'span', children }: EditableFieldProps) {
+function EditableField({ value, sectionId, fieldPath, fieldType, isEditing, onEdit, className = "", as: Component = 'span', children, style }: EditableFieldProps) {
   const renderContent = () => {
     if (children) return children;
-    if (value && value.includes('<br>')) {
+    // Check for any HTML tags (br, span, strong, em, etc.)
+    if (value && /<[^>]+>/.test(value)) {
       return <span dangerouslySetInnerHTML={{ __html: value }} />;
     }
     return value;
   };
 
   if (!isEditing || !onEdit) {
-    return <Component className={className}>{renderContent()}</Component>;
+    return <Component className={className} style={style}>{renderContent()}</Component>;
   }
   
   return (
     <Component 
       className={`${className} relative group cursor-pointer hover:bg-primary/10 hover:outline hover:outline-2 hover:outline-primary/50 rounded transition-colors`}
+      style={style}
       onClick={(e) => {
         e.stopPropagation();
         onEdit(sectionId, fieldPath, value, fieldType);
@@ -972,7 +975,7 @@ function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 isEditing={isEditing}
                 onEdit={onFieldEdit}
                 as="p"
-                className={`body-text mb-4 text-base leading-relaxed ${i === (data.paragraphs.length - 1) ? 'font-medium' : ''}`}
+                className={`body-text mb-4 text-base leading-relaxed ${i === ((data.paragraphs?.length || 0) - 1) ? 'font-medium' : ''}`}
               />
             ))}
           </div>
