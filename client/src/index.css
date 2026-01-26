@@ -397,7 +397,8 @@
   .stat-number { font-size: 48px; }
 }
 
-/* Container */
+/* Container - keep both for compatibility */
+.container,
 .ts-container {
   width: 100%;
   max-width: var(--ts-container-max-width);
@@ -406,10 +407,12 @@
 }
 
 @media (min-width: 768px) {
+  .container,
   .ts-container { padding: 0 24px; }
 }
 
 @media (min-width: 1024px) {
+  .container,
   .ts-container { padding: 0 40px; }
 }
 
