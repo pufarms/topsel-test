@@ -32,7 +32,7 @@ interface DynamicPageRendererProps {
   content: PageContent | null;
   isEditing?: boolean;
   onSectionClick?: (section: PageSection) => void;
-  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
 }
 
 interface EditableFieldProps {
@@ -117,20 +117,21 @@ function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, clas
 interface EditableButtonProps {
   text: string;
   link: string;
+  openInNewTab?: boolean;
   sectionId: string;
   fieldPath: string;
   isEditing?: boolean;
-  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
+  onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
   variant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
 }
 
-function EditableButton({ text, link, sectionId, fieldPath, isEditing, onEdit, variant = "default", size = "default", className = "" }: EditableButtonProps) {
+function EditableButton({ text, link, openInNewTab = false, sectionId, fieldPath, isEditing, onEdit, variant = "default", size = "default", className = "" }: EditableButtonProps) {
   if (!isEditing) {
     return (
       <Button asChild variant={variant} size={size} className={className}>
-        <Link href={link}>{text}</Link>
+        <Link href={link} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>{text}</Link>
       </Button>
     );
   }
@@ -144,7 +145,7 @@ function EditableButton({ text, link, sectionId, fieldPath, isEditing, onEdit, v
         e.preventDefault();
         e.stopPropagation();
         if (onEdit) {
-          onEdit(sectionId, fieldPath, `${text}|${link}`, 'text');
+          onEdit(sectionId, fieldPath, `${text}|${link}|${openInNewTab}`, 'button');
         }
       }}
       data-testid={`editable-button-${sectionId}-${fieldPath}`}
@@ -284,7 +285,7 @@ interface SectionProps {
   sectionId: string;
   isEditing?: boolean;
   onClick?: () => void;
-  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => void;
+  onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
 }
 
 function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
@@ -375,6 +376,7 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
             <EditableButton
               text={data.buttonText}
               link={data.buttonLink}
+              openInNewTab={data.buttonNewTab}
               sectionId={sectionId}
               fieldPath="button"
               isEditing={isEditing}
@@ -386,6 +388,7 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
             <EditableButton
               text={data.secondaryButtonText}
               link={data.secondaryButtonLink}
+              openInNewTab={data.secondaryButtonNewTab}
               sectionId={sectionId}
               fieldPath="secondaryButton"
               isEditing={isEditing}
@@ -729,6 +732,7 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
             <EditableButton
               text={data.buttonText}
               link={data.buttonLink}
+              openInNewTab={data.buttonNewTab}
               sectionId={sectionId}
               fieldPath="button"
               isEditing={isEditing}
@@ -741,6 +745,7 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
             <EditableButton
               text={data.secondaryButtonText}
               link={data.secondaryButtonLink}
+              openInNewTab={data.secondaryButtonNewTab}
               sectionId={sectionId}
               fieldPath="secondaryButton"
               isEditing={isEditing}
@@ -856,6 +861,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
             <EditableButton
               text={data.buttonText}
               link={data.buttonLink || "#"}
+              openInNewTab={data.buttonNewTab}
               sectionId={sectionId}
               fieldPath="button"
               isEditing={isEditing}
@@ -867,6 +873,7 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
             <EditableButton
               text={data.secondaryButtonText}
               link={data.secondaryButtonLink || "#"}
+              openInNewTab={data.secondaryButtonNewTab}
               sectionId={sectionId}
               fieldPath="secondaryButton"
               isEditing={isEditing}
@@ -1400,6 +1407,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
               <EditableButton
                 text={data.buttonText}
                 link={data.buttonLink || "#"}
+                openInNewTab={data.buttonNewTab}
                 sectionId={sectionId}
                 fieldPath="button"
                 isEditing={isEditing}
@@ -1411,6 +1419,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
               <EditableButton
                 text={data.secondaryButtonText}
                 link={data.secondaryButtonLink || "#"}
+                openInNewTab={data.secondaryButtonNewTab}
                 sectionId={sectionId}
                 fieldPath="secondaryButton"
                 isEditing={isEditing}

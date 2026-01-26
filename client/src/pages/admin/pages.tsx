@@ -144,9 +144,10 @@ export default function PagesManagement() {
     sectionId: string;
     fieldPath: string;
     currentValue: string;
-    fieldType: 'text' | 'image' | 'icon';
+    fieldType: 'text' | 'image' | 'icon' | 'button';
   }>({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
+  const [buttonEditData, setButtonEditData] = useState<{ text: string; link: string; openInNewTab: boolean }>({ text: '', link: '', openInNewTab: false });
   const [imageGalleryCategory, setImageGalleryCategory] = useState<string>('all');
 
   // Form state for add/edit
@@ -304,11 +305,21 @@ export default function PagesManagement() {
   };
   
   // Handle inline field editing from preview tab
-  const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon') => {
-    const editValue = fieldType === 'text' 
-      ? currentValue.replace(/<br\s*\/?>/gi, '\n')
-      : currentValue;
-    setInlineEditValue(editValue);
+  const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => {
+    if (fieldType === 'button') {
+      // Parse button data: "text|link|openInNewTab"
+      const parts = currentValue.split('|');
+      setButtonEditData({
+        text: parts[0] || '',
+        link: parts[1] || '',
+        openInNewTab: parts[2] === 'true'
+      });
+    } else {
+      const editValue = fieldType === 'text' 
+        ? currentValue.replace(/<br\s*\/?>/gi, '\n')
+        : currentValue;
+      setInlineEditValue(editValue);
+    }
     setInlineEditDialog({
       open: true,
       sectionId,
@@ -360,6 +371,24 @@ export default function PagesManagement() {
       const sectionIdentifier = section.id || `section-${index}`;
       if (sectionIdentifier === inlineEditDialog.sectionId) {
         const fieldPath = inlineEditDialog.fieldPath;
+        
+        // Special handling for button updates
+        if (inlineEditDialog.fieldType === 'button') {
+          const isSecondary = fieldPath === 'secondaryButton';
+          const textKey = isSecondary ? 'secondaryButtonText' : 'buttonText';
+          const linkKey = isSecondary ? 'secondaryButtonLink' : 'buttonLink';
+          const newTabKey = isSecondary ? 'secondaryButtonNewTab' : 'buttonNewTab';
+          
+          return {
+            ...section,
+            data: {
+              ...section.data,
+              [textKey]: buttonEditData.text,
+              [linkKey]: buttonEditData.link,
+              [newTabKey]: buttonEditData.openInNewTab
+            }
+          };
+        }
         
         // Special handling for YouTube video ID updates - also update thumbnail
         const videoIdMatch = fieldPath.match(/^videos\.(\d+)\.id$/);
@@ -1035,6 +1064,7 @@ export default function PagesManagement() {
             <DialogTitle>
               {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : 
                inlineEditDialog.fieldType === 'icon' ? '아이콘 변경' : 
+               inlineEditDialog.fieldType === 'button' ? '버튼 편집' :
                (inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id')) ? '유튜브 비디오 편집' : '텍스트 편집'}
             </DialogTitle>
             <DialogDescription>
@@ -1042,6 +1072,8 @@ export default function PagesManagement() {
                 ? '이미지 갤러리에서 이미지를 선택하세요' 
                 : inlineEditDialog.fieldType === 'icon'
                 ? '아이콘 갤러리에서 아이콘을 선택하세요'
+                : inlineEditDialog.fieldType === 'button'
+                ? '버튼의 텍스트, 링크, 열기 방식을 설정하세요'
                 : (inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id'))
                 ? 'YouTube URL 또는 비디오 ID를 입력하세요'
                 : '텍스트를 수정하세요'}
@@ -1139,6 +1171,52 @@ export default function PagesManagement() {
                     <p className="text-sm mt-2">이미지 갤러리에서 "아이콘" 카테고리에 이미지를 업로드하세요.</p>
                   </div>
                 )}
+              </div>
+            ) : inlineEditDialog.fieldType === 'button' ? (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">버튼 텍스트</Label>
+                  <Input
+                    value={buttonEditData.text}
+                    onChange={(e) => setButtonEditData(prev => ({ ...prev, text: e.target.value }))}
+                    className="mt-1"
+                    placeholder="버튼에 표시될 텍스트"
+                    data-testid="input-button-text"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">링크 주소</Label>
+                  <Input
+                    value={buttonEditData.link}
+                    onChange={(e) => setButtonEditData(prev => ({ ...prev, link: e.target.value }))}
+                    className="mt-1"
+                    placeholder="예: /register 또는 https://example.com"
+                    data-testid="input-button-link"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    내부 페이지는 /로 시작 (예: /register), 외부 링크는 https://로 시작
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="openInNewTab"
+                    checked={buttonEditData.openInNewTab}
+                    onChange={(e) => setButtonEditData(prev => ({ ...prev, openInNewTab: e.target.checked }))}
+                    className="w-4 h-4"
+                    data-testid="checkbox-button-newtab"
+                  />
+                  <Label htmlFor="openInNewTab" className="text-sm cursor-pointer">새 창에서 열기</Label>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-2">미리보기</p>
+                  <Button size="sm" className="pointer-events-none">
+                    {buttonEditData.text || '버튼 텍스트'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    링크: {buttonEditData.link || '(없음)'} {buttonEditData.openInNewTab ? '(새 창)' : '(현재 창)'}
+                  </p>
+                </div>
               </div>
             ) : inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id') ? (
               <div className="space-y-4">

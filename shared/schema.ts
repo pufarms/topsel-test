@@ -820,8 +820,10 @@ export interface PageSection {
     imageAlt?: string;
     buttonText?: string;
     buttonLink?: string;
+    buttonNewTab?: boolean;
     secondaryButtonText?: string;
     secondaryButtonLink?: string;
+    secondaryButtonNewTab?: boolean;
     backgroundColor?: string;
     backgroundType?: 'gradient' | 'image' | 'color';
     backgroundImage?: string;
