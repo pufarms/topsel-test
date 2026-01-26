@@ -996,13 +996,16 @@ export default function PagesManagement() {
           <DialogHeader>
             <DialogTitle>
               {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : 
-               inlineEditDialog.fieldType === 'icon' ? '아이콘 변경' : '텍스트 편집'}
+               inlineEditDialog.fieldType === 'icon' ? '아이콘 변경' : 
+               (inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id')) ? '유튜브 비디오 편집' : '텍스트 편집'}
             </DialogTitle>
             <DialogDescription>
               {inlineEditDialog.fieldType === 'image' 
                 ? '이미지 갤러리에서 이미지를 선택하세요' 
                 : inlineEditDialog.fieldType === 'icon'
                 ? '아이콘 갤러리에서 아이콘을 선택하세요'
+                : (inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id'))
+                ? 'YouTube URL 또는 비디오 ID를 입력하세요'
                 : '텍스트를 수정하세요'}
             </DialogDescription>
           </DialogHeader>
@@ -1098,6 +1101,50 @@ export default function PagesManagement() {
                     <p className="text-sm mt-2">이미지 갤러리에서 "아이콘" 카테고리에 이미지를 업로드하세요.</p>
                   </div>
                 )}
+              </div>
+            ) : inlineEditDialog.fieldPath.includes('videos') && inlineEditDialog.fieldPath.includes('.id') ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-2">현재 비디오 ID</p>
+                  <p className="font-mono text-sm bg-background p-2 rounded">{inlineEditValue || '없음'}</p>
+                  {inlineEditValue && (
+                    <div className="mt-2">
+                      <img 
+                        src={`https://img.youtube.com/vi/${inlineEditValue}/mqdefault.jpg`}
+                        alt="현재 비디오 썸네일"
+                        className="w-full max-w-xs rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">YouTube URL 또는 비디오 ID 입력</Label>
+                  <Input
+                    value={inlineEditValue}
+                    onChange={(e) => {
+                      let value = e.target.value.trim();
+                      // Extract video ID from various YouTube URL formats
+                      const patterns = [
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+                        /^([a-zA-Z0-9_-]{11})$/
+                      ];
+                      for (const pattern of patterns) {
+                        const match = value.match(pattern);
+                        if (match) {
+                          value = match[1];
+                          break;
+                        }
+                      }
+                      setInlineEditValue(value);
+                    }}
+                    className="mt-1"
+                    placeholder="예: https://www.youtube.com/watch?v=dQw4w9WgXcQ 또는 dQw4w9WgXcQ"
+                    data-testid="input-youtube-url"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    YouTube URL을 붙여넣으면 자동으로 비디오 ID가 추출됩니다
+                  </p>
+                </div>
               </div>
             ) : (
               <Textarea

@@ -852,19 +852,27 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
 
         {/* CTA Buttons */}
         <div className="flex flex-wrap gap-4 justify-center mb-16">
-          {data.buttonText && data.buttonLink && (
-            <Link href={data.buttonLink}>
-              <button className="ts-btn ts-btn-primary text-base px-8 py-3">
-                {data.buttonText}
-              </button>
-            </Link>
+          {data.buttonText && (
+            <EditableButton
+              text={data.buttonText}
+              link={data.buttonLink || "#"}
+              sectionId={sectionId}
+              fieldPath="button"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              className="ts-btn ts-btn-primary text-base px-8 py-3"
+            />
           )}
-          {data.secondaryButtonText && data.secondaryButtonLink && (
-            <Link href={data.secondaryButtonLink}>
-              <button className="ts-btn ts-btn-outline-white text-base px-8 py-3">
-                {data.secondaryButtonText}
-              </button>
-            </Link>
+          {data.secondaryButtonText && (
+            <EditableButton
+              text={data.secondaryButtonText}
+              link={data.secondaryButtonLink || "#"}
+              sectionId={sectionId}
+              fieldPath="secondaryButton"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              className="ts-btn ts-btn-outline-white text-base px-8 py-3"
+            />
           )}
         </div>
 
@@ -1349,7 +1357,15 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
               style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
             >
               <PartyPopper className="w-4 h-4" />
-              {data.promoBadge}
+              <EditableField
+                value={data.promoBadge}
+                sectionId={sectionId}
+                fieldPath="promoBadge"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="span"
+              />
             </a>
           )}
 
@@ -1380,25 +1396,27 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            {data.buttonText && data.buttonLink && (
-              <Link href={data.buttonLink}>
-                <button 
-                  className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90"
-                  style={{ background: 'white', color: 'var(--ts-primary)' }}
-                >
-                  {data.buttonText}
-                </button>
-              </Link>
+            {data.buttonText && (
+              <EditableButton
+                text={data.buttonText}
+                link={data.buttonLink || "#"}
+                sectionId={sectionId}
+                fieldPath="button"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90 bg-white text-primary"
+              />
             )}
-            {data.secondaryButtonText && data.secondaryButtonLink && (
-              <Link href={data.secondaryButtonLink}>
-                <button 
-                  className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90"
-                  style={{ background: 'transparent', color: 'white', border: '2px solid white' }}
-                >
-                  {data.secondaryButtonText}
-                </button>
-              </Link>
+            {data.secondaryButtonText && (
+              <EditableButton
+                text={data.secondaryButtonText}
+                link={data.secondaryButtonLink || "#"}
+                sectionId={sectionId}
+                fieldPath="secondaryButton"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                className="w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-base transition-colors hover:opacity-90 bg-transparent text-white border-2 border-white"
+              />
             )}
           </div>
 
@@ -1412,7 +1430,16 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
                   style={{ background: 'rgba(255,255,255,0.1)' }}
                 >
                   <Check className="w-4 h-4" style={{ color: 'var(--ts-accent-green)' }} />
-                  <span className="text-sm font-medium text-white">{benefit}</span>
+                  <EditableField
+                    value={benefit}
+                    sectionId={sectionId}
+                    fieldPath={`benefits.${index}`}
+                    fieldType="text"
+                    isEditing={isEditing}
+                    onEdit={onFieldEdit}
+                    as="span"
+                    className="text-sm font-medium text-white"
+                  />
                 </div>
               ))}
             </div>
