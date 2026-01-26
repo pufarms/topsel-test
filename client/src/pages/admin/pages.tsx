@@ -361,6 +361,27 @@ export default function PagesManagement() {
       if (sectionIdentifier === inlineEditDialog.sectionId) {
         const fieldPath = inlineEditDialog.fieldPath;
         
+        // Special handling for YouTube video ID updates - also update thumbnail
+        const videoIdMatch = fieldPath.match(/^videos\.(\d+)\.id$/);
+        if (videoIdMatch && section.data?.videos) {
+          const videoIndex = parseInt(videoIdMatch[1]);
+          const updatedVideos = [...section.data.videos];
+          if (updatedVideos[videoIndex]) {
+            updatedVideos[videoIndex] = {
+              ...updatedVideos[videoIndex],
+              id: saveValue,
+              thumbnail: `https://img.youtube.com/vi/${saveValue}/maxresdefault.jpg`
+            };
+          }
+          return {
+            ...section,
+            data: {
+              ...section.data,
+              videos: updatedVideos
+            }
+          };
+        }
+        
         // Handle nested paths like "items.0.title" or "items.0.description"
         if (fieldPath.includes('.')) {
           if (section.data) {
