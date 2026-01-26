@@ -369,16 +369,46 @@ function PositionToolbar({ sectionId, currentAlign, currentVerticalAlign, onPosi
   );
 }
 
-function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
+function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange }: SectionProps) {
   if (!data) return null;
   const description = data.text || data.description || "";
   const hasBackgroundImage = data.backgroundType === "image" && data.backgroundImage;
+  
+  // Get alignment values with defaults
+  const contentAlign = data.contentAlign || 'center';
+  const contentVerticalAlign = data.contentVerticalAlign || 'center';
+  
+  const getAlignClass = () => {
+    switch (contentAlign) {
+      case 'left': return 'text-left items-start';
+      case 'right': return 'text-right items-end';
+      default: return 'text-center items-center';
+    }
+  };
+  
+  const getButtonJustifyClass = () => {
+    switch (contentAlign) {
+      case 'left': return 'justify-start';
+      case 'right': return 'justify-end';
+      default: return 'justify-center';
+    }
+  };
   
   return (
     <section
       className={`relative py-16 md:py-24 ${!hasBackgroundImage ? "bg-gradient-to-br from-primary/10 to-primary/5" : ""} ${isEditing ? "cursor-pointer" : ""}`}
       data-testid="section-hero"
     >
+      {/* Position Toolbar for editing mode */}
+      {isEditing && onPositionChange && (
+        <PositionToolbar
+          sectionId={sectionId}
+          currentAlign={contentAlign}
+          currentVerticalAlign={contentVerticalAlign}
+          onPositionChange={onPositionChange}
+        />
+      )}
+
       {hasBackgroundImage && (
         <>
           <div 
@@ -402,7 +432,7 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
           <div className="absolute inset-0 bg-black/50 pointer-events-none" />
         </>
       )}
-      <div className={`container mx-auto px-4 text-center relative z-10 ${hasBackgroundImage ? "text-white" : ""}`}>
+      <div className={`container mx-auto px-4 relative z-10 flex flex-col ${getAlignClass()} ${hasBackgroundImage ? "text-white" : ""}`}>
         {data.imageUrl && (
           <div className="mb-8">
             <EditableImage
@@ -452,7 +482,7 @@ function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: Secti
             className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8"
           />
         )}
-        <div className="flex flex-wrap gap-4 justify-center">
+        <div className={`flex flex-wrap gap-4 ${getButtonJustifyClass()}`}>
           {data.buttonText && data.buttonLink && (
             <EditableButton
               text={data.buttonText}
