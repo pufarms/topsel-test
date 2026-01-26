@@ -828,6 +828,9 @@ export interface PageSection {
     backgroundType?: 'gradient' | 'image' | 'color';
     backgroundImage?: string;
     textColor?: string;
+    // Content positioning
+    contentAlign?: 'left' | 'center' | 'right';
+    contentVerticalAlign?: 'top' | 'center' | 'bottom';
     // Advanced section fields
     promoBadge?: string;
     promoBadgeLink?: string;

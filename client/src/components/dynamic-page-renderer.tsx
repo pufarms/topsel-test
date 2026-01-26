@@ -25,6 +25,13 @@ import {
   ImageIcon,
   Pencil,
   Video,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  Move,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -33,6 +40,7 @@ interface DynamicPageRendererProps {
   isEditing?: boolean;
   onSectionClick?: (section: PageSection) => void;
   onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
+  onPositionChange?: (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => void;
 }
 
 interface EditableFieldProps {
@@ -286,6 +294,79 @@ interface SectionProps {
   isEditing?: boolean;
   onClick?: () => void;
   onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
+  onPositionChange?: (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => void;
+}
+
+// Position Toolbar Component for editing mode
+interface PositionToolbarProps {
+  sectionId: string;
+  currentAlign: 'left' | 'center' | 'right';
+  currentVerticalAlign: 'top' | 'center' | 'bottom';
+  onPositionChange: (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => void;
+}
+
+function PositionToolbar({ sectionId, currentAlign, currentVerticalAlign, onPositionChange }: PositionToolbarProps) {
+  return (
+    <div 
+      className="absolute top-4 left-4 z-30 flex flex-col gap-2 bg-background/95 backdrop-blur-sm rounded-lg shadow-lg border p-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground px-1">
+        <Move className="w-3 h-3" />
+        <span>위치 조정</span>
+      </div>
+      
+      {/* Horizontal Alignment */}
+      <div className="flex gap-1">
+        <button
+          className={`p-1.5 rounded transition-colors ${currentAlign === 'left' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, 'left', currentVerticalAlign)}
+          title="왼쪽 정렬"
+        >
+          <AlignLeft className="w-4 h-4" />
+        </button>
+        <button
+          className={`p-1.5 rounded transition-colors ${currentAlign === 'center' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, 'center', currentVerticalAlign)}
+          title="가운데 정렬"
+        >
+          <AlignCenter className="w-4 h-4" />
+        </button>
+        <button
+          className={`p-1.5 rounded transition-colors ${currentAlign === 'right' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, 'right', currentVerticalAlign)}
+          title="오른쪽 정렬"
+        >
+          <AlignRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Vertical Alignment */}
+      <div className="flex gap-1">
+        <button
+          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'top' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, currentAlign, 'top')}
+          title="상단 정렬"
+        >
+          <AlignVerticalJustifyStart className="w-4 h-4" />
+        </button>
+        <button
+          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'center' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, currentAlign, 'center')}
+          title="중앙 정렬"
+        >
+          <AlignVerticalJustifyCenter className="w-4 h-4" />
+        </button>
+        <button
+          className={`p-1.5 rounded transition-colors ${currentVerticalAlign === 'bottom' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+          onClick={() => onPositionChange(sectionId, currentAlign, 'bottom')}
+          title="하단 정렬"
+        >
+          <AlignVerticalJustifyEnd className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function HeroSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
