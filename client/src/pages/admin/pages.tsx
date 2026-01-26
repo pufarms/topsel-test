@@ -946,9 +946,26 @@ export default function PagesManagement() {
             </TabsContent>
           </Tabs>
           
-          <DialogFooter className="mt-4 pt-4 border-t">
+          <DialogFooter className="mt-4 pt-4 border-t flex-wrap gap-2">
             <Button variant="outline" onClick={() => { setEditDialog({ open: false, page: null }); resetForm(); }}>
               취소
+            </Button>
+            <Button 
+              variant="secondary"
+              onClick={() => {
+                if (editDialog.page && contentData) {
+                  updateContentMutation.mutate({ 
+                    id: editDialog.page.id, 
+                    content: contentData,
+                    path: editDialog.page.path
+                  });
+                }
+              }}
+              disabled={updateContentMutation.isPending || !contentData}
+              data-testid="button-save-content"
+            >
+              {updateContentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              콘텐츠 저장
             </Button>
             <Button 
               onClick={() => editDialog.page && updateMutation.mutate({ id: editDialog.page.id, data: formData })}
