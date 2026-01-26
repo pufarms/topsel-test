@@ -11,7 +11,7 @@ export function PublicLayout({ children, transparentHeader = false, hasHeroBanne
   return (
     <div className="flex min-h-screen flex-col">
       <PublicHeader transparent={transparentHeader} />
-      <main className={`flex-1 ${!hasHeroBanner ? "pt-14" : ""}`}>
+      <main className={`flex-1 ${!hasHeroBanner ? "pt-16" : ""}`}>
         {children}
       </main>
       <PublicFooter />
