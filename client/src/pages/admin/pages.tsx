@@ -758,7 +758,7 @@ export default function PagesManagement() {
 
       {/* Edit Page Dialog with Tabs */}
       <Dialog open={editDialog.open} onOpenChange={(open) => { setEditDialog({ open, page: open ? editDialog.page : null }); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5" />
@@ -935,7 +935,7 @@ export default function PagesManagement() {
                     텍스트나 이미지를 클릭하면 바로 편집할 수 있습니다
                   </p>
                 </div>
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-[60vh]">
                   <DynamicPageRenderer 
                     content={contentData} 
                     isEditing={true}
@@ -992,7 +992,7 @@ export default function PagesManagement() {
       <Dialog open={inlineEditDialog.open} onOpenChange={(open) => {
         if (!open) setInlineEditDialog({ open: false, sectionId: '', fieldPath: '', currentValue: '', fieldType: 'text' });
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>
               {inlineEditDialog.fieldType === 'image' ? '이미지 변경' : 
