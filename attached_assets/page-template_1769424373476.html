@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Topsel B2B - 페이지 템플릿</title>
+  
+  <!-- ⚠️ CRITICAL: 모든 페이지에 이 CSS를 반드시 포함 -->
+  <link rel="stylesheet" href="design-system-global.css">
+  
+  <!-- 페이지별 추가 CSS (선택사항) -->
+  <style>
+    /* 이 페이지만의 특별한 스타일이 필요하면 여기에 */
+    /* 단, 디자인 시스템의 CSS Variables를 사용해야 함 */
+  </style>
+</head>
+<body>
+
+  <!-- ============================================
+       HEADER - 모든 페이지에 동일하게 사용
+       ============================================ -->
+  <header class="section-light" style="position: sticky; top: 0; z-index: 1000;">
+    <div class="container">
+      <nav style="display: flex; justify-content: space-between; align-items: center; height: 60px;">
+        <!-- 로고 -->
+        <div class="logo">
+          <img src="logo.svg" alt="Topsel" style="height: 30px;">
+        </div>
+        
+        <!-- 데스크톱 메뉴 -->
+        <ul class="hide-mobile" style="display: flex; gap: 32px; list-style: none;">
+          <li><a href="#" style="color: var(--text-main); text-decoration: none;">제품</a></li>
+          <li><a href="#" style="color: var(--text-main); text-decoration: none;">솔루션</a></li>
+          <li><a href="#" style="color: var(--text-main); text-decoration: none;">고객사례</a></li>
+          <li><a href="#" style="color: var(--text-main); text-decoration: none;">회사소개</a></li>
+        </ul>
+        
+        <!-- CTA 버튼 -->
+        <div class="hide-mobile">
+          <a href="#" class="btn btn-primary">무료 체험</a>
+        </div>
+        
+        <!-- 모바일 햄버거 메뉴 -->
+        <button class="show-mobile" style="background: none; border: none; font-size: 24px; cursor: pointer;">
+          ☰
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================================
+       HERO SECTION - Navy 배경
+       ============================================ -->
+  <section class="section-dark">
+    <div class="container">
+      <div style="text-align: center; max-width: 800px; margin: 0 auto;">
+        <!-- 상단 라벨 -->
+        <span class="subtitle-label">온라인과 오프라인 판매</span>
+        
+        <!-- 메인 제목 -->
+        <h1 class="h1-hero" style="margin-top: 16px; color: var(--white);">
+          온라인과 오프라인 판매의<br>
+          지속적 증대를 위한 솔루션
+        </h1>
+        
+        <!-- 설명 텍스트 -->
+        <p class="body-text" style="margin-top: 24px; color: rgba(255,255,255,0.8);">
+          Topsel은 B2B 비즈니스를 위한 통합 플랫폼입니다.<br>
+          온라인과 오프라인 판매를 하나의 시스템으로 관리하세요.
+        </p>
+        
+        <!-- 버튼 그룹 -->
+        <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+          <a href="#" class="btn btn-primary">무료로 시작하기</a>
+          <a href="#" class="btn btn-outline-white">데모 보기</a>
+        </div>
+      </div>
+      
+      <!-- 통계 섹션 -->
+      <div class="grid grid-2 grid-lg-4" style="margin-top: 60px; text-align: center;">
+        <div>
+          <div class="stat-number" style="color: var(--accent-green);">33건</div>
+          <div class="caption" style="color: rgba(255,255,255,0.6); margin-top: 8px;">성공 사례</div>
+        </div>
+        <div>
+          <div class="stat-number" style="color: var(--accent-green);">28+</div>
+          <div class="caption" style="color: rgba(255,255,255,0.6); margin-top: 8px;">파트너사</div>
+        </div>
+        <div>
+          <div class="stat-number" style="color: var(--accent-green);">56%</div>
+          <div class="caption" style="color: rgba(255,255,255,0.6); margin-top: 8px;">매출 증가</div>
+        </div>
+        <div>
+          <div class="stat-number" style="color: var(--accent-green);">99%</div>
+          <div class="caption" style="color: rgba(255,255,255,0.6); margin-top: 8px;">고객 만족도</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       FEATURE CARDS - White 배경
+       ============================================ -->
+  <section class="section-light">
+    <div class="container">
+      <!-- 섹션 제목 -->
+      <div style="text-align: center; margin-bottom: 48px;">
+        <span class="subtitle-label">주요 기능</span>
+        <h2 class="h2-section" style="margin-top: 16px;">
+          비즈니스 성장을 위한<br class="show-mobile">
+          완벽한 솔루션
+        </h2>
+      </div>
+      
+      <!-- 카드 그리드 (Mobile: 1단, Tablet: 2단, Desktop: 3단) -->
+      <div class="grid grid-1 grid-sm-2 grid-lg-3">
+        <!-- 카드 1 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--primary);">
+            📊
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">실시간 분석</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            판매 데이터를 실시간으로 분석하고 인사이트를 얻으세요.
+          </p>
+        </div>
+        
+        <!-- 카드 2 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--accent-orange);">
+            🔗
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">통합 관리</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            온라인과 오프라인 채널을 하나의 플랫폼에서 관리하세요.
+          </p>
+        </div>
+        
+        <!-- 카드 3 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--accent-green);">
+            ⚡
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">자동화</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            반복 작업을 자동화하고 효율성을 극대화하세요.
+          </p>
+        </div>
+        
+        <!-- 카드 4 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--accent-cyan);">
+            🛡️
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">안전한 보안</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            엔터프라이즈급 보안으로 데이터를 안전하게 보호합니다.
+          </p>
+        </div>
+        
+        <!-- 카드 5 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--badge-purple);">
+            📱
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">모바일 지원</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            언제 어디서나 모바일에서 비즈니스를 관리하세요.
+          </p>
+        </div>
+        
+        <!-- 카드 6 -->
+        <div class="card">
+          <div class="icon-box" style="background-color: var(--primary);">
+            💬
+          </div>
+          <h3 class="h3-card" style="margin-top: 20px;">24/7 지원</h3>
+          <p class="body-text" style="margin-top: 12px;">
+            전문 팀이 24시간 고객을 지원합니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       CONTENT + IMAGE - Navy 배경
+       ============================================ -->
+  <section class="section-dark">
+    <div class="container">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 48px; align-items: center;">
+        <!-- 이미지 (모바일: 위, 데스크톱: 왼쪽) -->
+        <div style="order: 1;">
+          <img src="placeholder-image.jpg" alt="제품 스크린샷" class="img-rounded" style="width: 100%;">
+        </div>
+        
+        <!-- 텍스트 (모바일: 아래, 데스크톱: 오른쪽) -->
+        <div style="order: 2;">
+          <span class="subtitle-label" style="color: var(--accent-cyan);">쉬운 사용</span>
+          <h2 class="h2-section" style="margin-top: 16px; color: var(--white);">
+            복잡한 설정 없이<br>
+            바로 시작하세요
+          </h2>
+          <p class="body-text" style="margin-top: 20px; color: rgba(255,255,255,0.8);">
+            직관적인 인터페이스로 누구나 쉽게 사용할 수 있습니다.
+            복잡한 교육이나 설정 없이 5분 만에 시작할 수 있습니다.
+          </p>
+          <ul style="margin-top: 24px; color: rgba(255,255,255,0.8); line-height: 2;">
+            <li>✓ 간단한 3단계 설정</li>
+            <li>✓ 기존 시스템과 자동 연동</li>
+            <li>✓ 무료 온보딩 지원</li>
+          </ul>
+          <a href="#" class="btn btn-outline-white" style="margin-top: 32px;">자세히 알아보기</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Desktop에서 이미지/텍스트 2단 레이아웃 -->
+  <style>
+    @media (min-width: 1024px) {
+      .section-dark .container > div {
+        grid-template-columns: 1fr 1fr !important;
+      }
+      .section-dark .container > div > div:first-child {
+        order: 1 !important;
+      }
+      .section-dark .container > div > div:last-child {
+        order: 2 !important;
+      }
+    }
+  </style>
+
+  <!-- ============================================
+       CTA BANNER - Primary 배경
+       ============================================ -->
+  <section style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%); padding: var(--section-padding-md); text-align: center;">
+    <div class="container">
+      <h2 class="h2-section" style="color: var(--white);">
+        지금 바로 시작하세요
+      </h2>
+      <p class="body-text" style="margin-top: 16px; color: rgba(255,255,255,0.9);">
+        14일 무료 체험, 신용카드 불필요
+      </p>
+      <a href="#" class="btn" style="margin-top: 32px; background: var(--white); color: var(--primary);">
+        무료로 시작하기
+      </a>
+    </div>
+  </section>
+
+  <!-- ============================================
+       FOOTER - Navy 배경
+       ============================================ -->
+  <footer class="section-dark" style="padding: 60px 0 30px;">
+    <div class="container">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 40px;">
+        <!-- 로고 & 설명 -->
+        <div>
+          <img src="logo-white.svg" alt="Topsel" style="height: 30px; filter: brightness(0) invert(1);">
+          <p class="body-text" style="margin-top: 16px; color: rgba(255,255,255,0.7);">
+            온라인과 오프라인 판매의 지속적 증대를 위한 솔루션
+          </p>
+        </div>
+        
+        <!-- 링크 그룹 (Desktop: 가로 배치) -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px;">
+          <div>
+            <h4 style="color: var(--white); font-weight: 700; margin-bottom: 16px;">제품</h4>
+            <ul style="list-style: none;">
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">기능</a></li>
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">가격</a></li>
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">고객사례</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color: var(--white); font-weight: 700; margin-bottom: 16px;">회사</h4>
+            <ul style="list-style: none;">
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">소개</a></li>
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">채용</a></li>
+              <li style="margin-bottom: 12px;"><a href="#" style="color: rgba(255,255,255,0.7); text-decoration: none;">문의</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Copyright -->
+      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px; text-align: center;">
+        <p class="caption" style="color: rgba(255,255,255,0.5);">
+          © 2026 Topsel B2B Platform. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Desktop Footer 레이아웃 -->
+  <style>
+    @media (min-width: 768px) {
+      footer .container > div:first-child {
+        grid-template-columns: 2fr 3fr !important;
+      }
+      footer .container > div:first-child > div:last-child {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+    }
+  </style>
+
+</body>
+</html>

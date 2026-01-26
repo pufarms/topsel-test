@@ -15,6 +15,37 @@ Preferred communication style: Simple, everyday language.
    - 텍스트: `text-xl md:text-2xl` 등 반응형 크기
 2. **Pretendard 한글 폰트 (필수!)**: 모든 페이지에 Pretendard 폰트 적용 유지
 
+### Topsel 디자인 시스템 (v2.0.0)
+공개 페이지 작업 시 반드시 준수해야 할 디자인 규칙:
+
+**파일 위치**: `public/design-system/`
+- `design-system-global.css`: 글로벌 CSS 스타일시트
+- `REPLIT-STRICT-GUIDELINES.md`: 준수 사항 체크리스트
+
+**색상 팔레트 (CSS Variables)**:
+- `--primary: #5D7AF2` (주요 브랜드 색상)
+- `--navy: #111827` (섹션 배경 어두운 색)
+- `--accent-orange: #FF6B00`
+- `--accent-cyan: #22D3EE`
+- `--accent-green: #10B981`
+
+**섹션 배경 교차 규칙**:
+- White ↔ Navy 반드시 교차 (연속 금지)
+- 예: Hero(Navy) → Features(White) → Content(Navy)
+
+**반응형 브레이크포인트**:
+- xs: 375px (모바일)
+- md: 768px (태블릿)
+- lg: 1024px (데스크톱)
+- Mobile-first 접근 (`min-width` 미디어쿼리만 사용)
+
+**타이포그래피 클래스**:
+- `.h1-hero`: 32px→56px (반응형)
+- `.h2-section`: 24px→36px
+- `.h3-card`: 18px→22px
+- `.body-text`: 14px→16px
+- `.stat-number`: 32px→48px (통계용)
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -29,7 +60,6 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture
 - **Framework**: Express 5 on Node.js with TypeScript
-- **HTTP Server**: Node's native HTTP server
 - **Session Management**: express-session with memorystore (development)
 - **API Design**: RESTful JSON API endpoints under `/api`
 - **Authentication**: Session-based with SHA256 password hashing and role-based access control (SUPER_ADMIN, ADMIN, seller)
@@ -38,152 +68,30 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema**: Shared `shared/schema.ts`
 - **Validation**: Zod schemas generated from Drizzle
-- **Database Connection**: `node-postgres` (pg) pool
 
 ### Database Schema Highlights
 - `users`: User authentication and role management (SUPER_ADMIN, ADMIN, seller)
 - `orders`: Core order details and user linkage
-- `products`, `product_registrations`, `categories`: Comprehensive product and category management, including supply price calculation.
+- `products`, `product_registrations`, `categories`: Product and category management.
 - `materials`, `material_categories_*`: Multi-level inventory management for raw, semi, and sub-materials with automatic code generation.
-- `product_mappings`, `product_material_mappings`: Links products to their required materials for inventory control.
-- `members`, `member_logs`: Member (partner) management and historical changes.
-  - Members can log in separately from admin users and access their own mypage.
-  - Member authentication checks: status="활성" and grade≠"PENDING"
+- `product_mappings`, `product_material_mappings`: Links products to their required materials.
+- `members`, `member_logs`: Member (partner) management and historical changes. Members can access their own mypage.
 - `images`: Storage of various image types with categories and subcategories.
+- `siteSettings`: Key-value pairs for site configuration.
+- `headerMenus`: Stores header menu items for dynamic navigation.
+- `pages`: Page definitions with categories, access levels, and JSONB content for CMS.
 
-### Member Mypage (Member Only)
-- **Route**: `/mypage` - Member self-service profile page
-- **API Endpoints**:
-  - `GET /api/member/profile`: Get current logged-in member's profile
-  - `PATCH /api/member/profile`: Update member's own profile
-- **Editable fields**: representative, businessAddress, phone, managerName, managerPhone, email, password
-- **Read-only fields**: companyName, businessNumber, username, grade, deposit, point
-- **Access control**: Only accessible when session.userType === "member"
-- **Data synchronization**: Admin and member both modify the same `members` table, ensuring real-time sync
-
-### Product Management (Admin Only)
-- Role-based access control for SUPER_ADMIN and ADMIN.
-- Dedicated routes for category management, product registration (with supply price calculation), and viewing product statuses (current, next-week, suspended).
-- Secure API endpoints enforce administrator permissions.
-
-### Inventory Management (Admin Only)
-- Role-based access control for SUPER_ADMIN and ADMIN.
-- Features include material management (4-level category structure), product mapping, stock status, and stock history tracking.
-- Materials have types (raw, semi, sub) and support automatic code generation.
-- Strict rules for stock immutability and deletion constraints on categories.
-- Supports bulk upload of materials via Excel.
-
-### Stock History Tracking
-- Comprehensive tracking of all stock changes (공급상품 and 원재료)
-- Records: stockType, actionType (in/out/adjust), itemCode, itemName, quantity, beforeStock, afterStock, reason, note, adminId, source, orderId
-- Automatic history recording on: product stock-in, stock adjustment, stock deletion, material stock adjustment
-- Source field supports: "manual" (현재 사용), "order" (주문 연동 대비)
-- API endpoints: GET /api/stock-history (with filters), GET /api/stock-history/admins, GET /api/stock-history/download
-- Frontend: Filter by stockType, actionType, source, adminId, date range, keyword search; pagination; Excel download
-
-### Product Mapping
-- Enables mapping products to necessary materials (raw, semi, sub) for inventory integration.
-- Provides a list of products with filtering and search, supporting responsive table/card views.
-- **Category Filtering**: Hierarchical filtering by product categories (대/중/소분류)
-  - Large category (대분류) dropdown enables medium category dropdown when selected
-  - Medium category (중분류) dropdown enables small category dropdown when selected
-  - Category data synced from product_registrations categories
-- Allows adding products from existing registrations or direct input.
-- Supports material selection, quantity input, and full replacement saving for mappings.
-- Automatic status updates (complete/incomplete) based on material assignments.
-- Includes Excel template download and bulk upload functionality for products and materials.
-- **Mapping Check Before Send**: When sending products to "차주 예상공급가 상품", the system checks if products are mapped. Unmapped products trigger a dialog prompting navigation to the mapping page.
-
-### Admin Design System
-- Standardized components (PageHeader, StatCard, FilterSection, DataTable, MobileCard) for consistent UI.
-- Common design rules for padding, section gaps, card padding, input/button heights, and responsive behavior.
-- Admin sidebar adapts to screen size (hidden on mobile, collapsed on tablet, expanded on desktop).
-
-### Excel Upload Standard Pattern
-- Supports `.xlsx` and `.xls` file formats.
-- Frontend uses FormData to send files directly to the server.
-- Backend utilizes `multer` for memory storage and `xlsx` library for parsing.
-- Server-side generation of Excel files for template downloads.
-
-### Site Settings Management (Admin)
-- **Database Table**: `siteSettings` stores key-value pairs with type information (string, boolean, number, json)
-- **Categories**: header (로고, 버튼 표시), footer (회사정보, 링크), general (사이트명, 설명)
-- **API Endpoints**:
-  - `GET /api/site-settings/public`: Public endpoint for header/footer (no auth required)
-  - `GET /api/site-settings`: Admin-only, all settings
-  - `PUT /api/site-settings/bulk`: Admin-only, bulk update
-  - `POST /api/site-settings/seed`: SUPER_ADMIN only, create initial settings
-- **Admin Page**: `/admin/settings/site` with tabs (일반, 헤더, 푸터) - 메뉴관리는 헤더 탭 안에 포함
-- **Public Components**: 
-  - `PublicHeader`: Dynamic header from settings (logo, dynamic menus, login/register/cart buttons)
-  - `PublicFooter`: Dynamic footer from settings (company info, copyright, links)
-  - `PublicLayout`: Wrapper component with header + content + footer
-- **Hook**: `useSiteSettings` with `usePublicSiteSettings()`, `useAdminSiteSettings()`, `useUpdateSiteSettings()`
-
-### Header Menu Management (Site Settings - 헤더 탭)
-- **Database Table**: `headerMenus` stores menu items with name, path, sortOrder, isVisible, openInNewTab, menuType, systemKey, showWhenLoggedIn, showWhenLoggedOut
-- **Menu Types**:
-  - `custom`: 사용자 정의 메뉴 (관리자가 추가)
-  - `system`: 시스템 메뉴 (login, logout, register, cart, mypage)
-- **Conditional Visibility**: 
-  - `showWhenLoggedIn`: 로그인 사용자에게 표시 여부
-  - `showWhenLoggedOut`: 비로그인 사용자에게 표시 여부
-- **API Endpoints**:
-  - `GET /api/header-menus/public`: Public endpoint for visible menus ordered by sortOrder
-  - `GET /api/header-menus`: Admin-only, all menus
-  - `POST /api/header-menus`: Create new menu
-  - `PUT /api/header-menus/:id`: Update menu
-  - `DELETE /api/header-menus/:id`: Delete menu
-  - `PUT /api/header-menus/order/update`: Bulk update menu order
-  - `POST /api/header-menus/seed`: SUPER_ADMIN only, create default system menus
-- **Features**:
-  - Add/Edit/Delete menus with name and path
-  - Drag-style ordering via up/down arrows
-  - Visibility toggle (show/hide menus on public site)
-  - Login-based conditional display (로그인/비로그인 시 표시)
-  - System menu seed button (로그인, 로그아웃, 회원가입, 장바구니, 마이페이지)
-  - "Open in new tab" option for external links
-  - Responsive design with desktop/mobile views in PublicHeader
-- **Hooks**: `usePublicHeaderMenus()`, `useAdminHeaderMenus()`, `useCreateHeaderMenu()`, `useUpdateHeaderMenu()`, `useDeleteHeaderMenu()`, `useUpdateHeaderMenuOrder()`, `useSeedHeaderMenus()`
-- **PublicHeader Logic**: All menus displayed on right side, filtered by login status
-
-### Page Management (Admin)
-- **Database Table**: `pages` stores page definitions with categories, access levels, settings, and content (JSONB)
-- **CMS Content System**: JSON 기반 동적 콘텐츠 관리
-  - **content** 필드: JSONB 타입으로 sections 배열과 meta 정보 저장
-  - **9가지 섹션 타입**: hero(히어로), heading(제목), text(텍스트), image(이미지), button(버튼), divider(구분선), cards(카드 그리드), features(기능 소개), cta(행동유도)
-  - **편집 워크플로우**: 설정 탭(페이지 기본정보) → 콘텐츠 탭(비주얼 에디터) → 미리보기 탭(실시간 렌더링)
-- **Page Categories (8)**:
-  1. 기본페이지: 로그인, 로그아웃, 회원가입, 이용약관, 개인정보처리방침, 개인정보 제3자 동의
-  2. 메인/서브페이지: 메인 페이지, 서브페이지
-  3. 회원마이페이지: 마이페이지 대시보드, 회원정보
-  4. 주문관리페이지: 주문등록, 취소건 관리, 운송장 다운로드, 배송중/완료 리스트
-  5. 통계관리페이지: 상품별 통계관리, 정산 관리
-  6. 가이드페이지: 회원가입과 등급, 주문/발주 관리, 상품, 예치금/포인트 정산, 혜택과 지원
-  7. 게시판관리페이지: 일반 게시판, 회원전용 게시판
-  8. 기타페이지
-- **Access Levels**: all (전체 공개), ASSOCIATE (준회원 이상), START (Start회원 이상), DRIVING (Driving회원 이상), TOP (Top회원 전용)
-- **API Endpoints**:
-  - `GET /api/pages`: Admin-only, all pages
-  - `GET /api/pages/by-path`: Public, get page by path for dynamic rendering
-  - `POST /api/pages`: Create new page (with Zod validation)
-  - `PUT /api/pages/:id`: Update page settings (with Zod validation)
-  - `PATCH /api/pages/:id/content`: Update page content (JSONB)
-  - `DELETE /api/pages/:id`: Delete page (system pages cannot be deleted)
-  - `POST /api/pages/seed`: SUPER_ADMIN only, create default pages
-- **UI Features**:
-  - List view grouped by 8 categories with collapsible sections
-  - Each page shows name, path, status badge, access level badge, system flag
-  - **비주얼 콘텐츠 에디터**: 드래그&드롭 없이 섹션 추가/편집/삭제/순서 변경
-  - **실시간 미리보기**: 편집 중 실시간으로 페이지 렌더링 확인
-- **동적 페이지 렌더링**: `/:path*` catch-all 라우트로 DB 기반 페이지 렌더링
-- **Key Components**:
-  - `PageContentEditor`: 비주얼 콘텐츠 에디터 컴포넌트
-  - `DynamicPageRenderer`: 페이지 섹션 렌더링 컴포넌트
-  - `DynamicPage`: 공개 페이지용 catch-all 라우트 컴포넌트
-  - Add/Edit/Delete pages with category, access level, and status selection
-  - Search functionality across all pages
-  - System pages (isSystem="true") cannot be deleted
+### Core Features
+- **Member Mypage**: Self-service profile page for members (`/mypage`), with editable fields and read-only information, accessible only to logged-in members.
+- **Product Management (Admin Only)**: Role-based access for product categories, registration, and status viewing.
+- **Inventory Management (Admin Only)**: Material management, product mapping, stock status, and history tracking. Supports bulk Excel uploads.
+- **Stock History Tracking**: Comprehensive tracking of all stock changes with detailed records and API for filtering and download.
+- **Product Mapping**: Links products to necessary materials for inventory control. Includes hierarchical category filtering, bulk upload/download, and mapping checks before product dispatch.
+- **Admin Design System**: Standardized components and design rules for consistent UI within the admin panel.
+- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` files for data import using `multer` and `xlsx`.
+- **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
+- **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
+- **Page Management (Admin)**: CMS for dynamic page creation and management using a JSON-based content system (`pages` table). Features include a visual content editor with 9 section types, real-time preview, 8 predefined page categories, and access level control. System pages are non-deletable. Dynamic page rendering handles public paths.
 
 ## External Dependencies
 
@@ -198,21 +106,13 @@ Preferred communication style: Simple, everyday language.
 - **vaul**: Drawer component.
 - **cmdk**: Command palette component.
 - **react-day-picker**: Calendar/date picker.
-- **recharts**: Charting library (via shadcn chart component).
+- **recharts**: Charting library.
 
 ### Session Storage
 - **memorystore**: In-memory session store for development.
-- **connect-pg-simple**: Available for PostgreSQL session storage in production.
 
 ### Image Storage
-- **Cloudflare R2**: S3-compatible object storage.
-- **R2 Public URL**: `https://pub-ecc7de5cc4bd40e3965936a44b6.r2.dev`
-- Supports image categorization (banner, product, icon, misc) with subcategories.
-- Features include drag-and-drop upload, auto-dimension detection, and 2-level category filtering.
+- **Cloudflare R2**: S3-compatible object storage for images. Public URL: `https://pub-ecc7de5cc4bd40e3965936a44b6.r2.dev`.
 
-### Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string.
-- `SESSION_SECRET`: Key for session encryption.
-- `R2_ACCESS_KEY_ID`: Cloudflare R2 access key.
-- `R2_SECRET_ACCESS_KEY`: Cloudflare R2 secret key.
-- `RESEND_API_KEY`: For email sending (e.g., password resets).
+### Other APIs
+- **Resend**: For email sending functionality.

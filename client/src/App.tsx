@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import AboutPage from "@/pages/about";
 import Dashboard from "@/pages/dashboard";
 import AdminLayout from "@/pages/admin-layout";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/mypage" component={MyPage} />
       <Route path="/public-preview" component={PublicPreviewPage} />
+      <Route path="/about" component={AboutPage} />
       
       <Route path="/admin">
         <AdminRoute><AdminDashboard /></AdminRoute>

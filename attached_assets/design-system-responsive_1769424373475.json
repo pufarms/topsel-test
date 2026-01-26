@@ -1,0 +1,515 @@
+{
+  "project_name": "Topsel B2B Platform",
+  "version": "2.0.0",
+  "description": "Design system with comprehensive responsive design rules",
+  "design_system": {
+    "colors": {
+      "brand": {
+        "primary": "#5D7AF2",
+        "primary_hover": "#4b63c7",
+        "secondary_navy": "#111827",
+        "accent_orange": "#FF6B00",
+        "highlight_cyan": "#22D3EE",
+        "accent_green": "#10B981",
+        "badge_purple": "#8B5CF6"
+      },
+      "neutral": {
+        "white": "#FFFFFF",
+        "gray_50": "#F9FAFB",
+        "gray_100": "#F3F4F6",
+        "gray_400": "#9CA3AF",
+        "gray_600": "#4B5563",
+        "gray_900": "#111827",
+        "text_main": "#1F2937",
+        "text_sub": "#6B7280",
+        "border": "#E5E7EB"
+      },
+      "semantic": {
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444"
+      }
+    },
+    "responsive": {
+      "breakpoints": {
+        "xs": "0px",
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1280px",
+        "2xl": "1536px"
+      },
+      "breakpoint_strategy": "Mobile-first approach (min-width media queries)",
+      "container": {
+        "xs": "100%",
+        "sm": "640px",
+        "md": "768px",
+        "lg": "1024px",
+        "xl": "1200px",
+        "2xl": "1200px"
+      },
+      "padding": {
+        "xs": "16px",
+        "sm": "20px",
+        "md": "24px",
+        "lg": "32px",
+        "xl": "40px"
+      },
+      "grid_columns": {
+        "xs": 1,
+        "sm": 2,
+        "md": 2,
+        "lg": 3,
+        "xl": 3
+      }
+    },
+    "typography": {
+      "font_family": "Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif",
+      "base_size": "16px",
+      "line_height": "1.6",
+      "hierarchy": {
+        "h1_hero": {
+          "xs": {"size": "32px", "weight": "800", "line_height": "1.2"},
+          "sm": {"size": "40px", "weight": "800", "line_height": "1.2"},
+          "md": {"size": "48px", "weight": "800", "line_height": "1.2"},
+          "lg": {"size": "56px", "weight": "800", "line_height": "1.2"}
+        },
+        "h2_section": {
+          "xs": {"size": "24px", "weight": "800", "color": "var(--navy)"},
+          "sm": {"size": "28px", "weight": "800", "color": "var(--navy)"},
+          "md": {"size": "32px", "weight": "800", "color": "var(--navy)"},
+          "lg": {"size": "36px", "weight": "800", "color": "var(--navy)"}
+        },
+        "h3_card": {
+          "xs": {"size": "18px", "weight": "700"},
+          "md": {"size": "20px", "weight": "700"},
+          "lg": {"size": "22px", "weight": "700"}
+        },
+        "stat_number": {
+          "xs": {"size": "32px", "weight": "800", "color": "var(--accent-green)"},
+          "md": {"size": "40px", "weight": "800", "color": "var(--accent-green)"},
+          "lg": {"size": "48px", "weight": "800", "color": "var(--accent-green)"}
+        },
+        "subtitle_label": {
+          "size": "14px",
+          "weight": "700",
+          "transform": "uppercase",
+          "color": "var(--primary)",
+          "letter_spacing": "1px"
+        },
+        "body": {
+          "xs": {"size": "14px", "weight": "400", "color": "var(--text-sub)"},
+          "md": {"size": "16px", "weight": "400", "color": "var(--text-sub)"}
+        },
+        "caption": {
+          "size": "14px",
+          "weight": "400",
+          "color": "var(--gray-400)"
+        },
+        "overline": {
+          "size": "12px",
+          "weight": "600",
+          "transform": "uppercase",
+          "letter_spacing": "1.5px"
+        }
+      }
+    },
+    "layout": {
+      "spacing": {
+        "section_padding": {
+          "xs": "60px 0",
+          "md": "80px 0",
+          "lg": "100px 0"
+        },
+        "element_gap": {
+          "xs": "12px",
+          "md": "16px",
+          "lg": "20px"
+        },
+        "grid_gap": {
+          "xs": "16px",
+          "md": "24px",
+          "lg": "30px"
+        }
+      },
+      "section_rhythm": "Alternating backgrounds (White <-> Navy) must be strictly enforced across all screen sizes"
+    },
+    "ui_components": {
+      "header": {
+        "height": {
+          "xs": "60px",
+          "md": "70px",
+          "lg": "80px"
+        },
+        "logo_size": {
+          "xs": "120px",
+          "md": "140px",
+          "lg": "160px"
+        },
+        "menu": {
+          "xs": "Hamburger menu (mobile drawer)",
+          "lg": "Horizontal navigation"
+        },
+        "responsive_behavior": "Sticky on scroll, collapse to compact version on mobile"
+      },
+      "buttons": {
+        "border_radius": "6px",
+        "font_weight": "600",
+        "padding": {
+          "xs": "10px 20px",
+          "md": "12px 24px",
+          "lg": "12px 28px"
+        },
+        "font_size": {
+          "xs": "14px",
+          "md": "15px",
+          "lg": "16px"
+        },
+        "types": {
+          "solid_primary": {
+            "bg": "var(--primary)",
+            "text": "#FFFFFF"
+          },
+          "outline_white": {
+            "border": "1px solid rgba(255,255,255,0.5)",
+            "bg": "rgba(255,255,255,0.1)",
+            "text": "#FFFFFF"
+          },
+          "pill_badge": {
+            "border_radius": "50px",
+            "padding": "6px 14px",
+            "font_size": "13px"
+          }
+        },
+        "responsive_behavior": "Stack vertically on mobile (xs), inline on tablet+"
+      },
+      "cards": {
+        "border_radius": {
+          "xs": "12px",
+          "md": "16px"
+        },
+        "shadow": "0 10px 30px rgba(0,0,0,0.05)",
+        "bg_light": "#FFFFFF",
+        "bg_dark_element": "#1F2937",
+        "padding": {
+          "xs": "20px",
+          "md": "24px",
+          "lg": "30px"
+        }
+      },
+      "icons": {
+        "style": "Boxed icons",
+        "container_size": {
+          "xs": "40px",
+          "md": "45px",
+          "lg": "50px"
+        },
+        "border_radius": "12px",
+        "alignment": "Center content within a colored box"
+      }
+    },
+    "media": {
+      "images": {
+        "border_radius": {
+          "xs": "12px",
+          "md": "16px"
+        },
+        "aspect_ratios": {
+          "hero": "16:9",
+          "hero_mobile": "4:3",
+          "card": "4:3",
+          "thumbnail": "1:1"
+        },
+        "overlay": {
+          "gradient": "linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6))",
+          "text_color": "#FFFFFF"
+        },
+        "responsive_behavior": "Use srcset and sizes attributes, load optimized images per breakpoint"
+      }
+    },
+    "interactions": {
+      "transitions": {
+        "default": "all 0.3s ease",
+        "fast": "0.15s ease"
+      },
+      "hover_effects": {
+        "button": "transform: translateY(-2px); box-shadow: 0 4px 12px rgba(93,122,242,0.3)",
+        "card": "transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.1)",
+        "mobile_note": "Disable hover effects on touch devices (use @media (hover: hover))"
+      },
+      "scroll_animations": {
+        "fade_in": "opacity 0 → 1",
+        "slide_up": "translateY(30px) → 0",
+        "mobile_behavior": "Reduce animation distance on mobile (15px instead of 30px)"
+      },
+      "touch_interactions": {
+        "tap_target_size": "minimum 44x44px for all interactive elements",
+        "swipe_enabled": "Enable swipe for carousels and galleries on mobile"
+      }
+    },
+    "section_patterns": {
+      "hero": {
+        "background": "var(--navy) with overlay image",
+        "layout": {
+          "xs": "Single column, text center, image below text",
+          "md": "Single column, text left, image as background",
+          "lg": "Two column, text left (50%), image right (50%)"
+        },
+        "text_alignment": {
+          "xs": "center",
+          "md": "left"
+        },
+        "cta_buttons": {
+          "xs": "Stack vertically, full width",
+          "md": "Inline, auto width"
+        },
+        "stats_row": {
+          "xs": "2 columns, 2 rows",
+          "md": "4 columns, 1 row"
+        },
+        "padding": {
+          "xs": "80px 16px 40px",
+          "md": "100px 24px 60px",
+          "lg": "120px 40px 80px"
+        }
+      },
+      "feature_card_grid": {
+        "columns": {
+          "xs": 1,
+          "sm": 2,
+          "lg": 3
+        },
+        "card_style": "white background, rounded corners",
+        "image_position": "top",
+        "icon_style": "boxed, colored background",
+        "gap": {
+          "xs": "16px",
+          "md": "24px",
+          "lg": "30px"
+        }
+      },
+      "content_image_section": {
+        "layout": {
+          "xs": "Single column - image top, content bottom",
+          "md": "Two column - alternating (image left/right)",
+          "lg": "Two column - 60/40 split"
+        },
+        "image_order": {
+          "xs": "Always image first (top)",
+          "md": "Alternate: odd sections image-left, even sections image-right"
+        },
+        "text_alignment": {
+          "xs": "center",
+          "md": "left"
+        }
+      },
+      "testimonial_section": {
+        "background": "var(--navy)",
+        "layout": {
+          "xs": "Single column, image hidden or small",
+          "md": "Two column, image left (40%), content right (60%)"
+        },
+        "text_color": "white"
+      },
+      "cta_banner": {
+        "background": "gradient or solid primary",
+        "text_alignment": "center",
+        "button_style": "large, white background",
+        "layout": {
+          "xs": "Stack vertically: heading → text → button",
+          "md": "Inline: heading + text left, button right",
+          "lg": "Center all elements"
+        }
+      },
+      "stats_showcase": {
+        "columns": {
+          "xs": 2,
+          "sm": 2,
+          "md": 4
+        },
+        "alignment": "center",
+        "number_size": "Responsive (32px → 48px)"
+      }
+    }
+  },
+  "implementation_guide": {
+    "css_strategy": "Use CSS Variables (:root) for all colors. Use CSS clamp() for fluid typography.",
+    "html_structure": "Use semantic tags (header, section, footer). Each section must have a clear class like .section-dark or .section-light.",
+    "responsive_strategy": {
+      "approach": "Mobile-first (start with xs, add complexity with min-width media queries)",
+      "css_example": "@media (min-width: 768px) { ... }",
+      "grid_system": "CSS Grid with auto-fit/auto-fill for flexible columns",
+      "flexbox_usage": "Flexbox for component-level layouts, Grid for page-level structure"
+    },
+    "accessibility": {
+      "contrast": "WCAG AA minimum - ensure high contrast for text on Navy background",
+      "focus_states": "Visible focus indicators on all interactive elements",
+      "tap_targets": "Minimum 44x44px touch targets on mobile",
+      "responsive_text": "Use rem units for accessibility, allow user zoom up to 200%"
+    },
+    "performance": {
+      "images": "Use WebP format with fallbacks, lazy load below-fold images",
+      "fonts": "Preload Pretendard font files, use font-display: swap",
+      "critical_css": "Inline above-the-fold CSS for faster First Contentful Paint",
+      "mobile_first_assets": "Load mobile-optimized assets first, progressively enhance for larger screens"
+    },
+    "testing_checklist": [
+      "Test on iPhone SE (375px) - smallest common mobile",
+      "Test on iPad (768px) - tablet breakpoint",
+      "Test on laptop (1024px - 1440px) - desktop range",
+      "Test on large desktop (1920px+) - ensure content doesn't stretch too wide",
+      "Test landscape mobile orientation",
+      "Test with browser zoom at 150% and 200%",
+      "Test touch interactions on real devices",
+      "Validate with Chrome DevTools device emulator"
+    ]
+  },
+  "replit_instructions": {
+    "CRITICAL_RULE": "⚠️ THIS DESIGN SYSTEM MUST BE APPLIED TO EVERY PAGE WITHOUT EXCEPTION ⚠️",
+    "framework_recommendation": "Use Tailwind CSS for rapid responsive development (matches this design system)",
+    "must_implement": [
+      "Mobile-first responsive design - start with xs breakpoint",
+      "All sections must work from 320px to 2560px width",
+      "Touch-friendly interactions (44px minimum tap targets)",
+      "Responsive images with srcset",
+      "Flexible grid layouts using CSS Grid",
+      "Sticky header that adapts on mobile",
+      "Hamburger menu for mobile navigation",
+      "Test on multiple breakpoints before delivering"
+    ],
+    "code_structure": "Create separate CSS files for each breakpoint to maintain clarity",
+    "component_approach": "Build each component mobile-first, then enhance for larger screens",
+    "consistency_enforcement": {
+      "rule": "Every new page MUST reference this design system. No exceptions.",
+      "workflow": [
+        "1. Read design-system-responsive.json BEFORE starting any page",
+        "2. Use ONLY colors defined in colors.brand and colors.neutral",
+        "3. Use ONLY typography sizes from typography.hierarchy",
+        "4. Follow section_patterns for all page sections",
+        "5. Apply responsive breakpoints exactly as defined",
+        "6. Test on all breakpoints (xs, sm, md, lg, xl) before completion",
+        "7. Ensure alternating White/Navy section backgrounds"
+      ],
+      "forbidden_actions": [
+        "❌ DO NOT create custom colors outside the defined palette",
+        "❌ DO NOT use random font sizes - use only defined hierarchy",
+        "❌ DO NOT ignore breakpoint rules",
+        "❌ DO NOT create inconsistent button styles",
+        "❌ DO NOT skip mobile testing",
+        "❌ DO NOT break the alternating section rhythm"
+      ],
+      "quality_checklist_before_delivery": [
+        "✅ All colors match design-system colors exactly",
+        "✅ Typography uses defined hierarchy (h1_hero, h2_section, etc.)",
+        "✅ Sections alternate White/Navy backgrounds correctly",
+        "✅ Responsive at xs(375px), md(768px), lg(1024px), xl(1280px)",
+        "✅ Buttons use defined styles (solid_primary, outline_white, pill_badge)",
+        "✅ Cards have correct border-radius (12px mobile, 16px desktop)",
+        "✅ Touch targets are minimum 44x44px on mobile",
+        "✅ Layout patterns match section_patterns definitions"
+      ]
+    },
+    "per_page_instructions": {
+      "when_creating_new_page": "ALWAYS start with: 'Based on design-system-responsive.json, I will create [page name] with...'",
+      "template_structure": {
+        "step_1": "Import/reference the global design system CSS variables",
+        "step_2": "Use section_patterns to determine page structure",
+        "step_3": "Apply responsive typography from typography.hierarchy",
+        "step_4": "Implement responsive layout using defined breakpoints",
+        "step_5": "Test on all breakpoints before showing to user"
+      },
+      "reusable_components": {
+        "header": "Use header definition from ui_components.header - SAME across all pages",
+        "footer": "Create once, reuse everywhere with consistent styling",
+        "buttons": "Use ONLY defined button types: solid_primary, outline_white, pill_badge",
+        "cards": "Always use cards definition from ui_components.cards",
+        "icons": "Follow icons definition: boxed style, defined sizes per breakpoint"
+      }
+    },
+    "version_control": {
+      "current_version": "2.0.0",
+      "rule": "If design system is updated, ALL existing pages must be reviewed and updated to match",
+      "changelog_requirement": "Document any deviations from design system with clear reasoning"
+    }
+  },
+  "global_css_template": {
+    "description": "This CSS must be included in EVERY page as a global stylesheet",
+    "file_name": "design-system-global.css",
+    "content_structure": {
+      "css_variables": "Define all colors, spacing, typography as CSS variables in :root",
+      "base_styles": "Set Pretendard font, base font-size 16px, box-sizing border-box",
+      "utility_classes": "Create .section-light, .section-dark, .container, .btn-primary, etc.",
+      "responsive_utilities": "Create .hide-mobile, .hide-desktop, .mobile-only classes"
+    },
+    "example_css_variables": {
+      ":root": {
+        "--primary": "#5D7AF2",
+        "--primary-hover": "#4b63c7",
+        "--navy": "#111827",
+        "--accent-orange": "#FF6B00",
+        "--accent-green": "#10B981",
+        "--white": "#FFFFFF",
+        "--gray-50": "#F9FAFB",
+        "--gray-900": "#111827",
+        "--text-main": "#1F2937",
+        "--text-sub": "#6B7280",
+        "--border": "#E5E7EB",
+        "--font-family": "Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+        "--container-max-width": "1200px",
+        "--section-padding-mobile": "60px 0",
+        "--section-padding-desktop": "100px 0",
+        "--border-radius-sm": "12px",
+        "--border-radius-lg": "16px"
+      }
+    }
+  },
+  "page_templates": {
+    "description": "Pre-defined page structures that follow design system",
+    "templates": {
+      "landing_page": {
+        "structure": [
+          "Header (sticky, white background)",
+          "Hero Section (navy background, h1_hero typography)",
+          "Feature Cards Grid (white background, 3 columns)",
+          "Content + Image Section (navy background, alternating layout)",
+          "Stats Showcase (white background, 4 columns)",
+          "Testimonial Section (navy background)",
+          "CTA Banner (primary gradient background)",
+          "Footer (navy background)"
+        ],
+        "responsive_behavior": "All sections collapse to single column on mobile, expand to multi-column on desktop"
+      },
+      "product_page": {
+        "structure": [
+          "Header (sticky)",
+          "Product Hero (navy, product image + details)",
+          "Features Grid (white, 3-column cards)",
+          "Specifications (navy, two-column layout)",
+          "Related Products (white, horizontal scroll on mobile)",
+          "CTA Banner (primary)",
+          "Footer (navy)"
+        ]
+      },
+      "about_page": {
+        "structure": [
+          "Header (sticky)",
+          "Company Hero (navy, mission statement)",
+          "Timeline Section (white, vertical on mobile, horizontal on desktop)",
+          "Team Grid (navy, 3-column cards with photos)",
+          "Values Section (white, icon cards)",
+          "CTA Banner (primary)",
+          "Footer (navy)"
+        ]
+      },
+      "contact_page": {
+        "structure": [
+          "Header (sticky)",
+          "Contact Hero (navy, brief intro)",
+          "Form + Map Section (white, two-column on desktop)",
+          "Contact Info Cards (navy, 3-column grid)",
+          "Footer (navy)"
+        ]
+      }
+    }
+  }
+}
