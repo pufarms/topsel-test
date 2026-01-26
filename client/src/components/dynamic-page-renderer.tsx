@@ -22,6 +22,9 @@ import {
   FileText,
   PartyPopper,
   Check,
+  ImageIcon,
+  Pencil,
+  Video,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -770,6 +773,23 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit 
       }}
       data-testid="section-hero-advanced"
     >
+      {/* Background Image Editor */}
+      {isEditing && onFieldEdit && (
+        <div
+          className="absolute top-4 right-4 z-20 cursor-pointer group"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFieldEdit(sectionId, "backgroundImage", data.backgroundImage || "", "image");
+          }}
+          data-testid={`editable-image-${sectionId}-backgroundImage`}
+        >
+          <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg hover:bg-primary/90 transition-colors">
+            <ImageIcon className="w-4 h-4" />
+            <span className="text-sm font-medium">배경 이미지 변경</span>
+          </div>
+        </div>
+      )}
+
       {/* Promo Badge */}
       {data.promoBadge && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10">
@@ -904,9 +924,17 @@ function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             className={`text-center mb-12 transition-all duration-700 ${anim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
           >
             {data.sectionSubtitle && (
-              <span className="subtitle-label mb-3" style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}>
-                {data.sectionSubtitle}
-              </span>
+              <EditableField
+                value={data.sectionSubtitle}
+                sectionId={sectionId}
+                fieldPath="sectionSubtitle"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="span"
+                className="subtitle-label mb-3 inline-block"
+                style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}
+              />
             )}
             {data.sectionTitle && (
               <EditableField
@@ -1023,9 +1051,17 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
           className={`text-center mb-12 transition-all duration-700 ${anim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
           {data.subtitle && (
-            <span className="subtitle-label mb-3" style={{ color: 'var(--ts-accent-cyan)' }}>
-              {data.subtitle}
-            </span>
+            <EditableField
+              value={data.subtitle}
+              sectionId={sectionId}
+              fieldPath="subtitle"
+              fieldType="text"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              as="span"
+              className="subtitle-label mb-3 inline-block"
+              style={{ color: 'var(--ts-accent-cyan)' }}
+            />
           )}
           {data.title && (
             <EditableField
@@ -1057,11 +1093,27 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
           {videos.slice(0, 5).map((video: any, index: number) => (
             <div
               key={`${video.id}-${index}`}
-              className={`${index >= 3 ? 'hidden lg:block' : ''} ${index >= 2 && index < 3 ? 'hidden sm:block' : ''}`}
+              className={`${index >= 3 ? 'hidden lg:block' : ''} ${index >= 2 && index < 3 ? 'hidden sm:block' : ''} relative`}
             >
+              {/* Edit button for video */}
+              {isEditing && onFieldEdit && (
+                <div
+                  className="absolute top-2 right-2 z-10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFieldEdit(sectionId, `videos.${index}.id`, video.id || "", "text");
+                  }}
+                  data-testid={`editable-video-${sectionId}-${index}`}
+                >
+                  <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded shadow-lg hover:bg-primary/90 transition-colors">
+                    <Video className="w-3 h-3" />
+                    <span className="text-xs font-medium">편집</span>
+                  </div>
+                </div>
+              )}
               <div 
                 className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video"
-                onClick={() => setActiveVideoId(video.id)}
+                onClick={() => !isEditing && setActiveVideoId(video.id)}
               >
                 <img 
                   src={video.thumbnail || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`}
@@ -1097,9 +1149,17 @@ function StatsCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }:
           className={`text-center mb-12 transition-all duration-700 ${anim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
           {data.subtitle && (
-            <span className="subtitle-label mb-3" style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}>
-              {data.subtitle}
-            </span>
+            <EditableField
+              value={data.subtitle}
+              sectionId={sectionId}
+              fieldPath="subtitle"
+              fieldType="text"
+              isEditing={isEditing}
+              onEdit={onFieldEdit}
+              as="span"
+              className="subtitle-label mb-3 inline-block"
+              style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}
+            />
           )}
           {data.title && (
             <EditableField
@@ -1174,9 +1234,17 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
         >
           <div className="text-center mb-12">
             {data.subtitle && (
-              <span className="subtitle-label mb-3" style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}>
-                {data.subtitle}
-              </span>
+              <EditableField
+                value={data.subtitle}
+                sectionId={sectionId}
+                fieldPath="subtitle"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="span"
+                className="subtitle-label mb-3 inline-block"
+                style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}
+              />
             )}
             {data.title && (
               <EditableField
