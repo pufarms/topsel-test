@@ -831,6 +831,8 @@ export interface PageSection {
     // Content positioning
     contentAlign?: 'left' | 'center' | 'right';
     contentVerticalAlign?: 'top' | 'center' | 'bottom';
+    // Element-level grid positioning (1-16 columns)
+    elementPositions?: Record<string, { col: number; span: number }>;
     // Advanced section fields
     promoBadge?: string;
     promoBadgeLink?: string;

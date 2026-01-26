@@ -41,6 +41,86 @@ interface DynamicPageRendererProps {
   onSectionClick?: (section: PageSection) => void;
   onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
   onPositionChange?: (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => void;
+  onElementPositionChange?: (sectionId: string, fieldPath: string, col: number, span: number) => void;
+}
+
+// PositionableElement - Wraps elements with 16-column grid positioning
+interface PositionableElementProps {
+  sectionId: string;
+  fieldPath: string;
+  elementPositions?: Record<string, { col: number; span: number }>;
+  isEditing?: boolean;
+  onElementPositionChange?: (sectionId: string, fieldPath: string, col: number, span: number) => void;
+  selectedElement?: { sectionId: string; fieldPath: string } | null;
+  onElementSelect?: (element: { sectionId: string; fieldPath: string } | null) => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function PositionableElement({
+  sectionId,
+  fieldPath,
+  elementPositions,
+  isEditing,
+  onElementPositionChange,
+  selectedElement,
+  onElementSelect,
+  children,
+  className = ""
+}: PositionableElementProps) {
+  const position = elementPositions?.[fieldPath] || { col: 1, span: 16 };
+  const isSelected = selectedElement?.sectionId === sectionId && selectedElement?.fieldPath === fieldPath;
+  
+  const gridStyle: React.CSSProperties = {
+    gridColumn: `${position.col} / span ${position.span}`,
+  };
+  
+  if (!isEditing) {
+    return (
+      <div style={gridStyle} className={className}>
+        {children}
+      </div>
+    );
+  }
+  
+  return (
+    <div 
+      style={gridStyle} 
+      className={`${className} relative ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+    >
+      {/* Position toggle button */}
+      <Button
+        size="icon"
+        variant="outline"
+        className="absolute -top-3 -left-3 z-40 bg-background shadow-sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isSelected) {
+            onElementSelect?.(null);
+          } else {
+            onElementSelect?.({ sectionId, fieldPath });
+          }
+        }}
+        title="위치 조정"
+      >
+        <Move className="w-4 h-4" />
+      </Button>
+      
+      {/* Element Position Toolbar when selected */}
+      {isSelected && onElementPositionChange && (
+        <ElementPositionToolbar
+          sectionId={sectionId}
+          fieldPath={fieldPath}
+          currentCol={position.col}
+          currentSpan={position.span}
+          onPositionChange={onElementPositionChange}
+          position={{ top: -120, left: 0 }}
+        />
+      )}
+      
+      {children}
+    </div>
+  );
 }
 
 interface EditableFieldProps {
@@ -295,6 +375,9 @@ interface SectionProps {
   onClick?: () => void;
   onFieldEdit?: (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => void;
   onPositionChange?: (sectionId: string, contentAlign: 'left' | 'center' | 'right', contentVerticalAlign: 'top' | 'center' | 'bottom') => void;
+  onElementPositionChange?: (sectionId: string, fieldPath: string, col: number, span: number) => void;
+  selectedElement?: { sectionId: string; fieldPath: string } | null;
+  onElementSelect?: (element: { sectionId: string; fieldPath: string } | null) => void;
 }
 
 // Position Toolbar Component for editing mode
@@ -370,6 +453,96 @@ function PositionToolbar({ sectionId, currentAlign, currentVerticalAlign, onPosi
         >
           <AlignVerticalJustifyEnd className="w-4 h-4" />
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// Element Position Toolbar - 16-column grid positioning for individual elements
+interface ElementPositionToolbarProps {
+  sectionId: string;
+  fieldPath: string;
+  currentCol: number;
+  currentSpan: number;
+  onPositionChange: (sectionId: string, fieldPath: string, col: number, span: number) => void;
+  position?: { top: number; left: number };
+}
+
+function ElementPositionToolbar({ 
+  sectionId, 
+  fieldPath, 
+  currentCol, 
+  currentSpan, 
+  onPositionChange,
+  position 
+}: ElementPositionToolbarProps) {
+  const columns = Array.from({ length: 16 }, (_, i) => i + 1);
+  const spans = [1, 2, 3, 4, 6, 8, 12, 16];
+  
+  return (
+    <div 
+      className="absolute z-50 flex flex-col gap-2 bg-background/95 backdrop-blur-sm rounded-lg shadow-lg border p-3 min-w-[280px]"
+      style={position ? { top: position.top, left: position.left } : { top: -80, left: 0 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+        <Move className="w-3 h-3" />
+        <span>요소 위치 (16등분 그리드)</span>
+      </div>
+      
+      {/* Column Start Position - Interactive Grid */}
+      <div className="space-y-1">
+        <div className="text-xs text-muted-foreground">시작 위치: {currentCol}열</div>
+        <div className="grid grid-cols-16 gap-px bg-muted rounded overflow-hidden">
+          {columns.map((col) => (
+            <button
+              key={col}
+              className={`h-6 text-xs font-medium transition-colors ${
+                currentCol === col 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background hover-elevate'
+              }`}
+              onClick={() => onPositionChange(sectionId, fieldPath, col, currentSpan)}
+              title={`${col}열에서 시작`}
+            >
+              {col}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Column Span */}
+      <div className="space-y-1">
+        <div className="text-xs text-muted-foreground">너비: {currentSpan}칸</div>
+        <div className="flex flex-wrap gap-1">
+          {spans.map((span) => (
+            <Button
+              key={span}
+              size="sm"
+              variant={currentSpan === span ? 'default' : 'outline'}
+              onClick={() => onPositionChange(sectionId, fieldPath, currentCol, span)}
+              title={`${span}칸 너비`}
+            >
+              {span}칸
+            </Button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Preview Grid */}
+      <div className="space-y-1 mt-1">
+        <div className="text-xs text-muted-foreground">미리보기</div>
+        <div className="grid grid-cols-16 gap-px bg-muted rounded overflow-hidden h-4">
+          {columns.map((col) => {
+            const isActive = col >= currentCol && col < currentCol + currentSpan;
+            return (
+              <div 
+                key={col}
+                className={`h-full ${isActive ? 'bg-primary' : 'bg-muted-foreground/20'}`}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -887,9 +1060,10 @@ function CTASection({ data, sectionId, isEditing, onClick, onFieldEdit }: Sectio
 }
 
 // Hero Advanced Section with stats counter and promo badge
-function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange }: SectionProps) {
+function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit, onPositionChange, onElementPositionChange, selectedElement, onElementSelect }: SectionProps) {
   if (!data) return null;
   const stats = data.stats || [];
+  const elementPositions = data.elementPositions || {};
   
   // Get alignment values with defaults
   const contentAlign = data.contentAlign || 'center';
@@ -989,80 +1163,136 @@ function HeroAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit,
         </div>
       )}
 
-      <div className={`container flex flex-col ${getHorizontalAlignClass()} py-20`}>
-        {data.title && (
-          <EditableField
-            value={data.title}
-            sectionId={sectionId}
-            fieldPath="title"
-            fieldType="text"
-            isEditing={isEditing}
-            onEdit={onFieldEdit}
-            as="h1"
-            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 text-white"
-          />
-        )}
-        {data.subtitle && (
-          <EditableField
-            value={data.subtitle}
-            sectionId={sectionId}
-            fieldPath="subtitle"
-            fieldType="text"
-            isEditing={isEditing}
-            onEdit={onFieldEdit}
-            as="p"
-            className="text-base sm:text-lg md:text-xl mb-4 font-medium text-white/90"
-          />
-        )}
-        {data.description && (
-          <EditableField
-            value={data.description}
-            sectionId={sectionId}
-            fieldPath="description"
-            fieldType="text"
-            isEditing={isEditing}
-            onEdit={onFieldEdit}
-            as="p"
-            className="text-sm sm:text-base md:text-lg mb-10 text-white/70"
-          />
-        )}
-
-        {/* CTA Buttons */}
-        <div className={`flex flex-wrap gap-4 ${getButtonJustifyClass()} mb-16`}>
-          {data.buttonText && (
-            <EditableButton
-              text={data.buttonText}
-              link={data.buttonLink || "#"}
-              openInNewTab={data.buttonNewTab}
+      {/* 16-column grid container for positionable elements */}
+      <div className="container py-20">
+        <div className="grid grid-cols-16 gap-2">
+          {data.title && (
+            <PositionableElement
               sectionId={sectionId}
-              fieldPath="button"
+              fieldPath="title"
+              elementPositions={elementPositions}
               isEditing={isEditing}
-              onEdit={onFieldEdit}
-              className="ts-btn ts-btn-primary text-base px-8 py-3"
-            />
+              onElementPositionChange={onElementPositionChange}
+              selectedElement={selectedElement}
+              onElementSelect={onElementSelect}
+              className={getHorizontalAlignClass()}
+            >
+              <EditableField
+                value={data.title}
+                sectionId={sectionId}
+                fieldPath="title"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="h1"
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 text-white"
+              />
+            </PositionableElement>
           )}
-          {data.secondaryButtonText && (
-            <EditableButton
-              text={data.secondaryButtonText}
-              link={data.secondaryButtonLink || "#"}
-              openInNewTab={data.secondaryButtonNewTab}
+          {data.subtitle && (
+            <PositionableElement
               sectionId={sectionId}
-              fieldPath="secondaryButton"
+              fieldPath="subtitle"
+              elementPositions={elementPositions}
               isEditing={isEditing}
-              onEdit={onFieldEdit}
-              className="ts-btn ts-btn-outline-white text-base px-8 py-3"
-            />
+              onElementPositionChange={onElementPositionChange}
+              selectedElement={selectedElement}
+              onElementSelect={onElementSelect}
+              className={getHorizontalAlignClass()}
+            >
+              <EditableField
+                value={data.subtitle}
+                sectionId={sectionId}
+                fieldPath="subtitle"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className="text-base sm:text-lg md:text-xl mb-4 font-medium text-white/90"
+              />
+            </PositionableElement>
+          )}
+          {data.description && (
+            <PositionableElement
+              sectionId={sectionId}
+              fieldPath="description"
+              elementPositions={elementPositions}
+              isEditing={isEditing}
+              onElementPositionChange={onElementPositionChange}
+              selectedElement={selectedElement}
+              onElementSelect={onElementSelect}
+              className={getHorizontalAlignClass()}
+            >
+              <EditableField
+                value={data.description}
+                sectionId={sectionId}
+                fieldPath="description"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className="text-sm sm:text-base md:text-lg mb-10 text-white/70"
+              />
+            </PositionableElement>
+          )}
+
+          {/* CTA Buttons */}
+          <PositionableElement
+            sectionId={sectionId}
+            fieldPath="buttons"
+            elementPositions={elementPositions}
+            isEditing={isEditing}
+            onElementPositionChange={onElementPositionChange}
+            selectedElement={selectedElement}
+            onElementSelect={onElementSelect}
+            className={`flex flex-wrap gap-4 ${getButtonJustifyClass()} mb-16`}
+          >
+            {data.buttonText && (
+              <EditableButton
+                text={data.buttonText}
+                link={data.buttonLink || "#"}
+                openInNewTab={data.buttonNewTab}
+                sectionId={sectionId}
+                fieldPath="button"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                className="ts-btn ts-btn-primary text-base px-8 py-3"
+              />
+            )}
+            {data.secondaryButtonText && (
+              <EditableButton
+                text={data.secondaryButtonText}
+                link={data.secondaryButtonLink || "#"}
+                openInNewTab={data.secondaryButtonNewTab}
+                sectionId={sectionId}
+                fieldPath="secondaryButton"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                className="ts-btn ts-btn-outline-white text-base px-8 py-3"
+              />
+            )}
+          </PositionableElement>
+
+          {/* Stats Counter */}
+          {stats.length > 0 && (
+            <PositionableElement
+              sectionId={sectionId}
+              fieldPath="stats"
+              elementPositions={elementPositions}
+              isEditing={isEditing}
+              onElementPositionChange={onElementPositionChange}
+              selectedElement={selectedElement}
+              onElementSelect={onElementSelect}
+              className={`${getStatsAlignClass()}`}
+            >
+              <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-xl">
+                {stats.map((stat: any, index: number) => (
+                  <StatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} />
+                ))}
+              </div>
+            </PositionableElement>
           )}
         </div>
-
-        {/* Stats Counter */}
-        {stats.length > 0 && (
-          <div className={`grid grid-cols-3 gap-4 sm:gap-8 max-w-xl ${getStatsAlignClass()}`}>
-            {stats.map((stat: any, index: number) => (
-              <StatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} />
-            ))}
-          </div>
-        )}
       </div>
     </section>
   );
@@ -1631,7 +1861,9 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
   );
 }
 
-export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit, onPositionChange }: DynamicPageRendererProps) {
+export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit, onPositionChange, onElementPositionChange }: DynamicPageRendererProps) {
+  const [selectedElement, setSelectedElement] = useState<{ sectionId: string; fieldPath: string } | null>(null);
+  
   if (!content || !content.sections || content.sections.length === 0) {
     return (
       <div className="py-16 text-center text-muted-foreground">
@@ -1650,7 +1882,17 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
         const sectionData = section.data || section;
         
         const sectionId = section.id || `section-${index}`;
-        const commonProps = { data: sectionData, sectionId, isEditing, onClick: handleClick, onFieldEdit, onPositionChange };
+        const commonProps = { 
+          data: sectionData, 
+          sectionId, 
+          isEditing, 
+          onClick: handleClick, 
+          onFieldEdit, 
+          onPositionChange,
+          onElementPositionChange,
+          selectedElement,
+          onElementSelect: setSelectedElement
+        };
         
         switch (section.type) {
           case "hero":

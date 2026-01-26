@@ -87,6 +87,9 @@ export default {
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
+      gridTemplateColumns: {
+        '16': 'repeat(16, minmax(0, 1fr))',
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
