@@ -286,7 +286,6 @@ export default function AdminGallery() {
                   </SelectContent>
                 </Select>
               )}
-              <label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -298,20 +297,18 @@ export default function AdminGallery() {
               />
               <Button 
                 variant="default" 
-                size="sm" 
-                asChild
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={uploadMutation.isPending}
+                data-testid="button-upload"
               >
-                <span className="cursor-pointer">
-                  {uploadMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Upload className="h-4 w-4 mr-2" />
-                  )}
-                  파일 업로드
-                </span>
+                {uploadMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                파일 업로드
               </Button>
-            </label>
             </div>
           </div>
 
