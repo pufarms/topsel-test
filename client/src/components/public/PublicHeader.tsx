@@ -122,11 +122,13 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
 
   return (
     <header 
-      className="fixed top-0 left-0 right-0 z-50 w-full"
+      className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ease-in-out ${
+        showTransparent ? '' : 'backdrop-blur-md'
+      }`}
       style={{
-        backgroundColor: showTransparent ? 'transparent' : '#111827',
-        boxShadow: showTransparent ? 'none' : '0 1px 3px rgba(0,0,0,0.3)',
-        transition: 'background-color 0.3s ease, box-shadow 0.3s ease'
+        backgroundColor: showTransparent ? 'transparent' : 'rgba(17, 24, 39, 0.85)',
+        boxShadow: showTransparent ? 'none' : '0 1px 3px rgba(0,0,0,0.2)',
+        borderBottom: showTransparent ? 'none' : '1px solid rgba(255,255,255,0.1)'
       }}
     >
       <div className="container flex h-16 items-center justify-between gap-4 px-4 md:px-6">
