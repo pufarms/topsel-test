@@ -31,7 +31,8 @@ export default function DynamicPage() {
     retry: false,
   });
 
-  const hasHeroBanner = page?.content?.sections?.[0]?.type === "hero";
+  const firstSectionType = page?.content?.sections?.[0]?.type;
+  const hasHeroBanner = firstSectionType === "hero" || firstSectionType === "hero_advanced";
 
   if (isLoading) {
     return (
