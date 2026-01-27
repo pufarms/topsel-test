@@ -803,7 +803,7 @@ export const pageStatuses = ["active", "draft", "hidden"] as const;
 export type PageStatus = typeof pageStatuses[number];
 
 // 페이지 콘텐츠 섹션 타입
-export const pageSectionTypes = ["hero", "hero_advanced", "hero_slider", "text", "image", "image_text", "text_image", "heading", "button", "divider", "cards", "features", "video_gallery", "stats_cards", "icon_cards", "cta", "cta_advanced"] as const;
+export const pageSectionTypes = ["hero", "hero_advanced", "hero_slider", "text", "image", "image_text", "text_image", "heading", "button", "divider", "cards", "features", "video_gallery", "stats_cards", "icon_cards", "cta", "cta_advanced", "announcement_marquee", "content_two_blocks"] as const;
 export type PageSectionType = typeof pageSectionTypes[number];
 
 // 페이지 콘텐츠 섹션 인터페이스
@@ -877,6 +877,25 @@ export interface PageSection {
       iconColor?: string;
       link?: string;
     }>;
+    // Content Two Blocks section
+    block1Bg?: string;
+    block2Bg?: string;
+    block1?: {
+      label?: string;
+      title?: string;
+      description?: string;
+      image?: string;
+      imageAlt?: string;
+      items?: string[];
+    };
+    block2?: {
+      label?: string;
+      title?: string;
+      description?: string;
+      image?: string;
+      imageAlt?: string;
+      items?: string[];
+    };
   };
 }
 

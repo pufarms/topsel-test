@@ -97,11 +97,12 @@ interface EditableImageProps {
   isEditing?: boolean;
   onEdit?: (sectionId: string, fieldPath: string, value: string, fieldType: 'text' | 'image' | 'icon') => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, className = "" }: EditableImageProps) {
+function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, className = "", style }: EditableImageProps) {
   if (!isEditing || !onEdit) {
-    return <img src={src} alt={alt} className={className} />;
+    return <img src={src} alt={alt} className={className} style={style} />;
   }
   
   return (
@@ -113,7 +114,7 @@ function EditableImage({ src, alt, sectionId, fieldPath, isEditing, onEdit, clas
       }}
       data-testid={`editable-image-${sectionId}-${fieldPath}`}
     >
-      <img src={src} alt={alt} className={`${className} group-hover:opacity-80 transition-opacity`} />
+      <img src={src} alt={alt} className={`${className} group-hover:opacity-80 transition-opacity`} style={style} />
       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity rounded">
         <span className="bg-primary text-primary-foreground text-sm px-3 py-1 rounded">
           이미지 변경
@@ -2155,6 +2156,219 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
   );
 }
 
+// Content Two Blocks Section - 60% width, centered, two paragraphs with alternating backgrounds
+function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
+  const anim1 = useScrollAnimation();
+  const anim2 = useScrollAnimation();
+  if (!data) return null;
+  
+  // Block 1 data (white background - text left, image right)
+  const block1 = data.block1 || {};
+  const block1Items = block1.items || [];
+  
+  // Block 2 data (gray/navy background - image left, text right)  
+  const block2 = data.block2 || {};
+  const block2Items = block2.items || [];
+  
+  return (
+    <div data-testid="section-content-two-blocks">
+      {/* Block 1: White background - Text Left, Image Right */}
+      <section
+        className="py-16 md:py-20"
+        style={{ background: data.block1Bg || '#FFFFFF' }}
+      >
+        <div 
+          ref={anim1.ref}
+          className={`max-w-[90%] md:max-w-[60%] mx-auto transition-all duration-700 ${anim1.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+        >
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
+            {/* Text Content - Left */}
+            <div className="w-full md:w-1/2 order-2 md:order-1">
+              {/* Label */}
+              {block1.label && (
+                <EditableField
+                  value={block1.label}
+                  sectionId={sectionId}
+                  fieldPath="block1.label"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="p"
+                  className="text-xs md:text-sm font-semibold tracking-widest uppercase mb-3"
+                  style={{ color: 'var(--ts-primary)' }}
+                />
+              )}
+              
+              {/* Title with highlight */}
+              {block1.title && (
+                <EditableField
+                  value={block1.title}
+                  sectionId={sectionId}
+                  fieldPath="block1.title"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="h2"
+                  className="text-xl md:text-2xl lg:text-3xl font-bold mb-4 leading-tight"
+                  style={{ color: '#111827' }}
+                />
+              )}
+              
+              {/* Description */}
+              {block1.description && (
+                <EditableField
+                  value={block1.description}
+                  sectionId={sectionId}
+                  fieldPath="block1.description"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="p"
+                  className="text-sm md:text-base text-gray-600 mb-6 leading-relaxed"
+                />
+              )}
+              
+              {/* Checklist Items */}
+              {block1Items.length > 0 && (
+                <ul className="space-y-2">
+                  {block1Items.map((item: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--ts-primary)' }} />
+                      <EditableField
+                        value={item}
+                        sectionId={sectionId}
+                        fieldPath={`block1.items.${index}`}
+                        fieldType="text"
+                        isEditing={isEditing}
+                        onEdit={onFieldEdit}
+                        as="span"
+                        className="text-sm md:text-base text-gray-700"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            
+            {/* Image - Right */}
+            <div className="w-full md:w-1/2 order-1 md:order-2">
+              {block1.image && (
+                <EditableImage
+                  src={block1.image}
+                  alt={block1.imageAlt || "Section image"}
+                  sectionId={sectionId}
+                  fieldPath="block1.image"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  className="w-full h-auto rounded-lg shadow-lg object-cover"
+                  style={{ aspectRatio: '4/3', maxHeight: '360px' }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      {/* Block 2: Gray/Navy background - Image Left, Text Right */}
+      <section
+        className="py-16 md:py-20"
+        style={{ background: data.block2Bg || '#F3F4F6' }}
+      >
+        <div 
+          ref={anim2.ref}
+          className={`max-w-[90%] md:max-w-[60%] mx-auto transition-all duration-700 ${anim2.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+        >
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
+            {/* Image - Left */}
+            <div className="w-full md:w-1/2">
+              {block2.image && (
+                <EditableImage
+                  src={block2.image}
+                  alt={block2.imageAlt || "Section image"}
+                  sectionId={sectionId}
+                  fieldPath="block2.image"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  className="w-full h-auto rounded-lg shadow-lg object-cover"
+                  style={{ aspectRatio: '4/3', maxHeight: '360px' }}
+                />
+              )}
+            </div>
+            
+            {/* Text Content - Right */}
+            <div className="w-full md:w-1/2">
+              {/* Label */}
+              {block2.label && (
+                <EditableField
+                  value={block2.label}
+                  sectionId={sectionId}
+                  fieldPath="block2.label"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="p"
+                  className="text-xs md:text-sm font-semibold tracking-widest uppercase mb-3"
+                  style={{ color: 'var(--ts-primary)' }}
+                />
+              )}
+              
+              {/* Title with highlight */}
+              {block2.title && (
+                <EditableField
+                  value={block2.title}
+                  sectionId={sectionId}
+                  fieldPath="block2.title"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="h2"
+                  className="text-xl md:text-2xl lg:text-3xl font-bold mb-4 leading-tight"
+                  style={{ color: '#111827' }}
+                />
+              )}
+              
+              {/* Description */}
+              {block2.description && (
+                <EditableField
+                  value={block2.description}
+                  sectionId={sectionId}
+                  fieldPath="block2.description"
+                  fieldType="text"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  as="p"
+                  className="text-sm md:text-base text-gray-600 mb-6 leading-relaxed"
+                />
+              )}
+              
+              {/* Checklist Items */}
+              {block2Items.length > 0 && (
+                <ul className="space-y-2">
+                  {block2Items.map((item: string, index: number) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--ts-primary)' }} />
+                      <EditableField
+                        value={item}
+                        sectionId={sectionId}
+                        fieldPath={`block2.items.${index}`}
+                        fieldType="text"
+                        isEditing={isEditing}
+                        onEdit={onFieldEdit}
+                        as="span"
+                        className="text-sm md:text-base text-gray-700"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFieldEdit, onPositionChange }: DynamicPageRendererProps) {
   const [selectedElement, setSelectedElement] = useState<{ sectionId: string; fieldPath: string } | null>(null);
   
@@ -2223,6 +2437,8 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
             return <CTASection key={sectionId} {...commonProps} />;
           case "cta_advanced":
             return <CTAAdvancedSection key={sectionId} {...commonProps} />;
+          case "content_two_blocks":
+            return <ContentTwoBlocksSection key={sectionId} {...commonProps} />;
           default:
             return null;
         }
