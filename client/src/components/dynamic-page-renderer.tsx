@@ -2230,10 +2230,20 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
               
               {/* Checklist Items */}
               {block1Items.length > 0 && (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {block1Items.map((item: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--ts-primary)' }} />
+                    <li key={index} className="flex items-start gap-3">
+                      <span 
+                        className="flex items-center justify-center flex-shrink-0 rounded"
+                        style={{ 
+                          width: '20px', 
+                          height: '20px', 
+                          background: 'var(--ts-primary)',
+                          marginTop: '2px'
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                      </span>
                       <EditableField
                         value={item}
                         sectionId={sectionId}
@@ -2343,10 +2353,20 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
               
               {/* Checklist Items */}
               {block2Items.length > 0 && (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {block2Items.map((item: string, index: number) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--ts-primary)' }} />
+                    <li key={index} className="flex items-start gap-3">
+                      <span 
+                        className="flex items-center justify-center flex-shrink-0 rounded"
+                        style={{ 
+                          width: '20px', 
+                          height: '20px', 
+                          background: 'var(--ts-primary)',
+                          marginTop: '2px'
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                      </span>
                       <EditableField
                         value={item}
                         sectionId={sectionId}
