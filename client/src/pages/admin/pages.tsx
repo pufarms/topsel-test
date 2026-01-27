@@ -55,7 +55,9 @@ import {
   Heart,
   Zap,
   Award,
-  TrendingUp
+  TrendingUp,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import {
   Dialog,
@@ -175,8 +177,24 @@ export default function PagesManagement() {
   
   // Resizable dialog state
   const [dialogSize, setDialogSize] = useState({ width: 80, height: 80 }); // vw, vh percentages
+  const [savedDialogSize, setSavedDialogSize] = useState({ width: 80, height: 80 }); // for restoring from fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    if (isFullscreen) {
+      // Restore previous size
+      setDialogSize(savedDialogSize);
+      setIsFullscreen(false);
+    } else {
+      // Save current size and go fullscreen
+      setSavedDialogSize(dialogSize);
+      setDialogSize({ width: 100, height: 100 });
+      setIsFullscreen(true);
+    }
+  };
   
   // Handle dialog resize
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -947,7 +965,7 @@ export default function PagesManagement() {
       <Dialog open={editDialog.open} onOpenChange={(open) => { setEditDialog({ open, page: open ? editDialog.page : null }); if (!open) resetForm(); }}>
         <DialogContent 
           ref={dialogRef}
-          className="overflow-hidden flex flex-col relative p-6"
+          className={`overflow-hidden flex flex-col relative transition-all duration-200 ${isFullscreen ? 'p-4 rounded-none' : 'p-6'}`}
           style={{
             width: `${dialogSize.width}vw`,
             height: `${dialogSize.height}vh`,
@@ -957,6 +975,7 @@ export default function PagesManagement() {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
+            borderRadius: isFullscreen ? '0' : undefined,
           }}
         >
           {/* Resize handles */}
@@ -974,11 +993,27 @@ export default function PagesManagement() {
             className="absolute bottom-0 left-1/2 -translate-x-1/2 h-2 w-16 cursor-s-resize z-50 hover:bg-primary/20 rounded transition-colors"
             onMouseDown={handleResizeStart}
           />
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5" />
-              페이지 수정: {editDialog.page?.name}
-            </DialogTitle>
+          <DialogHeader className="relative">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="w-5 h-5" />
+                페이지 수정: {editDialog.page?.name}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleFullscreen}
+                className="mr-8"
+                title={isFullscreen ? "창 모드로 전환" : "전체 화면으로 전환"}
+                data-testid="button-toggle-fullscreen"
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5" />
+                ) : (
+                  <Maximize2 className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
             <DialogDescription>페이지 설정과 콘텐츠를 수정합니다.</DialogDescription>
           </DialogHeader>
           
