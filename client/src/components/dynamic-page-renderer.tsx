@@ -2209,7 +2209,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-xl md:text-2xl lg:text-3xl font-bold mb-4 leading-tight"
+                  className="text-lg md:text-xl lg:text-2xl font-bold mb-4 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
@@ -2332,7 +2332,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-xl md:text-2xl lg:text-3xl font-bold mb-4 leading-tight"
+                  className="text-lg md:text-xl lg:text-2xl font-bold mb-4 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
