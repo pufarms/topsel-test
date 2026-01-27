@@ -2131,7 +2131,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
               isEditing={isEditing}
               onEdit={onFieldEdit}
               as="p"
-              className="max-w-2xl mx-auto mb-8 text-base md:text-lg"
+              className="max-w-2xl mx-auto mb-8 text-sm md:text-base"
               style={{ color: 'white' }}
             />
           )}
