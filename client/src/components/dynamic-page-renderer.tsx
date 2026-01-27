@@ -1228,7 +1228,7 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
   
   return (
     <section
-      className={`relative w-full h-screen overflow-hidden bg-[#0a0a0a] ${isEditing ? "cursor-pointer" : ""}`}
+      className={`relative w-full min-h-[500px] h-[70vh] sm:h-[80vh] md:h-screen overflow-hidden bg-[#0a0a0a] ${isEditing ? "cursor-pointer" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onTouchStart={handleTouchStart}
@@ -1246,11 +1246,12 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
           <img
             src={slide.imageUrl}
             alt={slide.imageAlt || `슬라이드 ${index + 1}`}
-            className={`w-full h-full object-cover ${
+            className={`w-full h-full object-cover object-center ${
               index === currentIndex ? 'animate-kenburns' : ''
             }`}
             style={{
               animationName: index === currentIndex ? `kenburns-${(index % 3) + 1}` : 'none',
+              objectPosition: 'center center',
             }}
           />
           {/* Image edit button in edit mode */}
@@ -1273,11 +1274,11 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
 
       {/* Content Overlay - Buttons and Stats */}
       {(data.buttonText || (data.stats && data.stats.length > 0)) && (
-        <div className="absolute bottom-[120px] left-0 right-0 z-10 px-4 md:px-8">
+        <div className="absolute bottom-[60px] sm:bottom-[80px] md:bottom-[120px] left-0 right-0 z-10 px-4 md:px-8">
           <div className="container mx-auto">
             {/* CTA Buttons */}
             {data.buttonText && (
-              <div className="flex flex-wrap gap-3 md:gap-4 mb-8 justify-center md:justify-start">
+              <div className="flex flex-wrap gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 justify-center md:justify-start">
                 <EditableButton
                   text={data.buttonText}
                   link={data.buttonLink || "#"}
@@ -1286,7 +1287,7 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
                   fieldPath="button"
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
-                  className="ts-btn ts-btn-primary text-sm md:text-base px-6 md:px-8 py-2.5 md:py-3"
+                  className="ts-btn ts-btn-primary text-xs sm:text-sm md:text-base px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3"
                 />
                 {data.secondaryButtonText && (
                   <EditableButton
@@ -1297,7 +1298,7 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
                     fieldPath="secondaryButton"
                     isEditing={isEditing}
                     onEdit={onFieldEdit}
-                    className="ts-btn ts-btn-outline-white text-sm md:text-base px-6 md:px-8 py-2.5 md:py-3"
+                    className="ts-btn ts-btn-outline-white text-xs sm:text-sm md:text-base px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3"
                   />
                 )}
               </div>
@@ -1306,7 +1307,7 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
             {/* Stats Counter */}
             {data.stats && data.stats.length > 0 && (
               <div className="flex justify-center md:justify-start">
-                <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-md">
+                <div className="grid grid-cols-3 gap-3 sm:gap-6 md:gap-8 max-w-[280px] sm:max-w-md">
                   {data.stats.map((stat: any, index: number) => (
                     <SliderStatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} slideIndex={currentIndex} />
                   ))}
