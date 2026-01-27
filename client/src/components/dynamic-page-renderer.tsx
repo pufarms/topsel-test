@@ -2177,6 +2177,29 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
 function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   const anim1 = useScrollAnimation();
   const anim2 = useScrollAnimation();
+  const [block1TextVisible, setBlock1TextVisible] = useState(false);
+  const [block1ImageVisible, setBlock1ImageVisible] = useState(false);
+  const [block2TextVisible, setBlock2TextVisible] = useState(false);
+  const [block2ImageVisible, setBlock2ImageVisible] = useState(false);
+  
+  // Block 1 staggered animation
+  useEffect(() => {
+    if (anim1.isVisible) {
+      setBlock1TextVisible(true);
+      const timer = setTimeout(() => setBlock1ImageVisible(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [anim1.isVisible]);
+  
+  // Block 2 staggered animation
+  useEffect(() => {
+    if (anim2.isVisible) {
+      setBlock2TextVisible(true);
+      const timer = setTimeout(() => setBlock2ImageVisible(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [anim2.isVisible]);
+  
   if (!data) return null;
   
   // Block 1 data (white background - text left, image right)
@@ -2200,7 +2223,9 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
         >
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
             {/* Text Content - Left */}
-            <div className="w-full md:w-1/2 order-2 md:order-1 flex flex-col justify-center">
+            <div 
+              className={`w-full md:w-1/2 order-2 md:order-1 flex flex-col justify-center transition-all duration-300 ease-out ${block1TextVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            >
               {/* Label */}
               {block1.label && (
                 <EditableField
@@ -2278,7 +2303,9 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
             </div>
             
             {/* Image - Right */}
-            <div className="w-full md:w-1/2 order-1 md:order-2">
+            <div 
+              className={`w-full md:w-1/2 order-1 md:order-2 transition-all duration-300 ease-out ${block1ImageVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            >
               {block1.image && (
                 <EditableImage
                   src={block1.image}
@@ -2307,7 +2334,9 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
         >
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
             {/* Image - Left */}
-            <div className="w-full md:w-1/2">
+            <div 
+              className={`w-full md:w-1/2 transition-all duration-300 ease-out ${block2ImageVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            >
               {block2.image && (
                 <EditableImage
                   src={block2.image}
@@ -2323,7 +2352,9 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
             </div>
             
             {/* Text Content - Right */}
-            <div className="w-full md:w-1/2 flex flex-col justify-center">
+            <div 
+              className={`w-full md:w-1/2 flex flex-col justify-center transition-all duration-300 ease-out ${block2TextVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+            >
               {/* Label */}
               {block2.label && (
                 <EditableField
