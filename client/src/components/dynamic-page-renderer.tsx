@@ -1954,6 +1954,7 @@ function StatsCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }:
 // Icon Cards Section (for benefits style - 4 columns)
 function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   const anim = useScrollAnimation();
+  const animGrid = useScrollAnimation();
   if (!data) return null;
   const isLight = data.theme !== 'dark';
   const items = data.items || [];
@@ -2017,7 +2018,10 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div 
+            ref={animGrid.ref}
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 transition-all duration-700 ${animGrid.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+          >
             {items.map((item: any, index: number) => (
               <div 
                 key={index} 
