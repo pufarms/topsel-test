@@ -1439,7 +1439,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         paddingBottom: '6px',
       }}
     >
-      {/* Top scroll roll effect - Navy theme */}
+      {/* Top scroll roll effect - Blue/Purple theme */}
       <div 
         className="scroll-roll-top pointer-events-none"
         style={{
@@ -1448,14 +1448,14 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           left: 0,
           right: 0,
           height: '6px',
-          background: 'linear-gradient(to bottom, #0D1321 0%, #1F2937 40%, #374151 70%, #E5E7EB 100%)',
+          background: 'linear-gradient(to bottom, #3D4A8C 0%, #5D7AF2 40%, #8B9EF6 70%, #E8ECFB 100%)',
           borderRadius: '0 0 50% 50% / 0 0 100% 100%',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3), inset 0 -1px 1px rgba(255,255,255,0.15)',
+          boxShadow: '0 1px 3px rgba(93,122,242,0.3), inset 0 -1px 1px rgba(255,255,255,0.15)',
           zIndex: 20,
         }}
       />
       
-      {/* Main content area - Light gray matching site */}
+      {/* Main content area - Light blue/purple matching CTA section */}
       <div
         className="scroll-content-area"
         style={{
@@ -1465,12 +1465,12 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
-          background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
-          color: '#1F2937',
+          background: 'linear-gradient(to bottom, #E8ECFB 0%, #DDE4F9 50%, #E8ECFB 100%)',
+          color: '#3D4A8C',
           fontSize: '14px',
           fontWeight: 500,
           letterSpacing: '0.02em',
-          boxShadow: 'inset 0 1px 2px rgba(17,24,39,0.05), inset 0 -1px 2px rgba(17,24,39,0.05)',
+          boxShadow: 'inset 0 1px 2px rgba(93,122,242,0.08), inset 0 -1px 2px rgba(93,122,242,0.08)',
         }}
       >
         {/* Fixed [알림] label */}
@@ -1591,7 +1591,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         </div>
       </div>
       
-      {/* Bottom scroll roll effect - Navy theme */}
+      {/* Bottom scroll roll effect - Blue/Purple theme */}
       <div 
         className="scroll-roll-bottom pointer-events-none"
         style={{
@@ -1600,9 +1600,9 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           left: 0,
           right: 0,
           height: '6px',
-          background: 'linear-gradient(to top, #0D1321 0%, #1F2937 40%, #374151 70%, #E5E7EB 100%)',
+          background: 'linear-gradient(to top, #3D4A8C 0%, #5D7AF2 40%, #8B9EF6 70%, #E8ECFB 100%)',
           borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
-          boxShadow: '0 -1px 3px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.15)',
+          boxShadow: '0 -1px 3px rgba(93,122,242,0.3), inset 0 1px 1px rgba(255,255,255,0.15)',
           zIndex: 20,
         }}
       />
