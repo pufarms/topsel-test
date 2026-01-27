@@ -1970,11 +1970,15 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
           ref={anim.ref}
           className={`transition-all duration-700 ${anim.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
-          <div className="text-center mb-12 flex flex-col items-center">
+          <div className="text-center mb-12 flex flex-col items-center" style={{ gap: 0 }}>
             {data.subtitle && (
               <span 
                 className="subtitle-label"
-                style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)', marginBottom: '12px' }}
+                style={{ 
+                  color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)', 
+                  marginBottom: '10px',
+                  display: 'block'
+                }}
                 onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'subtitle', data.subtitle, 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-subtitle`}
               >
@@ -1983,8 +1987,13 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             )}
             {data.title && (
               <h2 
-                className={`h2-section ${isLight ? '' : 'text-white'}`}
-                style={{ margin: 0, padding: 0, marginBottom: '10px' }}
+                className="h2-section"
+                style={{ 
+                  margin: 0, 
+                  padding: 0, 
+                  marginBottom: '10px',
+                  color: isLight ? 'var(--navy)' : '#ffffff'
+                }}
                 onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'title', data.title, 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-title`}
               >
@@ -1993,8 +2002,12 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             )}
             {data.description && (
               <p 
-                className={`body-text max-w-3xl ${isLight ? '' : 'text-white/70'}`}
-                style={{ margin: 0, padding: 0 }}
+                className="body-text max-w-3xl"
+                style={{ 
+                  margin: 0, 
+                  padding: 0,
+                  color: isLight ? undefined : 'rgba(255,255,255,0.7)'
+                }}
                 onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'description', data.description, 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-description`}
               >
