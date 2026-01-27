@@ -1818,11 +1818,11 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="flex flex-col gap-4">
           {videos.slice(0, 5).map((video: any, index: number) => (
             <div
               key={`${video.id}-${index}`}
-              className={`${index >= 3 ? 'hidden lg:block' : ''} ${index >= 2 && index < 3 ? 'hidden sm:block' : ''} relative`}
+              className="relative"
             >
               {/* Edit button for video */}
               {isEditing && onFieldEdit && (
