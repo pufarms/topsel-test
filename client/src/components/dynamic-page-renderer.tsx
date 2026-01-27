@@ -1958,8 +1958,13 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
   const isLight = data.theme !== 'dark';
   const items = data.items || [];
   
+  const sectionStyle: React.CSSProperties = {
+    paddingTop: data.paddingTop || undefined,
+    paddingBottom: data.paddingBottom || undefined,
+  };
+  
   return (
-    <section className={isLight ? 'ts-section-light' : 'ts-section-dark'} data-testid="section-icon-cards">
+    <section className={isLight ? 'ts-section-light' : 'ts-section-dark'} style={sectionStyle} data-testid="section-icon-cards">
       <div className="container">
         <div 
           ref={anim.ref}
