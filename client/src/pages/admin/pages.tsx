@@ -143,16 +143,25 @@ export default function PagesManagement() {
   
   // URL 변경 시 카테고리 필터 업데이트
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const category = params.get('category');
-    if (category) {
-      setCategoryFilter(category);
-      setExpandedCategories(new Set([category]));
-    } else {
-      setCategoryFilter("all");
-      setExpandedCategories(new Set(pageCategories));
-    }
-  }, [location]);
+    const updateCategoryFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const category = params.get('category');
+      if (category) {
+        setCategoryFilter(category);
+        setExpandedCategories(new Set([category]));
+      } else {
+        setCategoryFilter("all");
+        setExpandedCategories(new Set(pageCategories));
+      }
+    };
+    
+    // 초기 로드 시 URL 확인
+    updateCategoryFromUrl();
+    
+    // popstate 이벤트 리스너 등록 (브라우저 뒤로/앞으로 및 History API)
+    window.addEventListener('popstate', updateCategoryFromUrl);
+    return () => window.removeEventListener('popstate', updateCategoryFromUrl);
+  }, []);
   const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [addDialog, setAddDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });

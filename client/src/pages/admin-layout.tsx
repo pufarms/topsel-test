@@ -115,6 +115,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [openMenus, setOpenMenus] = useState<string[]>([]);
 
+  // 현재 위치에 따라 부모 메뉴 자동 열기
+  useEffect(() => {
+    const currentFullPath = location + window.location.search;
+    const openParents: string[] = [];
+    
+    menuItems.forEach(item => {
+      if (item.children) {
+        const isChildActive = item.children.some(child => {
+          if (child.path.includes('?')) {
+            return child.path === currentFullPath;
+          }
+          return child.path === location;
+        });
+        if (isChildActive && !openMenus.includes(item.id)) {
+          openParents.push(item.id);
+        }
+      }
+    });
+    
+    if (openParents.length > 0) {
+      setOpenMenus(prev => Array.from(new Set([...prev, ...openParents])));
+    }
+  }, [location]);
+
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
@@ -260,12 +284,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const handleClick = (e: React.MouseEvent) => {
                 e.preventDefault();
                 setMobileOpen(false);
-                // 쿼리 파라미터가 있는 경우 window.location으로 직접 이동
-                if (child.path.includes('?')) {
-                  window.location.href = child.path;
-                } else {
-                  navigate(child.path);
-                }
+                // History API로 URL 업데이트 후 커스텀 이벤트 발생
+                window.history.pushState({}, '', child.path);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+                // 기본 경로로 이동 (쿼리 파라미터 없는 경우)
+                const basePath = child.path.split('?')[0];
+                navigate(basePath);
               };
               return (
                 <a 
