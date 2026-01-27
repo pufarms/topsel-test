@@ -1541,8 +1541,9 @@ export class DatabaseStorage implements IStorage {
       { name: "혜택과 지원", path: "/guide/benefits", description: "콘텐츠 제공, 지원금, 할인, 후불결제", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 5, icon: "Gift", isSystem: "false" },
 
       // 7. 게시판관리페이지
-      { name: "일반 게시판", path: "/board/general", description: "일반 공개 게시판", category: "게시판관리페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "MessageSquare", isSystem: "false" },
-      { name: "회원전용 게시판", path: "/board/members", description: "회원 전용 게시판", category: "게시판관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 2, icon: "MessageCircle", isSystem: "false" },
+      { name: "공지게시판", path: "/board/notice", description: "공지사항 게시판", category: "게시판관리페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "MessageSquare", isSystem: "false" },
+      { name: "일반 게시판", path: "/board/general", description: "일반 공개 게시판", category: "게시판관리페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "MessageSquare", isSystem: "false" },
+      { name: "회원전용 게시판", path: "/board/members", description: "회원 전용 게시판", category: "게시판관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 3, icon: "MessageCircle", isSystem: "false" },
 
       // 8. 기타페이지
       { name: "공개 레이아웃 미리보기", path: "/public-preview", description: "헤더/푸터 설정 미리보기 (테스트용)", category: "기타페이지", accessLevel: "all", status: "active", sortOrder: 1, icon: "Eye", isSystem: "false" },
