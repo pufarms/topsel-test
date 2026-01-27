@@ -1750,7 +1750,7 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
   const videos = data.videos || [];
   
   return (
-    <section className="ts-section-dark" style={{ paddingTop: '50px', paddingBottom: '50px' }} data-testid="section-video-gallery">
+    <section className="ts-section-dark" style={{ paddingTop: '50px', paddingBottom: '50px', background: 'linear-gradient(135deg, #111827 0%, #1f2937 100%)' }} data-testid="section-video-gallery">
       {/* Video Modal */}
       {activeVideoId && (
         <div 
