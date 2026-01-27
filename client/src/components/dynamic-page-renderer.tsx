@@ -1483,7 +1483,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             zIndex: 15,
             fontWeight: 700,
             color: '#DC2626',
-            fontSize: '15px',
+            fontSize: '17px',
             letterSpacing: '0.05em',
           }}
         >
