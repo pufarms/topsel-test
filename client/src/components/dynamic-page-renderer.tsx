@@ -2261,7 +2261,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
             </div>
             
             {/* Image - Right */}
-            <div className="w-full md:w-1/2 order-1 md:order-2 flex items-stretch">
+            <div className="w-full md:w-1/2 order-1 md:order-2">
               {block1.image && (
                 <EditableImage
                   src={block1.image}
@@ -2271,7 +2271,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   className="w-full rounded-lg shadow-lg object-cover"
-                  style={{ minHeight: '320px', height: '100%' }}
+                  style={{ aspectRatio: '4/3' }}
                 />
               )}
             </div>
@@ -2290,7 +2290,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
         >
           <div className="flex flex-col md:flex-row items-stretch gap-8 md:gap-12">
             {/* Image - Left */}
-            <div className="w-full md:w-1/2 flex items-stretch">
+            <div className="w-full md:w-1/2">
               {block2.image && (
                 <EditableImage
                   src={block2.image}
@@ -2300,7 +2300,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   className="w-full rounded-lg shadow-lg object-cover"
-                  style={{ minHeight: '320px', height: '100%' }}
+                  style={{ aspectRatio: '4/3' }}
                 />
               )}
             </div>
