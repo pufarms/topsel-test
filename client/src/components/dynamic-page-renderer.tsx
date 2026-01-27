@@ -2181,7 +2181,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
           ref={anim1.ref}
           className={`max-w-[90%] md:max-w-[60%] mx-auto transition-all duration-700 ${anim1.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
-          <div className="flex flex-col md:flex-row items-stretch gap-8 md:gap-12">
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
             {/* Text Content - Left */}
             <div className="w-full md:w-1/2 order-2 md:order-1 flex flex-col justify-center">
               {/* Label */}
@@ -2288,7 +2288,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
           ref={anim2.ref}
           className={`max-w-[90%] md:max-w-[60%] mx-auto transition-all duration-700 ${anim2.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
         >
-          <div className="flex flex-col md:flex-row items-stretch gap-8 md:gap-12">
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
             {/* Image - Left */}
             <div className="w-full md:w-1/2">
               {block2.image && (
