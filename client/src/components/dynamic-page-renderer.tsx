@@ -2025,7 +2025,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             {items.map((item: any, index: number) => (
               <div 
                 key={index} 
-                className="text-center px-4 py-2 rounded-xl"
+                className="text-center px-4 py-2 rounded-xl shadow-lg shadow-black/40"
                 style={{ 
                   background: isLight ? 'white' : 'rgba(255,255,255,0.05)', 
                   border: isLight ? '1px solid var(--ts-border)' : '1px solid rgba(255,255,255,0.1)'
