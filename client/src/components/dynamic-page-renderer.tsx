@@ -36,6 +36,16 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
+// Helper function to render text that may contain HTML (like <br> tags)
+function renderHtmlText(text: string | undefined | null): React.ReactNode {
+  if (!text) return null;
+  // Check for any HTML tags
+  if (/<[^>]+>/.test(text)) {
+    return <span dangerouslySetInnerHTML={{ __html: text }} />;
+  }
+  return text;
+}
+
 interface DynamicPageRendererProps {
   content: PageContent | null;
   isEditing?: boolean;
@@ -2047,7 +2057,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'title', data.title, 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-title`}
               >
-                {data.title}
+                {renderHtmlText(data.title)}
               </h2>
             )}
             {data.description && (
@@ -2061,7 +2071,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'description', data.description, 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-description`}
               >
-                {data.description}
+                {renderHtmlText(data.description)}
               </p>
             )}
           </div>
