@@ -256,9 +256,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent forceMount className={`pl-8 mt-1 space-y-1 ${openMenus.includes(item.id) ? "" : "hidden"}`}>
-            {item.children.map((child) => (
-              <Link key={child.id} href={child.path} onClick={() => setMobileOpen(false)}>
-                <span
+            {item.children.map((child) => {
+              const handleClick = (e: React.MouseEvent) => {
+                e.preventDefault();
+                setMobileOpen(false);
+                // 쿼리 파라미터가 있는 경우 window.location으로 직접 이동
+                if (child.path.includes('?')) {
+                  window.location.href = child.path;
+                } else {
+                  navigate(child.path);
+                }
+              };
+              return (
+                <a 
+                  key={child.id} 
+                  href={child.path} 
+                  onClick={handleClick}
                   className={`block px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
                     isActive(child.path)
                       ? "bg-primary/20 text-primary"
@@ -267,9 +280,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   data-testid={`menu-${child.id}`}
                 >
                   {child.label}
-                </span>
-              </Link>
-            ))}
+                </a>
+              );
+            })}
           </CollapsibleContent>
         </Collapsible>
       );
