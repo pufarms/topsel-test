@@ -1100,15 +1100,38 @@ function StatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat:
   );
 }
 
-function SliderStatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat: any; sectionId: string; index: number; isEditing?: boolean; onFieldEdit?: any }) {
-  const counter = useCountUp(parseInt(stat.value) || 0, 2000);
+function SliderStatCounter({ stat, sectionId, index, isEditing, onFieldEdit, slideIndex }: { stat: any; sectionId: string; index: number; isEditing?: boolean; onFieldEdit?: any; slideIndex: number }) {
+  const [count, setCount] = useState(0);
+  const targetValue = parseInt(stat.value) || 0;
+  
+  // Re-animate counter when slide changes
+  useEffect(() => {
+    setCount(0);
+    const duration = 2000;
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * targetValue));
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [slideIndex, targetValue]);
+  
   return (
-    <div className="text-center" ref={counter.ref}>
+    <div className="text-center">
       <div 
         className="text-2xl sm:text-3xl md:text-4xl font-extrabold"
         style={{ color: stat.color || 'var(--ts-accent-green)' }}
       >
-        {counter.count}{stat.suffix || ''}
+        {count}{stat.suffix || ''}
       </div>
       <EditableField
         value={stat.label || ''}
@@ -1284,7 +1307,7 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
               <div className="flex justify-center md:justify-start">
                 <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-md">
                   {data.stats.map((stat: any, index: number) => (
-                    <SliderStatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} />
+                    <SliderStatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} slideIndex={currentIndex} />
                   ))}
                 </div>
               </div>
