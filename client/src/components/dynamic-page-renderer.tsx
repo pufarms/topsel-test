@@ -1246,12 +1246,14 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
           <img
             src={slide.imageUrl}
             alt={slide.imageAlt || `슬라이드 ${index + 1}`}
-            className={`w-full h-full object-cover object-center ${
+            className={`w-full h-full ${
               index === currentIndex ? 'animate-kenburns' : ''
             }`}
             style={{
               animationName: index === currentIndex ? `kenburns-${(index % 3) + 1}` : 'none',
+              objectFit: 'contain',
               objectPosition: 'center center',
+              backgroundColor: '#0a0a0a',
             }}
           />
           {/* Image edit button in edit mode */}
