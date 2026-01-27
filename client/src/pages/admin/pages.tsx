@@ -238,26 +238,22 @@ export default function PagesManagement() {
   // Content state for editing
   const [contentData, setContentData] = useState<PageContent | null>(null);
 
-  // Calculate auto-fit scale when dialog size changes or tab switches to preview
+  // Calculate auto-fit scale based on WIDTH only (height scrollable)
   useEffect(() => {
     if (editTab !== 'preview' || !editDialog.open) return;
     
     const calculateScale = () => {
       const container = previewContainerRef.current;
-      const content = previewContentRef.current;
-      if (!container || !content) return;
+      if (!container) return;
       
       const containerWidth = container.clientWidth - 32; // padding
-      const containerHeight = container.clientHeight - 32;
       const contentWidth = 1400; // fixed page width
-      const contentHeight = content.scrollHeight || 3000; // estimate page height
       
-      // Calculate scale to fit both width and height
+      // Scale to fit WIDTH only, height will be scrollable
       const scaleX = containerWidth / contentWidth;
-      const scaleY = containerHeight / contentHeight;
-      const newScale = Math.min(scaleX, scaleY, 1); // never scale up beyond 100%
+      const newScale = Math.min(scaleX, 1); // never scale up beyond 100%
       
-      setAutoFitScale(Math.max(0.1, newScale));
+      setAutoFitScale(Math.max(0.2, newScale));
     };
     
     // Delay calculation to allow content to render
@@ -1156,7 +1152,7 @@ export default function PagesManagement() {
                 </div>
                 <div 
                   ref={previewContainerRef}
-                  className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-start justify-center p-4"
+                  className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 dark:bg-gray-900 flex justify-center p-4"
                 >
                   <div 
                     style={{ 
