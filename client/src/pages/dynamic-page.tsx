@@ -32,7 +32,7 @@ export default function DynamicPage() {
   });
 
   const firstSectionType = page?.content?.sections?.[0]?.type;
-  const hasHeroBanner = firstSectionType === "hero" || firstSectionType === "hero_advanced";
+  const hasHeroBanner = firstSectionType === "hero" || firstSectionType === "hero_advanced" || firstSectionType === "hero_slider";
 
   if (isLoading) {
     return (

@@ -803,7 +803,7 @@ export const pageStatuses = ["active", "draft", "hidden"] as const;
 export type PageStatus = typeof pageStatuses[number];
 
 // 페이지 콘텐츠 섹션 타입
-export const pageSectionTypes = ["hero", "hero_advanced", "text", "image", "image_text", "text_image", "heading", "button", "divider", "cards", "features", "video_gallery", "stats_cards", "icon_cards", "cta", "cta_advanced"] as const;
+export const pageSectionTypes = ["hero", "hero_advanced", "hero_slider", "text", "image", "image_text", "text_image", "heading", "button", "divider", "cards", "features", "video_gallery", "stats_cards", "icon_cards", "cta", "cta_advanced"] as const;
 export type PageSectionType = typeof pageSectionTypes[number];
 
 // 페이지 콘텐츠 섹션 인터페이스
@@ -855,6 +855,17 @@ export interface PageSection {
       id: string;
       thumbnail?: string;
     }>;
+    // Slides for hero_slider
+    slides?: Array<{
+      id: string;
+      imageUrl: string;
+      imageAlt?: string;
+      link?: string;
+    }>;
+    // Slider settings
+    slideDuration?: number;
+    fadeSpeed?: number;
+    autoPlay?: boolean;
     // Extended items for icon_cards
     items?: Array<{
       id?: string;

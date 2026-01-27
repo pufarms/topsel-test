@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>탑셀 - Fade + Ken Burns 배너 슬라이드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* ===== 풀스크린 슬라이더 ===== */
+        .hero-slider {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+
+        /* 슬라이드 */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+            overflow: hidden;
+        }
+
+        .slide.active {
+            opacity: 1;
+            z-index: 1;
+        }
+
+        /* Ken Burns 이미지 효과 */
+        .slide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1);
+            transition: transform 0s ease-out;
+        }
+
+        .slide.active .slide-image {
+            animation: kenburns 6s ease-out forwards;
+        }
+
+        /* Ken Burns 애니메이션 - 각 슬라이드마다 다른 방향 */
+        @keyframes kenburns {
+            0% {
+                transform: scale(1) translate(0, 0);
+            }
+            100% {
+                transform: scale(1.08) translate(0, 0);
+            }
+        }
+
+        .slide:nth-child(1).active .slide-image {
+            animation-name: kenburns-1;
+        }
+
+        .slide:nth-child(2).active .slide-image {
+            animation-name: kenburns-2;
+        }
+
+        .slide:nth-child(3).active .slide-image {
+            animation-name: kenburns-3;
+        }
+
+        @keyframes kenburns-1 {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.08) translate(-1%, -0.5%); }
+        }
+
+        @keyframes kenburns-2 {
+            0% { transform: scale(1.05) translate(-1%, 0); }
+            100% { transform: scale(1) translate(0.5%, 0.5%); }
+        }
+
+        @keyframes kenburns-3 {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.06) translate(0.5%, -1%); }
+        }
+
+        /* ===== 인디케이터 (라인 스타일) ===== */
+        .indicators {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 16px;
+            z-index: 10;
+        }
+
+        .indicator {
+            width: 50px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: background 0.3s ease;
+        }
+
+        .indicator:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .indicator-progress {
+            width: 0%;
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            transition: width 0s linear;
+        }
+
+        .indicator.active .indicator-progress {
+            width: 100%;
+            transition: width 5.5s linear;
+        }
+
+        /* ===== 좌우 네비게이션 (옵션) ===== */
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 56px;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: all 0.3s ease;
+            opacity: 0;
+        }
+
+        .hero-slider:hover .nav-arrow {
+            opacity: 1;
+        }
+
+        .nav-arrow:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        .nav-arrow svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: #fff;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .nav-prev {
+            left: 40px;
+        }
+
+        .nav-next {
+            right: 40px;
+        }
+
+        /* ===== 반응형 ===== */
+        @media (max-width: 768px) {
+            .nav-arrow {
+                display: none;
+            }
+
+            .indicators {
+                bottom: 30px;
+            }
+
+            .indicator {
+                width: 35px;
+            }
+        }
+
+        /* ===== 다음 섹션 (데모용) ===== */
+        .next-section {
+            height: 50vh;
+            background: #f8f8f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- 히어로 슬라이더 -->
+    <section class="hero-slider" id="heroSlider">
+        <!-- Slide 1 -->
+        <div class="slide active">
+            <img 
+                src="https://pub-ecc7de5cc4bd40e3965936a44b8274b6.r2.dev/배너/26012797.png" 
+                alt="탑셀 배너 1" 
+                class="slide-image"
+            >
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="slide">
+            <img 
+                src="https://pub-ecc7de5cc4bd40e3965936a44b8274b6.r2.dev/배너/26012794.png" 
+                alt="탑셀 배너 2" 
+                class="slide-image"
+            >
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="slide">
+            <img 
+                src="https://pub-ecc7de5cc4bd40e3965936a44b8274b6.r2.dev/배너/26012747.png" 
+                alt="탑셀 배너 3" 
+                class="slide-image"
+            >
+        </div>
+
+        <!-- 인디케이터 -->
+        <div class="indicators">
+            <div class="indicator active" data-index="0">
+                <div class="indicator-progress"></div>
+            </div>
+            <div class="indicator" data-index="1">
+                <div class="indicator-progress"></div>
+            </div>
+            <div class="indicator" data-index="2">
+                <div class="indicator-progress"></div>
+            </div>
+        </div>
+
+        <!-- 좌우 네비게이션 -->
+        <button class="nav-arrow nav-prev" aria-label="이전 슬라이드">
+            <svg viewBox="0 0 24 24">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <button class="nav-arrow nav-next" aria-label="다음 슬라이드">
+            <svg viewBox="0 0 24 24">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+    </section>
+
+    <!-- 다음 섹션 (데모) -->
+    <section class="next-section">
+        <p>다음 섹션 영역</p>
+    </section>
+
+    <script>
+        const slider = document.getElementById('heroSlider');
+        const slides = document.querySelectorAll('.slide');
+        const indicators = document.querySelectorAll('.indicator');
+        const prevBtn = document.querySelector('.nav-prev');
+        const nextBtn = document.querySelector('.nav-next');
+        
+        let currentIndex = 0;
+        let slideInterval;
+        const SLIDE_DURATION = 5500; // 5.5초
+
+        function goToSlide(index) {
+            // 모든 슬라이드 비활성화
+            slides.forEach(slide => slide.classList.remove('active'));
+            indicators.forEach(ind => ind.classList.remove('active'));
+            
+            // 새 슬라이드 활성화
+            currentIndex = index;
+            if (currentIndex >= slides.length) currentIndex = 0;
+            if (currentIndex < 0) currentIndex = slides.length - 1;
+            
+            slides[currentIndex].classList.add('active');
+            indicators[currentIndex].classList.add('active');
+        }
+
+        function nextSlide() {
+            goToSlide(currentIndex + 1);
+        }
+
+        function prevSlide() {
+            goToSlide(currentIndex - 1);
+        }
+
+        function startSlider() {
+            stopSlider();
+            slideInterval = setInterval(nextSlide, SLIDE_DURATION);
+        }
+
+        function stopSlider() {
+            if (slideInterval) {
+                clearInterval(slideInterval);
+            }
+        }
+
+        // 인디케이터 클릭
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                goToSlide(index);
+                startSlider();
+            });
+        });
+
+        // 화살표 클릭
+        prevBtn.addEventListener('click', () => {
+            prevSlide();
+            startSlider();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            nextSlide();
+            startSlider();
+        });
+
+        // 키보드 네비게이션
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                prevSlide();
+                startSlider();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+                startSlider();
+            }
+        });
+
+        // 터치 스와이프 (모바일)
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        slider.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        slider.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    nextSlide();
+                } else {
+                    prevSlide();
+                }
+                startSlider();
+            }
+        }
+
+        // 시작
+        startSlider();
+    </script>
+</body>
+</html>

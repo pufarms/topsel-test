@@ -31,6 +31,8 @@ import {
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
   AlignVerticalJustifyEnd,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -1098,6 +1100,209 @@ function StatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat:
   );
 }
 
+// Hero Slider Section - Full-screen image slider with Fade + Ken Burns effect
+function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  if (!data) return null;
+  
+  const slides = data.slides || [];
+  const slideDuration = data.slideDuration || 5500;
+  const autoPlay = data.autoPlay !== false;
+  
+  // Start/stop auto-play
+  useEffect(() => {
+    if (autoPlay && slides.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex(prev => (prev + 1) % slides.length);
+      }, slideDuration);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [autoPlay, slides.length, slideDuration, currentIndex]);
+  
+  const goToSlide = (index: number) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setCurrentIndex(index);
+  };
+  
+  const prevSlide = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length);
+  };
+  
+  const nextSlide = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setCurrentIndex(prev => (prev + 1) % slides.length);
+  };
+  
+  // Touch swipe handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.changedTouches[0].screenX;
+  };
+  
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].screenX;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 50;
+    
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0) nextSlide();
+      else prevSlide();
+    }
+  };
+  
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') prevSlide();
+      else if (e.key === 'ArrowRight') nextSlide();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [slides.length]);
+  
+  if (slides.length === 0) {
+    return (
+      <section
+        className="relative w-full h-screen bg-[#0a0a0a] flex items-center justify-center"
+        data-testid="section-hero-slider"
+      >
+        <p className="text-white/50">슬라이드 이미지를 추가하세요</p>
+      </section>
+    );
+  }
+  
+  return (
+    <section
+      className={`relative w-full h-screen overflow-hidden bg-[#0a0a0a] ${isEditing ? "cursor-pointer" : ""}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      data-testid="section-hero-slider"
+    >
+      {/* Slides */}
+      {slides.map((slide: any, index: number) => (
+        <div
+          key={slide.id || index}
+          className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out overflow-hidden ${
+            index === currentIndex ? 'opacity-100 z-[1]' : 'opacity-0 z-0'
+          }`}
+        >
+          <img
+            src={slide.imageUrl}
+            alt={slide.imageAlt || `슬라이드 ${index + 1}`}
+            className={`w-full h-full object-cover ${
+              index === currentIndex ? 'animate-kenburns' : ''
+            }`}
+            style={{
+              animationName: index === currentIndex ? `kenburns-${(index % 3) + 1}` : 'none',
+            }}
+          />
+          {/* Image edit button in edit mode */}
+          {isEditing && onFieldEdit && index === currentIndex && (
+            <div
+              className="absolute top-4 right-4 z-20 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFieldEdit(sectionId, `slides.${index}.imageUrl`, slide.imageUrl || "", "image");
+              }}
+            >
+              <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg">
+                <ImageIcon className="w-4 h-4" />
+                <span className="text-sm font-medium">이미지 {index + 1} 변경</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Line-style Indicators */}
+      <div className="absolute bottom-[50px] left-1/2 -translate-x-1/2 flex gap-4 z-10">
+        {slides.map((_: any, index: number) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className="w-[50px] h-[3px] bg-white/30 rounded-sm overflow-hidden cursor-pointer transition-colors hover:bg-white/50"
+            data-testid={`slider-indicator-${index}`}
+          >
+            <div
+              className={`h-full bg-white rounded-sm ${
+                index === currentIndex ? 'animate-progress' : 'w-0'
+              }`}
+              style={{
+                animationDuration: index === currentIndex ? `${slideDuration}ms` : '0ms',
+              }}
+            />
+          </button>
+        ))}
+      </div>
+
+      {/* Navigation Arrows - show on hover (desktop only) */}
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={prevSlide}
+            className={`absolute top-1/2 left-10 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center z-10 transition-all duration-300 hover:bg-white/20 hover:scale-105 ${
+              isHovered ? 'opacity-100' : 'opacity-0'
+            } hidden md:flex`}
+            aria-label="이전 슬라이드"
+            data-testid="slider-prev"
+          >
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
+          <button
+            onClick={nextSlide}
+            className={`absolute top-1/2 right-10 -translate-y-1/2 w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center z-10 transition-all duration-300 hover:bg-white/20 hover:scale-105 ${
+              isHovered ? 'opacity-100' : 'opacity-0'
+            } hidden md:flex`}
+            aria-label="다음 슬라이드"
+            data-testid="slider-next"
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+        </>
+      )}
+
+      {/* Ken Burns & Progress Animations CSS */}
+      <style>{`
+        @keyframes kenburns-1 {
+          0% { transform: scale(1) translate(0, 0); }
+          100% { transform: scale(1.08) translate(-1%, -0.5%); }
+        }
+        @keyframes kenburns-2 {
+          0% { transform: scale(1.05) translate(-1%, 0); }
+          100% { transform: scale(1) translate(0.5%, 0.5%); }
+        }
+        @keyframes kenburns-3 {
+          0% { transform: scale(1) translate(0, 0); }
+          100% { transform: scale(1.06) translate(0.5%, -1%); }
+        }
+        .animate-kenburns {
+          animation-duration: 6s;
+          animation-timing-function: ease-out;
+          animation-fill-mode: forwards;
+        }
+        @keyframes progress {
+          0% { width: 0%; }
+          100% { width: 100%; }
+        }
+        .animate-progress {
+          animation-name: progress;
+          animation-timing-function: linear;
+          animation-fill-mode: forwards;
+        }
+      `}</style>
+    </section>
+  );
+}
+
 // Image + Text Section (side by side)
 function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   const anim = useScrollAnimation();
@@ -1674,6 +1879,8 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
             return <HeroSection key={sectionId} {...commonProps} />;
           case "hero_advanced":
             return <HeroAdvancedSection key={sectionId} {...commonProps} />;
+          case "hero_slider":
+            return <HeroSliderSection key={sectionId} {...commonProps} />;
           case "heading":
             return <HeadingSection key={sectionId} {...commonProps} />;
           case "text":
