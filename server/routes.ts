@@ -3892,5 +3892,108 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== Announcements Management ====================
+  // Get latest announcements (public)
+  app.get("/api/announcements/latest", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 5;
+      const announcements = await storage.getLatestAnnouncements(limit);
+      res.json(announcements);
+    } catch (error) {
+      console.error("Failed to get latest announcements:", error);
+      res.status(500).json({ error: "Failed to get announcements" });
+    }
+  });
+
+  // Get all announcements (admin only)
+  app.get("/api/announcements", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const announcements = await storage.getAllAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      console.error("Failed to get announcements:", error);
+      res.status(500).json({ error: "Failed to get announcements" });
+    }
+  });
+
+  // Get single announcement (public)
+  app.get("/api/announcements/:id", async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ message: "공지사항을 찾을 수 없습니다" });
+      }
+      res.json(announcement);
+    } catch (error) {
+      console.error("Failed to get announcement:", error);
+      res.status(500).json({ error: "Failed to get announcement" });
+    }
+  });
+
+  // Create announcement (admin only)
+  app.post("/api/announcements", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const announcement = await storage.createAnnouncement(req.body);
+      res.json(announcement);
+    } catch (error) {
+      console.error("Failed to create announcement:", error);
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+
+  // Update announcement (admin only)
+  app.patch("/api/announcements/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      const announcement = await storage.updateAnnouncement(req.params.id, req.body);
+      res.json(announcement);
+    } catch (error) {
+      console.error("Failed to update announcement:", error);
+      res.status(500).json({ error: "Failed to update announcement" });
+    }
+  });
+
+  // Delete announcement (admin only)
+  app.delete("/api/announcements/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    try {
+      await storage.deleteAnnouncement(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete announcement:", error);
+      res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
   return httpServer;
 }

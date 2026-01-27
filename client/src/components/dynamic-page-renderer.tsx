@@ -1396,6 +1396,121 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
   );
 }
 
+// Announcement Marquee Section - Scrolling notification bar with latest announcements
+function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: SectionProps) {
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
+  
+  useEffect(() => {
+    fetch('/api/announcements/latest?limit=5')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAnnouncements(data);
+        }
+      })
+      .catch(err => console.error('Failed to load announcements:', err));
+  }, []);
+  
+  if (announcements.length === 0) {
+    return null;
+  }
+  
+  // Duplicate announcements for seamless loop
+  const duplicatedAnnouncements = [...announcements, ...announcements];
+  
+  return (
+    <section
+      className={`announcement-bar ${isEditing ? "cursor-pointer" : ""}`}
+      onClick={isEditing ? onClick : undefined}
+      data-testid="section-announcement-marquee"
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+        background: '#FAFAFA',
+        color: '#171717',
+        borderTop: '1px solid #E3E3E3',
+        borderBottom: '1px solid #E3E3E3',
+        fontSize: '14px',
+        fontWeight: 500,
+        letterSpacing: '0.02em',
+      }}
+    >
+      {/* Gradient masks for fade effect - 10% on each side = 80% visible content */}
+      <div 
+        className="pointer-events-none" 
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: '10%',
+          height: '100%',
+          background: 'linear-gradient(to right, #FAFAFA, transparent)',
+          zIndex: 10,
+        }}
+      />
+      <div 
+        className="pointer-events-none" 
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          width: '10%',
+          height: '100%',
+          background: 'linear-gradient(to left, #FAFAFA, transparent)',
+          zIndex: 10,
+        }}
+      />
+      
+      {/* Marquee container - centered 80% width */}
+      <div 
+        className="relative w-full h-full flex items-center justify-center overflow-hidden"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        <div 
+          className="marquee-content flex whitespace-nowrap"
+          style={{
+            animation: `marquee 25s linear infinite`,
+            animationPlayState: isPaused ? 'paused' : 'running',
+          }}
+        >
+          {duplicatedAnnouncements.map((announcement, index) => (
+            <Link
+              key={`${announcement.id}-${index}`}
+              href={`/board/notice/${announcement.id}`}
+              className="inline-flex items-center mx-8 transition-colors hover:text-[#5D7AF2]"
+              data-testid={`announcement-link-${index}`}
+            >
+              {announcement.isImportant === 'true' && (
+                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2" />
+              )}
+              <span>{announcement.title}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @media (max-width: 768px) {
+          .announcement-bar {
+            height: 40px !important;
+            font-size: 13px !important;
+          }
+        }
+      `}</style>
+    </section>
+  );
+}
+
 // Image + Text Section (side by side)
 function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   const anim = useScrollAnimation();
@@ -1974,6 +2089,8 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
             return <HeroAdvancedSection key={sectionId} {...commonProps} />;
           case "hero_slider":
             return <HeroSliderSection key={sectionId} {...commonProps} />;
+          case "announcement_marquee":
+            return <AnnouncementMarqueeSection key={sectionId} {...commonProps} />;
           case "heading":
             return <HeadingSection key={sectionId} {...commonProps} />;
           case "text":

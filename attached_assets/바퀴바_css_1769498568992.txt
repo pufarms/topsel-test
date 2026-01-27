@@ -1,0 +1,58 @@
+Copy
+.announcement-bar {
+  /* 레이아웃 */
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  
+  /* 색상 (Topsel 컬러 시스템) */
+  background: #FAFAFA;           /* --card */
+  color: #171717;                /* --foreground */
+  border-top: 1px solid #E3E3E3;    /* --border */
+  border-bottom: 1px solid #E3E3E3;
+  
+  /* 타이포그래피 */
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* 중요 텍스트/링크 강조 */
+.announcement-bar a,
+.announcement-bar .highlight {
+  color: #5D7AF2;               /* --brand-primary */
+}
+
+/* 구분자 스타일 */
+.announcement-bar .separator {
+  margin: 0 24px;
+  color: #E3E3E3;
+}
+
+/* 흐르는 애니메이션 */
+.marquee-content {
+  display: flex;
+  animation: marquee 25s linear infinite;
+  white-space: nowrap;
+}
+
+.marquee-content:hover {
+  animation-play-state: paused;  /* 호버시 일시정지 */
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .announcement-bar {
+    height: 40px;
+    font-size: 13px;
+  }
+}
+
+Copy
