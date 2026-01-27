@@ -170,7 +170,7 @@ export default function PagesManagement() {
   const [previewScale, setPreviewScale] = useState<number>(0.4);
   
   // Resizable dialog state
-  const [dialogSize, setDialogSize] = useState({ width: 95, height: 90 }); // vw, vh percentages
+  const [dialogSize, setDialogSize] = useState({ width: 80, height: 80 }); // vw, vh percentages
   const [isResizing, setIsResizing] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   
@@ -910,12 +910,16 @@ export default function PagesManagement() {
       <Dialog open={editDialog.open} onOpenChange={(open) => { setEditDialog({ open, page: open ? editDialog.page : null }); if (!open) resetForm(); }}>
         <DialogContent 
           ref={dialogRef}
-          className="overflow-hidden flex flex-col relative"
+          className="overflow-hidden flex flex-col relative p-6"
           style={{
             width: `${dialogSize.width}vw`,
             height: `${dialogSize.height}vh`,
-            maxWidth: '98vw',
-            maxHeight: '98vh',
+            maxWidth: 'none',
+            maxHeight: 'none',
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
           }}
         >
           {/* Resize handles */}
