@@ -266,16 +266,16 @@ interface EditableIconProps {
 function EditableIcon({ iconName, sectionId, fieldPath, isEditing, onEdit, className = "" }: EditableIconProps) {
   const isUrl = iconName && (iconName.startsWith('http') || iconName.startsWith('/'));
   const icon = isUrl 
-    ? <img src={iconName} alt="아이콘" className="w-6 h-6 object-contain" />
-    : (iconMap[iconName] || <Star className="w-6 h-6" />);
+    ? <img src={iconName} alt="아이콘" className="w-full h-full object-contain" />
+    : (iconMap[iconName] || <Star className="w-full h-full" />);
   
   if (!isEditing || !onEdit) {
-    return <div className={className}>{icon}</div>;
+    return <div className={`${className} flex items-center justify-center`}>{icon}</div>;
   }
   
   return (
     <div 
-      className={`${className} relative group cursor-pointer hover-elevate rounded-full`}
+      className={`${className} flex items-center justify-center relative group cursor-pointer hover-elevate rounded-full`}
       onClick={(e) => {
         e.stopPropagation();
         onEdit(sectionId, fieldPath, iconName || '', 'icon');
