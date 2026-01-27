@@ -2275,7 +2275,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-xs md:text-sm font-semibold tracking-widest uppercase mb-3"
+                  className="text-xs md:text-sm xl:text-base 2xl:text-lg font-semibold tracking-widest uppercase mb-3 xl:mb-4"
                   style={{ color: 'var(--ts-primary)' }}
                 />
               )}
@@ -2290,7 +2290,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-lg md:text-xl lg:text-2xl font-bold mb-4 leading-tight"
+                  className="text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold mb-4 xl:mb-6 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
@@ -2305,25 +2305,25 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-sm md:text-base text-gray-600 mb-6 leading-relaxed"
+                  className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-600 mb-6 xl:mb-8 leading-relaxed"
                 />
               )}
               
               {/* Checklist Items */}
               {block1Items.length > 0 && (
-                <ul className="space-y-3">
+                <ul className="space-y-3 xl:space-y-4">
                   {block1Items.map((item: string, index: number) => (
-                    <li key={index} className="flex items-start gap-3">
+                    <li key={index} className="flex items-start gap-3 xl:gap-4">
                       <span 
-                        className="flex items-center justify-center flex-shrink-0 rounded"
+                        className="flex items-center justify-center flex-shrink-0 rounded xl:rounded-md"
                         style={{ 
-                          width: '20px', 
-                          height: '20px', 
+                          width: 'clamp(20px, 1.5vw, 28px)', 
+                          height: 'clamp(20px, 1.5vw, 28px)', 
                           background: 'var(--ts-primary)',
                           marginTop: '2px'
                         }}
                       >
-                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                        <Check className="w-3.5 h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 text-white" strokeWidth={3} />
                       </span>
                       <EditableField
                         value={item}
@@ -2333,7 +2333,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                         isEditing={isEditing}
                         onEdit={onFieldEdit}
                         as="span"
-                        className="text-sm md:text-base text-gray-700"
+                        className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-700"
                       />
                     </li>
                   ))}
@@ -2408,7 +2408,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-xs md:text-sm font-semibold tracking-widest uppercase mb-3"
+                  className="text-xs md:text-sm xl:text-base 2xl:text-lg font-semibold tracking-widest uppercase mb-3 xl:mb-4"
                   style={{ color: 'var(--ts-primary)' }}
                 />
               )}
@@ -2423,7 +2423,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-lg md:text-xl lg:text-2xl font-bold mb-4 leading-tight"
+                  className="text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold mb-4 xl:mb-6 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
@@ -2438,25 +2438,25 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-sm md:text-base text-gray-600 mb-6 leading-relaxed"
+                  className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-600 mb-6 xl:mb-8 leading-relaxed"
                 />
               )}
               
               {/* Checklist Items */}
               {block2Items.length > 0 && (
-                <ul className="space-y-3">
+                <ul className="space-y-3 xl:space-y-4">
                   {block2Items.map((item: string, index: number) => (
-                    <li key={index} className="flex items-start gap-3">
+                    <li key={index} className="flex items-start gap-3 xl:gap-4">
                       <span 
-                        className="flex items-center justify-center flex-shrink-0 rounded"
+                        className="flex items-center justify-center flex-shrink-0 rounded xl:rounded-md"
                         style={{ 
-                          width: '20px', 
-                          height: '20px', 
+                          width: 'clamp(20px, 1.5vw, 28px)', 
+                          height: 'clamp(20px, 1.5vw, 28px)', 
                           background: 'var(--ts-primary)',
                           marginTop: '2px'
                         }}
                       >
-                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                        <Check className="w-3.5 h-3.5 xl:w-4 xl:h-4 2xl:w-5 2xl:h-5 text-white" strokeWidth={3} />
                       </span>
                       <EditableField
                         value={item}
@@ -2466,7 +2466,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                         isEditing={isEditing}
                         onEdit={onFieldEdit}
                         as="span"
-                        className="text-sm md:text-base text-gray-700"
+                        className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-700"
                       />
                     </li>
                   ))}
