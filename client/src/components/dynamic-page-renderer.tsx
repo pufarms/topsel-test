@@ -2016,18 +2016,18 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {items.map((item: any, index: number) => (
               <div 
                 key={index} 
-                className="text-center p-6 rounded-xl"
+                className="text-center px-4 py-3 rounded-xl"
                 style={{ 
                   background: isLight ? 'white' : 'rgba(255,255,255,0.05)', 
                   border: isLight ? '1px solid var(--ts-border)' : '1px solid rgba(255,255,255,0.1)'
                 }}
               >
                 <div 
-                  className="w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center"
+                  className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center"
                   style={{ background: item.iconBg || 'rgba(93,122,242,0.2)' }}
                 >
                   <EditableIcon
@@ -2036,7 +2036,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                     fieldPath={`items.${index}.icon`}
                     isEditing={isEditing}
                     onEdit={onFieldEdit}
-                    className={`${item.iconColor ? '' : 'text-primary'}`}
+                    className={`${item.iconColor ? '' : 'text-primary'} w-5 h-5`}
                   />
                 </div>
                 <EditableField
@@ -2047,7 +2047,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h3"
-                  className={`font-bold text-lg mb-2 ${isLight ? '' : 'text-white'}`}
+                  className={`font-bold text-base mb-1 ${isLight ? '' : 'text-white'}`}
                 />
                 <EditableField
                   value={item.description || ''}
@@ -2057,7 +2057,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/60'}`}
+                  className={`text-xs ${isLight ? 'text-gray-600' : 'text-white/60'}`}
                 />
               </div>
             ))}
