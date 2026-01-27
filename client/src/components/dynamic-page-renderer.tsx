@@ -1428,124 +1428,166 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
   
   return (
     <section
-      className={`announcement-bar ${isEditing ? "cursor-pointer" : ""}`}
+      className={`scroll-marquee-wrapper ${isEditing ? "cursor-pointer" : ""}`}
       onClick={isEditing ? onClick : undefined}
       data-testid="section-announcement-marquee"
       style={{
         position: 'relative',
         width: '100%',
-        height: '48px',
-        display: 'flex',
-        alignItems: 'center',
-        overflow: 'hidden',
-        background: '#FAFAFA',
-        color: '#171717',
-        borderTop: '1px solid #E3E3E3',
-        borderBottom: '1px solid #E3E3E3',
-        fontSize: '14px',
-        fontWeight: 500,
-        letterSpacing: '0.02em',
+        paddingTop: '12px',
+        paddingBottom: '12px',
       }}
     >
-      {/* Left mask - solid cover for 0-10% */}
+      {/* Top scroll roll effect */}
       <div 
-        className="pointer-events-none" 
+        className="scroll-roll-top pointer-events-none"
         style={{
           position: 'absolute',
+          top: 0,
           left: 0,
-          top: 0,
-          width: '10%',
-          height: '100%',
-          background: '#FAFAFA',
-          zIndex: 10,
-        }}
-      />
-      {/* Left fade gradient - 10% to 15% */}
-      <div 
-        className="pointer-events-none" 
-        style={{
-          position: 'absolute',
-          left: '10%',
-          top: 0,
-          width: '5%',
-          height: '100%',
-          background: 'linear-gradient(to right, #FAFAFA, transparent)',
-          zIndex: 10,
-        }}
-      />
-      {/* Right fade gradient - 85% to 90% */}
-      <div 
-        className="pointer-events-none" 
-        style={{
-          position: 'absolute',
-          right: '10%',
-          top: 0,
-          width: '5%',
-          height: '100%',
-          background: 'linear-gradient(to left, #FAFAFA, transparent)',
-          zIndex: 10,
-        }}
-      />
-      {/* Right mask - solid cover for 90-100% */}
-      <div 
-        className="pointer-events-none" 
-        style={{
-          position: 'absolute',
           right: 0,
-          top: 0,
-          width: '10%',
-          height: '100%',
-          background: '#FAFAFA',
-          zIndex: 10,
+          height: '12px',
+          background: 'linear-gradient(to bottom, #8B7355 0%, #C4A574 30%, #F5E6D3 60%, #FDFBF7 100%)',
+          borderRadius: '0 0 50% 50% / 0 0 100% 100%',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.5)',
+          zIndex: 20,
         }}
       />
       
-      {/* Marquee container */}
-      <div 
-        className="relative w-full h-full flex items-center overflow-hidden"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
+      {/* Main content area - parchment style */}
+      <div
+        className="scroll-content-area"
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '44px',
+          display: 'flex',
+          alignItems: 'center',
+          overflow: 'hidden',
+          background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
+          color: '#3D3225',
+          fontSize: '14px',
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+          boxShadow: 'inset 0 1px 3px rgba(139,115,85,0.1), inset 0 -1px 3px rgba(139,115,85,0.1)',
+        }}
       >
+        {/* Left mask - solid cover for 0-10% */}
         <div 
-          ref={marqueeRef}
-          className="marquee-track flex whitespace-nowrap"
+          className="pointer-events-none" 
           style={{
-            animation: `seamless-scroll ${animationDuration}s linear infinite`,
-            animationPlayState: isPaused ? 'paused' : 'running',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: '10%',
+            height: '100%',
+            background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
+            zIndex: 10,
           }}
+        />
+        {/* Left fade gradient */}
+        <div 
+          className="pointer-events-none" 
+          style={{
+            position: 'absolute',
+            left: '10%',
+            top: 0,
+            width: '5%',
+            height: '100%',
+            background: 'linear-gradient(to right, #FBF8F3, transparent)',
+            zIndex: 10,
+          }}
+        />
+        {/* Right fade gradient */}
+        <div 
+          className="pointer-events-none" 
+          style={{
+            position: 'absolute',
+            right: '10%',
+            top: 0,
+            width: '5%',
+            height: '100%',
+            background: 'linear-gradient(to left, #FBF8F3, transparent)',
+            zIndex: 10,
+          }}
+        />
+        {/* Right mask - solid cover for 90-100% */}
+        <div 
+          className="pointer-events-none" 
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: '10%',
+            height: '100%',
+            background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
+            zIndex: 10,
+          }}
+        />
+        
+        {/* Marquee container */}
+        <div 
+          className="relative w-full h-full flex items-center overflow-hidden"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
         >
-          {/* First set of announcements */}
-          {announcements.map((announcement, index) => (
-            <Link
-              key={`first-${announcement.id}-${index}`}
-              href={`/board/notice/${announcement.id}`}
-              className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
-              style={{ padding: '0 3rem' }}
-              data-testid={`announcement-link-${index}`}
-            >
-              {announcement.isImportant === 'true' && (
-                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2 flex-shrink-0" />
-              )}
-              <span className="whitespace-nowrap">{announcement.title}</span>
-            </Link>
-          ))}
-          {/* Duplicate set for seamless loop */}
-          {announcements.map((announcement, index) => (
-            <Link
-              key={`second-${announcement.id}-${index}`}
-              href={`/board/notice/${announcement.id}`}
-              className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
-              style={{ padding: '0 3rem' }}
-              data-testid={`announcement-link-dup-${index}`}
-            >
-              {announcement.isImportant === 'true' && (
-                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2 flex-shrink-0" />
-              )}
-              <span className="whitespace-nowrap">{announcement.title}</span>
-            </Link>
-          ))}
+          <div 
+            ref={marqueeRef}
+            className="marquee-track flex whitespace-nowrap"
+            style={{
+              animation: `seamless-scroll ${animationDuration}s linear infinite`,
+              animationPlayState: isPaused ? 'paused' : 'running',
+            }}
+          >
+            {/* First set of announcements */}
+            {announcements.map((announcement, index) => (
+              <Link
+                key={`first-${announcement.id}-${index}`}
+                href={`/board/notice/${announcement.id}`}
+                className="inline-flex items-center transition-colors hover:text-[#8B5A2B] flex-shrink-0"
+                style={{ padding: '0 3rem' }}
+                data-testid={`announcement-link-${index}`}
+              >
+                {announcement.isImportant === 'true' && (
+                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#C4593A' }} />
+                )}
+                <span className="whitespace-nowrap">{announcement.title}</span>
+              </Link>
+            ))}
+            {/* Duplicate set for seamless loop */}
+            {announcements.map((announcement, index) => (
+              <Link
+                key={`second-${announcement.id}-${index}`}
+                href={`/board/notice/${announcement.id}`}
+                className="inline-flex items-center transition-colors hover:text-[#8B5A2B] flex-shrink-0"
+                style={{ padding: '0 3rem' }}
+                data-testid={`announcement-link-dup-${index}`}
+              >
+                {announcement.isImportant === 'true' && (
+                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#C4593A' }} />
+                )}
+                <span className="whitespace-nowrap">{announcement.title}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
+      
+      {/* Bottom scroll roll effect */}
+      <div 
+        className="scroll-roll-bottom pointer-events-none"
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '12px',
+          background: 'linear-gradient(to top, #8B7355 0%, #C4A574 30%, #F5E6D3 60%, #FDFBF7 100%)',
+          borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
+          boxShadow: '0 -2px 4px rgba(0,0,0,0.15), inset 0 1px 2px rgba(255,255,255,0.5)',
+          zIndex: 20,
+        }}
+      />
       
       <style>{`
         @keyframes seamless-scroll {
@@ -1557,9 +1599,16 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           }
         }
         @media (max-width: 768px) {
-          .announcement-bar {
-            height: 40px !important;
+          .scroll-content-area {
+            height: 36px !important;
             font-size: 13px !important;
+          }
+          .scroll-roll-top, .scroll-roll-bottom {
+            height: 10px !important;
+          }
+          .scroll-marquee-wrapper {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
           }
         }
       `}</style>
