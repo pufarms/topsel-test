@@ -167,7 +167,11 @@ export default function PagesManagement() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [previewDialog, setPreviewDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [editTab, setEditTab] = useState<string>("settings");
-  const [previewScale, setPreviewScale] = useState<number>(0.4);
+  
+  // Auto-fit preview refs and scale
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const previewContentRef = useRef<HTMLDivElement>(null);
+  const [autoFitScale, setAutoFitScale] = useState<number>(0.3);
   
   // Resizable dialog state
   const [dialogSize, setDialogSize] = useState({ width: 80, height: 80 }); // vw, vh percentages
@@ -233,6 +237,43 @@ export default function PagesManagement() {
   
   // Content state for editing
   const [contentData, setContentData] = useState<PageContent | null>(null);
+
+  // Calculate auto-fit scale when dialog size changes or tab switches to preview
+  useEffect(() => {
+    if (editTab !== 'preview' || !editDialog.open) return;
+    
+    const calculateScale = () => {
+      const container = previewContainerRef.current;
+      const content = previewContentRef.current;
+      if (!container || !content) return;
+      
+      const containerWidth = container.clientWidth - 32; // padding
+      const containerHeight = container.clientHeight - 32;
+      const contentWidth = 1400; // fixed page width
+      const contentHeight = content.scrollHeight || 3000; // estimate page height
+      
+      // Calculate scale to fit both width and height
+      const scaleX = containerWidth / contentWidth;
+      const scaleY = containerHeight / contentHeight;
+      const newScale = Math.min(scaleX, scaleY, 1); // never scale up beyond 100%
+      
+      setAutoFitScale(Math.max(0.1, newScale));
+    };
+    
+    // Delay calculation to allow content to render
+    const timer = setTimeout(calculateScale, 100);
+    
+    // Recalculate on resize
+    const resizeObserver = new ResizeObserver(calculateScale);
+    if (previewContainerRef.current) {
+      resizeObserver.observe(previewContainerRef.current);
+    }
+    
+    return () => {
+      clearTimeout(timer);
+      resizeObserver.disconnect();
+    };
+  }, [editTab, editDialog.open, dialogSize, contentData]);
 
   // Fetch pages
   const { data: pages = [], isLoading, refetch } = useQuery<Page[]>({
@@ -1102,54 +1143,33 @@ export default function PagesManagement() {
               </div>
             </TabsContent>
             
-            <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
-              <div className="border rounded-lg overflow-hidden bg-background">
-                <div className="bg-muted px-4 py-2 border-b flex items-center justify-between flex-wrap gap-2">
+            <TabsContent value="preview" className="flex-1 flex flex-col mt-4 min-h-0">
+              <div className="border rounded-lg overflow-hidden bg-background flex-1 flex flex-col min-h-0">
+                <div className="bg-muted px-4 py-2 border-b flex items-center justify-between flex-wrap gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     <Monitor className="w-4 h-4" />
                     <span className="text-sm font-medium">뷰 편집</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setPreviewScale(Math.max(0.2, previewScale - 0.1))}
-                    >
-                      -
-                    </Button>
-                    <span className="text-xs min-w-[50px] text-center">{Math.round(previewScale * 100)}%</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setPreviewScale(Math.min(1, previewScale + 0.1))}
-                    >
-                      +
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setPreviewScale(0.4)}
-                    >
-                      전체보기
-                    </Button>
-                  </div>
                   <p className="text-xs text-muted-foreground">
-                    요소를 클릭하면 편집창이 열립니다
+                    요소를 클릭하면 편집창이 열립니다 (전체 페이지가 자동으로 맞춰집니다)
                   </p>
                 </div>
                 <div 
-                  className="overflow-auto bg-gray-100 dark:bg-gray-900"
-                  style={{ height: '65vh' }}
+                  ref={previewContainerRef}
+                  className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-start justify-center p-4"
                 >
                   <div 
                     style={{ 
-                      transform: `scale(${previewScale})`,
+                      transform: `scale(${autoFitScale})`,
                       transformOrigin: 'top center',
-                      width: `${100 / previewScale}%`,
-                      minHeight: '100%',
+                      width: '1400px',
+                      flexShrink: 0,
                     }}
                   >
-                    <div className="bg-background shadow-lg mx-auto" style={{ maxWidth: '1400px' }}>
+                    <div 
+                      ref={previewContentRef}
+                      className="bg-background shadow-lg"
+                    >
                       <DynamicPageRenderer 
                         content={contentData} 
                         isEditing={true}
