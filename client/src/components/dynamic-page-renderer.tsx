@@ -1416,8 +1416,16 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
     return null;
   }
   
-  // Triple announcements for seamless continuous loop
-  const tripleAnnouncements = [...announcements, ...announcements, ...announcements];
+  const marqueeRef = useRef<HTMLDivElement>(null);
+  const [animationDuration, setAnimationDuration] = useState(20);
+  
+  useEffect(() => {
+    if (marqueeRef.current && announcements.length > 0) {
+      const contentWidth = marqueeRef.current.scrollWidth / 2;
+      const duration = Math.max(15, contentWidth / 50);
+      setAnimationDuration(duration);
+    }
+  }, [announcements]);
   
   return (
     <section
@@ -1440,7 +1448,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         letterSpacing: '0.02em',
       }}
     >
-      {/* Left mask - covers 0% to 10% (center - 40%) with solid then fade */}
+      {/* Left mask - solid cover for 0-10% */}
       <div 
         className="pointer-events-none" 
         style={{
@@ -1479,7 +1487,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           zIndex: 10,
         }}
       />
-      {/* Right mask - covers 90% to 100% (center + 40%) with solid */}
+      {/* Right mask - solid cover for 90-100% */}
       <div 
         className="pointer-events-none" 
         style={{
@@ -1493,40 +1501,61 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         }}
       />
       
-      {/* Marquee container - full width, content will be masked */}
+      {/* Marquee container */}
       <div 
         className="relative w-full h-full flex items-center overflow-hidden"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         <div 
+          ref={marqueeRef}
           className="marquee-track flex whitespace-nowrap"
           style={{
-            animation: `marquee-scroll 30s linear infinite`,
+            animation: `seamless-scroll ${animationDuration}s linear infinite`,
             animationPlayState: isPaused ? 'paused' : 'running',
           }}
         >
-          {tripleAnnouncements.map((announcement, index) => (
+          {/* First set of announcements */}
+          {announcements.map((announcement, index) => (
             <Link
-              key={`${announcement.id}-${index}`}
+              key={`first-${announcement.id}-${index}`}
               href={`/board/notice/${announcement.id}`}
-              className="inline-flex items-center transition-colors hover:text-[#5D7AF2]"
-              style={{ marginLeft: '3rem', marginRight: '3rem' }}
+              className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
+              style={{ padding: '0 3rem' }}
               data-testid={`announcement-link-${index}`}
             >
               {announcement.isImportant === 'true' && (
-                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2" />
+                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2 flex-shrink-0" />
               )}
-              <span>{announcement.title}</span>
+              <span className="whitespace-nowrap">{announcement.title}</span>
+            </Link>
+          ))}
+          {/* Duplicate set for seamless loop */}
+          {announcements.map((announcement, index) => (
+            <Link
+              key={`second-${announcement.id}-${index}`}
+              href={`/board/notice/${announcement.id}`}
+              className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
+              style={{ padding: '0 3rem' }}
+              data-testid={`announcement-link-dup-${index}`}
+            >
+              {announcement.isImportant === 'true' && (
+                <span className="inline-block w-2 h-2 rounded-full bg-[#FF6B00] mr-2 flex-shrink-0" />
+              )}
+              <span className="whitespace-nowrap">{announcement.title}</span>
             </Link>
           ))}
         </div>
       </div>
       
       <style>{`
-        @keyframes marquee-scroll {
-          0% { transform: translateX(40%); }
-          100% { transform: translateX(calc(-33.33% + 40%)); }
+        @keyframes seamless-scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
         }
         @media (max-width: 768px) {
           .announcement-bar {
