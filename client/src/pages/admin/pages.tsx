@@ -167,6 +167,7 @@ export default function PagesManagement() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [previewDialog, setPreviewDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [editTab, setEditTab] = useState<string>("settings");
+  const [previewScale, setPreviewScale] = useState<number>(0.4);
   
   // Inline field editing state
   const [inlineEditDialog, setInlineEditDialog] = useState<{
@@ -1036,23 +1037,61 @@ export default function PagesManagement() {
             
             <TabsContent value="preview" className="flex-1 overflow-auto mt-4">
               <div className="border rounded-lg overflow-hidden bg-background">
-                <div className="bg-muted px-4 py-2 border-b flex items-center justify-between">
+                <div className="bg-muted px-4 py-2 border-b flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <Monitor className="w-4 h-4" />
                     <span className="text-sm font-medium">뷰 편집</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setPreviewScale(Math.max(0.2, previewScale - 0.1))}
+                    >
+                      -
+                    </Button>
+                    <span className="text-xs min-w-[50px] text-center">{Math.round(previewScale * 100)}%</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setPreviewScale(Math.min(1, previewScale + 0.1))}
+                    >
+                      +
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setPreviewScale(0.4)}
+                    >
+                      전체보기
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    텍스트나 이미지를 클릭하면 바로 편집할 수 있습니다
+                    요소를 클릭하면 편집창이 열립니다
                   </p>
                 </div>
-                <ScrollArea className="h-[60vh]">
-                  <DynamicPageRenderer 
-                    content={contentData} 
-                    isEditing={true}
-                    onFieldEdit={handleFieldEdit}
-                    onPositionChange={handlePositionChange}
-                  />
-                </ScrollArea>
+                <div 
+                  className="overflow-auto bg-gray-100 dark:bg-gray-900"
+                  style={{ height: '65vh' }}
+                >
+                  <div 
+                    style={{ 
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: 'top center',
+                      width: `${100 / previewScale}%`,
+                      minHeight: '100%',
+                    }}
+                  >
+                    <div className="bg-background shadow-lg mx-auto" style={{ maxWidth: '1400px' }}>
+                      <DynamicPageRenderer 
+                        content={contentData} 
+                        isEditing={true}
+                        onFieldEdit={handleFieldEdit}
+                        onPositionChange={handlePositionChange}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
