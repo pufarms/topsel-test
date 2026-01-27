@@ -1994,7 +1994,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 onEdit={onFieldEdit}
                 as="h2"
                 className={`h2-section ${isLight ? '' : 'text-white'}`}
-                style={{ marginBottom: '10px' }}
+                style={{ marginBottom: '10px', paddingBottom: '0' }}
               />
             )}
             {data.description && (
@@ -2007,6 +2007,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 onEdit={onFieldEdit}
                 as="p"
                 className={`body-text max-w-3xl mx-auto ${isLight ? '' : 'text-white/70'}`}
+                style={{ marginTop: '0' }}
               />
             )}
           </div>
