@@ -1497,7 +1497,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             position: 'absolute',
             left: 0,
             top: 0,
-            width: '70px',
+            width: '15%',
             height: '100%',
             background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
             zIndex: 10,
@@ -1508,9 +1508,9 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           className="pointer-events-none" 
           style={{
             position: 'absolute',
-            left: '70px',
+            left: '15%',
             top: 0,
-            width: '30px',
+            width: '5%',
             height: '100%',
             background: 'linear-gradient(to right, #F3F4F6, transparent)',
             zIndex: 10,
@@ -1521,7 +1521,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           className="pointer-events-none" 
           style={{
             position: 'absolute',
-            right: '10%',
+            right: '15%',
             top: 0,
             width: '5%',
             height: '100%',
@@ -1529,14 +1529,14 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             zIndex: 10,
           }}
         />
-        {/* Right mask - solid cover for 90-100% */}
+        {/* Right mask - solid cover */}
         <div 
           className="pointer-events-none" 
           style={{
             position: 'absolute',
             right: 0,
             top: 0,
-            width: '10%',
+            width: '15%',
             height: '100%',
             background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
             zIndex: 10,
