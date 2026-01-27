@@ -1438,7 +1438,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         paddingBottom: '6px',
       }}
     >
-      {/* Top scroll roll effect */}
+      {/* Top scroll roll effect - Navy theme */}
       <div 
         className="scroll-roll-top pointer-events-none"
         style={{
@@ -1447,14 +1447,14 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           left: 0,
           right: 0,
           height: '6px',
-          background: 'linear-gradient(to bottom, #8B7355 0%, #C4A574 40%, #F5E6D3 80%, #FDFBF7 100%)',
+          background: 'linear-gradient(to bottom, #0D1321 0%, #1F2937 40%, #374151 70%, #E5E7EB 100%)',
           borderRadius: '0 0 50% 50% / 0 0 100% 100%',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.12), inset 0 -1px 1px rgba(255,255,255,0.4)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3), inset 0 -1px 1px rgba(255,255,255,0.15)',
           zIndex: 20,
         }}
       />
       
-      {/* Main content area - parchment style */}
+      {/* Main content area - Light gray matching site */}
       <div
         className="scroll-content-area"
         style={{
@@ -1464,12 +1464,12 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
-          background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
-          color: '#3D3225',
+          background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
+          color: '#1F2937',
           fontSize: '14px',
           fontWeight: 500,
           letterSpacing: '0.02em',
-          boxShadow: 'inset 0 1px 2px rgba(139,115,85,0.08), inset 0 -1px 2px rgba(139,115,85,0.08)',
+          boxShadow: 'inset 0 1px 2px rgba(17,24,39,0.05), inset 0 -1px 2px rgba(17,24,39,0.05)',
         }}
       >
         {/* Left mask - solid cover for 0-10% */}
@@ -1481,7 +1481,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             top: 0,
             width: '10%',
             height: '100%',
-            background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
+            background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
             zIndex: 10,
           }}
         />
@@ -1494,7 +1494,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             top: 0,
             width: '5%',
             height: '100%',
-            background: 'linear-gradient(to right, #FBF8F3, transparent)',
+            background: 'linear-gradient(to right, #F3F4F6, transparent)',
             zIndex: 10,
           }}
         />
@@ -1507,7 +1507,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             top: 0,
             width: '5%',
             height: '100%',
-            background: 'linear-gradient(to left, #FBF8F3, transparent)',
+            background: 'linear-gradient(to left, #F3F4F6, transparent)',
             zIndex: 10,
           }}
         />
@@ -1520,7 +1520,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
             top: 0,
             width: '10%',
             height: '100%',
-            background: 'linear-gradient(to bottom, #FDFBF7 0%, #FBF8F3 50%, #FDFBF7 100%)',
+            background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
             zIndex: 10,
           }}
         />
@@ -1544,12 +1544,12 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
               <Link
                 key={`first-${announcement.id}-${index}`}
                 href={`/board/notice/${announcement.id}`}
-                className="inline-flex items-center transition-colors hover:text-[#8B5A2B] flex-shrink-0"
+                className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
                 style={{ padding: '0 3rem' }}
                 data-testid={`announcement-link-${index}`}
               >
                 {announcement.isImportant === 'true' && (
-                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#C4593A' }} />
+                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#FF6B00' }} />
                 )}
                 <span className="whitespace-nowrap">{announcement.title}</span>
               </Link>
@@ -1559,12 +1559,12 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
               <Link
                 key={`second-${announcement.id}-${index}`}
                 href={`/board/notice/${announcement.id}`}
-                className="inline-flex items-center transition-colors hover:text-[#8B5A2B] flex-shrink-0"
+                className="inline-flex items-center transition-colors hover:text-[#5D7AF2] flex-shrink-0"
                 style={{ padding: '0 3rem' }}
                 data-testid={`announcement-link-dup-${index}`}
               >
                 {announcement.isImportant === 'true' && (
-                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#C4593A' }} />
+                  <span className="inline-block w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: '#FF6B00' }} />
                 )}
                 <span className="whitespace-nowrap">{announcement.title}</span>
               </Link>
@@ -1573,7 +1573,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         </div>
       </div>
       
-      {/* Bottom scroll roll effect */}
+      {/* Bottom scroll roll effect - Navy theme */}
       <div 
         className="scroll-roll-bottom pointer-events-none"
         style={{
@@ -1582,9 +1582,9 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           left: 0,
           right: 0,
           height: '6px',
-          background: 'linear-gradient(to top, #8B7355 0%, #C4A574 40%, #F5E6D3 80%, #FDFBF7 100%)',
+          background: 'linear-gradient(to top, #0D1321 0%, #1F2937 40%, #374151 70%, #E5E7EB 100%)',
           borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
-          boxShadow: '0 -1px 2px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.4)',
+          boxShadow: '0 -1px 3px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.15)',
           zIndex: 20,
         }}
       />
