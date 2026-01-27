@@ -1841,7 +1841,7 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
                 </div>
               )}
               <div 
-                className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video"
+                className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video shadow-lg shadow-black/40"
                 onClick={() => !isEditing && setActiveVideoId(video.id)}
               >
                 <img 
