@@ -131,17 +131,17 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
         borderBottom: '1px solid rgba(255,255,255,0.08)'
       }}
     >
-      <div className="container flex h-14 items-center justify-between gap-4 px-4 md:px-6">
-        <div className="flex items-center gap-6">
+      <div className="w-full max-w-7xl mx-auto flex h-12 sm:h-14 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 md:px-6">
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0 flex-shrink-0">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home">
             {logoUrl ? (
               <img 
                 src={logoUrl} 
                 alt={logoAlt} 
-                className="h-8 w-auto brightness-0 invert"
+                className="h-6 sm:h-8 w-auto brightness-0 invert"
               />
             ) : (
-              <span className="text-lg font-bold text-white">
+              <span className="text-base sm:text-lg font-bold text-white whitespace-nowrap">
                 {siteName}
               </span>
             )}
@@ -153,19 +153,19 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
         </nav>
 
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetTrigger asChild className="md:hidden">
+          <SheetTrigger asChild className="md:hidden flex-shrink-0">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="transition-colors duration-300 text-white"
+              className="transition-colors duration-300 text-white h-9 w-9 sm:h-10 sm:w-10"
               data-testid="button-mobile-menu"
             >
               <Menu className="h-5 w-5" />
               <span className="sr-only">메뉴</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[250px]">
-            <nav className="flex flex-col gap-2 mt-8">
+          <SheetContent side="right" className="w-[280px] sm:w-[300px]">
+            <nav className="flex flex-col gap-3 mt-8">
               {filteredMenus.map((menu) => renderMenuItem(menu, true))}
             </nav>
           </SheetContent>
