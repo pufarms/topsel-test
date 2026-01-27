@@ -1746,6 +1746,7 @@ function ImageTextSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
 function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit }: SectionProps) {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const anim = useScrollAnimation();
+  const animGrid = useScrollAnimation();
   if (!data) return null;
   const videos = data.videos || [];
   
@@ -1818,7 +1819,10 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
           )}
         </div>
 
-        <div className="grid grid-cols-5 gap-4">
+        <div 
+          ref={animGrid.ref}
+          className={`grid grid-cols-5 gap-4 transition-all duration-700 ${animGrid.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        >
           {videos.slice(0, 5).map((video: any, index: number) => (
             <div
               key={`${video.id}-${index}`}
