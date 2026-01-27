@@ -1477,7 +1477,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         <div 
           style={{
             position: 'absolute',
-            left: '15%',
+            left: '10%',
             top: '50%',
             transform: 'translateY(-50%)',
             zIndex: 15,
