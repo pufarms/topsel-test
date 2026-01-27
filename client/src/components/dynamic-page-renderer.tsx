@@ -1235,6 +1235,30 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
       onTouchEnd={handleTouchEnd}
       data-testid="section-hero-slider"
     >
+      {/* Edit Mode Toolbar */}
+      {isEditing && onFieldEdit && (
+        <div className="absolute top-16 left-4 right-4 z-30 flex flex-wrap gap-2 justify-center">
+          {slides.map((slide: any, index: number) => (
+            <button
+              key={slide.id || index}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all ${
+                index === currentIndex 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background/90 text-foreground hover:bg-background'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToSlide(index);
+                onFieldEdit(sectionId, `slides.${index}.imageUrl`, slide.imageUrl || "", "image");
+              }}
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span className="text-sm font-medium">배너 {index + 1}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Slides */}
       {slides.map((slide: any, index: number) => (
         <div
@@ -1254,21 +1278,6 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
               objectPosition: 'center center',
             }}
           />
-          {/* Image edit button in edit mode */}
-          {isEditing && onFieldEdit && index === currentIndex && (
-            <div
-              className="absolute top-4 right-4 z-20 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onFieldEdit(sectionId, `slides.${index}.imageUrl`, slide.imageUrl || "", "image");
-              }}
-            >
-              <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg">
-                <ImageIcon className="w-4 h-4" />
-                <span className="text-sm font-medium">이미지 {index + 1} 변경</span>
-              </div>
-            </div>
-          )}
         </div>
       ))}
 
