@@ -1831,22 +1831,19 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
 
         <div 
           ref={animGrid.ref}
-          className={`grid grid-cols-5 gap-4 transition-all duration-700 ${animGrid.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+          className={`flex gap-4 transition-all duration-700 ${animGrid.isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         >
-          {videos.slice(0, 5).map((video: any, index: number) => (
-            <div
-              key={`${video.id}-${index}`}
-              className="relative"
-            >
-              {/* Edit button for video */}
+          {/* Left: Main large video */}
+          {videos[0] && (
+            <div className="w-1/2 relative">
               {isEditing && onFieldEdit && (
                 <div
                   className="absolute top-2 right-2 z-10 cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onFieldEdit(sectionId, `videos.${index}.id`, video.id || "", "text");
+                    onFieldEdit(sectionId, `videos.0.id`, videos[0].id || "", "text");
                   }}
-                  data-testid={`editable-video-${sectionId}-${index}`}
+                  data-testid={`editable-video-${sectionId}-0`}
                 >
                   <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded shadow-lg">
                     <Video className="w-3 h-3" />
@@ -1855,22 +1852,63 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
                 </div>
               )}
               <div 
-                className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video shadow-lg shadow-black/40"
-                onClick={() => !isEditing && setActiveVideoId(video.id)}
+                className="relative rounded-xl overflow-hidden cursor-pointer group h-full shadow-lg shadow-black/40"
+                onClick={() => !isEditing && setActiveVideoId(videos[0].id)}
               >
                 <img 
-                  src={video.thumbnail || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`}
-                  alt={`비디오 ${index + 1}`}
+                  src={videos[0].thumbnail || `https://img.youtube.com/vi/${videos[0].id}/maxresdefault.jpg`}
+                  alt="메인 비디오"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/50 transition-colors">
-                  <div className="w-7 h-7 rounded-full bg-white/50 flex items-center justify-center transition-colors group-hover:bg-white/70">
-                    <Play className="w-3 h-3 text-red-600 ml-0.5" fill="currentColor" />
+                  <div className="w-12 h-12 rounded-full bg-white/50 flex items-center justify-center transition-colors group-hover:bg-white/70">
+                    <Play className="w-5 h-5 text-red-600 ml-0.5" fill="currentColor" />
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+          )}
+          
+          {/* Right: 2x2 grid of smaller videos */}
+          <div className="w-1/2 grid grid-cols-2 gap-4">
+            {videos.slice(1, 5).map((video: any, index: number) => (
+              <div
+                key={`${video.id}-${index}`}
+                className="relative"
+              >
+                {isEditing && onFieldEdit && (
+                  <div
+                    className="absolute top-2 right-2 z-10 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFieldEdit(sectionId, `videos.${index + 1}.id`, video.id || "", "text");
+                    }}
+                    data-testid={`editable-video-${sectionId}-${index + 1}`}
+                  >
+                    <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-1 rounded shadow-lg">
+                      <Video className="w-3 h-3" />
+                      <span className="text-xs font-medium">편집</span>
+                    </div>
+                  </div>
+                )}
+                <div 
+                  className="relative rounded-xl overflow-hidden cursor-pointer group aspect-video shadow-lg shadow-black/40"
+                  onClick={() => !isEditing && setActiveVideoId(video.id)}
+                >
+                  <img 
+                    src={video.thumbnail || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`}
+                    alt={`비디오 ${index + 2}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/50 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-white/50 flex items-center justify-center transition-colors group-hover:bg-white/70">
+                      <Play className="w-3 h-3 text-red-600 ml-0.5" fill="currentColor" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
