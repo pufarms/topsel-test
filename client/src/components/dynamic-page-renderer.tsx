@@ -1416,8 +1416,8 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
     return null;
   }
   
-  // Duplicate announcements for seamless loop
-  const duplicatedAnnouncements = [...announcements, ...announcements];
+  // Triple announcements for seamless continuous loop
+  const tripleAnnouncements = [...announcements, ...announcements, ...announcements];
   
   return (
     <section
@@ -1440,7 +1440,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         letterSpacing: '0.02em',
       }}
     >
-      {/* Gradient masks for fade effect - 10% on each side = 80% visible content */}
+      {/* Left mask - covers 0% to 10% (center - 40%) with solid then fade */}
       <div 
         className="pointer-events-none" 
         style={{
@@ -1449,10 +1449,37 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           top: 0,
           width: '10%',
           height: '100%',
+          background: '#FAFAFA',
+          zIndex: 10,
+        }}
+      />
+      {/* Left fade gradient - 10% to 15% */}
+      <div 
+        className="pointer-events-none" 
+        style={{
+          position: 'absolute',
+          left: '10%',
+          top: 0,
+          width: '5%',
+          height: '100%',
           background: 'linear-gradient(to right, #FAFAFA, transparent)',
           zIndex: 10,
         }}
       />
+      {/* Right fade gradient - 85% to 90% */}
+      <div 
+        className="pointer-events-none" 
+        style={{
+          position: 'absolute',
+          right: '10%',
+          top: 0,
+          width: '5%',
+          height: '100%',
+          background: 'linear-gradient(to left, #FAFAFA, transparent)',
+          zIndex: 10,
+        }}
+      />
+      {/* Right mask - covers 90% to 100% (center + 40%) with solid */}
       <div 
         className="pointer-events-none" 
         style={{
@@ -1461,29 +1488,30 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           top: 0,
           width: '10%',
           height: '100%',
-          background: 'linear-gradient(to left, #FAFAFA, transparent)',
+          background: '#FAFAFA',
           zIndex: 10,
         }}
       />
       
-      {/* Marquee container - centered 80% width */}
+      {/* Marquee container - full width, content will be masked */}
       <div 
-        className="relative w-full h-full flex items-center justify-center overflow-hidden"
+        className="relative w-full h-full flex items-center overflow-hidden"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         <div 
-          className="marquee-content flex whitespace-nowrap"
+          className="marquee-track flex whitespace-nowrap"
           style={{
-            animation: `marquee 25s linear infinite`,
+            animation: `marquee-scroll 30s linear infinite`,
             animationPlayState: isPaused ? 'paused' : 'running',
           }}
         >
-          {duplicatedAnnouncements.map((announcement, index) => (
+          {tripleAnnouncements.map((announcement, index) => (
             <Link
               key={`${announcement.id}-${index}`}
               href={`/board/notice/${announcement.id}`}
-              className="inline-flex items-center mx-8 transition-colors hover:text-[#5D7AF2]"
+              className="inline-flex items-center transition-colors hover:text-[#5D7AF2]"
+              style={{ marginLeft: '3rem', marginRight: '3rem' }}
               data-testid={`announcement-link-${index}`}
             >
               {announcement.isImportant === 'true' && (
@@ -1496,9 +1524,9 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
       </div>
       
       <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+        @keyframes marquee-scroll {
+          0% { transform: translateX(40%); }
+          100% { transform: translateX(calc(-33.33% + 40%)); }
         }
         @media (max-width: 768px) {
           .announcement-bar {
