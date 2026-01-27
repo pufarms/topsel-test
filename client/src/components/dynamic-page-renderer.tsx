@@ -1434,8 +1434,8 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
       style={{
         position: 'relative',
         width: '100%',
-        paddingTop: '12px',
-        paddingBottom: '12px',
+        paddingTop: '6px',
+        paddingBottom: '6px',
       }}
     >
       {/* Top scroll roll effect */}
@@ -1446,10 +1446,10 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           top: 0,
           left: 0,
           right: 0,
-          height: '12px',
-          background: 'linear-gradient(to bottom, #8B7355 0%, #C4A574 30%, #F5E6D3 60%, #FDFBF7 100%)',
+          height: '6px',
+          background: 'linear-gradient(to bottom, #8B7355 0%, #C4A574 40%, #F5E6D3 80%, #FDFBF7 100%)',
           borderRadius: '0 0 50% 50% / 0 0 100% 100%',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.5)',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.12), inset 0 -1px 1px rgba(255,255,255,0.4)',
           zIndex: 20,
         }}
       />
@@ -1460,7 +1460,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         style={{
           position: 'relative',
           width: '100%',
-          height: '44px',
+          height: '32px',
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
@@ -1469,7 +1469,7 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           fontSize: '14px',
           fontWeight: 500,
           letterSpacing: '0.02em',
-          boxShadow: 'inset 0 1px 3px rgba(139,115,85,0.1), inset 0 -1px 3px rgba(139,115,85,0.1)',
+          boxShadow: 'inset 0 1px 2px rgba(139,115,85,0.08), inset 0 -1px 2px rgba(139,115,85,0.08)',
         }}
       >
         {/* Left mask - solid cover for 0-10% */}
@@ -1581,10 +1581,10 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           bottom: 0,
           left: 0,
           right: 0,
-          height: '12px',
-          background: 'linear-gradient(to top, #8B7355 0%, #C4A574 30%, #F5E6D3 60%, #FDFBF7 100%)',
+          height: '6px',
+          background: 'linear-gradient(to top, #8B7355 0%, #C4A574 40%, #F5E6D3 80%, #FDFBF7 100%)',
           borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
-          boxShadow: '0 -2px 4px rgba(0,0,0,0.15), inset 0 1px 2px rgba(255,255,255,0.5)',
+          boxShadow: '0 -1px 2px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.4)',
           zIndex: 20,
         }}
       />
@@ -1600,15 +1600,15 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
         }
         @media (max-width: 768px) {
           .scroll-content-area {
-            height: 36px !important;
-            font-size: 13px !important;
+            height: 28px !important;
+            font-size: 14px !important;
           }
           .scroll-roll-top, .scroll-roll-bottom {
-            height: 10px !important;
+            height: 5px !important;
           }
           .scroll-marquee-wrapper {
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
+            padding-top: 5px !important;
+            padding-bottom: 5px !important;
           }
         }
       `}</style>
