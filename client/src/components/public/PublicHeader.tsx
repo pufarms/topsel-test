@@ -131,7 +131,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
         borderBottom: '1px solid rgba(255,255,255,0.08)'
       }}
     >
-      <div className="container flex h-16 items-center justify-between gap-4 px-4 md:px-6">
+      <div className="container flex h-14 items-center justify-between gap-4 px-4 md:px-6">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home">
             {logoUrl ? (
