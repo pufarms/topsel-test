@@ -2271,7 +2271,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   className="w-full rounded-lg shadow-lg object-cover"
-                  style={{ aspectRatio: '3/2' }}
+                  style={{ aspectRatio: '4/3' }}
                 />
               )}
             </div>
@@ -2300,7 +2300,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   className="w-full rounded-lg shadow-lg object-cover"
-                  style={{ aspectRatio: '3/2' }}
+                  style={{ aspectRatio: '4/3' }}
                 />
               )}
             </div>
