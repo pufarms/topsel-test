@@ -1984,34 +1984,30 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 style={{ color: isLight ? 'var(--ts-primary)' : 'var(--ts-accent-cyan)' }}
               />
             )}
-            <div className="flex flex-col items-center" style={{ gap: '10px' }}>
-              {data.title && (
-                <EditableField
-                  value={data.title}
-                  sectionId={sectionId}
-                  fieldPath="title"
-                  fieldType="text"
-                  isEditing={isEditing}
-                  onEdit={onFieldEdit}
-                  as="h2"
-                  className={`h2-section ${isLight ? '' : 'text-white'}`}
-                  style={{ margin: '0', padding: '0' }}
-                />
-              )}
-              {data.description && (
-                <EditableField
-                  value={data.description}
-                  sectionId={sectionId}
-                  fieldPath="description"
-                  fieldType="text"
-                  isEditing={isEditing}
-                  onEdit={onFieldEdit}
-                  as="p"
-                  className={`body-text max-w-3xl mx-auto ${isLight ? '' : 'text-white/70'}`}
-                  style={{ margin: '0', padding: '0' }}
-                />
-              )}
-            </div>
+            {data.title && (
+              <EditableField
+                value={data.title}
+                sectionId={sectionId}
+                fieldPath="title"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="h2"
+                className={`h2-section !mb-[10px] !mt-0 !pb-0 !pt-0 ${isLight ? '' : 'text-white'}`}
+              />
+            )}
+            {data.description && (
+              <EditableField
+                value={data.description}
+                sectionId={sectionId}
+                fieldPath="description"
+                fieldType="text"
+                isEditing={isEditing}
+                onEdit={onFieldEdit}
+                as="p"
+                className={`body-text max-w-3xl mx-auto !mt-0 !mb-0 !pt-0 !pb-0 ${isLight ? '' : 'text-white/70'}`}
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
