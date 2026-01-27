@@ -2020,14 +2020,14 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
             {items.map((item: any, index: number) => (
               <div 
                 key={index} 
-                className="text-center px-4 py-3 rounded-xl"
+                className="text-center px-4 py-2 rounded-xl"
                 style={{ 
                   background: isLight ? 'white' : 'rgba(255,255,255,0.05)', 
                   border: isLight ? '1px solid var(--ts-border)' : '1px solid rgba(255,255,255,0.1)'
                 }}
               >
                 <div 
-                  className="w-10 h-10 mx-auto mb-2 rounded-lg flex items-center justify-center"
+                  className="w-9 h-9 mx-auto mb-1.5 rounded-lg flex items-center justify-center"
                   style={{ background: item.iconBg || 'rgba(93,122,242,0.2)' }}
                 >
                   <EditableIcon
@@ -2036,7 +2036,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                     fieldPath={`items.${index}.icon`}
                     isEditing={isEditing}
                     onEdit={onFieldEdit}
-                    className={`${item.iconColor ? '' : 'text-primary'} w-5 h-5`}
+                    className={`${item.iconColor ? '' : 'text-primary'} w-4 h-4`}
                   />
                 </div>
                 <EditableField
@@ -2047,7 +2047,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h3"
-                  className={`font-bold text-base mb-1 ${isLight ? '' : 'text-white'}`}
+                  className={`font-semibold text-sm mb-0.5 ${isLight ? '' : 'text-white'}`}
                 />
                 <EditableField
                   value={item.description || ''}
