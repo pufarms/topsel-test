@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -168,6 +168,45 @@ export default function PagesManagement() {
   const [previewDialog, setPreviewDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [editTab, setEditTab] = useState<string>("settings");
   const [previewScale, setPreviewScale] = useState<number>(0.4);
+  
+  // Resizable dialog state
+  const [dialogSize, setDialogSize] = useState({ width: 95, height: 90 }); // vw, vh percentages
+  const [isResizing, setIsResizing] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  
+  // Handle dialog resize
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = dialogSize.width;
+    const startHeight = dialogSize.height;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      
+      // Calculate new size based on viewport
+      const vwDelta = (deltaX / window.innerWidth) * 100;
+      const vhDelta = (deltaY / window.innerHeight) * 100;
+      
+      const newWidth = Math.max(50, Math.min(98, startWidth + vwDelta * 2));
+      const newHeight = Math.max(50, Math.min(98, startHeight + vhDelta * 2));
+      
+      setDialogSize({ width: newWidth, height: newHeight });
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
   
   // Inline field editing state
   const [inlineEditDialog, setInlineEditDialog] = useState<{
@@ -869,7 +908,31 @@ export default function PagesManagement() {
 
       {/* Edit Page Dialog with Tabs */}
       <Dialog open={editDialog.open} onOpenChange={(open) => { setEditDialog({ open, page: open ? editDialog.page : null }); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogContent 
+          ref={dialogRef}
+          className="overflow-hidden flex flex-col relative"
+          style={{
+            width: `${dialogSize.width}vw`,
+            height: `${dialogSize.height}vh`,
+            maxWidth: '98vw',
+            maxHeight: '98vh',
+          }}
+        >
+          {/* Resize handles */}
+          <div 
+            className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize z-50 group"
+            onMouseDown={handleResizeStart}
+          >
+            <div className="absolute bottom-1 right-1 w-3 h-3 border-r-2 border-b-2 border-muted-foreground/50 group-hover:border-primary transition-colors" />
+          </div>
+          <div 
+            className="absolute top-1/2 right-0 -translate-y-1/2 w-2 h-16 cursor-e-resize z-50 hover:bg-primary/20 rounded transition-colors"
+            onMouseDown={handleResizeStart}
+          />
+          <div 
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 h-2 w-16 cursor-s-resize z-50 hover:bg-primary/20 rounded transition-colors"
+            onMouseDown={handleResizeStart}
+          />
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5" />
