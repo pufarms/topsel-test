@@ -79,7 +79,22 @@ const menuItems: MenuItem[] = [
   { id: "settlements", label: "정산관리", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
-  { id: "pages", label: "페이지관리", icon: <FileText className="h-5 w-5" />, path: "/admin/pages" },
+  { 
+    id: "pages", 
+    label: "페이지관리", 
+    icon: <FileText className="h-5 w-5" />,
+    children: [
+      { id: "pages-all", label: "전체 페이지", path: "/admin/pages" },
+      { id: "pages-basic", label: "기본페이지", path: "/admin/pages?category=기본페이지" },
+      { id: "pages-main-sub", label: "메인/서브페이지", path: "/admin/pages?category=메인/서브페이지" },
+      { id: "pages-mypage", label: "회원마이페이지", path: "/admin/pages?category=회원마이페이지" },
+      { id: "pages-order", label: "주문관리페이지", path: "/admin/pages?category=주문관리페이지" },
+      { id: "pages-stats", label: "통계관리페이지", path: "/admin/pages?category=통계관리페이지" },
+      { id: "pages-guide", label: "가이드페이지", path: "/admin/pages?category=가이드페이지" },
+      { id: "pages-board", label: "게시판관리페이지", path: "/admin/pages?category=게시판관리페이지" },
+      { id: "pages-etc", label: "기타페이지", path: "/admin/pages?category=기타페이지" },
+    ]
+  },
   { 
     id: "settings", 
     label: "설정", 
@@ -141,9 +156,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  const isActive = (path?: string) => path === location;
+  const isActive = (path?: string) => {
+    if (!path) return false;
+    // 쿼리 파라미터가 있는 경우 전체 URL과 비교
+    const currentFullPath = location + window.location.search;
+    if (path.includes('?')) {
+      return path === currentFullPath || path === location + window.location.search;
+    }
+    // 쿼리 파라미터가 없는 경로는 기본 경로만 비교
+    return path === location;
+  };
   const isChildActive = (children?: { path: string }[]) => 
-    children?.some(child => child.path === location);
+    children?.some(child => isActive(child.path));
   
   const isCollapsed = sidebarMode === "collapsed";
   const sidebarWidth = isCollapsed ? "w-16" : "w-64";

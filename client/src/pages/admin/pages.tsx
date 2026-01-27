@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { PageHeader } from "@/components/admin/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,10 +128,31 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
 
 export default function PagesManagement() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(pageCategories));
+  
+  // URL에서 카테고리 파라미터 읽기
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCategory = urlParams.get('category');
+  
+  const [categoryFilter, setCategoryFilter] = useState<string>(urlCategory || "all");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    urlCategory ? new Set([urlCategory]) : new Set(pageCategories)
+  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // URL 변경 시 카테고리 필터 업데이트
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get('category');
+    if (category) {
+      setCategoryFilter(category);
+      setExpandedCategories(new Set([category]));
+    } else {
+      setCategoryFilter("all");
+      setExpandedCategories(new Set(pageCategories));
+    }
+  }, [location]);
   const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [addDialog, setAddDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
