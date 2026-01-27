@@ -1993,7 +1993,8 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                 isEditing={isEditing}
                 onEdit={onFieldEdit}
                 as="h2"
-                className={`h2-section mb-4 ${isLight ? '' : 'text-white'}`}
+                className={`h2-section ${isLight ? '' : 'text-white'}`}
+                style={{ marginBottom: '10px' }}
               />
             )}
             {data.description && (
