@@ -1818,7 +1818,7 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
           )}
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-5 gap-4">
           {videos.slice(0, 5).map((video: any, index: number) => (
             <div
               key={`${video.id}-${index}`}
