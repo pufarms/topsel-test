@@ -2215,7 +2215,11 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
       {/* Block 1: White background - Text Left, Image Right */}
       <section
         className="py-16 md:py-20"
-        style={{ background: data.block1Bg || '#FFFFFF' }}
+        style={{ 
+          background: data.block1Bg || '#FFFFFF',
+          paddingTop: data.block1PaddingTop || undefined,
+          paddingBottom: data.block1PaddingBottom || undefined
+        }}
       >
         <div 
           ref={anim1.ref}
@@ -2326,7 +2330,11 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
       {/* Block 2: Gray/Navy background - Image Left, Text Right */}
       <section
         className="py-16 md:py-20"
-        style={{ background: data.block2Bg || '#F3F4F6' }}
+        style={{ 
+          background: data.block2Bg || '#F3F4F6',
+          paddingTop: data.block2PaddingTop || undefined,
+          paddingBottom: data.block2PaddingBottom || undefined
+        }}
       >
         <div 
           ref={anim2.ref}
