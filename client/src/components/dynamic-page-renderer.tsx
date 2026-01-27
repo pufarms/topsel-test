@@ -1100,6 +1100,30 @@ function StatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat:
   );
 }
 
+function SliderStatCounter({ stat, sectionId, index, isEditing, onFieldEdit }: { stat: any; sectionId: string; index: number; isEditing?: boolean; onFieldEdit?: any }) {
+  const counter = useCountUp(parseInt(stat.value) || 0, 2000);
+  return (
+    <div className="text-center" ref={counter.ref}>
+      <div 
+        className="text-2xl sm:text-3xl md:text-4xl font-extrabold"
+        style={{ color: stat.color || 'var(--ts-accent-green)' }}
+      >
+        {counter.count}{stat.suffix || ''}
+      </div>
+      <EditableField
+        value={stat.label || ''}
+        sectionId={sectionId}
+        fieldPath={`stats.${index}.label`}
+        fieldType="text"
+        isEditing={isEditing}
+        onEdit={onFieldEdit}
+        as="div"
+        className="text-xs sm:text-sm mt-1 text-white/70"
+      />
+    </div>
+  );
+}
+
 // Hero Slider Section - Full-screen image slider with Fade + Ken Burns effect
 function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1222,6 +1246,52 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
           )}
         </div>
       ))}
+
+      {/* Content Overlay - Buttons and Stats */}
+      {(data.buttonText || (data.stats && data.stats.length > 0)) && (
+        <div className="absolute bottom-[120px] left-0 right-0 z-10 px-4 md:px-8">
+          <div className="container mx-auto">
+            {/* CTA Buttons */}
+            {data.buttonText && (
+              <div className="flex flex-wrap gap-3 md:gap-4 mb-8 justify-center md:justify-start">
+                <EditableButton
+                  text={data.buttonText}
+                  link={data.buttonLink || "#"}
+                  openInNewTab={data.buttonNewTab}
+                  sectionId={sectionId}
+                  fieldPath="button"
+                  isEditing={isEditing}
+                  onEdit={onFieldEdit}
+                  className="ts-btn ts-btn-primary text-sm md:text-base px-6 md:px-8 py-2.5 md:py-3"
+                />
+                {data.secondaryButtonText && (
+                  <EditableButton
+                    text={data.secondaryButtonText}
+                    link={data.secondaryButtonLink || "#"}
+                    openInNewTab={data.secondaryButtonNewTab}
+                    sectionId={sectionId}
+                    fieldPath="secondaryButton"
+                    isEditing={isEditing}
+                    onEdit={onFieldEdit}
+                    className="ts-btn ts-btn-outline-white text-sm md:text-base px-6 md:px-8 py-2.5 md:py-3"
+                  />
+                )}
+              </div>
+            )}
+            
+            {/* Stats Counter */}
+            {data.stats && data.stats.length > 0 && (
+              <div className="flex justify-center md:justify-start">
+                <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-md">
+                  {data.stats.map((stat: any, index: number) => (
+                    <SliderStatCounter key={index} stat={stat} sectionId={sectionId} index={index} isEditing={isEditing} onFieldEdit={onFieldEdit} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Line-style Indicators */}
       <div className="absolute bottom-[50px] left-1/2 -translate-x-1/2 flex gap-4 z-10">
