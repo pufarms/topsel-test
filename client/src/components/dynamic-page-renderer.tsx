@@ -1400,6 +1400,8 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
 function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: SectionProps) {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isPaused, setIsPaused] = useState(false);
+  const marqueeRef = useRef<HTMLDivElement>(null);
+  const [animationDuration, setAnimationDuration] = useState(20);
   
   useEffect(() => {
     fetch('/api/announcements/latest?limit=5')
@@ -1412,13 +1414,6 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
       .catch(err => console.error('Failed to load announcements:', err));
   }, []);
   
-  if (announcements.length === 0) {
-    return null;
-  }
-  
-  const marqueeRef = useRef<HTMLDivElement>(null);
-  const [animationDuration, setAnimationDuration] = useState(20);
-  
   useEffect(() => {
     if (marqueeRef.current && announcements.length > 0) {
       const contentWidth = marqueeRef.current.scrollWidth / 2;
@@ -1426,6 +1421,10 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
       setAnimationDuration(duration);
     }
   }, [announcements]);
+  
+  if (announcements.length === 0) {
+    return null;
+  }
   
   return (
     <section
