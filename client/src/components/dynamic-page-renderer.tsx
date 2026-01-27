@@ -1473,14 +1473,31 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           boxShadow: 'inset 0 1px 2px rgba(17,24,39,0.05), inset 0 -1px 2px rgba(17,24,39,0.05)',
         }}
       >
-        {/* Left mask - solid cover for 0-10% */}
+        {/* Fixed [알림] label */}
+        <div 
+          style={{
+            position: 'absolute',
+            left: '16px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 15,
+            fontWeight: 700,
+            color: '#DC2626',
+            fontSize: '13px',
+            letterSpacing: '0.05em',
+          }}
+        >
+          [알림]
+        </div>
+        
+        {/* Left mask - solid cover behind label */}
         <div 
           className="pointer-events-none" 
           style={{
             position: 'absolute',
             left: 0,
             top: 0,
-            width: '10%',
+            width: '70px',
             height: '100%',
             background: 'linear-gradient(to bottom, #F9FAFB 0%, #F3F4F6 50%, #F9FAFB 100%)',
             zIndex: 10,
@@ -1491,9 +1508,9 @@ function AnnouncementMarqueeSection({ data, sectionId, isEditing, onClick }: Sec
           className="pointer-events-none" 
           style={{
             position: 'absolute',
-            left: '10%',
+            left: '70px',
             top: 0,
-            width: '5%',
+            width: '30px',
             height: '100%',
             background: 'linear-gradient(to right, #F3F4F6, transparent)',
             zIndex: 10,
