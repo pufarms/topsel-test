@@ -1788,8 +1788,8 @@ function VideoGallerySection({ data, sectionId, isEditing, onClick, onFieldEdit 
               isEditing={isEditing}
               onEdit={onFieldEdit}
               as="span"
-              className="subtitle-label mb-3 inline-block"
-              style={{ color: 'var(--ts-accent-cyan)' }}
+              className="subtitle-label inline-block"
+              style={{ color: 'var(--ts-accent-cyan)', marginBottom: '20px' }}
             />
           )}
           {data.title && (
