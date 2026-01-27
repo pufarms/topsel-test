@@ -2275,7 +2275,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-xs md:text-sm xl:text-base 2xl:text-lg font-semibold tracking-widest uppercase mb-3 xl:mb-4"
+                  className="text-[10px] md:text-xs xl:text-sm 2xl:text-base font-semibold tracking-widest uppercase mb-3 xl:mb-4"
                   style={{ color: 'var(--ts-primary)' }}
                 />
               )}
@@ -2290,7 +2290,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold mb-4 xl:mb-6 leading-tight"
+                  className="text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-bold mb-4 xl:mb-6 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
@@ -2305,7 +2305,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-600 mb-6 xl:mb-8 leading-relaxed"
+                  className="text-xs md:text-sm xl:text-base 2xl:text-lg text-gray-600 mb-6 xl:mb-8 leading-relaxed"
                 />
               )}
               
@@ -2333,7 +2333,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                         isEditing={isEditing}
                         onEdit={onFieldEdit}
                         as="span"
-                        className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-700"
+                        className="text-xs md:text-sm xl:text-base 2xl:text-lg text-gray-700"
                       />
                     </li>
                   ))}
@@ -2408,7 +2408,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-xs md:text-sm xl:text-base 2xl:text-lg font-semibold tracking-widest uppercase mb-3 xl:mb-4"
+                  className="text-[10px] md:text-xs xl:text-sm 2xl:text-base font-semibold tracking-widest uppercase mb-3 xl:mb-4"
                   style={{ color: 'var(--ts-primary)' }}
                 />
               )}
@@ -2423,7 +2423,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="h2"
-                  className="text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold mb-4 xl:mb-6 leading-tight"
+                  className="text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-bold mb-4 xl:mb-6 leading-tight"
                   style={{ color: '#111827' }}
                 />
               )}
@@ -2438,7 +2438,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                   isEditing={isEditing}
                   onEdit={onFieldEdit}
                   as="p"
-                  className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-600 mb-6 xl:mb-8 leading-relaxed"
+                  className="text-xs md:text-sm xl:text-base 2xl:text-lg text-gray-600 mb-6 xl:mb-8 leading-relaxed"
                 />
               )}
               
@@ -2466,7 +2466,7 @@ function ContentTwoBlocksSection({ data, sectionId, isEditing, onClick, onFieldE
                         isEditing={isEditing}
                         onEdit={onFieldEdit}
                         as="span"
-                        className="text-sm md:text-base xl:text-lg 2xl:text-xl text-gray-700"
+                        className="text-xs md:text-sm xl:text-base 2xl:text-lg text-gray-700"
                       />
                     </li>
                   ))}
