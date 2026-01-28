@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages } from "@shared/schema";
+import crypto from "crypto";
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
@@ -10,6 +11,8 @@ import axios from "axios";
 import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 // PortOne V2 환경변수
 const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
@@ -339,6 +342,61 @@ export async function registerRoutes(
         mailFilePath,
         signatureData: data.signatureData || undefined,
       });
+
+      // 약관 동의 기록 저장 (법적 증빙용)
+      try {
+        const [registerPage] = await db.select().from(pages).where(eq(pages.path, '/register'));
+        const pageContent = registerPage?.content as any || {};
+        const termsContent = pageContent.terms_content || {};
+        
+        const serviceTermContent = termsContent.service?.content || "";
+        const privacyTermContent = termsContent.privacy?.content || "";
+        const thirdPartyTermContent = termsContent.third_party?.content || "";
+        
+        const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || "";
+        const userAgent = req.headers['user-agent'] || "";
+        
+        const contentToHash = JSON.stringify({
+          memberId: member.id,
+          username: data.username,
+          serviceTermContent,
+          privacyTermContent,
+          thirdPartyTermContent,
+          signatureData: data.signatureData || "",
+          agreedAt: new Date().toISOString()
+        });
+        const contentHash = crypto.createHash('sha256').update(contentToHash).digest('hex');
+        const signatureHash = data.signatureData ? crypto.createHash('sha256').update(data.signatureData).digest('hex') : null;
+        
+        await db.insert(termAgreements).values({
+          memberId: member.id,
+          memberUsername: data.username,
+          memberName: data.memberName || null,
+          companyName: data.companyName,
+          businessNumber: data.businessNumber,
+          representative: data.representative,
+          serviceTermVersion: "1.0",
+          serviceTermContent: serviceTermContent,
+          serviceTermAgreed: "true",
+          privacyTermVersion: "1.0",
+          privacyTermContent: privacyTermContent,
+          privacyTermAgreed: "true",
+          thirdPartyTermVersion: "1.0",
+          thirdPartyTermContent: thirdPartyTermContent,
+          thirdPartyTermAgreed: "true",
+          signatureData: data.signatureData || null,
+          signatureHash: signatureHash,
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+          contentHash: contentHash,
+          ceoBirth: data.ceoBirth || null,
+          ceoCi: data.ceoCi || null,
+          ceoPhone: data.phone || null,
+        });
+        console.log('\x1b[32m   ✅ 약관 동의 기록 저장 완료\x1b[0m');
+      } catch (termError) {
+        console.error("Term agreement save error (non-critical):", termError);
+      }
 
       const { password, ...memberWithoutPassword } = member;
       return res.status(201).json({
@@ -1168,6 +1226,39 @@ export async function registerRoutes(
 
     const stats = await storage.getMemberStats();
     return res.json(stats);
+  });
+
+  // 약관 동의 기록 조회 API
+  app.get("/api/admin/term-agreements", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const agreements = await db.select().from(termAgreements).orderBy(desc(termAgreements.agreedAt));
+    return res.json(agreements);
+  });
+
+  // 특정 약관 동의 기록 상세 조회 API
+  app.get("/api/admin/term-agreements/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const [agreement] = await db.select().from(termAgreements).where(eq(termAgreements.id, req.params.id));
+    if (!agreement) {
+      return res.status(404).json({ message: "Agreement not found" });
+    }
+    return res.json(agreement);
   });
 
   app.get("/api/admin/members/:id", async (req, res) => {
