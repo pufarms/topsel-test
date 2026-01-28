@@ -63,6 +63,10 @@ export default function Register() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
   const [signatureData, setSignatureData] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  
+  const passwordMatch = passwordConfirm.length > 0 ? password === passwordConfirm : null;
 
   const { data: pageData } = useQuery<Page>({
     queryKey: ["/api/pages/by-path", { path: "/register" }],
@@ -289,11 +293,42 @@ export default function Register() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="password">{labels.password || "비밀번호"} <span className="text-destructive">*</span></Label>
-                      <Input id="password" name="password" type="password" required minLength={6} placeholder={placeholders.password || "6자 이상"} data-testid="input-password" />
+                      <Input 
+                        id="password" 
+                        name="password" 
+                        type="password" 
+                        required 
+                        minLength={6} 
+                        placeholder={placeholders.password || "6자 이상"} 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        data-testid="input-password" 
+                      />
                     </div>
                     <div>
                       <Label htmlFor="password_confirm">{labels.password_confirm || "비밀번호 확인"} <span className="text-destructive">*</span></Label>
-                      <Input id="password_confirm" name="password_confirm" type="password" required placeholder={placeholders.password_confirm || "비밀번호 확인"} data-testid="input-password-confirm" />
+                      <div className="relative">
+                        <Input 
+                          id="password_confirm" 
+                          name="password_confirm" 
+                          type="password" 
+                          required 
+                          placeholder={placeholders.password_confirm || "비밀번호 확인"} 
+                          value={passwordConfirm}
+                          onChange={(e) => setPasswordConfirm(e.target.value)}
+                          className={passwordMatch === false ? "border-destructive pr-20" : passwordMatch === true ? "border-green-500 pr-20" : ""}
+                          data-testid="input-password-confirm" 
+                        />
+                        {passwordMatch !== null && (
+                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium flex items-center gap-1 ${passwordMatch ? "text-green-600" : "text-destructive"}`}>
+                            {passwordMatch ? (
+                              <><Check className="w-4 h-4" /> 일치</>
+                            ) : (
+                              <><AlertCircle className="w-4 h-4" /> 불일치</>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
