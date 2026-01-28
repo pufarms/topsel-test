@@ -57,8 +57,53 @@ import {
   Award,
   TrendingUp,
   Maximize2,
-  Minimize2
+  Minimize2,
+  AlertTriangle
 } from "lucide-react";
+
+function GalleryImageThumbnail({ 
+  img, 
+  isSelected, 
+  onSelect 
+}: { 
+  img: { id: string; publicUrl: string; filename: string }; 
+  isSelected: boolean; 
+  onSelect: () => void;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const [imgLoading, setImgLoading] = useState(true);
+  
+  return (
+    <div
+      className={`cursor-pointer border-2 rounded-lg p-1 hover:border-primary transition-colors ${
+        isSelected ? 'border-primary bg-primary/10' : 'border-transparent'
+      }`}
+      onClick={onSelect}
+      data-testid={`image-select-${img.id}`}
+    >
+      {imgLoading && !imgError && (
+        <div className="w-full h-20 bg-muted rounded flex items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {imgError ? (
+        <div className="w-full h-20 bg-muted rounded flex flex-col items-center justify-center text-muted-foreground">
+          <AlertTriangle className="h-4 w-4 mb-1" />
+          <span className="text-[10px]">로드 실패</span>
+        </div>
+      ) : (
+        <img 
+          src={img.publicUrl} 
+          alt={img.filename} 
+          className={`w-full h-20 object-cover rounded ${imgLoading ? 'hidden' : ''}`}
+          onLoad={() => setImgLoading(false)}
+          onError={() => { setImgError(true); setImgLoading(false); }}
+        />
+      )}
+      <p className="text-xs text-center mt-1 truncate">{img.filename}</p>
+    </div>
+  );
+}
 import {
   Dialog,
   DialogContent,
@@ -308,17 +353,21 @@ export default function PagesManagement() {
   });
 
   // Fetch images from gallery for image picker
-  const { data: galleryImages = [] } = useQuery<{ id: string; publicUrl: string; filename: string; category: string }[]>({
+  const { data: galleryImages = [], refetch: refetchGalleryImages } = useQuery<{ id: string; publicUrl: string; filename: string; category: string }[]>({
     queryKey: ["/api/admin/images", imageGalleryCategory],
     queryFn: async () => {
       const url = imageGalleryCategory === 'all' 
         ? "/api/admin/images" 
         : `/api/admin/images?category=${encodeURIComponent(imageGalleryCategory)}`;
-      const res = await fetch(url);
-      if (!res.ok) return [];
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        console.error("Failed to fetch images:", res.status);
+        return [];
+      }
       return res.json();
     },
     enabled: inlineEditDialog.fieldType === 'image',
+    staleTime: 0,
   });
 
   // Seed pages mutation
@@ -1388,21 +1437,12 @@ export default function PagesManagement() {
                   <ScrollArea className="h-[250px] border rounded-lg p-2">
                     <div className="grid grid-cols-3 gap-2">
                       {galleryImages.map((img) => (
-                        <div
+                        <GalleryImageThumbnail
                           key={img.id}
-                          className={`cursor-pointer border-2 rounded-lg p-1 hover:border-primary transition-colors ${
-                            inlineEditValue === img.publicUrl ? 'border-primary bg-primary/10' : 'border-transparent'
-                          }`}
-                          onClick={() => setInlineEditValue(img.publicUrl)}
-                          data-testid={`image-select-${img.id}`}
-                        >
-                          <img 
-                            src={img.publicUrl} 
-                            alt={img.filename} 
-                            className="w-full h-20 object-cover rounded"
-                          />
-                          <p className="text-xs text-center mt-1 truncate">{img.filename}</p>
-                        </div>
+                          img={img}
+                          isSelected={inlineEditValue === img.publicUrl}
+                          onSelect={() => setInlineEditValue(img.publicUrl)}
+                        />
                       ))}
                     </div>
                   </ScrollArea>
