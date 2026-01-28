@@ -965,3 +965,59 @@ export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
 
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = typeof announcements.$inferSelect;
+
+// 약관 버전 관리 테이블
+export const termVersions = pgTable("term_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  version: text("version").notNull(),
+  termType: text("term_type").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+export const insertTermVersionSchema = createInsertSchema(termVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTermVersion = z.infer<typeof insertTermVersionSchema>;
+export type TermVersion = typeof termVersions.$inferSelect;
+
+// 약관 동의 기록 테이블 (법적 증빙용)
+export const termAgreements = pgTable("term_agreements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  memberUsername: text("member_username").notNull(),
+  memberName: text("member_name"),
+  companyName: text("company_name"),
+  businessNumber: text("business_number"),
+  representative: text("representative"),
+  agreedAt: timestamp("agreed_at").defaultNow().notNull(),
+  serviceTermVersion: text("service_term_version"),
+  serviceTermContent: text("service_term_content"),
+  serviceTermAgreed: text("service_term_agreed").notNull().default("true"),
+  privacyTermVersion: text("privacy_term_version"),
+  privacyTermContent: text("privacy_term_content"),
+  privacyTermAgreed: text("privacy_term_agreed").notNull().default("true"),
+  thirdPartyTermVersion: text("third_party_term_version"),
+  thirdPartyTermContent: text("third_party_term_content"),
+  thirdPartyTermAgreed: text("third_party_term_agreed").notNull().default("true"),
+  signatureData: text("signature_data"),
+  signatureHash: text("signature_hash"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  contentHash: text("content_hash"),
+  ceoBirth: text("ceo_birth"),
+  ceoCi: text("ceo_ci"),
+  ceoPhone: text("ceo_phone"),
+});
+
+export const insertTermAgreementSchema = createInsertSchema(termAgreements).omit({
+  id: true,
+});
+
+export type InsertTermAgreement = z.infer<typeof insertTermAgreementSchema>;
+export type TermAgreement = typeof termAgreements.$inferSelect;
