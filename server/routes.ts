@@ -113,6 +113,9 @@ export async function registerRoutes(
   const uploadsDir = path.resolve(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('\x1b[32m✅ uploads 폴더 생성됨:', uploadsDir, '\x1b[0m');
+  } else {
+    console.log('\x1b[34mℹ️  uploads 폴더 존재:', uploadsDir, '\x1b[0m');
   }
 
   // Multer 디스크 스토리지 설정
@@ -136,6 +139,10 @@ export async function registerRoutes(
     { name: "bizFile", maxCount: 1 },
     { name: "mailFile", maxCount: 1 }
   ]), async (req, res) => {
+    console.log('\x1b[36m📝 [회원가입] 요청 수신\x1b[0m');
+    console.log('   - Body fields:', Object.keys(req.body));
+    console.log('   - Files:', req.files ? Object.keys(req.files as any) : 'none');
+    
     try {
       const registerFormSchema = z.object({
         member_name: z.string().min(1, "회원명을 입력해주세요"),
@@ -171,26 +178,33 @@ export async function registerRoutes(
       }
 
       // user_id 중복 체크
+      console.log('   - 아이디 중복 체크:', data.user_id);
       const existingUser = await storage.getUserByUsername(data.user_id);
       if (existingUser) {
+        console.log('\x1b[31m   ❌ 중복 아이디 (users 테이블)\x1b[0m');
         return res.status(400).json({ success: false, message: "이미 사용 중인 아이디입니다" });
       }
       const existingMember = await storage.getMemberByUsername(data.user_id);
       if (existingMember) {
+        console.log('\x1b[31m   ❌ 중복 아이디 (members 테이블)\x1b[0m');
         return res.status(400).json({ success: false, message: "이미 사용 중인 아이디입니다" });
       }
 
       // 사업자번호 중복 체크
+      console.log('   - 사업자번호 중복 체크:', data.biz_no);
       const existingBusiness = await storage.getMemberByBusinessNumber(data.biz_no);
       if (existingBusiness) {
+        console.log('\x1b[31m   ❌ 중복 사업자번호\x1b[0m');
         return res.status(400).json({ success: false, message: "이미 등록된 사업자번호입니다" });
       }
 
       // 파일 경로 저장
       const bizFilePath = files.bizFile[0].filename;
       const mailFilePath = files.mailFile[0].filename;
+      console.log('   - 업로드 파일:', { bizFilePath, mailFilePath });
 
       // DB INSERT (status='pending')
+      console.log('   - DB INSERT 시작 (grade=PENDING)');
       const member = await storage.createMember({
         username: data.user_id,
         password: data.password,
@@ -217,6 +231,7 @@ export async function registerRoutes(
         status: "활성",
       });
 
+      console.log('\x1b[32m   ✅ 회원가입 성공! ID:', member.id, '\x1b[0m');
       return res.status(201).json({
         success: true,
         message: "회원가입 신청이 완료되었습니다. 관리자 승인 대기 중입니다."
@@ -224,9 +239,10 @@ export async function registerRoutes(
 
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.log('\x1b[31m   ❌ 유효성 검사 실패:', error.errors[0].message, '\x1b[0m');
         return res.status(400).json({ success: false, message: error.errors[0].message });
       }
-      console.error("Register error:", error);
+      console.error("\x1b[31m   ❌ Register error:", error, '\x1b[0m');
       return res.status(500).json({ success: false, message: "회원가입 처리 중 오류가 발생했습니다" });
     }
   });
@@ -1188,10 +1204,14 @@ export async function registerRoutes(
 
   // 포트원 본인인증 검증 API
   app.post("/api/auth/get-certification", async (req, res) => {
+    console.log('\x1b[36m📱 [본인인증] 요청 수신\x1b[0m');
+    
     try {
       const { imp_uid } = req.body;
+      console.log('   - imp_uid:', imp_uid);
       
       if (!imp_uid) {
+        console.log('\x1b[31m   ❌ imp_uid 누락\x1b[0m');
         return res.status(400).json({ 
           success: false, 
           message: "imp_uid가 필요합니다" 
@@ -1199,6 +1219,7 @@ export async function registerRoutes(
       }
 
       if (!IMP_KEY || !IMP_SECRET) {
+        console.log('\x1b[31m   ❌ 포트원 API 키 미설정\x1b[0m');
         return res.status(500).json({ 
           success: false, 
           message: "포트원 API 키가 설정되지 않았습니다" 
@@ -1206,21 +1227,25 @@ export async function registerRoutes(
       }
 
       // 1. 포트원 토큰 발급
+      console.log('   - 포트원 토큰 발급 중...');
       const tokenResponse = await axios.post("https://api.iamport.kr/users/getToken", {
         imp_key: IMP_KEY,
         imp_secret: IMP_SECRET
       });
 
       if (tokenResponse.data.code !== 0) {
+        console.log('\x1b[31m   ❌ 포트원 토큰 발급 실패\x1b[0m');
         return res.status(500).json({ 
           success: false, 
           message: "포트원 토큰 발급 실패" 
         });
       }
+      console.log('   - 토큰 발급 성공');
 
       const accessToken = tokenResponse.data.response.access_token;
 
       // 2. 인증 정보 조회
+      console.log('   - 인증 정보 조회 중...');
       const certResponse = await axios.get(
         `https://api.iamport.kr/certifications/${imp_uid}`,
         {
@@ -1229,6 +1254,7 @@ export async function registerRoutes(
       );
 
       if (certResponse.data.code !== 0) {
+        console.log('\x1b[31m   ❌ 인증 정보 조회 실패\x1b[0m');
         return res.status(500).json({ 
           success: false, 
           message: "인증 정보 조회 실패" 
@@ -1236,6 +1262,7 @@ export async function registerRoutes(
       }
 
       const certInfo = certResponse.data.response;
+      console.log('\x1b[32m   ✅ 본인인증 성공:', certInfo.name, '\x1b[0m');
 
       // 3. 클라이언트 응답
       return res.json({
@@ -1247,7 +1274,7 @@ export async function registerRoutes(
       });
 
     } catch (error) {
-      console.error("PortOne certification error:", error);
+      console.error("\x1b[31m   ❌ PortOne certification error:", error, '\x1b[0m');
       return res.status(500).json({ 
         success: false, 
         message: "본인인증 처리 중 오류가 발생했습니다" 
