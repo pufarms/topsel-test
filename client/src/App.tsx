@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import Logout from "@/pages/logout";
 import AboutPage from "@/pages/about";
 import Dashboard from "@/pages/dashboard";
 import AdminLayout from "@/pages/admin-layout";
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/" component={DynamicPage} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/logout" component={Logout} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/mypage" component={MyPage} />
       <Route path="/public-preview" component={PublicPreviewPage} />

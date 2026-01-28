@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,30 @@ import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { loginSchema } from "@shared/schema";
 import type { z } from "zod";
+import type { Page } from "@shared/schema";
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+interface LoginPageContent {
+  title?: string;
+  description?: string;
+  fields?: {
+    username_label?: string;
+    username_placeholder?: string;
+    password_label?: string;
+    password_placeholder?: string;
+    remember_me_label?: string;
+    submit_button?: string;
+    register_prompt?: string;
+    register_link?: string;
+  };
+  messages?: {
+    success_title?: string;
+    success_description?: string;
+    error_title?: string;
+    error_description?: string;
+  };
+}
 
 const SAVED_USERNAME_KEY = "saved_username";
 const REMEMBER_ME_KEY = "remember_me";
@@ -26,6 +49,19 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  const { data: pageData } = useQuery<Page>({
+    queryKey: ["/api/pages/by-path", { path: "/login" }],
+    queryFn: async () => {
+      const res = await fetch("/api/pages/by-path?path=/login");
+      if (!res.ok) throw new Error("Failed to fetch page");
+      return res.json();
+    },
+  });
+
+  const content = (pageData?.content as LoginPageContent) || {};
+  const fields = content.fields || {};
+  const messages = content.messages || {};
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -61,12 +97,15 @@ export default function Login() {
         localStorage.removeItem(REMEMBER_ME_KEY);
       }
       await login(data.username, data.password);
-      toast({ title: "로그인 성공", description: "환영합니다!" });
+      toast({ 
+        title: messages.success_title || "로그인 성공", 
+        description: messages.success_description || "환영합니다!" 
+      });
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "로그인 실패",
-        description: error.message || "아이디 또는 비밀번호를 확인해주세요.",
+        title: messages.error_title || "로그인 실패",
+        description: error.message || messages.error_description || "아이디 또는 비밀번호를 확인해주세요.",
       });
     } finally {
       setIsLoading(false);
@@ -80,8 +119,8 @@ export default function Login() {
       <main className="flex-1 flex items-center justify-center p-6 pt-24">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">로그인</CardTitle>
-            <CardDescription>계정에 로그인하세요</CardDescription>
+            <CardTitle className="text-2xl">{content.title || "로그인"}</CardTitle>
+            <CardDescription>{content.description || "계정에 로그인하세요"}</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -91,11 +130,11 @@ export default function Login() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>아이디</FormLabel>
+                      <FormLabel>{fields.username_label || "아이디"}</FormLabel>
                       <FormControl>
                         <Input 
                           type="text" 
-                          placeholder="아이디를 입력하세요" 
+                          placeholder={fields.username_placeholder || "아이디를 입력하세요"} 
                           data-testid="input-username"
                           {...field} 
                         />
@@ -109,12 +148,12 @@ export default function Login() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>비밀번호</FormLabel>
+                      <FormLabel>{fields.password_label || "비밀번호"}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input 
                             type={showPassword ? "text" : "password"}
-                            placeholder="••••••••" 
+                            placeholder={fields.password_placeholder || "••••••••"} 
                             className="pr-12"
                             data-testid="input-password"
                             {...field} 
@@ -148,7 +187,7 @@ export default function Login() {
                     htmlFor="rememberMe"
                     className="text-sm font-medium leading-none cursor-pointer"
                   >
-                    아이디 저장
+                    {fields.remember_me_label || "아이디 저장"}
                   </label>
                 </div>
                 <Button 
@@ -158,14 +197,14 @@ export default function Login() {
                   data-testid="button-login"
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  로그인
+                  {fields.submit_button || "로그인"}
                 </Button>
               </form>
             </Form>
             <div className="mt-6 text-center text-sm text-muted-foreground">
-              계정이 없으신가요?{" "}
+              {fields.register_prompt || "계정이 없으신가요?"}{" "}
               <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
-                회원가입
+                {fields.register_link || "회원가입"}
               </Link>
             </div>
           </CardContent>
