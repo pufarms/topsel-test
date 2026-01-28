@@ -2199,11 +2199,11 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
   
   return (
     <section
-      className="py-20"
+      className="pt-20 pb-10"
       style={{ 
         background: 'linear-gradient(135deg, var(--ts-primary) 0%, #4338ca 100%)',
         paddingTop: data.paddingTop || undefined,
-        paddingBottom: data.paddingBottom || undefined
+        paddingBottom: data.paddingBottom || '40px'
       }}
       data-testid="section-cta-advanced"
     >
