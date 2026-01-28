@@ -62,6 +62,7 @@ export interface IStorage {
   getAllMembers(): Promise<Member[]>;
   getMember(id: string): Promise<Member | undefined>;
   getMemberByUsername(username: string): Promise<Member | undefined>;
+  getMemberByBusinessNumber(businessNumber: string): Promise<Member | undefined>;
   createMember(data: InsertMember): Promise<Member>;
   updateMember(id: string, data: Partial<InsertMember>): Promise<Member | undefined>;
   deleteMember(id: string): Promise<boolean>;
@@ -512,6 +513,11 @@ export class DatabaseStorage implements IStorage {
     return member;
   }
 
+  async getMemberByBusinessNumber(businessNumber: string): Promise<Member | undefined> {
+    const [member] = await db.select().from(members).where(eq(members.businessNumber, businessNumber));
+    return member;
+  }
+
   async getMembersByGrade(grade: string): Promise<Member[]> {
     return db.select().from(members).where(eq(members.grade, grade)).orderBy(desc(members.createdAt));
   }
@@ -542,6 +548,8 @@ export class DatabaseStorage implements IStorage {
     grade?: string;
     status?: string;
     memo?: string;
+    businessLicenseUrl?: string;
+    profileImageUrl?: string;
   }): Promise<Member> {
     const [member] = await db.insert(members).values({
       username: data.username,
@@ -557,6 +565,8 @@ export class DatabaseStorage implements IStorage {
       grade: data.grade || "PENDING",
       status: data.status || "활성",
       memo: data.memo || null,
+      businessLicenseUrl: data.businessLicenseUrl || null,
+      profileImageUrl: data.profileImageUrl || null,
     }).returning();
     return member;
   }

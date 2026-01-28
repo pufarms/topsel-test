@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>회원가입 - 탑셀러</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 600px;
+      padding: 40px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    
+    .header h1 {
+      color: #1f2937;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    
+    @media (max-width: 480px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    label {
+      display: block;
+      color: #374151;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    
+    label .required {
+      color: #ef4444;
+    }
+    
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #5D7AF2;
+      box-shadow: 0 0 0 3px rgba(93, 122, 242, 0.1);
+    }
+    
+    input.error {
+      border-color: #ef4444;
+    }
+    
+    .error-message {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+    
+    .file-upload {
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    
+    .file-upload:hover {
+      border-color: #5D7AF2;
+      background: rgba(93, 122, 242, 0.05);
+    }
+    
+    .file-upload.has-file {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.05);
+    }
+    
+    .file-upload input {
+      display: none;
+    }
+    
+    .file-upload .upload-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .file-upload .upload-text {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .file-upload .file-name {
+      color: #10b981;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+    
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #5D7AF2 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 24px;
+    }
+    
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(93, 122, 242, 0.4);
+    }
+    
+    .submit-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .login-link {
+      text-align: center;
+      margin-top: 20px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+    
+    .login-link a {
+      color: #5D7AF2;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .login-link a:hover {
+      text-decoration: underline;
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .alert.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #10b981;
+    }
+    
+    .alert.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #ef4444;
+    }
+    
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>셀러 회원가입</h1>
+      <p>사업자 정보를 입력하여 회원가입을 진행해주세요</p>
+    </div>
+    
+    <div id="alertBox" class="alert"></div>
+    
+    <form id="signupForm" enctype="multipart/form-data">
+      <div class="section-title">계정 정보</div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>아이디 <span class="required">*</span></label>
+          <input type="text" id="username" name="username" placeholder="4자 이상" required>
+          <div class="error-message" id="usernameError"></div>
+        </div>
+        <div class="form-group">
+          <label>비밀번호 <span class="required">*</span></label>
+          <input type="password" id="password" name="password" placeholder="6자 이상" required>
+          <div class="error-message" id="passwordError"></div>
+        </div>
+      </div>
+      
+      <div class="section-title">사업자 정보</div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>상호명 <span class="required">*</span></label>
+          <input type="text" id="companyName" name="companyName" placeholder="회사/상호명" required>
+        </div>
+        <div class="form-group">
+          <label>사업자번호 <span class="required">*</span></label>
+          <input type="text" id="businessNumber" name="businessNumber" placeholder="000-00-00000" required>
+          <div class="error-message" id="businessNumberError"></div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>사업장 주소</label>
+        <input type="text" id="businessAddress" name="businessAddress" placeholder="사업장 주소를 입력하세요">
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>대표자명 <span class="required">*</span></label>
+          <input type="text" id="representative" name="representative" placeholder="대표자명" required>
+        </div>
+        <div class="form-group">
+          <label>대표연락처 <span class="required">*</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="010-0000-0000" required>
+        </div>
+      </div>
+      
+      <div class="section-title">담당자 정보 (선택)</div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>담당자명</label>
+          <input type="text" id="managerName" name="managerName" placeholder="담당자명">
+        </div>
+        <div class="form-group">
+          <label>담당자 연락처</label>
+          <input type="tel" id="managerPhone" name="managerPhone" placeholder="담당자 연락처">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>이메일</label>
+        <input type="email" id="email" name="email" placeholder="example@email.com">
+        <div class="error-message" id="emailError"></div>
+      </div>
+      
+      <div class="section-title">서류 업로드</div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>사업자등록증</label>
+          <div class="file-upload" id="businessLicenseUpload">
+            <input type="file" id="businessLicense" name="businessLicense" accept="image/*,.pdf">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">클릭하여 파일 선택</div>
+            <div class="file-name" id="businessLicenseFileName"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>프로필 이미지</label>
+          <div class="file-upload" id="profileImageUpload">
+            <input type="file" id="profileImage" name="profileImage" accept="image/*">
+            <div class="upload-icon">🖼️</div>
+            <div class="upload-text">클릭하여 파일 선택</div>
+            <div class="file-name" id="profileImageFileName"></div>
+          </div>
+        </div>
+      </div>
+      
+      <button type="submit" class="submit-btn" id="submitBtn">
+        회원가입
+      </button>
+    </form>
+    
+    <div class="login-link">
+      이미 계정이 있으신가요? <a href="/login">로그인</a>
+    </div>
+  </div>
+  
+  <script>
+    const form = document.getElementById('signupForm');
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    function setupFileUpload(uploadId, inputId, fileNameId) {
+      const uploadDiv = document.getElementById(uploadId);
+      const input = document.getElementById(inputId);
+      const fileName = document.getElementById(fileNameId);
+      
+      uploadDiv.addEventListener('click', () => input.click());
+      
+      input.addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+          fileName.textContent = e.target.files[0].name;
+          uploadDiv.classList.add('has-file');
+        } else {
+          fileName.textContent = '';
+          uploadDiv.classList.remove('has-file');
+        }
+      });
+    }
+    
+    setupFileUpload('businessLicenseUpload', 'businessLicense', 'businessLicenseFileName');
+    setupFileUpload('profileImageUpload', 'profileImage', 'profileImageFileName');
+    
+    document.getElementById('businessNumber').addEventListener('input', function(e) {
+      let value = e.target.value.replace(/[^0-9]/g, '');
+      if (value.length > 3) value = value.slice(0, 3) + '-' + value.slice(3);
+      if (value.length > 6) value = value.slice(0, 6) + '-' + value.slice(6);
+      if (value.length > 12) value = value.slice(0, 12);
+      e.target.value = value;
+    });
+    
+    async function checkUsername(username) {
+      try {
+        const res = await fetch(`/api/auth/check-member-username/${username}`);
+        const data = await res.json();
+        return data.available;
+      } catch {
+        return true;
+      }
+    }
+    
+    function showAlert(message, type) {
+      alertBox.textContent = message;
+      alertBox.className = `alert ${type}`;
+      alertBox.style.display = 'block';
+      
+      if (type === 'success') {
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      }
+    }
+    
+    function hideAlert() {
+      alertBox.style.display = 'none';
+    }
+    
+    function setLoading(loading) {
+      if (loading) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span>처리 중...';
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '회원가입';
+      }
+    }
+    
+    function clearErrors() {
+      document.querySelectorAll('.error-message').forEach(el => {
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('input.error').forEach(el => {
+        el.classList.remove('error');
+      });
+    }
+    
+    function showError(inputId, message) {
+      const input = document.getElementById(inputId);
+      const errorEl = document.getElementById(inputId + 'Error');
+      if (input) input.classList.add('error');
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+    }
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideAlert();
+      clearErrors();
+      
+      const formData = new FormData(form);
+      
+      const username = formData.get('username');
+      if (username.length < 4) {
+        showError('username', '아이디는 4자 이상이어야 합니다');
+        return;
+      }
+      
+      const password = formData.get('password');
+      if (password.length < 6) {
+        showError('password', '비밀번호는 6자 이상이어야 합니다');
+        return;
+      }
+      
+      const businessNumber = formData.get('businessNumber');
+      if (!/^\d{3}-\d{2}-\d{5}$/.test(businessNumber)) {
+        showError('businessNumber', '사업자번호 형식: 000-00-00000');
+        return;
+      }
+      
+      const email = formData.get('email');
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('email', '유효한 이메일을 입력해주세요');
+        return;
+      }
+      
+      setLoading(true);
+      
+      try {
+        const isAvailable = await checkUsername(username);
+        if (!isAvailable) {
+          showError('username', '이미 사용 중인 아이디입니다');
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch('/api/auth/member-register', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          showAlert(data.message || '회원가입이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.', 'success');
+        } else {
+          showAlert(data.message || '회원가입에 실패했습니다.', 'error');
+        }
+      } catch (error) {
+        showAlert('네트워크 오류가 발생했습니다.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>

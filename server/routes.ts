@@ -91,6 +91,94 @@ export async function registerRoutes(
     return res.json({ available: !existingUser });
   });
 
+  // 회원(셀러) 회원가입 API with file upload (공개 엔드포인트)
+  const memberSignupUpload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/auth/member-register", memberSignupUpload.fields([
+    { name: "businessLicense", maxCount: 1 },
+    { name: "profileImage", maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const memberSignupSchema = z.object({
+        username: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+        companyName: z.string().min(1, "상호명을 입력해주세요"),
+        businessNumber: z.string().regex(/^\d{3}-\d{2}-\d{5}$/, "사업자번호 형식: 000-00-00000"),
+        businessAddress: z.string().optional().or(z.literal("")),
+        representative: z.string().min(1, "대표자명을 입력해주세요"),
+        phone: z.string().min(1, "대표연락처를 입력해주세요"),
+        managerName: z.string().optional().or(z.literal("")),
+        managerPhone: z.string().optional().or(z.literal("")),
+        email: z.string().email("유효한 이메일을 입력해주세요").optional().or(z.literal("")),
+      });
+
+      const data = memberSignupSchema.parse(req.body);
+
+      // 아이디 중복 확인 (users와 members 테이블 모두)
+      const existingUser = await storage.getUserByUsername(data.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+      const existingMember = await storage.getMemberByUsername(data.username);
+      if (existingMember) {
+        return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+
+      // 사업자번호 중복 확인
+      const existingBusiness = await storage.getMemberByBusinessNumber(data.businessNumber);
+      if (existingBusiness) {
+        return res.status(400).json({ message: "이미 등록된 사업자번호입니다" });
+      }
+
+      // 파일 업로드 처리
+      let businessLicenseUrl: string | undefined;
+      let profileImageUrl: string | undefined;
+      
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      
+      if (files?.businessLicense?.[0]) {
+        const file = files.businessLicense[0];
+        const result = await uploadImage(file.buffer, file.originalname, file.mimetype, "member-documents");
+        businessLicenseUrl = result.publicUrl;
+      }
+      
+      if (files?.profileImage?.[0]) {
+        const file = files.profileImage[0];
+        const result = await uploadImage(file.buffer, file.originalname, file.mimetype, "member-profiles");
+        profileImageUrl = result.publicUrl;
+      }
+
+      // 회원 생성 (승인 대기 상태)
+      const member = await storage.createMember({
+        username: data.username,
+        password: data.password,
+        companyName: data.companyName,
+        businessNumber: data.businessNumber,
+        representative: data.representative,
+        phone: data.phone,
+        businessAddress: data.businessAddress || undefined,
+        managerName: data.managerName || undefined,
+        managerPhone: data.managerPhone || undefined,
+        email: data.email || undefined,
+        grade: "PENDING",
+        status: "활성",
+        businessLicenseUrl,
+        profileImageUrl,
+      });
+
+      const { password, ...memberWithoutPassword } = member;
+      return res.status(201).json({
+        ...memberWithoutPassword,
+        message: "회원가입이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다."
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Member registration error:", error);
+      throw error;
+    }
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
