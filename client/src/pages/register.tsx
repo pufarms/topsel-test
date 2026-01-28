@@ -500,7 +500,7 @@ export default function Register() {
               </section>
 
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">{sections.signature?.title || "전자 서명 (필수)"}</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">{sections.signature?.title || "약관 동의 전자 서명 (필수)"}</h3>
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2 mb-4">
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
