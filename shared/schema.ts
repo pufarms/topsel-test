@@ -989,7 +989,7 @@ export type TermVersion = typeof termVersions.$inferSelect;
 // 약관 동의 기록 테이블 (법적 증빙용)
 export const termAgreements = pgTable("term_agreements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  memberId: varchar("member_id").notNull().references(() => members.id),
+  memberId: varchar("member_id").references(() => members.id),
   memberUsername: text("member_username").notNull(),
   memberName: text("member_name"),
   companyName: text("company_name"),
@@ -1013,6 +1013,44 @@ export const termAgreements = pgTable("term_agreements", {
   ceoBirth: text("ceo_birth"),
   ceoCi: text("ceo_ci"),
   ceoPhone: text("ceo_phone"),
+  memberStatus: text("member_status").notNull().default("active"),
+});
+
+export const deletedMembers = pgTable("deleted_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalMemberId: varchar("original_member_id").notNull(),
+  username: text("username").notNull(),
+  companyName: text("company_name").notNull(),
+  businessNumber: text("business_number"),
+  representative: text("representative"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  detailAddress: text("detail_address"),
+  grade: text("grade"),
+  deposit: integer("deposit").default(0),
+  point: integer("point").default(0),
+  status: text("status"),
+  memo: text("memo"),
+  signatureData: text("signature_data"),
+  deletedAt: timestamp("deleted_at").defaultNow().notNull(),
+  deletedBy: varchar("deleted_by"),
+  retentionUntil: timestamp("retention_until").notNull(),
+  originalCreatedAt: timestamp("original_created_at"),
+});
+
+export const deletedMemberOrders = pgTable("deleted_member_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deletedMemberId: varchar("deleted_member_id").notNull().references(() => deletedMembers.id),
+  originalOrderId: varchar("original_order_id"),
+  productName: text("product_name"),
+  quantity: integer("quantity"),
+  price: integer("price"),
+  recipientName: text("recipient_name"),
+  recipientPhone: text("recipient_phone"),
+  recipientAddress: text("recipient_address"),
+  orderCreatedAt: timestamp("order_created_at"),
+  archivedAt: timestamp("archived_at").defaultNow().notNull(),
 });
 
 export const insertTermAgreementSchema = createInsertSchema(termAgreements).omit({
@@ -1021,3 +1059,17 @@ export const insertTermAgreementSchema = createInsertSchema(termAgreements).omit
 
 export type InsertTermAgreement = z.infer<typeof insertTermAgreementSchema>;
 export type TermAgreement = typeof termAgreements.$inferSelect;
+
+export const insertDeletedMemberSchema = createInsertSchema(deletedMembers).omit({
+  id: true,
+});
+
+export type InsertDeletedMember = z.infer<typeof insertDeletedMemberSchema>;
+export type DeletedMember = typeof deletedMembers.$inferSelect;
+
+export const insertDeletedMemberOrderSchema = createInsertSchema(deletedMemberOrders).omit({
+  id: true,
+});
+
+export type InsertDeletedMemberOrder = z.infer<typeof insertDeletedMemberOrderSchema>;
+export type DeletedMemberOrder = typeof deletedMemberOrders.$inferSelect;

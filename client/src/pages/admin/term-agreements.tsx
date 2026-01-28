@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Search, Eye, Shield, Clock, User, Building, Phone, Hash, Globe, Monitor, CheckCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Search, Eye, Shield, Clock, User, Building, Phone, Hash, Globe, Monitor, CheckCircle, UserX } from "lucide-react";
 
 interface TermAgreement {
   id: string;
-  memberId: string;
+  memberId: string | null;
   memberUsername: string;
   memberName: string | null;
   companyName: string | null;
@@ -35,10 +36,12 @@ interface TermAgreement {
   ceoBirth: string | null;
   ceoCi: string | null;
   ceoPhone: string | null;
+  memberStatus: string;
 }
 
 export default function TermAgreementsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedAgreement, setSelectedAgreement] = useState<TermAgreement | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -46,13 +49,20 @@ export default function TermAgreementsPage() {
     queryKey: ["/api/admin/term-agreements"],
   });
 
-  const filteredAgreements = agreements.filter(
-    (a) =>
+  const filteredAgreements = agreements.filter((a) => {
+    const matchesSearch =
       a.memberUsername?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.businessNumber?.includes(searchTerm) ||
-      a.representative?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      a.representative?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || a.memberStatus === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const activeCount = agreements.filter(a => a.memberStatus === "active").length;
+  const deletedCount = agreements.filter(a => a.memberStatus === "deleted").length;
 
   const openDetail = (agreement: TermAgreement) => {
     setSelectedAgreement(agreement);
@@ -80,7 +90,7 @@ export default function TermAgreementsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Shield className="h-6 w-6 text-primary" />
@@ -90,15 +100,23 @@ export default function TermAgreementsPage() {
             회원가입 시 동의한 약관 기록을 조회합니다. 법적 증빙 자료로 활용됩니다.
           </p>
         </div>
-        <Badge variant="outline" className="text-sm">
-          총 {agreements.length}건
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-sm">
+            전체 {agreements.length}건
+          </Badge>
+          <Badge variant="default" className="text-sm">
+            활성 {activeCount}건
+          </Badge>
+          <Badge variant="secondary" className="text-sm bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+            탈퇴 {deletedCount}건
+          </Badge>
+        </div>
       </div>
 
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="회원명, 상호명, 사업자번호, 대표자명 검색..."
@@ -108,6 +126,16 @@ export default function TermAgreementsPage() {
                 data-testid="input-search-agreements"
               />
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                <SelectValue placeholder="회원 상태" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="active">활성 회원</SelectItem>
+                <SelectItem value="deleted">탈퇴 회원</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -124,8 +152,12 @@ export default function TermAgreementsPage() {
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${agreement.memberStatus === "deleted" ? "bg-orange-100 dark:bg-orange-900" : "bg-primary/10"}`}>
+                      {agreement.memberStatus === "deleted" ? (
+                        <UserX className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      ) : (
+                        <User className="h-5 w-5 text-primary" />
+                      )}
                     </div>
                     <div>
                       <div className="font-medium flex items-center gap-2">
@@ -133,6 +165,11 @@ export default function TermAgreementsPage() {
                         <Badge variant="secondary" className="text-xs">
                           {agreement.memberUsername}
                         </Badge>
+                        {agreement.memberStatus === "deleted" && (
+                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700">
+                            탈퇴
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1">
                         <span className="flex items-center gap-1">

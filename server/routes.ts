@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders } from "@shared/schema";
 import crypto from "crypto";
 import { z } from "zod";
 import MemoryStore from "memorystore";
@@ -1647,8 +1647,59 @@ export async function registerRoutes(
       return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
     }
 
-    await storage.deleteMember(req.params.id);
-    return res.json({ message: "삭제되었습니다" });
+    try {
+      const retentionDate = new Date();
+      retentionDate.setFullYear(retentionDate.getFullYear() + 3);
+
+      const [deletedMember] = await db.insert(deletedMembers).values({
+        originalMemberId: member.id,
+        username: member.username,
+        companyName: member.companyName,
+        businessNumber: member.businessNumber || null,
+        representative: member.representative || null,
+        phone: member.phone || null,
+        email: member.email || null,
+        address: member.businessAddress || null,
+        detailAddress: null,
+        grade: member.grade,
+        deposit: member.deposit,
+        point: member.point,
+        status: member.status,
+        memo: member.memo || null,
+        signatureData: member.signatureData || null,
+        deletedBy: req.session.userId,
+        retentionUntil: retentionDate,
+        originalCreatedAt: member.createdAt,
+      }).returning();
+
+      const memberOrders = await db.select().from(orders).where(eq(orders.userId, member.id));
+      if (memberOrders.length > 0) {
+        for (const order of memberOrders) {
+          await db.insert(deletedMemberOrders).values({
+            deletedMemberId: deletedMember.id,
+            originalOrderId: order.id,
+            productName: order.productName,
+            quantity: order.quantity,
+            price: order.price,
+            recipientName: order.recipientName,
+            recipientPhone: order.recipientPhone,
+            recipientAddress: order.recipientAddress,
+            orderCreatedAt: order.createdAt,
+          });
+        }
+      }
+
+      await db.update(termAgreements)
+        .set({ memberStatus: "deleted", memberId: null })
+        .where(eq(termAgreements.memberId, member.id));
+
+      await storage.deleteMember(req.params.id);
+      
+      return res.json({ message: "회원이 삭제되었습니다. 탈퇴 회원 정보와 거래 내역은 3년간 보관됩니다." });
+    } catch (error) {
+      console.error("Member deletion error:", error);
+      return res.status(500).json({ message: "회원 삭제 중 오류가 발생했습니다" });
+    }
   });
 
   app.get("/api/admin/member-grades", async (req, res) => {
