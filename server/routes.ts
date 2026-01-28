@@ -6,7 +6,11 @@ import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, upda
 import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
+import axios from "axios";
 import { uploadImage, deleteImage } from "./r2";
+
+const IMP_KEY = process.env.IMP_KEY || '';
+const IMP_SECRET = process.env.IMP_SECRET || '';
 
 declare module "express-session" {
   interface SessionData {
@@ -95,20 +99,29 @@ export async function registerRoutes(
   const memberSignupUpload = multer({ storage: multer.memoryStorage() });
   app.post("/api/auth/member-register", memberSignupUpload.fields([
     { name: "businessLicense", maxCount: 1 },
-    { name: "profileImage", maxCount: 1 }
+    { name: "mailFile", maxCount: 1 }
   ]), async (req, res) => {
     try {
       const memberSignupSchema = z.object({
         username: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
         password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+        memberName: z.string().optional().or(z.literal("")),
         companyName: z.string().min(1, "상호명을 입력해주세요"),
         businessNumber: z.string().regex(/^\d{3}-\d{2}-\d{5}$/, "사업자번호 형식: 000-00-00000"),
-        businessAddress: z.string().optional().or(z.literal("")),
+        businessAddress: z.string().min(1, "사업장 주소를 입력해주세요"),
         representative: z.string().min(1, "대표자명을 입력해주세요"),
         phone: z.string().min(1, "대표연락처를 입력해주세요"),
+        ceoBirth: z.string().optional().or(z.literal("")),
+        ceoCi: z.string().optional().or(z.literal("")),
+        mailNo: z.string().optional().or(z.literal("")),
         managerName: z.string().optional().or(z.literal("")),
         managerPhone: z.string().optional().or(z.literal("")),
-        email: z.string().email("유효한 이메일을 입력해주세요").optional().or(z.literal("")),
+        manager2Name: z.string().optional().or(z.literal("")),
+        manager2Phone: z.string().optional().or(z.literal("")),
+        manager3Name: z.string().optional().or(z.literal("")),
+        manager3Phone: z.string().optional().or(z.literal("")),
+        email: z.string().email("유효한 이메일을 입력해주세요"),
+        signatureData: z.string().optional().or(z.literal("")),
       });
 
       const data = memberSignupSchema.parse(req.body);
@@ -131,7 +144,7 @@ export async function registerRoutes(
 
       // 파일 업로드 처리
       let businessLicenseUrl: string | undefined;
-      let profileImageUrl: string | undefined;
+      let mailFilePath: string | undefined;
       
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       
@@ -141,28 +154,37 @@ export async function registerRoutes(
         businessLicenseUrl = result.publicUrl;
       }
       
-      if (files?.profileImage?.[0]) {
-        const file = files.profileImage[0];
-        const result = await uploadImage(file.buffer, file.originalname, file.mimetype, "member-profiles");
-        profileImageUrl = result.publicUrl;
+      if (files?.mailFile?.[0]) {
+        const file = files.mailFile[0];
+        const result = await uploadImage(file.buffer, file.originalname, file.mimetype, "member-documents");
+        mailFilePath = result.publicUrl;
       }
 
       // 회원 생성 (승인 대기 상태)
       const member = await storage.createMember({
         username: data.username,
         password: data.password,
+        memberName: data.memberName || undefined,
         companyName: data.companyName,
         businessNumber: data.businessNumber,
         representative: data.representative,
         phone: data.phone,
         businessAddress: data.businessAddress || undefined,
+        ceoBirth: data.ceoBirth || undefined,
+        ceoCi: data.ceoCi || undefined,
+        mailNo: data.mailNo || undefined,
         managerName: data.managerName || undefined,
         managerPhone: data.managerPhone || undefined,
+        manager2Name: data.manager2Name || undefined,
+        manager2Phone: data.manager2Phone || undefined,
+        manager3Name: data.manager3Name || undefined,
+        manager3Phone: data.manager3Phone || undefined,
         email: data.email || undefined,
         grade: "PENDING",
         status: "활성",
         businessLicenseUrl,
-        profileImageUrl,
+        mailFilePath,
+        signatureData: data.signatureData || undefined,
       });
 
       const { password, ...memberWithoutPassword } = member;
@@ -1018,6 +1040,75 @@ export async function registerRoutes(
   app.get("/api/auth/check-member-username/:username", async (req, res) => {
     const existing = await storage.getMemberByUsername(req.params.username);
     return res.json({ available: !existing });
+  });
+
+  // 포트원 본인인증 검증 API
+  app.post("/api/auth/get-certification", async (req, res) => {
+    try {
+      const { imp_uid } = req.body;
+      
+      if (!imp_uid) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "imp_uid가 필요합니다" 
+        });
+      }
+
+      if (!IMP_KEY || !IMP_SECRET) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "포트원 API 키가 설정되지 않았습니다" 
+        });
+      }
+
+      // 1. 포트원 토큰 발급
+      const tokenResponse = await axios.post("https://api.iamport.kr/users/getToken", {
+        imp_key: IMP_KEY,
+        imp_secret: IMP_SECRET
+      });
+
+      if (tokenResponse.data.code !== 0) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "포트원 토큰 발급 실패" 
+        });
+      }
+
+      const accessToken = tokenResponse.data.response.access_token;
+
+      // 2. 인증 정보 조회
+      const certResponse = await axios.get(
+        `https://api.iamport.kr/certifications/${imp_uid}`,
+        {
+          headers: { Authorization: accessToken }
+        }
+      );
+
+      if (certResponse.data.code !== 0) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "인증 정보 조회 실패" 
+        });
+      }
+
+      const certInfo = certResponse.data.response;
+
+      // 3. 클라이언트 응답
+      return res.json({
+        success: true,
+        name: certInfo.name,
+        phone: certInfo.phone,
+        birth: certInfo.birthday ? certInfo.birthday.replace(/-/g, '') : '',
+        ci: certInfo.unique_key
+      });
+
+    } catch (error) {
+      console.error("PortOne certification error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "본인인증 처리 중 오류가 발생했습니다" 
+      });
+    }
   });
 
   app.post("/api/admin/members", async (req, res) => {

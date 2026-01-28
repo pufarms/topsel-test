@@ -1,0 +1,74 @@
+데이터베이스 테이블을 생성해줘.
+서버 시작 시 자동으로 테이블이 없으면 생성되도록 해줘.
+## 컬럼 구성
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_name TEXT NOT NULL,              -- 회원명 (입금자명, 한글 6자 이내)
+    user_id TEXT UNIQUE NOT NULL,           -- 로그인 아이디
+    password TEXT NOT NULL,                 -- 비밀번호
+    biz_name TEXT NOT NULL,                 -- 상호명
+    biz_no TEXT NOT NULL,                   -- 사업자번호
+    ceo_name TEXT NOT NULL,                 -- 대표자명 (본인인증)
+    ceo_phone TEXT NOT NULL,                -- 대표자 연락처 (본인인증)
+    ceo_birth TEXT,                         -- 생년월일 (본인인증)
+    ceo_ci TEXT,                            -- CI 고유값 (본인인증)
+    mail_no TEXT NOT NULL,                  -- 통신판매번호
+    address TEXT NOT NULL,                  -- 사업장 주소
+    email TEXT NOT NULL,                    -- 이메일
+    manager1_name TEXT,                     -- 담당자1 이름(역할)
+    manager1_phone TEXT,                    -- 담당자1 휴대폰
+    manager2_name TEXT,                     -- 담당자2 이름(역할)
+    manager2_phone TEXT,                    -- 담당자2 휴대폰
+    manager3_name TEXT,                     -- 담당자3 이름(역할)
+    manager3_phone TEXT,                    -- 담당자3 휴대폰
+    biz_file_path TEXT NOT NULL,            -- 사업자등록증 파일 경로
+    mail_file_path TEXT NOT NULL,           -- 통신판매증 파일 경로
+    signature_data TEXT NOT NULL,           -- Base64 서명 데이터
+    status TEXT DEFAULT 'pending',          -- 승인 상태
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+데이터베이스 연결 코드를 server.js에 추가해줘.
+
+포트원(PortOne) V2 REST API를 사용한 본인인증 검증 엔드포인트를 만들어줘.
+
+## API 엔드포인트
+POST /get-certification
+
+## 환경변수 (server.js 상단에 선언)
+const IMP_KEY = process.env.IMP_KEY || 'YOUR_IMP_KEY';
+const IMP_SECRET = process.env.IMP_SECRET || 'YOUR_IMP_SECRET';
+
+## 요청 Body
+{
+  "imp_uid": "imp_123456789"
+}
+
+## 처리 로직
+1. 포트원 토큰 발급
+   - URL: https://api.iamport.kr/users/getToken
+   - Method: POST
+   - Body: { imp_key: IMP_KEY, imp_secret: IMP_SECRET }
+   - 응답에서 access_token 추출
+
+2. 인증 정보 조회
+   - URL: https://api.iamport.kr/certifications/{imp_uid}
+   - Method: GET
+   - Header: { Authorization: access_token }
+   - 응답에서 name, phone, birth, unique_key(CI) 추출
+
+3. 클라이언트 응답
+{
+  "success": true,
+  "name": "홍길동",
+  "phone": "01012345678",
+  "birth": "19900101",
+  "ci": "unique_ci_value"
+}
+
+## 에러 처리
+- 토큰 발급 실패 시 500 에러
+- 인증 정보 조회 실패 시 500 에러
+- imp_uid 없을 시 400 에러
+
+axios를 사용해서 구현해줘.

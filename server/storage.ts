@@ -541,32 +541,52 @@ export class DatabaseStorage implements IStorage {
     businessNumber: string;
     representative: string;
     phone: string;
+    memberName?: string;
     businessAddress?: string;
+    ceoBirth?: string;
+    ceoCi?: string;
+    mailNo?: string;
     managerName?: string;
     managerPhone?: string;
+    manager2Name?: string;
+    manager2Phone?: string;
+    manager3Name?: string;
+    manager3Phone?: string;
     email?: string;
     grade?: string;
     status?: string;
     memo?: string;
     businessLicenseUrl?: string;
+    mailFilePath?: string;
     profileImageUrl?: string;
+    signatureData?: string;
   }): Promise<Member> {
     const [member] = await db.insert(members).values({
       username: data.username,
       password: hashPassword(data.password),
+      memberName: data.memberName || null,
       companyName: data.companyName,
       businessNumber: data.businessNumber,
       representative: data.representative,
       phone: data.phone,
       businessAddress: data.businessAddress || null,
+      ceoBirth: data.ceoBirth || null,
+      ceoCi: data.ceoCi || null,
+      mailNo: data.mailNo || null,
       managerName: data.managerName || null,
       managerPhone: data.managerPhone || null,
+      manager2Name: data.manager2Name || null,
+      manager2Phone: data.manager2Phone || null,
+      manager3Name: data.manager3Name || null,
+      manager3Phone: data.manager3Phone || null,
       email: data.email || null,
       grade: data.grade || "PENDING",
       status: data.status || "활성",
       memo: data.memo || null,
       businessLicenseUrl: data.businessLicenseUrl || null,
+      mailFilePath: data.mailFilePath || null,
       profileImageUrl: data.profileImageUrl || null,
+      signatureData: data.signatureData || null,
     }).returning();
     return member;
   }
