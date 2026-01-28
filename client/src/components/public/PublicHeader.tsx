@@ -138,7 +138,7 @@ export function PublicHeader({ transparent = false }: PublicHeaderProps) {
               <img 
                 src={logoUrl} 
                 alt={logoAlt} 
-                className="h-6 sm:h-8 w-auto brightness-0 invert"
+                className="h-6 sm:h-8 w-auto"
               />
             ) : (
               <span className="text-base sm:text-lg font-bold text-white whitespace-nowrap">
