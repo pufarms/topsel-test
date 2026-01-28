@@ -8,6 +8,9 @@ const app = express();
 
 // Serve static files from public folder
 app.use(express.static(path.resolve(process.cwd(), "public")));
+
+// Serve uploaded files from uploads folder
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 const httpServer = createServer(app);
 
 declare module "http" {

@@ -7,6 +7,8 @@ import { z } from "zod";
 import MemoryStore from "memorystore";
 import multer from "multer";
 import axios from "axios";
+import path from "path";
+import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 
 const IMP_KEY = process.env.IMP_KEY || '';
@@ -93,6 +95,128 @@ export async function registerRoutes(
   app.get("/api/auth/check-username/:username", async (req, res) => {
     const existingUser = await storage.getUserByUsername(req.params.username);
     return res.json({ available: !existingUser });
+  });
+
+  // uploads 폴더가 없으면 생성
+  const uploadsDir = path.resolve(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Multer 디스크 스토리지 설정
+  const diskStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 100000);
+      const ext = path.extname(file.originalname);
+      const baseName = path.basename(file.originalname, ext);
+      cb(null, `${timestamp}-${random}-${baseName}${ext}`);
+    }
+  });
+
+  const registerUpload = multer({ storage: diskStorage });
+
+  // 회원가입 API (POST /register)
+  app.post("/register", registerUpload.fields([
+    { name: "bizFile", maxCount: 1 },
+    { name: "mailFile", maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const registerFormSchema = z.object({
+        member_name: z.string().min(1, "회원명을 입력해주세요"),
+        user_id: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+        biz_name: z.string().min(1, "상호명을 입력해주세요"),
+        biz_no: z.string().min(1, "사업자번호를 입력해주세요"),
+        ceo_name: z.string().min(1, "대표자명을 입력해주세요"),
+        ceo_phone: z.string().min(1, "대표자 연락처를 입력해주세요"),
+        ceo_birth: z.string().optional().or(z.literal("")),
+        ceo_ci: z.string().optional().or(z.literal("")),
+        mail_no: z.string().min(1, "통신판매번호를 입력해주세요"),
+        address: z.string().min(1, "사업장 주소를 입력해주세요"),
+        email: z.string().email("유효한 이메일을 입력해주세요"),
+        manager1_name: z.string().optional().or(z.literal("")),
+        manager1_phone: z.string().optional().or(z.literal("")),
+        manager2_name: z.string().optional().or(z.literal("")),
+        manager2_phone: z.string().optional().or(z.literal("")),
+        manager3_name: z.string().optional().or(z.literal("")),
+        manager3_phone: z.string().optional().or(z.literal("")),
+        signature_data: z.string().min(1, "서명을 입력해주세요"),
+      });
+
+      const data = registerFormSchema.parse(req.body);
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // 필수 파일 검증
+      if (!files?.bizFile?.[0]) {
+        return res.status(400).json({ success: false, message: "사업자등록증을 업로드해주세요" });
+      }
+      if (!files?.mailFile?.[0]) {
+        return res.status(400).json({ success: false, message: "통신판매업신고증을 업로드해주세요" });
+      }
+
+      // user_id 중복 체크
+      const existingUser = await storage.getUserByUsername(data.user_id);
+      if (existingUser) {
+        return res.status(400).json({ success: false, message: "이미 사용 중인 아이디입니다" });
+      }
+      const existingMember = await storage.getMemberByUsername(data.user_id);
+      if (existingMember) {
+        return res.status(400).json({ success: false, message: "이미 사용 중인 아이디입니다" });
+      }
+
+      // 사업자번호 중복 체크
+      const existingBusiness = await storage.getMemberByBusinessNumber(data.biz_no);
+      if (existingBusiness) {
+        return res.status(400).json({ success: false, message: "이미 등록된 사업자번호입니다" });
+      }
+
+      // 파일 경로 저장
+      const bizFilePath = files.bizFile[0].filename;
+      const mailFilePath = files.mailFile[0].filename;
+
+      // DB INSERT (status='pending')
+      const member = await storage.createMember({
+        username: data.user_id,
+        password: data.password,
+        memberName: data.member_name,
+        companyName: data.biz_name,
+        businessNumber: data.biz_no,
+        representative: data.ceo_name,
+        phone: data.ceo_phone,
+        ceoBirth: data.ceo_birth || undefined,
+        ceoCi: data.ceo_ci || undefined,
+        mailNo: data.mail_no,
+        businessAddress: data.address,
+        email: data.email,
+        managerName: data.manager1_name || undefined,
+        managerPhone: data.manager1_phone || undefined,
+        manager2Name: data.manager2_name || undefined,
+        manager2Phone: data.manager2_phone || undefined,
+        manager3Name: data.manager3_name || undefined,
+        manager3Phone: data.manager3_phone || undefined,
+        businessLicenseUrl: `/uploads/${bizFilePath}`,
+        mailFilePath: `/uploads/${mailFilePath}`,
+        signatureData: data.signature_data,
+        grade: "PENDING",
+        status: "활성",
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "회원가입 신청이 완료되었습니다. 관리자 승인 대기 중입니다."
+      });
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: error.errors[0].message });
+      }
+      console.error("Register error:", error);
+      return res.status(500).json({ success: false, message: "회원가입 처리 중 오류가 발생했습니다" });
+    }
   });
 
   // 회원(셀러) 회원가입 API with file upload (공개 엔드포인트)
