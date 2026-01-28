@@ -4,13 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown } from "lucide-react";
+import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberGrade } from "@shared/schema";
 import { memberGradeLabels } from "@shared/schema";
 import * as XLSX from "xlsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   PageHeader,
   StatCard,
@@ -69,6 +79,9 @@ export default function MembersPage() {
   const [bulkDepositAdjust, setBulkDepositAdjust] = useState("");
   const [bulkPointAdjust, setBulkPointAdjust] = useState("");
   const [bulkMemoAdd, setBulkMemoAdd] = useState("");
+  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<MemberWithoutPassword | null>(null);
 
   const { data: members = [], isLoading } = useQuery<MemberWithoutPassword[]>({
     queryKey: ["/api/admin/members"],
@@ -100,6 +113,35 @@ export default function MembersPage() {
       toast({ title: "업데이트 실패", variant: "destructive" });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/members/${memberId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members/stats"] });
+      toast({ title: "회원이 삭제되었습니다" });
+      setDeleteDialogOpen(false);
+      setMemberToDelete(null);
+    },
+    onError: () => {
+      toast({ title: "삭제 실패", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, member: MemberWithoutPassword) => {
+    e.stopPropagation();
+    setMemberToDelete(member);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (memberToDelete) {
+      deleteMutation.mutate(memberToDelete.id);
+    }
+  };
 
   const filteredMembers = members
     .filter(m => {
@@ -187,6 +229,17 @@ export default function MembersPage() {
       <Badge variant={m.status === "활성" ? "default" : "secondary"}>{m.status}</Badge>
     )},
     { key: "createdAt", label: "가입일", render: (m) => formatDate(m.createdAt) },
+    { key: "actions", label: "관리", render: (m) => (
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={(e) => handleDeleteClick(e, m)}
+        className="text-destructive hover:text-destructive"
+        data-testid={`button-delete-member-${m.id}`}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    )},
   ];
 
   if (isLoading) {
@@ -403,9 +456,20 @@ export default function MembersPage() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium truncate">{member.companyName}</span>
-              <Badge className={gradeColors[member.grade]}>
-                {memberGradeLabels[member.grade as MemberGrade]}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={gradeColors[member.grade]}>
+                  {memberGradeLabels[member.grade as MemberGrade]}
+                </Badge>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={(e) => handleDeleteClick(e, member)}
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  data-testid={`button-delete-member-mobile-${member.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground mb-2">@{member.username}</p>
             <div className="space-y-1">
@@ -421,6 +485,34 @@ export default function MembersPage() {
           </div>
         )}
       </MobileCardsList>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>회원 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              {memberToDelete && (
+                <>
+                  <strong>{memberToDelete.companyName}</strong> ({memberToDelete.username}) 회원을 삭제하시겠습니까?
+                  <br />
+                  <span className="text-destructive">이 작업은 되돌릴 수 없습니다.</span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
