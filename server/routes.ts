@@ -11,19 +11,20 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 
-const IMP_KEY = process.env.IMP_KEY || '';
-const IMP_SECRET = process.env.IMP_SECRET || '';
-const IMP_CODE = process.env.IMP_CODE || 'imp10391932';
+// PortOne V2 환경변수
+const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
+const PORTONE_CHANNEL_KEY = process.env.PORTONE_CHANNEL_KEY || '';
+const PORTONE_API_SECRET = process.env.PORTONE_API_SECRET || '';
 
-// 포트원 환경변수 설정 경고
-if (!process.env.IMP_KEY) {
-  console.warn('\x1b[33m⚠️  경고: IMP_KEY 환경변수가 설정되지 않았습니다. 포트원 본인인증이 작동하지 않습니다.\x1b[0m');
+// 포트원 V2 환경변수 설정 경고
+if (!process.env.PORTONE_STORE_ID) {
+  console.warn('\x1b[33m⚠️  경고: PORTONE_STORE_ID 환경변수가 설정되지 않았습니다. 포트원 V2 본인인증이 작동하지 않습니다.\x1b[0m');
 }
-if (!process.env.IMP_SECRET) {
-  console.warn('\x1b[33m⚠️  경고: IMP_SECRET 환경변수가 설정되지 않았습니다. 포트원 본인인증이 작동하지 않습니다.\x1b[0m');
+if (!process.env.PORTONE_CHANNEL_KEY) {
+  console.warn('\x1b[33m⚠️  경고: PORTONE_CHANNEL_KEY 환경변수가 설정되지 않았습니다. 포트원 V2 본인인증이 작동하지 않습니다.\x1b[0m');
 }
-if (!process.env.IMP_CODE) {
-  console.warn('\x1b[33m⚠️  경고: IMP_CODE 환경변수가 설정되지 않았습니다. 테스트 코드(imp10391932)를 사용합니다.\x1b[0m');
+if (!process.env.PORTONE_API_SECRET) {
+  console.warn('\x1b[33m⚠️  경고: PORTONE_API_SECRET 환경변수가 설정되지 않았습니다. 포트원 V2 본인인증이 작동하지 않습니다.\x1b[0m');
 }
 
 declare module "express-session" {
@@ -1194,90 +1195,81 @@ export async function registerRoutes(
     return res.json({ available: !existing });
   });
 
-  // 포트원 설정 API (프론트엔드용)
+  // 포트원 V2 설정 API (프론트엔드용)
   app.get("/api/config/portone", async (req, res) => {
     res.json({ 
-      imp_code: IMP_CODE,
-      configured: !!(process.env.IMP_KEY && process.env.IMP_SECRET)
+      storeId: PORTONE_STORE_ID,
+      channelKey: PORTONE_CHANNEL_KEY,
+      configured: !!(PORTONE_STORE_ID && PORTONE_CHANNEL_KEY && PORTONE_API_SECRET)
     });
   });
 
-  // 포트원 본인인증 검증 API
+  // 포트원 V2 본인인증 검증 API
   app.post("/api/auth/get-certification", async (req, res) => {
-    console.log('\x1b[36m📱 [본인인증] 요청 수신\x1b[0m');
+    console.log('\x1b[36m📱 [본인인증 V2] 요청 수신\x1b[0m');
     
     try {
-      const { imp_uid } = req.body;
-      console.log('   - imp_uid:', imp_uid);
+      const { identityVerificationId } = req.body;
+      console.log('   - identityVerificationId:', identityVerificationId);
       
-      if (!imp_uid) {
-        console.log('\x1b[31m   ❌ imp_uid 누락\x1b[0m');
+      if (!identityVerificationId) {
+        console.log('\x1b[31m   ❌ identityVerificationId 누락\x1b[0m');
         return res.status(400).json({ 
           success: false, 
-          message: "imp_uid가 필요합니다" 
+          message: "identityVerificationId가 필요합니다" 
         });
       }
 
-      if (!IMP_KEY || !IMP_SECRET) {
-        console.log('\x1b[31m   ❌ 포트원 API 키 미설정\x1b[0m');
+      if (!PORTONE_API_SECRET) {
+        console.log('\x1b[31m   ❌ 포트원 V2 API Secret 미설정\x1b[0m');
         return res.status(500).json({ 
           success: false, 
-          message: "포트원 API 키가 설정되지 않았습니다" 
+          message: "포트원 API Secret이 설정되지 않았습니다" 
         });
       }
 
-      // 1. 포트원 토큰 발급
-      console.log('   - 포트원 토큰 발급 중...');
-      const tokenResponse = await axios.post("https://api.iamport.kr/users/getToken", {
-        imp_key: IMP_KEY,
-        imp_secret: IMP_SECRET
-      });
-
-      if (tokenResponse.data.code !== 0) {
-        console.log('\x1b[31m   ❌ 포트원 토큰 발급 실패\x1b[0m');
-        return res.status(500).json({ 
-          success: false, 
-          message: "포트원 토큰 발급 실패" 
-        });
-      }
-      console.log('   - 토큰 발급 성공');
-
-      const accessToken = tokenResponse.data.response.access_token;
-
-      // 2. 인증 정보 조회
-      console.log('   - 인증 정보 조회 중...');
+      // 포트원 V2 API 직접 호출 (토큰 발급 불필요)
+      console.log('   - 포트원 V2 인증 정보 조회 중...');
       const certResponse = await axios.get(
-        `https://api.iamport.kr/certifications/${imp_uid}`,
+        `https://api.portone.io/identity-verifications/${encodeURIComponent(identityVerificationId)}`,
         {
-          headers: { Authorization: accessToken }
+          headers: { 
+            Authorization: `PortOne ${PORTONE_API_SECRET}`,
+            'Content-Type': 'application/json'
+          }
         }
       );
 
-      if (certResponse.data.code !== 0) {
-        console.log('\x1b[31m   ❌ 인증 정보 조회 실패\x1b[0m');
+      const certData = certResponse.data;
+      console.log('   - 인증 응답:', JSON.stringify(certData, null, 2));
+
+      // V2 API 응답 구조 확인
+      if (!certData.verifiedCustomer) {
+        console.log('\x1b[31m   ❌ 인증 정보 없음 (verifiedCustomer 누락)\x1b[0m');
         return res.status(500).json({ 
           success: false, 
-          message: "인증 정보 조회 실패" 
+          message: "인증 정보를 찾을 수 없습니다" 
         });
       }
 
-      const certInfo = certResponse.data.response;
-      console.log('\x1b[32m   ✅ 본인인증 성공:', certInfo.name, '\x1b[0m');
+      const verifiedCustomer = certData.verifiedCustomer;
+      console.log('\x1b[32m   ✅ 본인인증 V2 성공:', verifiedCustomer.name, '\x1b[0m');
 
-      // 3. 클라이언트 응답
+      // 클라이언트 응답
       return res.json({
         success: true,
-        name: certInfo.name,
-        phone: certInfo.phone,
-        birth: certInfo.birthday ? certInfo.birthday.replace(/-/g, '') : '',
-        ci: certInfo.unique_key
+        name: verifiedCustomer.name || '',
+        phone: verifiedCustomer.phoneNumber || '',
+        birth: verifiedCustomer.birthDate ? verifiedCustomer.birthDate.replace(/-/g, '') : '',
+        ci: verifiedCustomer.ci || ''
       });
 
-    } catch (error) {
-      console.error("\x1b[31m   ❌ PortOne certification error:", error, '\x1b[0m');
+    } catch (error: any) {
+      console.error("\x1b[31m   ❌ PortOne V2 certification error:", error.response?.data || error.message, '\x1b[0m');
       return res.status(500).json({ 
         success: false, 
-        message: "본인인증 처리 중 오류가 발생했습니다" 
+        message: "본인인증 처리 중 오류가 발생했습니다",
+        error: error.response?.data || error.message
       });
     }
   });

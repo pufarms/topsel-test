@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>탑셀러 회원가입</title>
-    <script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+    <script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
     <style>
         * {
             margin: 0;
@@ -569,23 +569,25 @@
     </div>
     
     <script>
-        // 포트원(아임포트) 초기화
-        const IMP = window.IMP;
-        let portoneConfigured = false;
+        // 포트원 V2 설정
+        let portoneConfig = {
+            storeId: '',
+            channelKey: '',
+            configured: false
+        };
         
-        // 서버에서 포트원 설정 가져오기
+        // 서버에서 포트원 V2 설정 가져오기
         fetch('/api/config/portone')
             .then(res => res.json())
             .then(config => {
-                IMP.init(config.imp_code);
-                portoneConfigured = config.configured;
+                portoneConfig = config;
+                console.log('포트원 V2 설정 로드:', config);
                 if (!config.configured) {
-                    console.warn('포트원 API 키가 설정되지 않았습니다. 본인인증이 작동하지 않을 수 있습니다.');
+                    console.warn('포트원 V2 API 키가 설정되지 않았습니다. 본인인증이 작동하지 않을 수 있습니다.');
                 }
             })
             .catch(err => {
-                console.error('포트원 설정 로드 실패:', err);
-                IMP.init('imp10391932'); // 폴백
+                console.error('포트원 V2 설정 로드 실패:', err);
             });
         
         let isVerified = false;
@@ -692,52 +694,65 @@
             content.classList.toggle('active');
         }
         
-        // 본인인증 버튼 - 포트원 다날 연동
-        document.getElementById('btnVerification').addEventListener('click', () => {
-            IMP.certification({
-                pg: 'danal',
-                merchant_uid: 'topsel_auth_' + new Date().getTime(),
-                popup: false,
-                m_redirect_url: window.location.href
-            }, async (rsp) => {
-                if (rsp.success) {
-                    try {
-                        // 서버로 imp_uid 전송하여 인증 정보 조회
-                        const response = await fetch('/api/auth/get-certification', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ imp_uid: rsp.imp_uid })
-                        });
-                        
-                        const data = await response.json();
-                        
-                        if (data.success) {
-                            // 폼에 자동 입력
-                            document.getElementById('ceo_name').value = data.name;
-                            document.getElementById('ceo_phone').value = data.phone;
-                            
-                            // Hidden 필드에 저장 (DB 저장용)
-                            document.getElementById('ceo_birth').value = data.birth || '';
-                            document.getElementById('ceo_ci').value = data.ci || '';
-                            
-                            // 인증 완료 상태 표시
-                            const btn = document.getElementById('btnVerification');
-                            btn.innerHTML = '본인인증 완료';
-                            btn.disabled = true;
-                            
-                            isVerified = true;
-                            alert('본인인증이 완료되었습니다!');
-                        } else {
-                            alert('인증 정보를 가져오는데 실패했습니다: ' + (data.message || ''));
-                        }
-                    } catch (error) {
-                        console.error('Certification error:', error);
-                        alert('인증 처리 중 오류가 발생했습니다.');
-                    }
-                } else {
-                    alert('본인인증에 실패했습니다: ' + rsp.error_msg);
+        // 본인인증 버튼 - 포트원 V2 연동
+        document.getElementById('btnVerification').addEventListener('click', async () => {
+            if (!portoneConfig.configured) {
+                alert('포트원 V2 설정이 완료되지 않았습니다. 관리자에게 문의해주세요.');
+                return;
+            }
+            
+            // 고유 인증 ID 생성
+            const identityVerificationId = 'auth_' + new Date().getTime() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            try {
+                // 포트원 V2 본인인증 요청
+                const response = await PortOne.requestIdentityVerification({
+                    storeId: portoneConfig.storeId,
+                    channelKey: portoneConfig.channelKey,
+                    identityVerificationId: identityVerificationId
+                });
+                
+                console.log('PortOne V2 응답:', response);
+                
+                // 인증 성공 확인
+                if (response.code) {
+                    // 오류 발생
+                    alert('본인인증에 실패했습니다: ' + (response.message || response.code));
+                    return;
                 }
-            });
+                
+                // 서버로 identityVerificationId 전송하여 인증 정보 조회
+                const verifyResponse = await fetch('/api/auth/get-certification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identityVerificationId: identityVerificationId })
+                });
+                
+                const data = await verifyResponse.json();
+                
+                if (data.success) {
+                    // 폼에 자동 입력
+                    document.getElementById('ceo_name').value = data.name;
+                    document.getElementById('ceo_phone').value = data.phone;
+                    
+                    // Hidden 필드에 저장 (DB 저장용)
+                    document.getElementById('ceo_birth').value = data.birth || '';
+                    document.getElementById('ceo_ci').value = data.ci || '';
+                    
+                    // 인증 완료 상태 표시
+                    const btn = document.getElementById('btnVerification');
+                    btn.innerHTML = '본인인증 완료';
+                    btn.disabled = true;
+                    
+                    isVerified = true;
+                    alert('본인인증이 완료되었습니다!');
+                } else {
+                    alert('인증 정보를 가져오는데 실패했습니다: ' + (data.message || ''));
+                }
+            } catch (error) {
+                console.error('PortOne V2 Certification error:', error);
+                alert('인증 처리 중 오류가 발생했습니다: ' + (error.message || ''));
+            }
         });
         
         // 폼 제출
