@@ -19,6 +19,7 @@ import AdminGallery from "@/pages/admin/gallery";
 import AdminManagement from "@/pages/admin/admins";
 import PartnerManagement from "@/pages/admin/partners";
 import MemberManagement from "@/pages/admin/members";
+import TermAgreementsPage from "@/pages/admin/term-agreements";
 import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import CategoryManagement from "@/pages/admin/products/categories";
@@ -92,6 +93,9 @@ function Router() {
       </Route>
       <Route path="/admin/partners">
         <AdminRoute><PartnerManagement /></AdminRoute>
+      </Route>
+      <Route path="/admin/term-agreements">
+        <AdminRoute><TermAgreementsPage /></AdminRoute>
       </Route>
       <Route path="/admin/orders">
         <AdminRoute><AdminOrders /></AdminRoute>

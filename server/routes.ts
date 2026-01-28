@@ -352,46 +352,54 @@ export async function registerRoutes(
         const serviceTermContent = termsContent.service?.content || "";
         const privacyTermContent = termsContent.privacy?.content || "";
         const thirdPartyTermContent = termsContent.third_party?.content || "";
+        const serviceTermVersion = termsContent.service?.version || "1.0";
+        const privacyTermVersion = termsContent.privacy?.version || "1.0";
+        const thirdPartyTermVersion = termsContent.third_party?.version || "1.0";
         
-        const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || "";
+        const xForwardedFor = req.headers['x-forwarded-for'] as string || "";
+        const ipAddress = xForwardedFor.split(',')[0].trim() || req.socket.remoteAddress || "";
         const userAgent = req.headers['user-agent'] || "";
         
-        const contentToHash = JSON.stringify({
-          memberId: member.id,
-          username: data.username,
-          serviceTermContent,
-          privacyTermContent,
-          thirdPartyTermContent,
-          signatureData: data.signatureData || "",
-          agreedAt: new Date().toISOString()
-        });
-        const contentHash = crypto.createHash('sha256').update(contentToHash).digest('hex');
-        const signatureHash = data.signatureData ? crypto.createHash('sha256').update(data.signatureData).digest('hex') : null;
+        const agreedAt = new Date();
+        const agreedAtISO = agreedAt.toISOString();
         
-        await db.insert(termAgreements).values({
+        const agreementRecord = {
           memberId: member.id,
           memberUsername: data.username,
           memberName: data.memberName || null,
           companyName: data.companyName,
           businessNumber: data.businessNumber,
           representative: data.representative,
-          serviceTermVersion: "1.0",
-          serviceTermContent: serviceTermContent,
+          serviceTermVersion,
+          serviceTermContent,
           serviceTermAgreed: "true",
-          privacyTermVersion: "1.0",
-          privacyTermContent: privacyTermContent,
+          privacyTermVersion,
+          privacyTermContent,
           privacyTermAgreed: "true",
-          thirdPartyTermVersion: "1.0",
-          thirdPartyTermContent: thirdPartyTermContent,
+          thirdPartyTermVersion,
+          thirdPartyTermContent,
           thirdPartyTermAgreed: "true",
           signatureData: data.signatureData || null,
-          signatureHash: signatureHash,
-          ipAddress: ipAddress,
-          userAgent: userAgent,
-          contentHash: contentHash,
           ceoBirth: data.ceoBirth || null,
           ceoCi: data.ceoCi || null,
           ceoPhone: data.phone || null,
+          agreedAt: agreedAtISO
+        };
+        
+        const contentHash = crypto.createHash('sha256')
+          .update(JSON.stringify(agreementRecord))
+          .digest('hex');
+        const signatureHash = data.signatureData 
+          ? crypto.createHash('sha256').update(data.signatureData).digest('hex') 
+          : null;
+        
+        await db.insert(termAgreements).values({
+          ...agreementRecord,
+          agreedAt: agreedAt,
+          signatureHash,
+          ipAddress,
+          userAgent,
+          contentHash,
         });
         console.log('\x1b[32m   ✅ 약관 동의 기록 저장 완료\x1b[0m');
       } catch (termError) {

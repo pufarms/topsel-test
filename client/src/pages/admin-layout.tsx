@@ -29,7 +29,8 @@ import {
   Building2,
   User,
   ChevronLeft,
-  Warehouse
+  Warehouse,
+  Shield
 } from "lucide-react";
 
 interface MenuItem {
@@ -50,6 +51,7 @@ const menuItems: MenuItem[] = [
       { id: "admin-users", label: "관리자 관리", path: "/admin/admins" },
       { id: "partners", label: "협력업체 관리", path: "/admin/partners" },
       { id: "users", label: "회원관리", path: "/admin/users" },
+      { id: "term-agreements", label: "약관 동의 기록", path: "/admin/term-agreements" },
     ]
   },
   { id: "orders", label: "주문관리", icon: <ShoppingCart className="h-5 w-5" />, path: "/admin/orders" },
