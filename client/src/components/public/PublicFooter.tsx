@@ -16,7 +16,7 @@ export function PublicFooter() {
 
   return (
     <footer className="border-t bg-muted/40" data-testid="footer">
-      <div className="container px-4 md:px-6 pt-16 pb-8">
+      <div className="container px-4 md:px-6 pb-8" style={{ paddingTop: '80px' }}>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             {companyName && (
