@@ -1,0 +1,66 @@
+아래 HTML 파일을 public/signup.html로 저장해줘.
+이 파일은 이미 완성된 회원가입 페이지야.
+
+## 주요 기능
+- 회원명 입력 (한글 6자 이내)
+- 로그인 정보 (아이디, 비밀번호)
+- 사업자 정보
+- 담당자 정보 3명
+- 약관 동의 (3개)
+- 본인인증 (포트원 다날)
+- 전자 서명 (Canvas)
+- 파일 업로드 (사업자등록증, 통신판매증)
+
+## 본인인증 스크립트 구현 필요
+현재 HTML의 본인인증 부분을 아래 로직으로 수정해줘:
+
+### 포트원 SDK 초기화
+<script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+<script>
+const IMP = window.IMP;
+IMP.init('YOUR_IMP_CODE'); // Replit 환경변수에서 가져오도록
+</script>
+
+### 본인인증 버튼 클릭 이벤트
+document.getElementById('btnVerification').addEventListener('click', () => {
+    IMP.certification({
+        pg: 'danal',
+        merchant_uid: 'topsel_auth_' + new Date().getTime(),
+        popup: false,
+        m_redirect_url: window.location.href  // 모바일 리다이렉트
+    }, async (rsp) => {
+        if (rsp.success) {
+            // 서버로 imp_uid 전송
+            const response = await fetch('/get-certification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imp_uid: rsp.imp_uid })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // 폼에 자동 입력
+                document.getElementById('ceo_name').value = data.name;
+                document.getElementById('ceo_phone').value = data.phone;
+                
+                // Hidden 필드에 저장 (DB 저장용)
+                document.getElementById('ceo_birth').value = data.birth || '';
+                document.getElementById('ceo_ci').value = data.ci || '';
+                
+                // 인증 완료 상태 표시
+                document.getElementById('btnVerification').innerHTML = '✅ 본인인증 완료';
+                document.getElementById('btnVerification').style.background = '#27ae60';
+                document.getElementById('btnVerification').disabled = true;
+                
+                isVerified = true;
+                alert('✅ 본인인증이 완료되었습니다!');
+            } else {
+                alert('❌ 인증 정보를 가져오는데 실패했습니다.');
+            }
+        } else {
+            alert('본인인증에 실패했습니다: ' + rsp.error_msg);
+        }
+    });
+});
+</script>

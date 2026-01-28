@@ -123,6 +123,7 @@
             gap: 15px;
         }
         
+        /* 약관 동의 */
         .agreement-section {
             background: #f8f9fa;
             padding: 20px;
@@ -209,6 +210,7 @@
             margin: 0;
         }
         
+        /* 서명 패드 */
         .signature-section {
             background: #f8f9fa;
             padding: 25px;
@@ -247,6 +249,7 @@
             background: #c0392b;
         }
         
+        /* 본인인증 버튼 */
         .btn-verification {
             width: 100%;
             padding: 15px;
@@ -267,11 +270,12 @@
         }
         
         .btn-verification:disabled {
-            background: #27ae60;
+            background: #ccc;
             cursor: not-allowed;
             transform: none;
         }
         
+        /* 제출 버튼 */
         .btn-submit {
             width: 100%;
             padding: 18px;
@@ -327,120 +331,129 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>탑셀러 회원가입</h1>
+            <h1>🍎 탑셀러 회원가입</h1>
             <p>30년 과일 유통 경력의 믿을 수 있는 파트너</p>
         </div>
         
         <div class="form-container">
             <form id="signupForm" enctype="multipart/form-data">
                 
+                <!-- 회원정보 -->
                 <div class="section">
                     <h3 class="section-title">회원정보</h3>
                     <div class="form-group">
                         <label>회원명 <span class="required">*</span></label>
-                        <input type="text" name="member_name" required placeholder="한글 6자 이내로 입력" maxlength="6" data-testid="input-member-name">
-                        <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">입금 시 자동매칭을 위하여 한글 6자 이내로 해 주세요</small>
+                        <input type="text" name="member_name" required placeholder="한글 6자 이내로 입력" maxlength="6">
+                        <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">💡 입금 시 자동매칭을 위하여 한글 6자 이내로 해 주세요</small>
                     </div>
                     <div class="form-group">
                         <label>아이디 <span class="required">*</span></label>
-                        <input type="text" name="user_id" required placeholder="사용하실 아이디를 입력하세요" data-testid="input-user-id">
+                        <input type="text" name="user_id" required placeholder="사용하실 아이디를 입력하세요">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>비밀번호 <span class="required">*</span></label>
-                            <input type="password" name="password" id="password" required placeholder="비밀번호" data-testid="input-password">
+                            <input type="password" name="password" id="password" required placeholder="비밀번호">
                         </div>
                         <div class="form-group">
                             <label>비밀번호 확인 <span class="required">*</span></label>
-                            <input type="password" id="password_confirm" required placeholder="비밀번호 확인" data-testid="input-password-confirm">
+                            <input type="password" id="password_confirm" required placeholder="비밀번호 확인">
                         </div>
                     </div>
                 </div>
                 
+                <!-- 사업자 정보 -->
                 <div class="section">
                     <h3 class="section-title">사업자 정보</h3>
                     <div class="form-group">
                         <label>상호명 <span class="required">*</span></label>
-                        <input type="text" name="biz_name" required placeholder="사업자 상호명" data-testid="input-biz-name">
+                        <input type="text" name="biz_name" required placeholder="사업자 상호명">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>사업자번호 <span class="required">*</span></label>
-                            <input type="text" name="biz_no" required placeholder="123-45-67890" data-testid="input-biz-no">
+                            <input type="text" name="biz_no" required placeholder="123-45-67890">
                         </div>
                         <div class="form-group">
                             <label>통신판매번호 <span class="required">*</span></label>
-                            <input type="text" name="mail_no" required placeholder="제2023-경북-000호" data-testid="input-mail-no">
+                            <input type="text" name="mail_no" required placeholder="제2023-경북-000호">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>사업장 주소 <span class="required">*</span></label>
-                        <input type="text" name="address" required placeholder="전체 주소를 입력하세요" data-testid="input-address">
+                        <input type="text" name="address" required placeholder="전체 주소를 입력하세요">
                     </div>
                     <div class="form-group">
                         <label>이메일 <span class="required">*</span></label>
-                        <input type="email" name="email" required placeholder="example@email.com" data-testid="input-email">
+                        <input type="email" name="email" required placeholder="example@email.com">
                     </div>
                 </div>
                 
+                <!-- 담당자 정보 -->
                 <div class="section">
                     <h3 class="section-title">담당자 정보 (선택사항)</h3>
                     <div class="alert alert-info">
-                        담당자 정보를 입력하시면 주문 관련 알림을 자동으로 발송해드립니다. (최대 3명)
+                        💡 담당자 정보를 입력하시면 주문 관련 알림을 자동으로 발송해드립니다. (최대 3명)
                     </div>
                     
+                    <!-- 담당자 1 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label>담당자1 (역할)</label>
-                            <input type="text" name="manager1_name" placeholder="예: 홍길동(주문담당)" data-testid="input-manager1-name">
+                            <input type="text" name="manager1_name" placeholder="예: 홍길동(주문담당)">
                         </div>
                         <div class="form-group">
                             <label>담당자1 휴대폰번호</label>
-                            <input type="text" name="manager1_phone" placeholder="010-0000-0000" data-testid="input-manager1-phone">
+                            <input type="text" name="manager1_phone" placeholder="010-0000-0000">
                         </div>
                     </div>
                     
+                    <!-- 담당자 2 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label>담당자2 (역할)</label>
-                            <input type="text" name="manager2_name" placeholder="예: 김철수(배송담당)" data-testid="input-manager2-name">
+                            <input type="text" name="manager2_name" placeholder="예: 김철수(배송담당)">
                         </div>
                         <div class="form-group">
                             <label>담당자2 휴대폰번호</label>
-                            <input type="text" name="manager2_phone" placeholder="010-0000-0000" data-testid="input-manager2-phone">
+                            <input type="text" name="manager2_phone" placeholder="010-0000-0000">
                         </div>
                     </div>
                     
+                    <!-- 담당자 3 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label>담당자3 (역할)</label>
-                            <input type="text" name="manager3_name" placeholder="예: 이영희(CS담당)" data-testid="input-manager3-name">
+                            <input type="text" name="manager3_name" placeholder="예: 이영희(CS담당)">
                         </div>
                         <div class="form-group">
                             <label>담당자3 휴대폰번호</label>
-                            <input type="text" name="manager3_phone" placeholder="010-0000-0000" data-testid="input-manager3-phone">
+                            <input type="text" name="manager3_phone" placeholder="010-0000-0000">
                         </div>
                     </div>
                 </div>
                 
+                <!-- 서류 업로드 -->
                 <div class="section">
                     <h3 class="section-title">서류 업로드</h3>
                     <div class="form-group">
                         <label>사업자등록증 <span class="required">*</span></label>
-                        <input type="file" name="bizFile" accept="image/*,.pdf" required data-testid="input-biz-file">
+                        <input type="file" name="bizFile" accept="image/*,.pdf" required>
                     </div>
                     <div class="form-group">
                         <label>통신판매업신고증 <span class="required">*</span></label>
-                        <input type="file" name="mailFile" accept="image/*,.pdf" required data-testid="input-mail-file">
+                        <input type="file" name="mailFile" accept="image/*,.pdf" required>
                     </div>
                 </div>
                 
+                <!-- 약관 동의 -->
                 <div class="section">
                     <h3 class="section-title">약관 동의</h3>
                     <div class="agreement-section">
+                        <!-- 약관 1 -->
                         <div class="agreement-item">
                             <div class="agreement-header" onclick="toggleAgreement(0)">
-                                <h4>1. 탑셀러 서비스 이용약관 (클릭하여 전체보기)</h4>
+                                <h4>🔒 1. 탑셀러 서비스 이용약관 (클릭하여 전체보기)</h4>
                                 <span class="agreement-toggle">▼</span>
                             </div>
                             <div class="agreement-content" id="agreement0">
@@ -451,19 +464,20 @@
                                     <p><strong>제2조 (서비스의 내용)</strong></p>
                                     <p>회사는 다음과 같은 서비스를 제공합니다:</p>
                                     <ul style="margin-left: 20px;">
-                                        <li>과일 상품 공급 (수매, 선별, 포장)</li>
-                                        <li>배송 대행 서비스</li>
-                                        <li>주문 관리 시스템</li>
-                                        <li>1:1 판매 코칭 및 교육</li>
-                                        <li>산지 정보 및 가격 정보 제공</li>
+                                        <li>• 과일 상품 공급 (수매, 선별, 포장)</li>
+                                        <li>• 배송 대행 서비스</li>
+                                        <li>• 주문 관리 시스템</li>
+                                        <li>• 1:1 판매 코칭 및 교육</li>
+                                        <li>• 산지 정보 및 가격 정보 제공</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                         
+                        <!-- 약관 2 -->
                         <div class="agreement-item">
                             <div class="agreement-header" onclick="toggleAgreement(1)">
-                                <h4>2. 개인정보 수집 및 이용 동의 (클릭하여 전체보기)</h4>
+                                <h4>🔒 2. 개인정보 수집 및 이용 동의 (클릭하여 전체보기)</h4>
                                 <span class="agreement-toggle">▼</span>
                             </div>
                             <div class="agreement-content" id="agreement1">
@@ -471,107 +485,110 @@
                                     <p><strong>개인정보의 수집 및 이용 목적</strong></p>
                                     <p>회사는 다음의 목적을 위해 개인정보를 수집합니다:</p>
                                     <ul style="margin-left: 20px;">
-                                        <li>서비스 제공 및 계약 이행</li>
-                                        <li>회원 관리 및 본인 확인</li>
-                                        <li>고지사항 전달 및 민원 처리</li>
+                                        <li>• 서비스 제공 및 계약 이행</li>
+                                        <li>• 회원 관리 및 본인 확인</li>
+                                        <li>• 고지사항 전달 및 민원 처리</li>
                                     </ul>
                                     <br>
                                     <p><strong>개인정보 보호책임자</strong></p>
                                     <ul style="margin-left: 20px;">
-                                        <li>성명: 공강렬</li>
-                                        <li>전화번호: 1588-8707</li>
-                                        <li>이메일: topsel@naver.com</li>
+                                        <li>• 성명: 공강렬</li>
+                                        <li>• 전화번호: 1588-8707</li>
+                                        <li>• 이메일: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="daaeb5aaa9bfb6e8eae8ef9ab4bbacbfa8f4b9b5b7">[email&#160;protected]</a></li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                         
+                        <!-- 약관 3 -->
                         <div class="agreement-item">
                             <div class="agreement-header" onclick="toggleAgreement(2)">
-                                <h4>3. 개인정보 제3자 제공 동의 (클릭하여 전체보기)</h4>
+                                <h4>🚚 3. 개인정보 제3자 제공 동의 (클릭하여 전체보기)</h4>
                                 <span class="agreement-toggle">▼</span>
                             </div>
                             <div class="agreement-content" id="agreement2">
                                 <div class="agreement-text">
                                     <p><strong>택배사 (배송 업무)</strong></p>
                                     <ul style="margin-left: 20px;">
-                                        <li>제공받는 자: CJ대한통운, 롯데택배 등</li>
-                                        <li>제공 목적: 상품 배송</li>
-                                        <li>제공 항목: 수령인 성명, 전화번호, 배송지 주소</li>
-                                        <li>보유 기간: 배송 완료 후 3개월</li>
+                                        <li>• 제공받는 자: CJ대한통운, 롯데택배 등</li>
+                                        <li>• 제공 목적: 상품 배송</li>
+                                        <li>• 제공 항목: 수령인 성명, 전화번호, 배송지 주소</li>
+                                        <li>• 보유 기간: 배송 완료 후 3개월</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                         
+                        <!-- 체크박스 -->
                         <div class="checkbox-group">
                             <div class="checkbox-item">
-                                <input type="checkbox" id="agree1" required data-testid="checkbox-agree1">
+                                <input type="checkbox" id="agree1" required>
                                 <label for="agree1">[필수] 위 서비스 이용약관 내용에 동의합니다.</label>
                             </div>
                             <div class="checkbox-item">
-                                <input type="checkbox" id="agree2" required data-testid="checkbox-agree2">
+                                <input type="checkbox" id="agree2" required>
                                 <label for="agree2">[필수] 개인정보 수집 및 이용에 동의합니다.</label>
                             </div>
                             <div class="checkbox-item">
-                                <input type="checkbox" id="agree3" required data-testid="checkbox-agree3">
+                                <input type="checkbox" id="agree3" required>
                                 <label for="agree3">[필수] 개인정보 제3자 제공에 동의합니다.</label>
                             </div>
                         </div>
                     </div>
                 </div>
                 
+                <!-- 본인인증 섹션 -->
                 <div class="section">
                     <h3 class="section-title">대표자 본인인증</h3>
                     <div class="alert alert-info">
-                        휴대폰 본인인증을 통해 대표자 정보를 자동으로 입력합니다.
+                        📱 휴대폰 본인인증을 통해 대표자 정보를 자동으로 입력합니다.
                     </div>
-                    <button type="button" class="btn-verification" id="btnVerification" data-testid="button-verification">
-                        휴대폰 본인인증 하기
+                    <button type="button" class="btn-verification" id="btnVerification">
+                        📱 휴대폰 본인인증 하기
                     </button>
                     <div class="form-row">
                         <div class="form-group">
                             <label>대표자명 <span class="required">*</span></label>
-                            <input type="text" name="ceo_name" id="ceo_name" required disabled placeholder="본인인증 후 자동입력" data-testid="input-ceo-name">
+                            <input type="text" name="ceo_name" id="ceo_name" required disabled placeholder="본인인증 후 자동입력">
                         </div>
                         <div class="form-group">
                             <label>대표자 연락처 <span class="required">*</span></label>
-                            <input type="text" name="ceo_phone" id="ceo_phone" required disabled placeholder="본인인증 후 자동입력" data-testid="input-ceo-phone">
+                            <input type="text" name="ceo_phone" id="ceo_phone" required disabled placeholder="본인인증 후 자동입력">
                         </div>
                     </div>
-                    <input type="hidden" name="ceo_birth" id="ceo_birth">
-                    <input type="hidden" name="ceo_ci" id="ceo_ci">
                 </div>
                 
+                <!-- 전자 서명 -->
                 <div class="section">
-                    <h3 class="section-title">전자 서명 (필수)</h3>
+                    <h3 class="section-title">✍️ 전자 서명 (필수)</h3>
                     <div class="signature-section">
                         <div class="alert alert-info">
                             아래 서명란에 본인의 서명을 작성해주세요. 이는 전자서명법에 의거한 법적 효력이 있습니다.
                         </div>
-                        <canvas id="signaturePad" class="signature-pad" data-testid="canvas-signature"></canvas>
+                        <canvas id="signaturePad" class="signature-pad"></canvas>
                         <div class="signature-buttons">
-                            <button type="button" class="btn-clear" onclick="clearSignature()" data-testid="button-clear-signature">서명 지우기</button>
+                            <button type="button" class="btn-clear" onclick="clearSignature()">🗑️ 서명 지우기</button>
                         </div>
                         <input type="hidden" name="signature_data" id="signature_data" required>
                     </div>
                 </div>
                 
-                <button type="submit" class="btn-submit" id="btnSubmit" data-testid="button-submit">
-                    회원가입 신청하기
+                <!-- 제출 버튼 -->
+                <button type="submit" class="btn-submit" id="btnSubmit">
+                    ✅ 회원가입 신청하기
                 </button>
                 
-                <div class="alert alert-info" style="margin-top: 20px;">
-                    회원가입 신청 후 관리자 승인이 완료되면 서비스를 이용하실 수 있습니다.
+                <div class="alert alert-info">
+                    💡 회원가입 신청 후 관리자 승인이 완료되면 서비스를 이용하실 수 있습니다.
                 </div>
             </form>
         </div>
     </div>
     
-    <script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
         // 포트원(아임포트) 초기화
         const IMP = window.IMP;
-        IMP.init('imp10391932'); // 가맹점 코드
+        IMP.init('imp10391932'); // 테스트용 가맹점 코드
         
         let isVerified = false;
         let isDrawing = false;
@@ -677,52 +694,23 @@
             content.classList.toggle('active');
         }
         
-        // 본인인증 버튼 - 포트원 다날 연동
+        // 본인인증 버튼 (데모용 - 실제로는 포트원 API 사용)
         document.getElementById('btnVerification').addEventListener('click', () => {
-            IMP.certification({
-                pg: 'danal',
-                merchant_uid: 'topsel_auth_' + new Date().getTime(),
-                popup: false,
-                m_redirect_url: window.location.href
-            }, async (rsp) => {
-                if (rsp.success) {
-                    try {
-                        // 서버로 imp_uid 전송하여 인증 정보 조회
-                        const response = await fetch('/api/auth/get-certification', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ imp_uid: rsp.imp_uid })
-                        });
-                        
-                        const data = await response.json();
-                        
-                        if (data.success) {
-                            // 폼에 자동 입력
-                            document.getElementById('ceo_name').value = data.name;
-                            document.getElementById('ceo_phone').value = data.phone;
-                            
-                            // Hidden 필드에 저장 (DB 저장용)
-                            document.getElementById('ceo_birth').value = data.birth || '';
-                            document.getElementById('ceo_ci').value = data.ci || '';
-                            
-                            // 인증 완료 상태 표시
-                            const btn = document.getElementById('btnVerification');
-                            btn.innerHTML = '본인인증 완료';
-                            btn.disabled = true;
-                            
-                            isVerified = true;
-                            alert('본인인증이 완료되었습니다!');
-                        } else {
-                            alert('인증 정보를 가져오는데 실패했습니다: ' + (data.message || ''));
-                        }
-                    } catch (error) {
-                        console.error('Certification error:', error);
-                        alert('인증 처리 중 오류가 발생했습니다.');
-                    }
-                } else {
-                    alert('본인인증에 실패했습니다: ' + rsp.error_msg);
-                }
-            });
+            // 데모용: 직접 입력 가능하도록
+            const name = prompt('대표자명을 입력하세요:');
+            const phone = prompt('연락처를 입력하세요 (예: 010-1234-5678):');
+            
+            if (name && phone) {
+                document.getElementById('ceo_name').value = name;
+                document.getElementById('ceo_phone').value = phone;
+                isVerified = true;
+                
+                document.getElementById('btnVerification').innerHTML = '✅ 본인인증 완료';
+                document.getElementById('btnVerification').style.background = '#27ae60';
+                document.getElementById('btnVerification').disabled = true;
+                
+                alert('✅ 본인인증이 완료되었습니다!');
+            }
         });
         
         // 폼 제출
@@ -734,30 +722,25 @@
             const passwordConfirm = document.getElementById('password_confirm').value;
             
             if (password !== passwordConfirm) {
-                alert('비밀번호가 일치하지 않습니다.');
-                return;
-            }
-            
-            if (password.length < 6) {
-                alert('비밀번호는 6자 이상이어야 합니다.');
+                alert('❌ 비밀번호가 일치하지 않습니다.');
                 return;
             }
             
             if (!isVerified) {
-                alert('본인인증을 완료해주세요.');
+                alert('❌ 본인인증을 완료해주세요.');
                 return;
             }
             
             const signatureData = document.getElementById('signature_data').value;
             if (!signatureData) {
-                alert('전자 서명을 작성해주세요.');
+                alert('❌ 전자 서명을 작성해주세요.');
                 return;
             }
             
             if (!document.getElementById('agree1').checked || 
                 !document.getElementById('agree2').checked || 
                 !document.getElementById('agree3').checked) {
-                alert('필수 약관에 모두 동의해주세요.');
+                alert('❌ 필수 약관에 모두 동의해주세요.');
                 return;
             }
             
@@ -767,7 +750,7 @@
             // 제출 버튼 비활성화
             const btnSubmit = document.getElementById('btnSubmit');
             btnSubmit.disabled = true;
-            btnSubmit.innerHTML = '처리 중...';
+            btnSubmit.innerHTML = '⏳ 처리 중...';
             
             try {
                 const response = await fetch('/register', {
@@ -778,18 +761,18 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(data.message + '\n관리자 승인 후 이용 가능합니다.');
-                    window.location.href = '/login';
+                    alert('✅ ' + data.message + '\n관리자 승인 후 이용 가능합니다.');
+                    window.location.reload();
                 } else {
-                    alert(data.message);
+                    alert('❌ ' + data.message);
                     btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = '회원가입 신청하기';
+                    btnSubmit.innerHTML = '✅ 회원가입 신청하기';
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('서버 오류가 발생했습니다.');
+                alert('❌ 서버 오류가 발생했습니다.');
                 btnSubmit.disabled = false;
-                btnSubmit.innerHTML = '회원가입 신청하기';
+                btnSubmit.innerHTML = '✅ 회원가입 신청하기';
             }
         });
     </script>
