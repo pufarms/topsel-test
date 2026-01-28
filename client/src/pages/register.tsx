@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ChevronDown, ChevronUp, Check, AlertCircle } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Check, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import type { Page } from "@shared/schema";
@@ -65,6 +65,8 @@ export default function Register() {
   const [signatureData, setSignatureData] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   
   const passwordMatch = passwordConfirm.length > 0 ? password === passwordConfirm : null;
 
@@ -293,17 +295,28 @@ export default function Register() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="password">{labels.password || "비밀번호"} <span className="text-destructive">*</span></Label>
-                      <Input 
-                        id="password" 
-                        name="password" 
-                        type="password" 
-                        required 
-                        minLength={6} 
-                        placeholder={placeholders.password || "6자 이상"} 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        data-testid="input-password" 
-                      />
+                      <div className="relative">
+                        <Input 
+                          id="password" 
+                          name="password" 
+                          type={showPassword ? "text" : "password"} 
+                          required 
+                          minLength={6} 
+                          placeholder={placeholders.password || "6자 이상"} 
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pr-10"
+                          data-testid="input-password" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          data-testid="button-toggle-password"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="password_confirm">{labels.password_confirm || "비밀번호 확인"} <span className="text-destructive">*</span></Label>
@@ -311,23 +324,33 @@ export default function Register() {
                         <Input 
                           id="password_confirm" 
                           name="password_confirm" 
-                          type="password" 
+                          type={showPasswordConfirm ? "text" : "password"} 
                           required 
                           placeholder={placeholders.password_confirm || "비밀번호 확인"} 
                           value={passwordConfirm}
                           onChange={(e) => setPasswordConfirm(e.target.value)}
-                          className={passwordMatch === false ? "border-destructive pr-20" : passwordMatch === true ? "border-green-500 pr-20" : ""}
+                          className={`pr-24 ${passwordMatch === false ? "border-destructive" : passwordMatch === true ? "border-green-500" : ""}`}
                           data-testid="input-password-confirm" 
                         />
-                        {passwordMatch !== null && (
-                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium flex items-center gap-1 ${passwordMatch ? "text-green-600" : "text-destructive"}`}>
-                            {passwordMatch ? (
-                              <><Check className="w-4 h-4" /> 일치</>
-                            ) : (
-                              <><AlertCircle className="w-4 h-4" /> 불일치</>
-                            )}
-                          </span>
-                        )}
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                          {passwordMatch !== null && (
+                            <span className={`text-sm font-medium flex items-center gap-1 ${passwordMatch ? "text-green-600" : "text-destructive"}`}>
+                              {passwordMatch ? (
+                                <><Check className="w-4 h-4" /> 일치</>
+                              ) : (
+                                <><AlertCircle className="w-4 h-4" /> 불일치</>
+                              )}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                            className="text-muted-foreground hover:text-foreground"
+                            data-testid="button-toggle-password-confirm"
+                          >
+                            {showPasswordConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
