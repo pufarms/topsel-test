@@ -91,6 +91,50 @@
             transition: all 0.3s;
         }
         
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+        .password-toggle:hover {
+            color: #333;
+        }
+        .password-match-status {
+            position: absolute;
+            right: 45px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .password-match-status.match {
+            color: #10B981;
+        }
+        .password-match-status.mismatch {
+            color: #EF4444;
+        }
+        .password-wrapper input.match {
+            border-color: #10B981;
+        }
+        .password-wrapper input.mismatch {
+            border-color: #EF4444;
+        }
+        
         .form-group input:focus,
         .form-group textarea:focus {
             outline: none;
@@ -348,11 +392,24 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>비밀번호 <span class="required">*</span></label>
-                            <input type="password" name="password" id="password" required placeholder="비밀번호" data-testid="input-password">
+                            <div class="password-wrapper">
+                                <input type="password" name="password" id="password" required placeholder="비밀번호 (6자 이상)" minlength="6" data-testid="input-password">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" data-testid="button-toggle-password">
+                                    <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    <svg class="eye-off-icon" style="display:none" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>비밀번호 확인 <span class="required">*</span></label>
-                            <input type="password" id="password_confirm" required placeholder="비밀번호 확인" data-testid="input-password-confirm">
+                            <div class="password-wrapper">
+                                <input type="password" id="password_confirm" required placeholder="비밀번호 확인" data-testid="input-password-confirm">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password_confirm', this)" data-testid="button-toggle-password-confirm">
+                                    <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    <svg class="eye-off-icon" style="display:none" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                </button>
+                                <span id="password-match-status" class="password-match-status"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -569,6 +626,63 @@
     </div>
     
     <script>
+        // 비밀번호 보기/숨기기 토글
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const eyeIcon = btn.querySelector('.eye-icon');
+            const eyeOffIcon = btn.querySelector('.eye-off-icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+            } else {
+                input.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+            }
+        }
+        
+        // 비밀번호 일치 확인 (실시간)
+        function checkPasswordMatch() {
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('password_confirm').value;
+            const statusEl = document.getElementById('password-match-status');
+            const confirmInput = document.getElementById('password_confirm');
+            
+            if (passwordConfirm.length === 0) {
+                statusEl.innerHTML = '';
+                statusEl.className = 'password-match-status';
+                confirmInput.classList.remove('match', 'mismatch');
+                return;
+            }
+            
+            if (password === passwordConfirm) {
+                statusEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> 일치';
+                statusEl.className = 'password-match-status match';
+                confirmInput.classList.remove('mismatch');
+                confirmInput.classList.add('match');
+            } else {
+                statusEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> 불일치';
+                statusEl.className = 'password-match-status mismatch';
+                confirmInput.classList.remove('match');
+                confirmInput.classList.add('mismatch');
+            }
+        }
+        
+        // 페이지 로드 시 이벤트 리스너 추가
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInput = document.getElementById('password');
+            const passwordConfirmInput = document.getElementById('password_confirm');
+            
+            if (passwordInput) {
+                passwordInput.addEventListener('input', checkPasswordMatch);
+            }
+            if (passwordConfirmInput) {
+                passwordConfirmInput.addEventListener('input', checkPasswordMatch);
+            }
+        });
+        
         // 포트원 V2 설정
         let portoneConfig = {
             storeId: '',
