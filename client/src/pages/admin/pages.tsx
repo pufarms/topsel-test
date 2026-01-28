@@ -10,6 +10,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageContentEditor } from "@/components/admin/page-content-editor";
+import { RegisterPageEditor } from "@/components/admin/register-page-editor";
 import { DynamicPageRenderer, availableIcons } from "@/components/dynamic-page-renderer";
 import { 
   Eye, 
@@ -1296,26 +1297,35 @@ export default function PagesManagement() {
                   ref={previewContainerRef}
                   className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 dark:bg-gray-900 flex justify-center p-4"
                 >
-                  <div 
-                    style={{ 
-                      transform: `scale(${autoFitScale})`,
-                      transformOrigin: 'top center',
-                      width: '1400px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div 
-                      ref={previewContentRef}
-                      className="bg-background shadow-lg"
-                    >
-                      <DynamicPageRenderer 
-                        content={contentData} 
-                        isEditing={true}
-                        onFieldEdit={handleFieldEdit}
-                        onPositionChange={handlePositionChange}
+                  {editDialog.page?.path === '/register' ? (
+                    <div className="w-full max-w-4xl bg-background shadow-lg rounded-lg">
+                      <RegisterPageEditor 
+                        content={contentData as any} 
+                        onChange={(newContent) => setContentData(newContent as any)}
                       />
                     </div>
-                  </div>
+                  ) : (
+                    <div 
+                      style={{ 
+                        transform: `scale(${autoFitScale})`,
+                        transformOrigin: 'top center',
+                        width: '1400px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div 
+                        ref={previewContentRef}
+                        className="bg-background shadow-lg"
+                      >
+                        <DynamicPageRenderer 
+                          content={contentData} 
+                          isEditing={true}
+                          onFieldEdit={handleFieldEdit}
+                          onPositionChange={handlePositionChange}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </TabsContent>
