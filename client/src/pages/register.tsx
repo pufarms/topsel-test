@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Package, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { usePublicSiteSettings } from "@/hooks/use-site-settings";
 import { registerSchema } from "@shared/schema";
 import type { z } from "zod";
 
@@ -18,7 +19,10 @@ export default function Register() {
   const [, navigate] = useLocation();
   const { register, user } = useAuth();
   const { toast } = useToast();
+  const { data: siteSettings } = usePublicSiteSettings();
   const [isLoading, setIsLoading] = useState(false);
+  
+  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -59,8 +63,12 @@ export default function Register() {
         <div className="container mx-auto px-6 py-4">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer w-fit">
-              <Package className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">주문관리</span>
+              {siteSettings?.header_logo_url ? (
+                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
+              ) : (
+                <Package className="h-6 w-6 text-primary" />
+              )}
+              <span className="text-xl font-bold">{siteName}</span>
             </div>
           </Link>
         </div>

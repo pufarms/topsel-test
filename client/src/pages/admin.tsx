@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Package, LogOut, Loader2, Download, Users, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { usePublicSiteSettings } from "@/hooks/use-site-settings";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { userTiers, type User, type Order } from "@shared/schema";
 
@@ -22,6 +23,9 @@ export default function Admin() {
   const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { data: siteSettings } = usePublicSiteSettings();
+  
+  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -126,8 +130,12 @@ export default function Admin() {
         <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <Package className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">주문관리</span>
+              {siteSettings?.header_logo_url ? (
+                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
+              ) : (
+                <Package className="h-6 w-6 text-primary" />
+              )}
+              <span className="text-xl font-bold">{siteName}</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">

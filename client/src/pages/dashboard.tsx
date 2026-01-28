@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, LogOut, Loader2, ShoppingCart, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { usePublicSiteSettings } from "@/hooks/use-site-settings";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertOrderSchema } from "@shared/schema";
 import type { z } from "zod";
@@ -23,7 +24,10 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { data: siteSettings } = usePublicSiteSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const form = useForm<OrderForm>({
     resolver: zodResolver(insertOrderSchema),
@@ -108,8 +112,12 @@ export default function Dashboard() {
         <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <Package className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">주문관리</span>
+              {siteSettings?.header_logo_url ? (
+                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
+              ) : (
+                <Package className="h-6 w-6 text-primary" />
+              )}
+              <span className="text-xl font-bold">{siteName}</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">
