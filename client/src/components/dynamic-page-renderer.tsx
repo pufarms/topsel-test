@@ -2259,7 +2259,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
           )}
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center" style={{ marginBottom: '78px' }}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center" style={{ marginBottom: '40px' }}>
             {data.buttonText && (
               <EditableButton
                 text={data.buttonText}
