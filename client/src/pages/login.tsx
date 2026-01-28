@@ -82,7 +82,7 @@ export default function Login() {
 
   if (user) {
     const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-    navigate(isAdmin ? "/admin" : "/dashboard");
+    navigate(isAdmin ? "/admin" : "/");
     return null;
   }
 
