@@ -255,6 +255,8 @@ export default function PagesManagement() {
   
   // Content state for editing
   const [contentData, setContentData] = useState<PageContent | null>(null);
+  const [codeText, setCodeText] = useState<string>(''); // Raw text for code editor
+  const [codeError, setCodeError] = useState<string | null>(null); // JSON parse error
 
   // Calculate auto-fit scale based on WIDTH only (height scrollable)
   useEffect(() => {
@@ -411,6 +413,8 @@ export default function PagesManagement() {
       icon: "",
     });
     setContentData(null);
+    setCodeText('');
+    setCodeError(null);
     setEditTab("settings");
   };
 
@@ -424,10 +428,34 @@ export default function PagesManagement() {
       status: page.status,
       icon: page.icon || "",
     });
-    setContentData(page.content || { sections: [] });
+    const content = page.content || { sections: [] };
+    setContentData(content);
+    setCodeText(JSON.stringify(content, null, 2));
+    setCodeError(null);
     setEditTab("settings");
     setEditDialog({ open: true, page });
   };
+  
+  // Sync codeText when switching to code tab (from contentData)
+  useEffect(() => {
+    if (editTab === 'code' && contentData) {
+      setCodeText(JSON.stringify(contentData, null, 2));
+      setCodeError(null);
+    }
+  }, [editTab]);
+  
+  // Parse codeText and update contentData when switching away from code tab
+  useEffect(() => {
+    if (editTab !== 'code' && codeText) {
+      try {
+        const parsed = JSON.parse(codeText);
+        setContentData(parsed);
+        setCodeError(null);
+      } catch (err) {
+        // Keep previous contentData if parse fails
+      }
+    }
+  }, [editTab]);
   
   // Handle inline field editing from preview tab
   const handleFieldEdit = (sectionId: string, fieldPath: string, currentValue: string, fieldType: 'text' | 'image' | 'icon' | 'button') => {
@@ -1117,12 +1145,15 @@ export default function PagesManagement() {
               </div>
             </TabsContent>
             
-            <TabsContent value="code" className="flex-1 overflow-auto mt-4">
-              <div className="space-y-4">
+            <TabsContent value="code" className="flex-1 flex flex-col min-h-0 mt-4">
+              <div className="flex-1 flex flex-col min-h-0 space-y-2">
                 <div className="bg-muted px-4 py-2 rounded-t-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Code className="w-4 h-4" />
                     <span className="text-sm font-medium">페이지 콘텐츠 코드 (JSON)</span>
+                    {codeError && (
+                      <span className="text-xs text-destructive ml-2">⚠ JSON 오류</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1130,8 +1161,10 @@ export default function PagesManagement() {
                       variant="outline"
                       onClick={() => {
                         try {
-                          const formatted = JSON.stringify(contentData, null, 2);
-                          setContentData(JSON.parse(formatted));
+                          const parsed = JSON.parse(codeText);
+                          const formatted = JSON.stringify(parsed, null, 2);
+                          setCodeText(formatted);
+                          setCodeError(null);
                           toast({ title: "코드 포맷 완료", description: "JSON 코드가 정렬되었습니다." });
                         } catch (e) {
                           toast({ title: "포맷 오류", description: "올바른 JSON 형식이 아닙니다.", variant: "destructive" });
@@ -1145,31 +1178,56 @@ export default function PagesManagement() {
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        navigator.clipboard.writeText(JSON.stringify(contentData, null, 2));
+                        navigator.clipboard.writeText(codeText);
                         toast({ title: "복사됨", description: "코드가 클립보드에 복사되었습니다." });
                       }}
                       data-testid="button-copy-code"
                     >
                       복사
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => {
+                        try {
+                          const parsed = JSON.parse(codeText);
+                          setContentData(parsed);
+                          setCodeError(null);
+                          toast({ title: "적용됨", description: "코드가 콘텐츠에 적용되었습니다." });
+                        } catch (e) {
+                          toast({ title: "적용 오류", description: "올바른 JSON 형식이 아닙니다.", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-apply-code"
+                    >
+                      적용
+                    </Button>
                   </div>
                 </div>
-                <Textarea
-                  className="font-mono text-sm h-[350px] resize-none"
-                  value={JSON.stringify(contentData, null, 2)}
+                <textarea
+                  className="flex-1 min-h-0 w-full font-mono text-sm p-4 border rounded-b-lg bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={codeText}
                   onChange={(e) => {
+                    setCodeText(e.target.value);
+                    // Validate JSON in background
                     try {
-                      const parsed = JSON.parse(e.target.value);
-                      setContentData(parsed);
-                    } catch (err) {
-                      // Allow partial editing - will validate on save
+                      JSON.parse(e.target.value);
+                      setCodeError(null);
+                    } catch (err: any) {
+                      setCodeError(err.message);
                     }
                   }}
                   placeholder='{"meta": {...}, "sections": [...]}'
+                  spellCheck={false}
                   data-testid="textarea-code-editor"
                 />
+                {codeError && (
+                  <p className="text-xs text-destructive px-2">
+                    오류: {codeError}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  페이지 콘텐츠를 JSON 형식으로 직접 수정할 수 있습니다. 변경 후 "콘텐츠 저장" 버튼을 클릭하세요.
+                  페이지 콘텐츠를 JSON 형식으로 직접 수정할 수 있습니다. "적용" 버튼을 클릭하여 변경사항을 미리보기에 반영하세요.
                 </p>
               </div>
             </TabsContent>
