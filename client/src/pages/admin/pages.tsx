@@ -1061,7 +1061,7 @@ export default function PagesManagement() {
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="settings" className="flex-1 overflow-auto mt-4">
+            <TabsContent value="settings" className="data-[state=active]:flex-1 overflow-auto mt-4">
               <div className="space-y-4 pr-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -1145,7 +1145,7 @@ export default function PagesManagement() {
               </div>
             </TabsContent>
             
-            <TabsContent value="code" className="flex-1 flex flex-col min-h-0 mt-4">
+            <TabsContent value="code" className="data-[state=active]:flex-1 data-[state=active]:flex flex-col min-h-0 mt-4">
               <div className="flex-1 flex flex-col min-h-0 space-y-2">
                 <div className="bg-muted px-4 py-2 rounded-t-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1232,7 +1232,7 @@ export default function PagesManagement() {
               </div>
             </TabsContent>
             
-            <TabsContent value="preview" className="flex-1 flex flex-col mt-4 min-h-0">
+            <TabsContent value="preview" className="data-[state=active]:flex-1 data-[state=active]:flex flex-col mt-4 min-h-0">
               <div className="border rounded-lg overflow-hidden bg-background flex-1 flex flex-col min-h-0">
                 <div className="bg-muted px-4 py-2 border-b flex items-center justify-between flex-wrap gap-2 shrink-0">
                   <div className="flex items-center gap-2">
