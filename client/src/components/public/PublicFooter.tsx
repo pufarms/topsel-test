@@ -15,7 +15,7 @@ export function PublicFooter() {
   const showPrivacy = settings?.footer_show_privacy !== false;
 
   return (
-    <footer className="border-t bg-muted/40" data-testid="footer">
+    <footer className="border-t bg-muted/40 mt-16" data-testid="footer">
       <div className="container px-4 md:px-6 py-8">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">

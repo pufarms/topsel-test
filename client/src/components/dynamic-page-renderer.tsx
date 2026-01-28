@@ -2290,7 +2290,6 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
           {benefits.length > 0 && (
             <div 
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto"
-              style={{ marginBottom: '60px' }}
             >
               {benefits.map((benefit: string, index: number) => (
                 <div 
