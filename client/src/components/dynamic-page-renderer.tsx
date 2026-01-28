@@ -2240,7 +2240,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
               isEditing={isEditing}
               onEdit={onFieldEdit}
               as="h2"
-              className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-4 text-white"
+              className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white"
             />
           )}
           {data.description && (
