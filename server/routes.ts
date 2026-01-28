@@ -13,6 +13,18 @@ import { uploadImage, deleteImage } from "./r2";
 
 const IMP_KEY = process.env.IMP_KEY || '';
 const IMP_SECRET = process.env.IMP_SECRET || '';
+const IMP_CODE = process.env.IMP_CODE || 'imp10391932';
+
+// 포트원 환경변수 설정 경고
+if (!process.env.IMP_KEY) {
+  console.warn('\x1b[33m⚠️  경고: IMP_KEY 환경변수가 설정되지 않았습니다. 포트원 본인인증이 작동하지 않습니다.\x1b[0m');
+}
+if (!process.env.IMP_SECRET) {
+  console.warn('\x1b[33m⚠️  경고: IMP_SECRET 환경변수가 설정되지 않았습니다. 포트원 본인인증이 작동하지 않습니다.\x1b[0m');
+}
+if (!process.env.IMP_CODE) {
+  console.warn('\x1b[33m⚠️  경고: IMP_CODE 환경변수가 설정되지 않았습니다. 테스트 코드(imp10391932)를 사용합니다.\x1b[0m');
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -1164,6 +1176,14 @@ export async function registerRoutes(
   app.get("/api/auth/check-member-username/:username", async (req, res) => {
     const existing = await storage.getMemberByUsername(req.params.username);
     return res.json({ available: !existing });
+  });
+
+  // 포트원 설정 API (프론트엔드용)
+  app.get("/api/config/portone", async (req, res) => {
+    res.json({ 
+      imp_code: IMP_CODE,
+      configured: !!(process.env.IMP_KEY && process.env.IMP_SECRET)
+    });
   });
 
   // 포트원 본인인증 검증 API
