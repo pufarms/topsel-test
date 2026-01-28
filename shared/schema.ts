@@ -265,6 +265,8 @@ export const members = pgTable("members", {
   point: integer("point").notNull().default(0),
   status: text("status").notNull().default("활성"),
   memo: text("memo"),
+  businessLicenseUrl: text("business_license_url"),
+  profileImageUrl: text("profile_image_url"),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   lastLoginAt: timestamp("last_login_at"),
