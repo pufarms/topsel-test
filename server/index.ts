@@ -1,9 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
+
+// Serve static files from public folder
+app.use(express.static(path.resolve(process.cwd(), "public")));
 const httpServer = createServer(app);
 
 declare module "http" {
