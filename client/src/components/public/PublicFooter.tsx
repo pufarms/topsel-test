@@ -13,6 +13,7 @@ export function PublicFooter() {
   const copyright = settings?.footer_copyright || "Copyright © 2025 TopSeller. All rights reserved.";
   const showTerms = settings?.footer_show_terms !== false;
   const showPrivacy = settings?.footer_show_privacy !== false;
+  const showThirdParty = settings?.footer_show_third_party === true;
 
   return (
     <footer className="border-t bg-muted/40" data-testid="footer">
@@ -55,7 +56,7 @@ export function PublicFooter() {
           </div>
 
           <div className="space-y-2">
-            {(showTerms || showPrivacy) && (
+            {(showTerms || showPrivacy || showThirdParty) && (
               <div className="flex flex-wrap gap-4">
                 {showTerms && (
                   <Link 
@@ -73,6 +74,15 @@ export function PublicFooter() {
                     data-testid="link-privacy"
                   >
                     개인정보처리방침
+                  </Link>
+                )}
+                {showThirdParty && (
+                  <Link 
+                    href="/third-party-consent" 
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    data-testid="link-third-party"
+                  >
+                    개인정보 제3자 제공 동의
                   </Link>
                 )}
               </div>

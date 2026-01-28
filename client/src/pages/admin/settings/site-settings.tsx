@@ -340,6 +340,17 @@ export default function SiteSettingsPage() {
                           data-testid="switch-show-privacy"
                         />
                       </div>
+                      <div className="flex items-center justify-between p-3 rounded-md border">
+                        <Label htmlFor="footer_show_third_party" className="cursor-pointer">
+                          개인정보 제3자 제공 동의 링크
+                        </Label>
+                        <Switch
+                          id="footer_show_third_party"
+                          checked={formData.footer_show_third_party === "true"}
+                          onCheckedChange={(checked) => handleSwitchChange("footer_show_third_party", checked)}
+                          data-testid="switch-show-third-party"
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
