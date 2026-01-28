@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, LogOut, Loader2, ShoppingCart, DollarSign } from "lucide-react";
+import { Loader2, ShoppingCart, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { usePublicSiteSettings } from "@/hooks/use-site-settings";
+import { PublicHeader } from "@/components/public/PublicHeader";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertOrderSchema } from "@shared/schema";
 import type { z } from "zod";
@@ -24,10 +24,7 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const { data: siteSettings } = usePublicSiteSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const form = useForm<OrderForm>({
     resolver: zodResolver(insertOrderSchema),
@@ -108,36 +105,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              {siteSettings?.header_logo_url ? (
-                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
-              ) : (
-                <Package className="h-6 w-6 text-primary" />
-              )}
-              <span className="text-xl font-bold">{siteName}</span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              {user.name}님
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              로그아웃
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-8 pt-24">
         <h1 className="text-3xl font-bold mb-8">대시보드</h1>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">

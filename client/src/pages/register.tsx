@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Package, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { usePublicSiteSettings } from "@/hooks/use-site-settings";
+import { PublicHeader } from "@/components/public/PublicHeader";
 import { registerSchema } from "@shared/schema";
 import type { z } from "zod";
 
@@ -19,10 +19,7 @@ export default function Register() {
   const [, navigate] = useLocation();
   const { register, user } = useAuth();
   const { toast } = useToast();
-  const { data: siteSettings } = usePublicSiteSettings();
   const [isLoading, setIsLoading] = useState(false);
-  
-  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -59,22 +56,9 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer w-fit">
-              {siteSettings?.header_logo_url ? (
-                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
-              ) : (
-                <Package className="h-6 w-6 text-primary" />
-              )}
-              <span className="text-xl font-bold">{siteName}</span>
-            </div>
-          </Link>
-        </div>
-      </header>
+      <PublicHeader />
 
-      <main className="flex-1 flex items-center justify-center p-6">
+      <main className="flex-1 flex items-center justify-center p-6 pt-24">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">회원가입</CardTitle>

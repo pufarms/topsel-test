@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, LogOut, Loader2, Download, Users, ShoppingCart } from "lucide-react";
+import { Loader2, Download, Users, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { usePublicSiteSettings } from "@/hooks/use-site-settings";
+import { PublicHeader } from "@/components/public/PublicHeader";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { userTiers, type User, type Order } from "@shared/schema";
 
@@ -23,9 +23,6 @@ export default function Admin() {
   const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const { data: siteSettings } = usePublicSiteSettings();
-  
-  const siteName = siteSettings?.site_name || "TOPSEL";
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -126,37 +123,9 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              {siteSettings?.header_logo_url ? (
-                <img src={siteSettings.header_logo_url} alt={siteName} className="h-8" />
-              ) : (
-                <Package className="h-6 w-6 text-primary" />
-              )}
-              <span className="text-xl font-bold">{siteName}</span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="text-xs">관리자</Badge>
-            <span className="text-sm text-muted-foreground">
-              {user.name}님
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              로그아웃
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-8 pt-24">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <h1 className="text-3xl font-bold">관리자 페이지</h1>
           <Button onClick={handleExportCSV} data-testid="button-export-csv">
