@@ -92,6 +92,14 @@ Preferred communication style: Simple, everyday language.
 - **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
 - **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
 - **Page Management (Admin)**: CMS for dynamic page creation and management using a JSON-based content system (`pages` table). Features include a visual content editor with 9 section types, real-time preview, 8 predefined page categories, and access level control. System pages are non-deletable. Dynamic page rendering handles public paths.
+- **Term Agreement Record Keeping (Admin)**: Legal evidence system for storing user consent records (`term_agreements` table). Features include:
+  - Full terms content snapshot at time of agreement (not a reference)
+  - SHA-256 hash for content integrity verification (contentHash)
+  - Electronic signature storage with SHA-256 signature hash (signatureHash)
+  - IP address (first IP from x-forwarded-for), user agent, and timestamp recording
+  - Member identification (CEO birth, CI from identity verification, phone)
+  - Term versions from CMS for traceability
+  - Admin page for searching and viewing agreement records (/admin/term-agreements)
 
 ## External Dependencies
 
