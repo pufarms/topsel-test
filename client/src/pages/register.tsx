@@ -422,50 +422,6 @@ export default function Register() {
               </section>
 
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">{sections.terms?.title || "약관 동의"}</h3>
-                <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-                  {[
-                    { key: 'service', title: termsContent.service?.title || "서비스 이용약관", content: termsContent.service?.content || "본 약관은 현 농업회사법인 주식회사가 제공하는 탑셀러 서비스의 이용과 관련하여 회사와 이용자 간의 권리, 의무 및 책임사항을 규정합니다." },
-                    { key: 'privacy', title: termsContent.privacy?.title || "개인정보 수집 및 이용 동의", content: termsContent.privacy?.content || "서비스 제공 및 계약 이행, 회원 관리 및 본인 확인, 고지사항 전달 및 민원 처리를 위해 개인정보를 수집합니다." },
-                    { key: 'third_party', title: termsContent.third_party?.title || "개인정보 제3자 제공 동의", content: termsContent.third_party?.content || "택배사(CJ대한통운, 롯데택배 등)에 수령인 성명, 전화번호, 배송지 주소를 제공합니다. 배송 완료 후 3개월간 보유됩니다." },
-                  ].map((term, index) => (
-                    <div key={term.key} className="bg-background rounded-lg border">
-                      <div 
-                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
-                        onClick={() => toggleTerm(index)}
-                      >
-                        <span className="font-medium text-sm">{index + 1}. {term.title}</span>
-                        {expandedTerms.includes(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </div>
-                      {expandedTerms.includes(index) && (
-                        <div className="p-3 pt-0 text-sm text-muted-foreground border-t">
-                          {term.content}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <div className="space-y-2 pt-2">
-                    {[
-                      { id: 'agree1', label: '[필수] 위 서비스 이용약관 내용에 동의합니다.' },
-                      { id: 'agree2', label: '[필수] 개인정보 수집 및 이용에 동의합니다.' },
-                      { id: 'agree3', label: '[필수] 개인정보 제3자 제공에 동의합니다.' },
-                    ].map((item) => (
-                      <div key={item.id} className="flex items-center gap-2 p-2 bg-background rounded">
-                        <Checkbox 
-                          id={item.id} 
-                          checked={agreements[item.id as keyof typeof agreements]}
-                          onCheckedChange={(checked) => setAgreements(prev => ({ ...prev, [item.id]: !!checked }))}
-                          data-testid={`checkbox-${item.id}`}
-                        />
-                        <Label htmlFor={item.id} className="text-sm cursor-pointer">{item.label}</Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">{sections.verification?.title || "대표자 본인인증"}</h3>
                 <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -497,6 +453,50 @@ export default function Register() {
                 </div>
                 <input type="hidden" name="ceo_birth" />
                 <input type="hidden" name="ceo_ci" />
+
+                <div className="mt-6 pt-4 border-t">
+                  <h4 className="text-base font-medium mb-3">{sections.terms?.title || "약관 동의"}</h4>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    {[
+                      { key: 'service', title: termsContent.service?.title || "서비스 이용약관", content: termsContent.service?.content || "본 약관은 현 농업회사법인 주식회사가 제공하는 탑셀러 서비스의 이용과 관련하여 회사와 이용자 간의 권리, 의무 및 책임사항을 규정합니다." },
+                      { key: 'privacy', title: termsContent.privacy?.title || "개인정보 수집 및 이용 동의", content: termsContent.privacy?.content || "서비스 제공 및 계약 이행, 회원 관리 및 본인 확인, 고지사항 전달 및 민원 처리를 위해 개인정보를 수집합니다." },
+                      { key: 'third_party', title: termsContent.third_party?.title || "개인정보 제3자 제공 동의", content: termsContent.third_party?.content || "택배사(CJ대한통운, 롯데택배 등)에 수령인 성명, 전화번호, 배송지 주소를 제공합니다. 배송 완료 후 3개월간 보유됩니다." },
+                    ].map((term, index) => (
+                      <div key={term.key} className="bg-background rounded-lg border">
+                        <div 
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50"
+                          onClick={() => toggleTerm(index)}
+                        >
+                          <span className="font-medium text-sm">{index + 1}. {term.title}</span>
+                          {expandedTerms.includes(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </div>
+                        {expandedTerms.includes(index) && (
+                          <div className="p-3 pt-0 text-sm text-muted-foreground border-t">
+                            {term.content}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    <div className="space-y-2 pt-2">
+                      {[
+                        { id: 'agree1', label: '[필수] 위 서비스 이용약관 내용에 동의합니다.' },
+                        { id: 'agree2', label: '[필수] 개인정보 수집 및 이용에 동의합니다.' },
+                        { id: 'agree3', label: '[필수] 개인정보 제3자 제공에 동의합니다.' },
+                      ].map((item) => (
+                        <div key={item.id} className="flex items-center gap-2 p-2 bg-background rounded">
+                          <Checkbox 
+                            id={item.id} 
+                            checked={agreements[item.id as keyof typeof agreements]}
+                            onCheckedChange={(checked) => setAgreements(prev => ({ ...prev, [item.id]: !!checked }))}
+                            data-testid={`checkbox-${item.id}`}
+                          />
+                          <Label htmlFor={item.id} className="text-sm cursor-pointer">{item.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section className="space-y-4">
