@@ -2600,6 +2600,15 @@ export function DynamicPageRenderer({ content, isEditing, onSectionClick, onFiel
     );
   }
 
+  // Check if sections is an array (normal pages) or object (special pages like register)
+  if (!Array.isArray(content.sections)) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p>이 페이지는 별도의 전용 렌더러를 사용합니다.</p>
+      </div>
+    );
+  }
+  
   const sortedSections = [...content.sections].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
