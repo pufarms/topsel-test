@@ -45,6 +45,8 @@ interface RegisterPageContent {
     success?: string;
     error?: string;
     password_mismatch?: string;
+    password_match?: string;
+    password_min_length?: string;
     signature_required?: string;
     verification_required?: string;
     terms_required?: string;
@@ -336,9 +338,9 @@ export default function Register() {
                           {passwordMatch !== null && (
                             <span className={`text-sm font-medium flex items-center gap-1 ${passwordMatch ? "text-green-600" : "text-destructive"}`}>
                               {passwordMatch ? (
-                                <><Check className="w-4 h-4" /> 일치</>
+                                <><Check className="w-4 h-4" /> {messages.password_match || "일치"}</>
                               ) : (
-                                <><AlertCircle className="w-4 h-4" /> 불일치</>
+                                <><AlertCircle className="w-4 h-4" /> {messages.password_mismatch || "불일치"}</>
                               )}
                             </span>
                           )}
