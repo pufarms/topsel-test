@@ -1161,42 +1161,84 @@ function SliderStatCounter({ stat, sectionId, index, isEditing, onFieldEdit, sli
 // Hero Slider Section - Full-screen image slider with Fade + Ken Burns effect
 function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   if (!data) return null;
   
   const slides = data.slides || [];
   const slideDuration = data.slideDuration || 5500;
   const autoPlay = data.autoPlay !== false;
+  const transitionDuration = 1200; // ms for crossfade
+  
+  // Handle slide change with proper crossfade
+  const changeSlide = (newIndex: number) => {
+    if (newIndex === currentIndex || isTransitioning) return;
+    
+    // Clear any existing timers
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
+    
+    // Start transition
+    setPreviousIndex(currentIndex);
+    setIsTransitioning(true);
+    setCurrentIndex(newIndex);
+    
+    // End transition after animation completes
+    transitionTimeoutRef.current = setTimeout(() => {
+      setPreviousIndex(null);
+      setIsTransitioning(false);
+    }, transitionDuration);
+  };
   
   // Start/stop auto-play
   useEffect(() => {
-    if (autoPlay && slides.length > 1) {
+    if (autoPlay && slides.length > 1 && !isTransitioning) {
       intervalRef.current = setInterval(() => {
-        setCurrentIndex(prev => (prev + 1) % slides.length);
+        setCurrentIndex(prev => {
+          const next = (prev + 1) % slides.length;
+          setPreviousIndex(prev);
+          setIsTransitioning(true);
+          
+          // End transition
+          setTimeout(() => {
+            setPreviousIndex(null);
+            setIsTransitioning(false);
+          }, transitionDuration);
+          
+          return next;
+        });
       }, slideDuration);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [autoPlay, slides.length, slideDuration, currentIndex]);
+  }, [autoPlay, slides.length, slideDuration, isTransitioning]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
+    };
+  }, []);
   
   const goToSlide = (index: number) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setCurrentIndex(index);
+    changeSlide(index);
   };
   
   const prevSlide = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length);
+    const newIndex = (currentIndex - 1 + slides.length) % slides.length;
+    changeSlide(newIndex);
   };
   
   const nextSlide = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setCurrentIndex(prev => (prev + 1) % slides.length);
+    const newIndex = (currentIndex + 1) % slides.length;
+    changeSlide(newIndex);
   };
   
   // Touch swipe handlers
@@ -1269,27 +1311,45 @@ function HeroSliderSection({ data, sectionId, isEditing, onFieldEdit }: SectionP
         </div>
       )}
 
-      {/* Slides */}
-      {slides.map((slide: any, index: number) => (
-        <div
-          key={slide.id || index}
-          className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out overflow-hidden ${
-            index === currentIndex ? 'opacity-100 z-[1]' : 'opacity-0 z-0'
-          }`}
-        >
-          <img
-            src={slide.imageUrl}
-            alt={slide.imageAlt || `슬라이드 ${index + 1}`}
-            className={`w-full h-full object-contain md:object-cover ${
-              index === currentIndex ? 'animate-kenburns' : ''
-            }`}
+      {/* Slides - Proper crossfade with previous slide visible during transition */}
+      {slides.map((slide: any, index: number) => {
+        const isCurrent = index === currentIndex;
+        const isPrevious = index === previousIndex;
+        const isVisible = isCurrent || isPrevious;
+        
+        // z-index: previous slide at 1, current slide at 2 during transition
+        const zIndex = isCurrent ? 2 : (isPrevious ? 1 : 0);
+        
+        return (
+          <div
+            key={slide.id || index}
+            className={`absolute inset-0 overflow-hidden`}
             style={{
-              animationName: index === currentIndex ? `kenburns-${(index % 3) + 1}` : 'none',
-              objectPosition: 'center center',
+              opacity: isCurrent ? 1 : (isPrevious ? 1 : 0),
+              zIndex,
+              transition: `opacity ${transitionDuration}ms ease-in-out`,
+              visibility: isVisible ? 'visible' : 'hidden',
             }}
-          />
-        </div>
-      ))}
+          >
+            <img
+              src={slide.imageUrl}
+              alt={slide.imageAlt || `슬라이드 ${index + 1}`}
+              className={`w-full h-full object-contain md:object-cover ${
+                isCurrent ? 'animate-kenburns' : ''
+              }`}
+              style={{
+                animationName: isCurrent ? `kenburns-${(index % 3) + 1}` : 'none',
+                objectPosition: 'center center',
+              }}
+              onError={(e) => {
+                // Fallback for broken images - show placeholder
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          </div>
+        );
+      })}
 
       {/* Content Overlay - Buttons and Stats */}
       {(data.buttonText || (data.stats && data.stats.length > 0)) && (
