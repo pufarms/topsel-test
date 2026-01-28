@@ -2216,7 +2216,7 @@ function CTAAdvancedSection({ data, sectionId, isEditing, onClick, onFieldEdit }
             <a 
               href={data.promoBadgeLink || "#"}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
-              style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', marginBottom: '100px' }}
+              style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', marginBottom: '50px' }}
             >
               <PartyPopper className="w-4 h-4" />
               <EditableField
