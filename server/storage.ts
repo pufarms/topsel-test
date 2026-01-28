@@ -1381,12 +1381,40 @@ export class DatabaseStorage implements IStorage {
 
   async updateSiteSettings(settings: Record<string, string>): Promise<void> {
     for (const [key, value] of Object.entries(settings)) {
-      await db.update(siteSettings)
-        .set({ 
+      // Check if setting exists
+      const [existing] = await db.select().from(siteSettings).where(eq(siteSettings.settingKey, key));
+      
+      if (existing) {
+        // Update existing setting
+        await db.update(siteSettings)
+          .set({ 
+            settingValue: String(value),
+            updatedAt: new Date()
+          })
+          .where(eq(siteSettings.settingKey, key));
+      } else {
+        // Create new setting - determine type and category from key
+        let settingType = "string";
+        let category = "general";
+        
+        if (value === "true" || value === "false") {
+          settingType = "boolean";
+        }
+        
+        if (key.startsWith("header_")) {
+          category = "header";
+        } else if (key.startsWith("footer_")) {
+          category = "footer";
+        }
+        
+        await db.insert(siteSettings).values({
+          settingKey: key,
           settingValue: String(value),
-          updatedAt: new Date()
-        })
-        .where(eq(siteSettings.settingKey, key));
+          settingType,
+          category,
+          description: key,
+        });
+      }
     }
   }
 
@@ -1414,6 +1442,7 @@ export class DatabaseStorage implements IStorage {
       { settingKey: "footer_copyright", settingValue: "Copyright © 2025 TopSeller. All rights reserved.", settingType: "string", category: "footer", description: "저작권 문구" },
       { settingKey: "footer_show_terms", settingValue: "true", settingType: "boolean", category: "footer", description: "이용약관 링크 표시" },
       { settingKey: "footer_show_privacy", settingValue: "true", settingType: "boolean", category: "footer", description: "개인정보처리방침 링크 표시" },
+      { settingKey: "footer_show_third_party", settingValue: "false", settingType: "boolean", category: "footer", description: "개인정보 제3자 제공 동의 링크 표시" },
       
       // 일반 설정
       { settingKey: "site_name", settingValue: "탑셀러", settingType: "string", category: "general", description: "사이트 이름" },

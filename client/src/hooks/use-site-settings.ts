@@ -20,6 +20,7 @@ export interface SiteSettingsMap {
   footer_copyright?: string;
   footer_show_terms?: boolean;
   footer_show_privacy?: boolean;
+  footer_show_third_party?: boolean;
   
   // General
   site_name?: string;
