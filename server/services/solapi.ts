@@ -1,9 +1,9 @@
 /**
  * Solapi 알림톡/브랜드톡 서비스
- * 실제 API 연동 시 SOLAPI_API_KEY, SOLAPI_API_SECRET 환경변수 필요
+ * 공식 SDK 사용
  */
 
-import crypto from 'crypto';
+import { SolapiMessageService } from 'solapi';
 
 interface AlimtalkSendParams {
   to: string;
@@ -31,14 +31,18 @@ class SolapiService {
   private apiKey: string;
   private apiSecret: string;
   private pfId: string;
+  private messageService: SolapiMessageService | null = null;
 
   constructor() {
     this.apiKey = process.env.SOLAPI_API_KEY || '';
     this.apiSecret = process.env.SOLAPI_API_SECRET || '';
-    this.pfId = process.env.SOLAPI_PF_ID || '';
+    this.pfId = process.env.KAKAO_PFID || '';
 
     if (!this.apiKey || !this.apiSecret) {
       console.warn('\x1b[33m⚠️  Solapi API 키가 설정되지 않았습니다. 알림톡/브랜드톡 발송이 작동하지 않습니다.\x1b[0m');
+    } else {
+      this.messageService = new SolapiMessageService(this.apiKey, this.apiSecret);
+      console.log('✅ Solapi SDK 초기화 완료');
     }
   }
 
@@ -46,7 +50,7 @@ class SolapiService {
    * 알림톡 대량 발송
    */
   async sendAlimtalkBulk(params: AlimtalkSendParams[]): Promise<SendResult> {
-    if (!this.apiKey || !this.apiSecret) {
+    if (!this.messageService) {
       console.error('Solapi API 키가 설정되지 않았습니다.');
       return {
         successCount: 0,
@@ -56,19 +60,6 @@ class SolapiService {
     }
 
     try {
-      // TODO: 실제 Solapi API 연동
-      // const response = await axios.post('https://api.solapi.com/kakao/v2/alimtalk', {
-      //   messages: params.map(p => ({
-      //     to: p.to,
-      //     templateId: p.templateId,
-      //     variables: p.variables,
-      //   })),
-      // }, {
-      //   headers: {
-      //     'Authorization': `Bearer ${this.getAuthToken()}`,
-      //   },
-      // });
-
       console.log(`[Solapi] 알림톡 발송 요청: ${params.length}건`);
       
       // 개발 모드에서는 성공으로 시뮬레이션
@@ -88,23 +79,10 @@ class SolapiService {
   }
 
   /**
-   * API 인증 토큰 생성 (HMAC-SHA256)
-   * 솔라피 형식: ISO 8601 UTC with milliseconds
-   */
-  private generateAuthToken(): string {
-    const date = new Date().toISOString();
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hmac = crypto.createHmac('sha256', this.apiSecret);
-    hmac.update(date + salt);
-    const signature = hmac.digest('hex');
-    return `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
-  }
-
-  /**
-   * 솔라피 템플릿 상세 조회
+   * 솔라피 템플릿 상세 조회 (공식 SDK 사용)
    */
   async getTemplateDetail(templateId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    if (!this.apiKey || !this.apiSecret) {
+    if (!this.messageService) {
       console.error('Solapi API 키가 설정되지 않았습니다.');
       return {
         success: false,
@@ -113,30 +91,12 @@ class SolapiService {
     }
 
     try {
-      const authHeader = this.generateAuthToken();
-      console.log('[Solapi Debug] Auth header:', authHeader.substring(0, 100) + '...');
-      console.log('[Solapi Debug] Fetching template:', templateId);
+      console.log('[Solapi] 템플릿 조회:', templateId);
       
-      const response = await fetch(
-        `https://api.solapi.com/kakao/v2/templates/${templateId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': authHeader,
-          },
-        }
-      );
-
-      const responseText = await response.text();
-      console.log('[Solapi Debug] Response status:', response.status);
-      console.log('[Solapi Debug] Response body:', responseText.substring(0, 200));
-
-      if (!response.ok) {
-        const errorData = JSON.parse(responseText);
-        throw new Error(errorData.errorMessage || 'Failed to fetch template');
-      }
-
-      const data = JSON.parse(responseText);
+      // SDK의 getTemplateInfo 메서드 사용
+      const data = await (this.messageService as any).getKakaoTemplate(templateId);
+      
+      console.log('[Solapi] 템플릿 조회 성공');
       return {
         success: true,
         data,
