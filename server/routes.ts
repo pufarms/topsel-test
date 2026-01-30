@@ -4665,6 +4665,41 @@ export async function registerRoutes(
     }
   });
 
+  // 알림톡 템플릿 상세 조회 (솔라피 API)
+  app.get('/api/admin/alimtalk/templates/:id/detail', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+
+    try {
+      const [template] = await db.select()
+        .from(alimtalkTemplates)
+        .where(eq(alimtalkTemplates.id, parseInt(id)))
+        .limit(1);
+
+      if (!template) {
+        return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
+      }
+
+      const { solapiService } = await import('./services/solapi');
+      const result = await solapiService.getTemplateDetail(template.templateId);
+
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
+      }
+
+      res.json(result.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 알림톡 수동 발송
   app.post('/api/admin/alimtalk/send/:code', async (req, res) => {
     if (!req.session.userId) {

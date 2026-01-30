@@ -1,0 +1,152 @@
+// 템플릿 상세 조회 쿼리 추가 (handleViewTemplate 함수 위에)
+const { data: templateDetailData, isLoading: loadingDetail } = useQuery({
+  queryKey: ['/api/admin/alimtalk/templates', viewingTemplate?.id, 'detail'],
+  queryFn: async () => {
+    if (!viewingTemplate) return null;
+    const res = await fetch(`/api/admin/alimtalk/templates/${viewingTemplate.id}/detail`);
+    if (!res.ok) throw new Error('조회 실패');
+    return res.json();
+  },
+  enabled: !!viewingTemplate && viewModalOpen,
+});
+
+// 템플릿 내용 보기 모달 전체 교체:
+<Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>{viewingTemplate?.templateName}</DialogTitle>
+      <DialogDescription>
+        {viewingTemplate?.isAuto ? '자동 발송 알림' : '수동 발송 알림'}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-4">
+      <div>
+        <label className="text-sm font-medium mb-2 block">템플릿 코드</label>
+        <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+          {viewingTemplate?.templateCode}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</label>
+        <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
+          {viewingTemplate?.templateId}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-2 block">설명</label>
+        <div className="p-3 bg-muted rounded-lg text-sm">
+          {viewingTemplate?.description}
+        </div>
+      </div>
+
+      {/* 메시지 내용 (솔라피에서 조회) */}
+      <div>
+        <label className="text-sm font-medium mb-2 block">
+          📝 메시지 내용
+        </label>
+        {loadingDetail ? (
+          <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+            솔라피에서 조회 중...
+          </div>
+        ) : !templateDetailData ? (
+          <div className="p-4 bg-muted rounded-lg text-sm text-red-600">
+            내용을 불러올 수 없습니다
+          </div>
+        ) : (
+          <div className="p-4 bg-muted rounded-lg border border-gray-300">
+            <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+              {templateDetailData.templateContent || 
+               templateDetailData.content || 
+               '내용을 불러올 수 없습니다'}
+            </pre>
+          </div>
+        )}
+      </div>
+
+      {/* 템플릿 변수 (있는 경우) */}
+      {templateDetailData?.templateParameter && templateDetailData.templateParameter.length > 0 && (
+        <div>
+          <label className="text-sm font-medium mb-2 block">
+            🔤 변수 목록
+          </label>
+          <div className="p-3 bg-muted rounded-lg">
+            <div className="flex flex-wrap gap-2">
+              {templateDetailData.templateParameter.map((param: string, idx: number) => (
+                <Badge key={idx} variant="secondary">
+                  #{{{param}}}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 버튼 정보 (있는 경우) */}
+      {templateDetailData?.buttons && templateDetailData.buttons.length > 0 && (
+        <div>
+          <label className="text-sm font-medium mb-2 block">
+            🔘 버튼 정보
+          </label>
+          <div className="space-y-2">
+            {templateDetailData.buttons.map((button: any, idx: number) => (
+              <div key={idx} className="p-3 bg-muted rounded-lg">
+                <div className="font-medium text-sm">{button.name}</div>
+                {button.linkMo && (
+                  <div className="text-muted-foreground text-xs mt-1 break-all">
+                    {button.linkMo}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="text-sm font-medium mb-2 block">발송 통계</label>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-3 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground mb-1">총 발송</div>
+            <div className="text-2xl font-bold">
+              {viewingTemplate?.totalSent.toLocaleString()}건
+            </div>
+          </div>
+          <div className="p-3 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground mb-1">총 비용</div>
+            <div className="text-2xl font-bold">
+              {viewingTemplate?.totalCost.toLocaleString()}원
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-2 block">상태</label>
+        <div className="flex gap-2">
+          <Badge variant={viewingTemplate?.isAuto ? 'secondary' : 'default'}>
+            {viewingTemplate?.isAuto ? '자동 발송' : '수동 발송'}
+          </Badge>
+          <Badge variant={viewingTemplate?.isActive ? 'default' : 'secondary'}>
+            {viewingTemplate?.isActive ? 'ON' : 'OFF'}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="p-4 border-l-4 border-blue-500 bg-blue-50 rounded">
+        <p className="text-sm text-blue-900">
+          <strong>💡 참고:</strong>
+          {viewingTemplate?.isAuto
+            ? ' 이 알림은 시스템에서 자동으로 발송됩니다.'
+            : ' 이 알림은 관련 관리 페이지에서 버튼을 클릭하여 발송할 수 있습니다.'}
+        </p>
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button onClick={() => setViewModalOpen(false)}>닫기</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>

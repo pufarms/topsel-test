@@ -3,6 +3,8 @@
  * 실제 API 연동 시 SOLAPI_API_KEY, SOLAPI_API_SECRET 환경변수 필요
  */
 
+import crypto from 'crypto';
+
 interface AlimtalkSendParams {
   to: string;
   templateId: string;
@@ -81,6 +83,60 @@ class SolapiService {
         successCount: 0,
         failCount: params.length,
         data: { error: error.message },
+      };
+    }
+  }
+
+  /**
+   * API 인증 토큰 생성 (HMAC-SHA256)
+   */
+  private generateAuthToken(): string {
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hmac = crypto.createHmac('sha256', this.apiSecret);
+    hmac.update(date + salt);
+    const signature = hmac.digest('hex');
+    return `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+  }
+
+  /**
+   * 솔라피 템플릿 상세 조회
+   */
+  async getTemplateDetail(templateId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.apiKey || !this.apiSecret) {
+      console.error('Solapi API 키가 설정되지 않았습니다.');
+      return {
+        success: false,
+        error: 'API key not configured',
+      };
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.solapi.com/kakao/v2/templates/${templateId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': this.generateAuthToken(),
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errorMessage || 'Failed to fetch template');
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data,
+      };
+    } catch (error: any) {
+      console.error('템플릿 조회 실패:', error.message);
+      return {
+        success: false,
+        error: error.message,
       };
     }
   }
