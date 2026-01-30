@@ -105,7 +105,7 @@ class SolapiService {
       
       const response = await axios.get(url, {
         headers: {
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': authToken,
           'Content-Type': 'application/json'
         },
         timeout: 10000
