@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, brandtalkTemplates, brandtalkHistory } from "@shared/schema";
+import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
 import MemoryStore from "memorystore";
@@ -13,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -4542,6 +4543,398 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to delete announcement:", error);
       res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // ━━━━━ 알림톡 API ━━━━━
+
+  // 알림톡 템플릿 목록 조회
+  app.get('/api/admin/alimtalk/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const templates = await db.select().from(alimtalkTemplates).orderBy(
+        desc(alimtalkTemplates.isAuto),
+        alimtalkTemplates.templateName
+      );
+
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 알림톡 전체 통계
+  app.get('/api/admin/alimtalk/statistics', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const templates = await db.select().from(alimtalkTemplates);
+      
+      const totalTemplates = templates.length;
+      const totalSent = templates.reduce((sum, t) => sum + (t.totalSent || 0), 0);
+      const totalCost = templates.reduce((sum, t) => sum + (t.totalCost || 0), 0);
+
+      // 이번 달 통계
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const monthlyHistory = await db.select().from(alimtalkHistory).where(
+        sql`${alimtalkHistory.sentAt} >= ${startOfMonth}`
+      );
+
+      const monthlySent = monthlyHistory.reduce((sum, h) => sum + h.recipientCount, 0);
+      const monthlyCost = monthlyHistory.reduce((sum, h) => sum + h.cost, 0);
+
+      res.json({
+        totalTemplates,
+        totalSent,
+        totalCost,
+        monthlySent,
+        monthlyCost,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 알림톡 템플릿 ON/OFF 토글
+  app.patch('/api/admin/alimtalk/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    try {
+      await db.update(alimtalkTemplates)
+        .set({ 
+          isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(alimtalkTemplates.id, parseInt(id)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 알림톡 수동 발송
+  app.post('/api/admin/alimtalk/send/:code', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { code } = req.params;
+    const { recipients, variables } = req.body;
+
+    try {
+      // 템플릿 조회
+      const [template] = await db.select()
+        .from(alimtalkTemplates)
+        .where(eq(alimtalkTemplates.templateCode, code))
+        .limit(1);
+
+      if (!template) {
+        return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
+      }
+
+      if (!template.isActive) {
+        return res.status(400).json({ error: '비활성화된 템플릿입니다' });
+      }
+
+      // 발송
+      const sendParams = recipients.map((phone: string) => ({
+        to: phone,
+        templateId: template.templateId,
+        variables: variables || {},
+      }));
+
+      const result = await solapiService.sendAlimtalkBulk(sendParams);
+
+      // 이력 저장
+      const cost = result.successCount * 13; // 알림톡 건당 13원
+
+      await db.insert(alimtalkHistory).values({
+        templateId: template.id,
+        recipientCount: recipients.length,
+        successCount: result.successCount,
+        failCount: result.failCount,
+        cost,
+        sentBy: req.session.userId,
+        responseData: result.data,
+      });
+
+      // 템플릿 통계 업데이트
+      await db.update(alimtalkTemplates)
+        .set({
+          totalSent: sql`${alimtalkTemplates.totalSent} + ${result.successCount}`,
+          totalCost: sql`${alimtalkTemplates.totalCost} + ${cost}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(alimtalkTemplates.id, template.id));
+
+      res.json({
+        success: true,
+        sent: recipients.length,
+        successCount: result.successCount,
+        failCount: result.failCount,
+        cost,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 알림톡 발송 이력
+  app.get('/api/admin/alimtalk/history', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { limit = 50, offset = 0 } = req.query;
+
+    try {
+      const history = await db.select({
+        id: alimtalkHistory.id,
+        templateName: alimtalkTemplates.templateName,
+        recipientCount: alimtalkHistory.recipientCount,
+        successCount: alimtalkHistory.successCount,
+        failCount: alimtalkHistory.failCount,
+        cost: alimtalkHistory.cost,
+        sentAt: alimtalkHistory.sentAt,
+      })
+        .from(alimtalkHistory)
+        .leftJoin(alimtalkTemplates, eq(alimtalkHistory.templateId, alimtalkTemplates.id))
+        .orderBy(desc(alimtalkHistory.sentAt))
+        .limit(parseInt(limit as string))
+        .offset(parseInt(offset as string));
+
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ━━━━━ 브랜드톡 API ━━━━━
+
+  // 브랜드톡 템플릿 목록
+  app.get('/api/admin/brandtalk/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const templates = await db.select().from(brandtalkTemplates).orderBy(
+        desc(brandtalkTemplates.createdAt)
+      );
+
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 템플릿 저장
+  app.post('/api/admin/brandtalk/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { title, message, buttonName, buttonUrl } = req.body;
+
+    try {
+      const [template] = await db.insert(brandtalkTemplates).values({
+        title,
+        message,
+        buttonName: buttonName || null,
+        buttonUrl: buttonUrl || null,
+        createdBy: req.session.userId,
+      }).returning();
+
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 템플릿 수정
+  app.put('/api/admin/brandtalk/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+    const { title, message, buttonName, buttonUrl } = req.body;
+
+    try {
+      await db.update(brandtalkTemplates)
+        .set({
+          title,
+          message,
+          buttonName: buttonName || null,
+          buttonUrl: buttonUrl || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(brandtalkTemplates.id, parseInt(id)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 템플릿 삭제
+  app.delete('/api/admin/brandtalk/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+
+    try {
+      await db.delete(brandtalkTemplates).where(eq(brandtalkTemplates.id, parseInt(id)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 발송
+  app.post('/api/admin/brandtalk/send/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+    const { recipients } = req.body;
+
+    try {
+      // 템플릿 조회
+      const [template] = await db.select()
+        .from(brandtalkTemplates)
+        .where(eq(brandtalkTemplates.id, parseInt(id)))
+        .limit(1);
+
+      if (!template) {
+        return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
+      }
+
+      // 발송
+      const result = await solapiService.sendBrandtalk({
+        to: recipients,
+        title: template.title,
+        message: template.message,
+        button: template.buttonName && template.buttonUrl
+          ? { name: template.buttonName, url: template.buttonUrl }
+          : undefined,
+      });
+
+      // 이력 저장
+      const cost = result.successCount * 27; // 브랜드톡 건당 27원 (비친구)
+
+      await db.insert(brandtalkHistory).values({
+        templateId: template.id,
+        title: template.title,
+        message: template.message,
+        recipientCount: recipients.length,
+        successCount: result.successCount,
+        failCount: result.failCount,
+        cost,
+        sentBy: req.session.userId,
+        responseData: result.data,
+      });
+
+      // 템플릿 통계 업데이트
+      await db.update(brandtalkTemplates)
+        .set({
+          totalSent: sql`${brandtalkTemplates.totalSent} + ${result.successCount}`,
+          lastSentAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(brandtalkTemplates.id, template.id));
+
+      res.json({
+        success: true,
+        sent: recipients.length,
+        successCount: result.successCount,
+        failCount: result.failCount,
+        cost,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 발송 이력
+  app.get('/api/admin/brandtalk/history', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { limit = 50, offset = 0 } = req.query;
+
+    try {
+      const history = await db.select().from(brandtalkHistory)
+        .orderBy(desc(brandtalkHistory.sentAt))
+        .limit(parseInt(limit as string))
+        .offset(parseInt(offset as string));
+
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
