@@ -348,78 +348,68 @@ export default function AlimtalkPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <CardTitle>템플릿 목록</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
+                    </p>
+                    <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
+                      <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체</SelectItem>
+                        <SelectItem value="auto">자동</SelectItem>
+                        <SelectItem value="manual">수동</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
-                    <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="auto">자동</SelectItem>
-                      <SelectItem value="manual">수동</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {selectedTemplateIds.length > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg">
-                      <ArrowRightLeft className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">선택변경</span>
-                      <span className="text-sm text-muted-foreground">({selectedTemplateIds.length}개)</span>
-                      
-                      {templateFilter === 'manual' ? (
-                        <Button
-                          size="sm"
-                          className="bg-blue-500 hover:bg-blue-600 text-white"
-                          onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
-                          disabled={bulkModeMutation.isPending}
-                          data-testid="btn-bulk-auto"
-                        >
-                          <Zap className="w-4 h-4 mr-1" />
-                          자동으로 변경
-                        </Button>
-                      ) : templateFilter === 'auto' ? (
-                        <Button
-                          size="sm"
-                          className="bg-orange-500 hover:bg-orange-600 text-white"
-                          onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
-                          disabled={bulkModeMutation.isPending}
-                          data-testid="btn-bulk-manual"
-                        >
-                          <Hand className="w-4 h-4 mr-1" />
-                          수동으로 변경
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-blue-500 hover:bg-blue-600 text-white"
-                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
-                            disabled={bulkModeMutation.isPending}
-                            data-testid="btn-bulk-auto"
-                          >
-                            <Zap className="w-4 h-4 mr-1" />
-                            자동으로
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
-                            disabled={bulkModeMutation.isPending}
-                            data-testid="btn-bulk-manual"
-                          >
-                            <Hand className="w-4 h-4 mr-1" />
-                            수동으로
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border rounded-lg">
+                  <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">선택변경</span>
+                  {selectedTemplateIds.length > 0 ? (
+                    <>
+                      <span className="text-sm text-muted-foreground">({selectedTemplateIds.length}개 선택)</span>
+                      {(() => {
+                        const selectedTemplates = templates.filter(t => selectedTemplateIds.includes(t.id));
+                        const hasManual = selectedTemplates.some(t => !t.isAuto);
+                        const hasAuto = selectedTemplates.some(t => t.isAuto);
+                        return (
+                          <>
+                            {hasManual && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-500 hover:bg-blue-600 text-white"
+                                onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
+                                disabled={bulkModeMutation.isPending}
+                                data-testid="btn-bulk-auto"
+                              >
+                                <Zap className="w-4 h-4 mr-1" />
+                                자동으로 변경
+                              </Button>
+                            )}
+                            {hasAuto && (
+                              <Button
+                                size="sm"
+                                className="bg-orange-500 hover:bg-orange-600 text-white"
+                                onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
+                                disabled={bulkModeMutation.isPending}
+                                data-testid="btn-bulk-manual"
+                              >
+                                <Hand className="w-4 h-4 mr-1" />
+                                수동으로 변경
+                              </Button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">템플릿을 선택하세요</span>
                   )}
                 </div>
               </div>
