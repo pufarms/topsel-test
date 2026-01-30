@@ -30,7 +30,8 @@ import {
   User,
   ChevronLeft,
   Warehouse,
-  Shield
+  Shield,
+  MessageSquare
 } from "lucide-react";
 
 interface MenuItem {
@@ -81,6 +82,7 @@ const menuItems: MenuItem[] = [
   { id: "settlements", label: "정산관리", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
+  { id: "kakao-notifications", label: "카카오 알림 관리", icon: <MessageSquare className="h-5 w-5" />, path: "/admin/kakao-notifications" },
   { 
     id: "pages", 
     label: "페이지관리", 
