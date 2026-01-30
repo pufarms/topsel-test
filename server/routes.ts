@@ -4665,7 +4665,7 @@ export async function registerRoutes(
     }
   });
 
-  // 알림톡 템플릿 상세 조회 (솔라피 API)
+  // 알림톡 템플릿 상세 조회 (DB 정보만)
   app.get('/api/admin/alimtalk/templates/:id/detail', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -4687,27 +4687,42 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Template not found' });
       }
 
-      const templateData = template[0];
-      
-      if (!templateData.templateId) {
-        return res.status(400).json({ error: 'No Solapi template ID' });
+      return res.json(template[0]);
+    } catch (error: any) {
+      console.error('Server error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // 알림톡 템플릿 수정
+  app.put('/api/admin/alimtalk/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    try {
+      const templateId = parseInt(req.params.id);
+      const { templateName, description } = req.body;
+
+      const updated = await db
+        .update(alimtalkTemplates)
+        .set({
+          templateName,
+          description,
+          updatedAt: new Date()
+        })
+        .where(eq(alimtalkTemplates.id, templateId))
+        .returning();
+
+      if (!updated || updated.length === 0) {
+        return res.status(404).json({ error: 'Template not found' });
       }
 
-      const result = await solapiService.getTemplateDetail(templateData.templateId);
-
-      if (result.success) {
-        return res.json({
-          success: true,
-          template: templateData,
-          detail: result.data
-        });
-      } else {
-        return res.status(result.error.status || 500).json({
-          error: 'Failed to load template content',
-          code: result.error.code,
-          details: result.error.message
-        });
-      }
+      return res.json(updated[0]);
     } catch (error: any) {
       console.error('Server error:', error);
       return res.status(500).json({ error: 'Internal server error' });

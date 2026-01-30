@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye } from 'lucide-react';
+import { Eye, Save } from 'lucide-react';
 
 interface AlimtalkTemplate {
   id: number;
@@ -61,6 +64,8 @@ export default function AlimtalkPage() {
   const [viewingTemplate, setViewingTemplate] = useState<AlimtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -76,7 +81,7 @@ export default function AlimtalkPage() {
     queryKey: ['/api/admin/alimtalk/history'],
   });
 
-  const { data: templateDetail, isLoading: isLoadingDetail, error: detailError } = useQuery({
+  const { data: templateDetail, isLoading: isLoadingDetail } = useQuery({
     queryKey: ['/api/admin/alimtalk/templates', viewingTemplate?.id, 'detail'],
     queryFn: async () => {
       if (!viewingTemplate?.id) return null;
@@ -93,6 +98,13 @@ export default function AlimtalkPage() {
     retry: 1,
     staleTime: 0
   });
+
+  useEffect(() => {
+    if (templateDetail) {
+      setEditName(templateDetail.templateName || '');
+      setEditDescription(templateDetail.description || '');
+    }
+  }, [templateDetail]);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
@@ -160,6 +172,27 @@ export default function AlimtalkPage() {
     },
     onError: () => {
       toast({ title: '발송 실패', variant: 'destructive' });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, templateName, description }: { id: number; templateName: string; description: string }) => {
+      const res = await fetch(`/api/admin/alimtalk/templates/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateName, description }),
+      });
+      if (!res.ok) throw new Error('수정 실패');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates', viewingTemplate?.id, 'detail'] });
+      toast({ title: '템플릿이 수정되었습니다' });
+      setViewingTemplate(null);
+    },
+    onError: () => {
+      toast({ title: '수정 실패', variant: 'destructive' });
     },
   });
 
@@ -476,135 +509,110 @@ export default function AlimtalkPage() {
       </Dialog>
 
       <Dialog open={!!viewingTemplate} onOpenChange={(open) => !open && setViewingTemplate(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>템플릿 상세 정보</DialogTitle>
+            <DialogTitle>템플릿 정보 수정</DialogTitle>
             <DialogDescription>
-              {viewingTemplate?.templateName}
+              템플릿 정보를 확인하고 수정할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* 기본 정보 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">템플릿 코드</label>
-                <div className="p-3 bg-muted rounded-lg font-mono text-sm">
-                  {viewingTemplate?.templateCode}
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</label>
-                <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                  {viewingTemplate?.templateId}
-                </div>
-              </div>
+          {isLoadingDetail ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">로딩 중...</div>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">이름</label>
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                {viewingTemplate?.templateName}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">설명</label>
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                {viewingTemplate?.description}
-              </div>
-            </div>
-
-            {/* 메시지 내용 (API에서 조회) */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">메시지 내용</label>
-              {isLoadingDetail ? (
-                <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                  로딩 중...
-                </div>
-              ) : detailError ? (
-                <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-600 dark:text-red-400">
-                  템플릿 내용을 불러오는데 실패했습니다: {(detailError as Error).message}
-                </div>
-              ) : templateDetail?.detail?.content ? (
-                <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
-                  {templateDetail.detail.content}
-                </div>
-              ) : (
-                <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                  메시지 내용이 없습니다
-                </div>
-              )}
-            </div>
-
-            {/* 변수 목록 */}
-            {templateDetail?.detail?.variables && templateDetail.detail.variables.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">변수 목록</label>
-                <div className="flex flex-wrap gap-2">
-                  {templateDetail.detail.variables.map((variable: string, index: number) => (
-                    <Badge key={index} variant="outline">
-                      #{`{${variable}}`}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 버튼 정보 */}
-            {templateDetail?.detail?.buttons && templateDetail.detail.buttons.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">버튼 정보</label>
-                <div className="space-y-2">
-                  {templateDetail.detail.buttons.map((button: any, index: number) => (
-                    <div key={index} className="p-3 bg-muted rounded-lg text-sm">
-                      <div className="font-medium">{button.name || button.buttonName}</div>
-                      {button.linkMobile && (
-                        <div className="text-muted-foreground text-xs mt-1">
-                          링크: {button.linkMobile}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 발송 통계 */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">발송 통계</label>
+          ) : (
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">총 발송</div>
-                  <div className="text-2xl font-bold">
-                    {viewingTemplate?.totalSent?.toLocaleString() || 0}건
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">템플릿 코드</Label>
+                  <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+                    {viewingTemplate?.templateCode}
                   </div>
                 </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">총 비용</div>
-                  <div className="text-2xl font-bold">
-                    {viewingTemplate?.totalCost?.toLocaleString() || 0}원
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</Label>
+                  <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                    {viewingTemplate?.templateId}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* 상태 */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">상태</label>
-              <div className="flex gap-2">
-                <Badge variant={viewingTemplate?.isAuto ? 'secondary' : 'default'}>
-                  {viewingTemplate?.isAuto ? '자동 발송' : '수동 발송'}
-                </Badge>
-                <Badge variant={viewingTemplate?.isActive ? 'default' : 'secondary'}>
-                  {viewingTemplate?.isActive ? 'ON' : 'OFF'}
-                </Badge>
+              <div>
+                <Label htmlFor="edit-name" className="text-sm font-medium mb-2 block">템플릿 이름</Label>
+                <Input
+                  id="edit-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="템플릿 이름을 입력하세요"
+                  data-testid="input-template-name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-description" className="text-sm font-medium mb-2 block">설명</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="템플릿 설명을 입력하세요"
+                  rows={3}
+                  data-testid="input-template-description"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium mb-2 block">발송 통계</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">총 발송</div>
+                    <div className="text-2xl font-bold">
+                      {viewingTemplate?.totalSent?.toLocaleString() || 0}건
+                    </div>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-1">총 비용</div>
+                    <div className="text-2xl font-bold">
+                      {viewingTemplate?.totalCost?.toLocaleString() || 0}원
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium mb-2 block">현재 상태</Label>
+                <div className="flex gap-2">
+                  <Badge variant={viewingTemplate?.isAuto ? 'secondary' : 'default'}>
+                    {viewingTemplate?.isAuto ? '자동 발송' : '수동 발송'}
+                  </Badge>
+                  <Badge variant={viewingTemplate?.isActive ? 'default' : 'secondary'}>
+                    {viewingTemplate?.isActive ? '활성화' : '비활성화'}
+                  </Badge>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <DialogFooter>
-            <Button onClick={() => setViewingTemplate(null)} data-testid="btn-close-view">닫기</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setViewingTemplate(null)} data-testid="btn-close-view">
+              취소
+            </Button>
+            <Button 
+              onClick={() => {
+                if (viewingTemplate) {
+                  updateMutation.mutate({
+                    id: viewingTemplate.id,
+                    templateName: editName,
+                    description: editDescription
+                  });
+                }
+              }}
+              disabled={updateMutation.isPending || !editName.trim()}
+              data-testid="btn-save-template"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {updateMutation.isPending ? '저장 중...' : '저장'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
