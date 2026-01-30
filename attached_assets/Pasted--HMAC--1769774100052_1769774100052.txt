@@ -1,0 +1,91 @@
+====================================
+🔧 긴급 수정: HMAC 서명 생성 오류 해결
+====================================
+
+📁 파일: server/services/solapi.ts
+
+🎯 수정 위치: getTemplateDetail() 메서드
+
+🔧 수정 내용:
+
+기존 코드에서 HMAC 서명 생성 부분을 아래로 **교체**:
+
+```typescript
+async getTemplateDetail(templateId: string) {
+  try {
+    console.log('🔍 [Solapi] 템플릿 상세 조회 시작:', templateId);
+
+    // URL 인코딩
+    const encodedId = encodeURIComponent(templateId);
+    const url = `https://api.solapi.com/kakao/v2/templates/${encodedId}`;
+
+    // HMAC 인증 헤더 생성 (수정됨)
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(16).toString('hex'); // 32바이트로 변경
+    
+    // 서명 생성: date와 salt를 공백 없이 연결
+    const data = date + salt;
+    const signature = crypto
+      .createHmac('sha256', this.apiSecret)
+      .update(data)
+      .digest('hex');
+
+    const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+    console.log('🚀 [Solapi] REST API 호출:', url);
+    console.log('🔑 [Solapi] 인증 정보:', {
+      apiKey: this.apiKey,
+      date,
+      saltLength: salt.length,
+      signatureLength: signature.length
+    });
+
+    // REST API 호출
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('📡 [Solapi] 응답 상태:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [Solapi] API 오류:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+
+      return {
+        success: false,
+        error: {
+          status: response.status,
+          message: response.statusText,
+          details: errorText
+        }
+      };
+    }
+
+    const data = await response.json();
+    console.log('✅ [Solapi] 템플릿 조회 성공:', data.name);
+
+    return {
+      success: true,
+      data
+    };
+
+  } catch (error: any) {
+    console.error('❌ [Solapi] getTemplateDetail 예외:', error);
+    return {
+      success: false,
+      error: {
+        status: 500,
+        message: error.message || '템플릿 조회 중 오류 발생',
+        details: error.stack
+      }
+    };
+  }
+}

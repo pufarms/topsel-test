@@ -105,17 +105,26 @@ class SolapiService {
       const encodedId = encodeURIComponent(templateId);
       const url = `https://api.solapi.com/kakao/v2/templates/${encodedId}`;
 
-      // HMAC 인증 헤더 생성
+      // HMAC 인증 헤더 생성 (수정됨)
       const date = new Date().toISOString();
-      const salt = crypto.randomBytes(32).toString('hex');
+      const salt = crypto.randomBytes(16).toString('hex');
+      
+      // 서명 생성: date와 salt를 공백 없이 연결
+      const hmacData = date + salt;
       const signature = crypto
         .createHmac('sha256', this.apiSecret)
-        .update(date + salt)
+        .update(hmacData)
         .digest('hex');
 
       const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
 
       console.log('🚀 [Solapi] REST API 호출:', url);
+      console.log('🔑 [Solapi] 인증 정보:', {
+        apiKey: this.apiKey,
+        date,
+        saltLength: salt.length,
+        signatureLength: signature.length
+      });
 
       // REST API 호출
       const response = await fetch(url, {
@@ -123,8 +132,7 @@ class SolapiService {
         headers: {
           'Authorization': authHeader,
           'Content-Type': 'application/json'
-        },
-        signal: AbortSignal.timeout(10000)
+        }
       });
 
       console.log('📡 [Solapi] 응답 상태:', response.status);
@@ -147,12 +155,12 @@ class SolapiService {
         };
       }
 
-      const data = await response.json();
-      console.log('✅ [Solapi] 템플릿 조회 성공:', data.name);
+      const responseData = await response.json();
+      console.log('✅ [Solapi] 템플릿 조회 성공:', responseData.name);
 
       return {
         success: true,
-        data
+        data: responseData
       };
 
     } catch (error: any) {
