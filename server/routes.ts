@@ -441,7 +441,9 @@ export async function registerRoutes(
           username: user.username,
           userType: "user",
         });
-        res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+        if (token) {
+          res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+        }
 
         const { password, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
@@ -470,7 +472,9 @@ export async function registerRoutes(
           grade: member.grade,
           companyName: member.companyName,
         });
-        res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+        if (token) {
+          res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+        }
 
         const { password, ...memberWithoutPassword } = member;
         return res.json({ ...memberWithoutPassword, role: "member" });
