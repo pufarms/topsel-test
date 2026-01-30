@@ -89,9 +89,14 @@ class SolapiService {
 
   /**
    * API 인증 토큰 생성 (HMAC-SHA256)
+   * 솔라피 형식: YYYY-MM-DD HH:mm:ss (KST)
    */
   private generateAuthToken(): string {
-    const date = new Date().toISOString();
+    const now = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(now.getTime() + kstOffset);
+    const date = kstDate.toISOString().replace('T', ' ').substring(0, 19);
+    
     const salt = crypto.randomBytes(16).toString('hex');
     const hmac = crypto.createHmac('sha256', this.apiSecret);
     hmac.update(date + salt);
