@@ -89,14 +89,10 @@ class SolapiService {
 
   /**
    * API 인증 토큰 생성 (HMAC-SHA256)
-   * 솔라피 형식: YYYY-MM-DD HH:mm:ss (KST)
+   * 솔라피 형식: ISO 8601 UTC with milliseconds
    */
   private generateAuthToken(): string {
-    const now = new Date();
-    const kstOffset = 9 * 60 * 60 * 1000;
-    const kstDate = new Date(now.getTime() + kstOffset);
-    const date = kstDate.toISOString().replace('T', ' ').substring(0, 19);
-    
+    const date = new Date().toISOString();
     const salt = crypto.randomBytes(16).toString('hex');
     const hmac = crypto.createHmac('sha256', this.apiSecret);
     hmac.update(date + salt);
@@ -117,22 +113,30 @@ class SolapiService {
     }
 
     try {
+      const authHeader = this.generateAuthToken();
+      console.log('[Solapi Debug] Auth header:', authHeader.substring(0, 100) + '...');
+      console.log('[Solapi Debug] Fetching template:', templateId);
+      
       const response = await fetch(
         `https://api.solapi.com/kakao/v2/templates/${templateId}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': this.generateAuthToken(),
+            'Authorization': authHeader,
           },
         }
       );
 
+      const responseText = await response.text();
+      console.log('[Solapi Debug] Response status:', response.status);
+      console.log('[Solapi Debug] Response body:', responseText.substring(0, 200));
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = JSON.parse(responseText);
         throw new Error(errorData.errorMessage || 'Failed to fetch template');
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       return {
         success: true,
         data,
