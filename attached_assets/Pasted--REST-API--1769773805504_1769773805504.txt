@@ -1,0 +1,81 @@
+====================================
+🎯 수정 요청: 솔라피 템플릿 조회 REST API 직접 호출
+====================================
+
+📁 파일: server/services/solapi.ts
+
+🔧 수정 내용:
+
+1) getTemplateDetail() 메서드를 아래 코드로 **완전히 교체**:
+
+```typescript
+async getTemplateDetail(templateId: string) {
+  try {
+    console.log('🔍 [Solapi] 템플릿 상세 조회 시작:', templateId);
+
+    // URL 인코딩
+    const encodedId = encodeURIComponent(templateId);
+    const url = `https://api.solapi.com/kakao/v2/templates/${encodedId}`;
+
+    // HMAC 인증 헤더 생성
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(32).toString('hex');
+    const signature = crypto
+      .createHmac('sha256', this.apiSecret)
+      .update(date + salt)
+      .digest('hex');
+
+    const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+    console.log('🚀 [Solapi] REST API 호출:', url);
+
+    // REST API 호출
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      },
+      signal: AbortSignal.timeout(10000) // 10초 타임아웃
+    });
+
+    console.log('📡 [Solapi] 응답 상태:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [Solapi] API 오류:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+
+      return {
+        success: false,
+        error: {
+          status: response.status,
+          message: response.statusText,
+          details: errorText
+        }
+      };
+    }
+
+    const data = await response.json();
+    console.log('✅ [Solapi] 템플릿 조회 성공:', data.name);
+
+    return {
+      success: true,
+      data
+    };
+
+  } catch (error: any) {
+    console.error('❌ [Solapi] getTemplateDetail 예외:', error);
+    return {
+      success: false,
+      error: {
+        status: 500,
+        message: error.message || '템플릿 조회 중 오류 발생',
+        details: error.stack
+      }
+    };
+  }
+}

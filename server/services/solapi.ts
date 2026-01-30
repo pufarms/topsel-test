@@ -5,7 +5,6 @@
 
 import { SolapiMessageService } from 'solapi';
 import crypto from 'crypto';
-import axios from 'axios';
 
 interface AlimtalkSendParams {
   to: string;
@@ -98,48 +97,72 @@ class SolapiService {
   /**
    * 솔라피 템플릿 상세 조회 (REST API 직접 호출)
    */
-  async getTemplateDetail(templateId: string): Promise<any> {
+  async getTemplateDetail(templateId: string) {
     try {
-      if (!this.apiKey || !this.apiSecret) {
-        return {
-          success: false,
-          error: {
-            status: 400,
-            message: 'Solapi API 키가 설정되지 않았습니다.',
-            code: 'API_NOT_CONFIGURED'
-          }
-        };
-      }
+      console.log('🔍 [Solapi] 템플릿 상세 조회 시작:', templateId);
 
-      console.log('🔍 템플릿 조회 시작:', templateId);
+      // URL 인코딩
+      const encodedId = encodeURIComponent(templateId);
+      const url = `https://api.solapi.com/kakao/v2/templates/${encodedId}`;
 
-      const url = `${this.baseUrl}/kakao/v2/templates/${encodeURIComponent(templateId)}`;
-      const authHeader = this.generateAuthHeader();
-      
-      console.log('🔐 인증 헤더:', authHeader.substring(0, 80) + '...');
+      // HMAC 인증 헤더 생성
+      const date = new Date().toISOString();
+      const salt = crypto.randomBytes(32).toString('hex');
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(date + salt)
+        .digest('hex');
 
-      const response = await axios.get(url, {
+      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+      console.log('🚀 [Solapi] REST API 호출:', url);
+
+      // REST API 호출
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Authorization': authHeader,
           'Content-Type': 'application/json'
         },
-        timeout: 15000
+        signal: AbortSignal.timeout(10000)
       });
 
-      console.log('✅ 템플릿 조회 성공:', response.data);
+      console.log('📡 [Solapi] 응답 상태:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Solapi] API 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+
+        return {
+          success: false,
+          error: {
+            status: response.status,
+            message: response.statusText,
+            details: errorText
+          }
+        };
+      }
+
+      const data = await response.json();
+      console.log('✅ [Solapi] 템플릿 조회 성공:', data.name);
 
       return {
         success: true,
-        data: response.data
+        data
       };
+
     } catch (error: any) {
-      console.error('❌ 템플릿 조회 실패:', error.response?.data || error.message);
+      console.error('❌ [Solapi] getTemplateDetail 예외:', error);
       return {
         success: false,
         error: {
-          status: error.response?.status || 500,
-          message: error.response?.data?.errorMessage || error.message || '템플릿을 불러올 수 없습니다',
-          code: error.response?.data?.errorCode || 'UNKNOWN_ERROR'
+          status: 500,
+          message: error.message || '템플릿 조회 중 오류 발생',
+          details: error.stack
         }
       };
     }
