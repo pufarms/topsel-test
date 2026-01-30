@@ -34,6 +34,8 @@ import ReceivingPage from "@/pages/admin/inventory/receiving";
 import InventoryHistoryPage from "@/pages/admin/inventory/history";
 import SiteSettingsPage from "@/pages/admin/settings/site-settings";
 import PagesManagement from "@/pages/admin/pages";
+import AlimtalkPage from "@/pages/admin/kakao-notifications/alimtalk";
+import BrandtalkPage from "@/pages/admin/kakao-notifications/brandtalk";
 import PublicPreviewPage from "@/pages/public-preview";
 import MyPage from "@/pages/mypage";
 import DynamicPage from "@/pages/dynamic-page";
@@ -138,6 +140,12 @@ function Router() {
       </Route>
       <Route path="/admin/coupons">
         <AdminRoute><PlaceholderPage title="쿠폰관리" description="쿠폰을 관리합니다" /></AdminRoute>
+      </Route>
+      <Route path="/admin/kakao-notifications/alimtalk">
+        <AdminRoute><AlimtalkPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/kakao-notifications/brandtalk">
+        <AdminRoute><BrandtalkPage /></AdminRoute>
       </Route>
       <Route path="/admin/pages">
         <AdminRoute><PagesManagement /></AdminRoute>
