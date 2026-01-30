@@ -5015,15 +5015,52 @@ export async function registerRoutes(
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
 
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit = 50, offset = 0, days } = req.query;
 
     try {
-      const history = await db.select().from(brandtalkHistory)
+      let query = db.select().from(brandtalkHistory);
+      
+      if (days && days !== 'all') {
+        const daysNum = parseInt(days as string);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - daysNum);
+        query = query.where(sql`${brandtalkHistory.sentAt} >= ${startDate}`) as any;
+      }
+
+      const history = await query
         .orderBy(desc(brandtalkHistory.sentAt))
         .limit(parseInt(limit as string))
         .offset(parseInt(offset as string));
 
       res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 브랜드톡 통계
+  app.get('/api/admin/brandtalk/statistics', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const templates = await db.select().from(brandtalkTemplates);
+      const history = await db.select().from(brandtalkHistory);
+
+      const totalTemplates = templates.length;
+      const totalSent = history.reduce((sum, h) => sum + h.successCount, 0);
+      const totalCost = history.reduce((sum, h) => sum + h.cost, 0);
+
+      res.json({
+        totalTemplates,
+        totalSent,
+        totalCost
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
