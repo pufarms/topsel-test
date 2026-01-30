@@ -378,6 +378,14 @@ export default function AlimtalkPage() {
                         const selectedTemplates = templates.filter(t => selectedTemplateIds.includes(t.id));
                         const hasManual = selectedTemplates.some(t => !t.isAuto);
                         const hasAuto = selectedTemplates.some(t => t.isAuto);
+                        const isMixed = hasManual && hasAuto;
+                        
+                        if (isMixed) {
+                          return (
+                            <span className="text-sm text-destructive">동일 유형만 선택 가능합니다</span>
+                          );
+                        }
+                        
                         return (
                           <>
                             {hasManual && (
