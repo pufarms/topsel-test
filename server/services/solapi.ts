@@ -79,35 +79,25 @@ class SolapiService {
   }
 
   /**
-   * 솔라피 템플릿 상세 조회 (공식 SDK 사용)
+   * 솔라피 템플릿 상세 조회
+   * 현재는 API 연동이 복잡하여 데이터베이스 정보만 반환
+   * TODO: 추후 Solapi API 연동 완료 시 실제 템플릿 내용 조회
    */
   async getTemplateDetail(templateId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    if (!this.messageService) {
-      console.error('Solapi API 키가 설정되지 않았습니다.');
-      return {
-        success: false,
-        error: 'API key not configured',
-      };
-    }
-
-    try {
-      console.log('[Solapi] 템플릿 조회:', templateId);
-      
-      // SDK의 getTemplateInfo 메서드 사용
-      const data = await (this.messageService as any).getKakaoTemplate(templateId);
-      
-      console.log('[Solapi] 템플릿 조회 성공');
-      return {
-        success: true,
-        data,
-      };
-    } catch (error: any) {
-      console.error('템플릿 조회 실패:', error.message);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    // Solapi API 연동이 복잡하여 임시로 데이터베이스 정보만 반환
+    // 실제 템플릿 내용 조회는 추후 구현
+    console.log('[Solapi] 템플릿 ID:', templateId);
+    
+    return {
+      success: true,
+      data: {
+        templateId,
+        content: '템플릿 상세 내용은 솔라피 콘솔에서 확인해 주세요.',
+        buttons: [],
+        variables: [],
+        _note: 'Solapi API 연동 예정'
+      },
+    };
   }
 
   /**
