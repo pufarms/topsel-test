@@ -351,21 +351,16 @@ export default function AlimtalkPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <CardTitle>템플릿 목록</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">
-                      자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
-                    </p>
-                    <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
-                      <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">전체</SelectItem>
-                        <SelectItem value="auto">자동</SelectItem>
-                        <SelectItem value="manual">수동</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
+                    <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="auto">자동</SelectItem>
+                      <SelectItem value="manual">수동</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border rounded-lg">
