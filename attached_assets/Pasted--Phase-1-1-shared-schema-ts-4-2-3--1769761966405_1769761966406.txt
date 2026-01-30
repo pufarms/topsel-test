@@ -1,0 +1,92 @@
+【Phase 1: 카카오 알림 관리 데이터베이스 구축】
+
+작업 내용:
+1. shared/schema.ts에 테이블 4개 추가
+2. 초기 데이터 시드
+3. 마이그레이션 실행
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1] shared/schema.ts 추가 코드:
+
+// 알림톡 템플릿 설정
+export const alimtalkTemplates = pgTable("alimtalk_templates", {
+  id: serial("id").primaryKey(),
+  templateCode: text("template_code").notNull().unique(),
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  isAuto: boolean("is_auto").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  totalSent: integer("total_sent").notNull().default(0),
+  totalCost: integer("total_cost").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// 알림톡 발송 이력
+export const alimtalkHistory = pgTable("alimtalk_history", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => alimtalkTemplates.id).notNull(),
+  recipientCount: integer("recipient_count").notNull(),
+  successCount: integer("success_count").notNull(),
+  failCount: integer("fail_count").notNull(),
+  cost: integer("cost").notNull(),
+  sentBy: integer("sent_by").references(() => members.id),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  responseData: jsonb("response_data"),
+});
+
+// 브랜드톡 템플릿
+export const brandtalkTemplates = pgTable("brandtalk_templates", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  buttonName: text("button_name"),
+  buttonUrl: text("button_url"),
+  totalSent: integer("total_sent").notNull().default(0),
+  lastSentAt: timestamp("last_sent_at"),
+  createdBy: integer("created_by").references(() => members.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// 브랜드톡 발송 이력
+export const brandtalkHistory = pgTable("brandtalk_history", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => brandtalkTemplates.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  recipientCount: integer("recipient_count").notNull(),
+  successCount: integer("success_count").notNull(),
+  failCount: integer("fail_count").notNull(),
+  cost: integer("cost").notNull(),
+  sentBy: integer("sent_by").references(() => members.id).notNull(),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  responseData: jsonb("response_data"),
+});
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[2] 초기 데이터 시드 (alimtalk_templates):
+
+INSERT INTO alimtalk_templates (template_code, template_name, description, is_auto, is_active) VALUES
+('ORDER_CONFIRM', '주문 확인 알림', '주문 완료 시 자동 발송', true, true),
+('DELIVERY_START', '배송 시작 알림', '배송 시작 시 자동 발송', true, true),
+('PAYMENT_CONFIRM', '입금 확인 알림', '입금 확인 시 자동 발송', true, true),
+('GRADE_CHANGE', '등급 변경 알림', '회원 등급 변경 시 자동 발송', true, true),
+('SHIPPING_INFO', '배송출발', '상품 배송 출발 알림', true, true),
+('ORDER_DEADLINE_10MIN', '주문마감 10분전', '9시/10시 주문 마감 10분 전 수동 발송', false, true),
+('ORDER_DEADLINE_9AM', '9시 주문마감', '9시 주문 마감 알림 수동 발송', false, true),
+('ORDER_DEADLINE_10AM', '10시 주문마감', '10시 주문 마감 알림 수동 발송', false, true),
+('WELCOME', '회원가입 환영', '회원 가입 시 환영 알림', false, true),
+('DOWNLOAD_GUIDE', '온후장 다운로드', '온후장(온도 이력서) 다운로드 안내', false, true);
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[3] 실행 순서:
+1. shared/schema.ts에 위 4개 테이블 추가
+2. 마이그레이션 실행 (npm run db:push)
+3. 초기 데이터 삽입 (INSERT 쿼리 실행)
+4. 테이블 생성 및 데이터 확인
+
+완료 후 알려주세요!

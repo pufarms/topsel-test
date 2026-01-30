@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1073,3 +1073,93 @@ export const insertDeletedMemberOrderSchema = createInsertSchema(deletedMemberOr
 
 export type InsertDeletedMemberOrder = z.infer<typeof insertDeletedMemberOrderSchema>;
 export type DeletedMemberOrder = typeof deletedMemberOrders.$inferSelect;
+
+// 알림톡 템플릿 설정
+export const alimtalkTemplates = pgTable("alimtalk_templates", {
+  id: serial("id").primaryKey(),
+  templateCode: text("template_code").notNull().unique(),
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  isAuto: boolean("is_auto").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  totalSent: integer("total_sent").notNull().default(0),
+  totalCost: integer("total_cost").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// 알림톡 발송 이력
+export const alimtalkHistory = pgTable("alimtalk_history", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => alimtalkTemplates.id).notNull(),
+  recipientCount: integer("recipient_count").notNull(),
+  successCount: integer("success_count").notNull(),
+  failCount: integer("fail_count").notNull(),
+  cost: integer("cost").notNull(),
+  sentBy: varchar("sent_by").references(() => members.id),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  responseData: jsonb("response_data"),
+});
+
+// 브랜드톡 템플릿
+export const brandtalkTemplates = pgTable("brandtalk_templates", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  buttonName: text("button_name"),
+  buttonUrl: text("button_url"),
+  totalSent: integer("total_sent").notNull().default(0),
+  lastSentAt: timestamp("last_sent_at"),
+  createdBy: varchar("created_by").references(() => members.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// 브랜드톡 발송 이력
+export const brandtalkHistory = pgTable("brandtalk_history", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => brandtalkTemplates.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  recipientCount: integer("recipient_count").notNull(),
+  successCount: integer("success_count").notNull(),
+  failCount: integer("fail_count").notNull(),
+  cost: integer("cost").notNull(),
+  sentBy: varchar("sent_by").references(() => members.id).notNull(),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  responseData: jsonb("response_data"),
+});
+
+export const insertAlimtalkTemplateSchema = createInsertSchema(alimtalkTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAlimtalkTemplate = z.infer<typeof insertAlimtalkTemplateSchema>;
+export type AlimtalkTemplate = typeof alimtalkTemplates.$inferSelect;
+
+export const insertAlimtalkHistorySchema = createInsertSchema(alimtalkHistory).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertAlimtalkHistory = z.infer<typeof insertAlimtalkHistorySchema>;
+export type AlimtalkHistory = typeof alimtalkHistory.$inferSelect;
+
+export const insertBrandtalkTemplateSchema = createInsertSchema(brandtalkTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBrandtalkTemplate = z.infer<typeof insertBrandtalkTemplateSchema>;
+export type BrandtalkTemplate = typeof brandtalkTemplates.$inferSelect;
+
+export const insertBrandtalkHistorySchema = createInsertSchema(brandtalkHistory).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertBrandtalkHistory = z.infer<typeof insertBrandtalkHistorySchema>;
+export type BrandtalkHistory = typeof brandtalkHistory.$inferSelect;
