@@ -428,6 +428,20 @@ export async function registerRoutes(
     try {
       const data = loginSchema.parse(req.body);
       
+      // 환경 감지
+      const isProduction = process.env.NODE_ENV === 'production';
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      
+      // JWT 쿠키 설정 (환경별 자동 조정)
+      const cookieOptions = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: (isProduction ? 'lax' : 'lax') as 'lax' | 'none',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
+        ...(isProduction && { domain: '.topsel.kr' })
+      };
+      
       // First try to authenticate as admin user
       const user = await storage.validatePassword(data.username, data.password);
       if (user) {
@@ -442,11 +456,19 @@ export async function registerRoutes(
           userType: "user",
         });
         if (token) {
-          res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+          res.cookie("topsel_token", token, cookieOptions);
         }
 
         const { password, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
+        return res.json({
+          ...userWithoutPassword,
+          token: token,
+          _dev: isDevelopment ? {
+            message: '개발 환경: 토큰을 응답에 포함했습니다',
+            cookieSet: !!token,
+            tokenPreview: token ? token.substring(0, 20) + '...' : null
+          } : undefined
+        });
       }
       
       // If not found in users, try members table
@@ -473,11 +495,20 @@ export async function registerRoutes(
           companyName: member.companyName,
         });
         if (token) {
-          res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+          res.cookie("topsel_token", token, cookieOptions);
         }
 
         const { password, ...memberWithoutPassword } = member;
-        return res.json({ ...memberWithoutPassword, role: "member" });
+        return res.json({
+          ...memberWithoutPassword,
+          role: "member",
+          token: token,
+          _dev: isDevelopment ? {
+            message: '개발 환경: 토큰을 응답에 포함했습니다',
+            cookieSet: !!token,
+            tokenPreview: token ? token.substring(0, 20) + '...' : null
+          } : undefined
+        });
       }
       
       return res.status(401).json({ message: "아이디 또는 비밀번호가 올바르지 않습니다" });
