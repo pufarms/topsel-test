@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSquare, Plus, Edit, Send, Trash2, Calendar, Users, DollarSign, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageSquare, Plus, Edit, Send, Trash2, Calendar, Users, DollarSign, X, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 
 interface BrandtalkTemplate {
   id: number;
@@ -75,16 +75,25 @@ interface ButtonItem {
 
 const COST_PER_MESSAGE = 27;
 
+interface SolapiTemplate {
+  templateId: string;
+  name: string;
+  content: string;
+  buttons?: Array<{ name: string; url: string }>;
+}
+
 export default function BrandtalkPage() {
   const [activeTab, setActiveTab] = useState('templates');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [solapiModalOpen, setSolapiModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<BrandtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedSolapiTemplates, setSelectedSolapiTemplates] = useState<string[]>([]);
   const itemsPerPage = 20;
 
   const [editTitle, setEditTitle] = useState('');
@@ -114,6 +123,38 @@ export default function BrandtalkPage() {
       });
       if (!res.ok) throw new Error('Failed to fetch history');
       return res.json();
+    }
+  });
+
+  const { data: solapiData, isLoading: isLoadingSolapi, refetch: refetchSolapi } = useQuery<{ success: boolean; templates: SolapiTemplate[] }>({
+    queryKey: ['/api/admin/brandtalk/solapi/templates'],
+    enabled: solapiModalOpen,
+    retry: 1,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (templateIds: string[]) => {
+      const res = await fetch('/api/admin/brandtalk/solapi/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateIds }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('동기화 실패');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: '동기화 완료', 
+        description: `${data.synced}개 템플릿을 성공적으로 불러왔습니다` 
+      });
+      setSolapiModalOpen(false);
+      setSelectedSolapiTemplates([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/brandtalk/templates'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/brandtalk/statistics'] });
+    },
+    onError: () => {
+      toast({ title: '동기화 실패', description: '다시 시도해주세요', variant: 'destructive' });
     }
   });
 
@@ -351,7 +392,11 @@ export default function BrandtalkPage() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSolapiModalOpen(true)} data-testid="btn-solapi-import">
+              <Download className="w-4 h-4 mr-2" />
+              솔라피에서 불러오기
+            </Button>
             <Button onClick={handleCreate} data-testid="btn-create-brandtalk">
               <Plus className="w-4 h-4 mr-2" />
               새 브랜드톡 작성
@@ -723,6 +768,81 @@ export default function BrandtalkPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={solapiModalOpen} onOpenChange={setSolapiModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>솔라피 브랜드톡 템플릿 불러오기</DialogTitle>
+            <DialogDescription>
+              솔라피 콘솔에 등록된 브랜드톡 템플릿을 선택하여 불러옵니다
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingSolapi ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+          ) : solapiData?.success && solapiData?.templates?.length > 0 ? (
+            <div className="space-y-2">
+              {solapiData.templates.map((template: SolapiTemplate) => (
+                <div
+                  key={template.templateId}
+                  className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover-elevate"
+                  onClick={() => {
+                    setSelectedSolapiTemplates(prev =>
+                      prev.includes(template.templateId)
+                        ? prev.filter(id => id !== template.templateId)
+                        : [...prev, template.templateId]
+                    );
+                  }}
+                  data-testid={`solapi-template-${template.templateId}`}
+                >
+                  <Checkbox
+                    checked={selectedSolapiTemplates.includes(template.templateId)}
+                    onCheckedChange={() => {}}
+                    data-testid={`checkbox-solapi-${template.templateId}`}
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-medium">{template.name || '제목 없음'}</h4>
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      {template.content?.substring(0, 100)}...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      ID: {template.templateId}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              {solapiData?.success === false
+                ? '솔라피 API 연결에 실패했습니다. API 키를 확인해주세요.'
+                : '등록된 브랜드톡 템플릿이 없습니다'}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSolapiModalOpen(false)} data-testid="btn-cancel-solapi">
+              취소
+            </Button>
+            <Button
+              onClick={() => syncMutation.mutate(selectedSolapiTemplates)}
+              disabled={selectedSolapiTemplates.length === 0 || syncMutation.isPending}
+              data-testid="btn-sync-solapi"
+            >
+              {syncMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  동기화 중...
+                </>
+              ) : (
+                `선택한 ${selectedSolapiTemplates.length}개 불러오기`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

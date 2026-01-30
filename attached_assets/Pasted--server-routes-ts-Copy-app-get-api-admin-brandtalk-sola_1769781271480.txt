@@ -1,0 +1,255 @@
+백엔드 라우트 추가 (server/routes.ts)
+Copy// 솔라피 브랜드 템플릿 목록 조회
+app.get('/api/admin/brandtalk/solapi/templates', async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: '접근 권한이 없습니다' 
+      });
+    }
+
+    console.log('📥 솔라피 브랜드 템플릿 조회 요청');
+
+    const result = await solapiService.getBrandTemplates();
+
+    if (!result.success) {
+      return res.status(result.error?.status || 500).json({
+        success: false,
+        error: result.error?.message || '템플릿 조회 실패'
+      });
+    }
+
+    return res.json({
+      success: true,
+      templates: result.data
+    });
+
+  } catch (error: any) {
+    console.error('❌ 브랜드 템플릿 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '서버 오류가 발생했습니다'
+    });
+  }
+});
+
+// 솔라피 브랜드 템플릿 동기화 (DB에 저장)
+app.post('/api/admin/brandtalk/solapi/sync', async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: '접근 권한이 없습니다' 
+      });
+    }
+
+    const { templateIds } = req.body; // 선택한 템플릿 ID 배열
+
+    if (!Array.isArray(templateIds) || templateIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '템플릿을 선택해주세요'
+      });
+    }
+
+    console.log('📥 솔라피 브랜드 템플릿 동기화 요청:', templateIds.length, '개');
+
+    const syncedTemplates = [];
+    const errors = [];
+
+    for (const templateId of templateIds) {
+      // 솔라피에서 템플릿 상세 조회
+      const result = await solapiService.getBrandTemplateDetail(templateId);
+
+      if (!result.success) {
+        errors.push({ templateId, error: result.error?.message });
+        continue;
+      }
+
+      const template = result.data;
+
+      // DB에 저장 (중복 체크)
+      const existing = await storage.db
+        .prepare('SELECT id FROM brandtalk_templates WHERE template_id = ?')
+        .get(templateId);
+
+      if (existing) {
+        // 업데이트
+        await storage.db
+          .prepare(`
+            UPDATE brandtalk_templates 
+            SET title = ?, message_content = ?, buttons = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE template_id = ?
+          `)
+          .run(
+            template.name || '제목 없음',
+            template.content || '',
+            JSON.stringify(template.buttons || []),
+            templateId
+          );
+      } else {
+        // 신규 등록
+        await storage.db
+          .prepare(`
+            INSERT INTO brandtalk_templates (
+              template_id, title, message_content, buttons, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `)
+          .run(
+            templateId,
+            template.name || '제목 없음',
+            template.content || '',
+            JSON.stringify(template.buttons || [])
+          );
+      }
+
+      syncedTemplates.push(template);
+    }
+
+    console.log('✅ 동기화 완료:', syncedTemplates.length, '개 성공,', errors.length, '개 실패');
+
+    return res.json({
+      success: true,
+      synced: syncedTemplates.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${syncedTemplates.length}개 템플릿이 동기화되었습니다`
+    });
+
+  } catch (error: any) {
+    console.error('❌ 템플릿 동기화 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '동기화 중 오류가 발생했습니다'
+    });
+  }
+});
+Copy
+프론트엔드 UI 수정 (client/src/pages/admin/kakao-notifications/brandtalk.tsx)
+브랜드톡 관리 탭 상단에 [솔라피에서 불러오기] 버튼 추가:
+
+Copy// 상태 추가
+const [showSolapiModal, setShowSolapiModal] = useState(false);
+const [solapiTemplates, setSolapiTemplates] = useState([]);
+const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+const [isSyncing, setIsSyncing] = useState(false);
+
+// 솔라피 템플릿 조회 쿼리
+const { data: solapiData, isLoading: isLoadingSolapi, refetch: refetchSolapi } = useQuery({
+  queryKey: ['/api/admin/brandtalk/solapi/templates'],
+  enabled: showSolapiModal,
+  retry: 1
+});
+
+// 동기화 mutation
+const syncMutation = useMutation({
+  mutationFn: async (templateIds: string[]) => {
+    const response = await fetch('/api/admin/brandtalk/solapi/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ templateIds })
+    });
+    
+    if (!response.ok) throw new Error('동기화 실패');
+    return response.json();
+  },
+  onSuccess: () => {
+    toast({ title: '동기화 완료', description: '템플릿을 성공적으로 불러왔습니다' });
+    setShowSolapiModal(false);
+    setSelectedTemplates([]);
+    refetch(); // 브랜드톡 목록 새로고침
+  },
+  onError: () => {
+    toast({ title: '동기화 실패', description: '다시 시도해주세요', variant: 'destructive' });
+  }
+});
+
+// 브랜드톡 관리 탭 상단 버튼 영역에 추가
+<div className="flex gap-2">
+  <Button onClick={() => setShowSolapiModal(true)}>
+    <Download className="w-4 h-4 mr-2" />
+    솔라피에서 불러오기
+  </Button>
+  <Button onClick={() => setIsCreating(true)}>
+    <Plus className="w-4 h-4 mr-2" />
+    새 브랜드톡 작성
+  </Button>
+</div>
+
+// 솔라피 템플릿 선택 모달 추가
+<Dialog open={showSolapiModal} onOpenChange={setShowSolapiModal}>
+  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>솔라피 브랜드톡 템플릿 불러오기</DialogTitle>
+      <DialogDescription>
+        솔라피 콘솔에 등록된 브랜드톡 템플릿을 선택하여 불러옵니다
+      </DialogDescription>
+    </DialogHeader>
+
+    {isLoadingSolapi ? (
+      <div className="flex justify-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    ) : solapiData?.templates?.length > 0 ? (
+      <div className="space-y-2">
+        {solapiData.templates.map((template: any) => (
+          <div
+            key={template.templateId}
+            className="flex items-start gap-3 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+            onClick={() => {
+              setSelectedTemplates(prev =>
+                prev.includes(template.templateId)
+                  ? prev.filter(id => id !== template.templateId)
+                  : [...prev, template.templateId]
+              );
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={selectedTemplates.includes(template.templateId)}
+              onChange={() => {}}
+              className="mt-1"
+            />
+            <div className="flex-1">
+              <h4 className="font-medium">{template.name || '제목 없음'}</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                {template.content?.substring(0, 100)}...
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
+                ID: {template.templateId}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="text-center py-8 text-gray-500">
+        등록된 브랜드톡 템플릿이 없습니다
+      </div>
+    )}
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowSolapiModal(false)}>
+        취소
+      </Button>
+      <Button
+        onClick={() => syncMutation.mutate(selectedTemplates)}
+        disabled={selectedTemplates.length === 0 || syncMutation.isPending}
+      >
+        {syncMutation.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            동기화 중...
+          </>
+        ) : (
+          `선택한 ${selectedTemplates.length}개 불러오기`
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+Copy
+필요한 import 추가:
+
+Copyimport { Download, Loader2 } from 'lucide-react';

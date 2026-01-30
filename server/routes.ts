@@ -4935,6 +4935,122 @@ export async function registerRoutes(
     }
   });
 
+  // 솔라피 브랜드 템플릿 목록 조회
+  app.get('/api/admin/brandtalk/solapi/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      console.log('📥 솔라피 브랜드 템플릿 조회 요청');
+      const result = await solapiService.getBrandTemplates();
+
+      if (!result.success) {
+        return res.status(result.error?.status || 500).json({
+          success: false,
+          error: result.error?.message || '템플릿 조회 실패'
+        });
+      }
+
+      return res.json({
+        success: true,
+        templates: result.data
+      });
+    } catch (error: any) {
+      console.error('❌ 브랜드 템플릿 조회 오류:', error);
+      return res.status(500).json({
+        success: false,
+        error: '서버 오류가 발생했습니다'
+      });
+    }
+  });
+
+  // 솔라피 브랜드 템플릿 동기화 (DB에 저장)
+  app.post('/api/admin/brandtalk/solapi/sync', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { templateIds } = req.body;
+
+    if (!Array.isArray(templateIds) || templateIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '템플릿을 선택해주세요'
+      });
+    }
+
+    try {
+      console.log('📥 솔라피 브랜드 템플릿 동기화 요청:', templateIds.length, '개');
+
+      const syncedTemplates = [];
+      const errors = [];
+
+      for (const templateId of templateIds) {
+        const result = await solapiService.getBrandTemplateDetail(templateId);
+
+        if (!result.success) {
+          errors.push({ templateId, error: result.error?.message });
+          continue;
+        }
+
+        const template = result.data;
+
+        // DB에 저장 (중복 체크)
+        const existing = await db.select()
+          .from(brandtalkTemplates)
+          .where(eq(brandtalkTemplates.title, template.name || '제목 없음'))
+          .limit(1);
+
+        if (existing.length > 0) {
+          // 업데이트
+          await db.update(brandtalkTemplates)
+            .set({
+              message: template.content || '',
+              buttonName: template.buttons?.[0]?.name || null,
+              buttonUrl: template.buttons?.[0]?.url || null,
+              updatedAt: new Date(),
+            })
+            .where(eq(brandtalkTemplates.id, existing[0].id));
+        } else {
+          // 신규 등록
+          await db.insert(brandtalkTemplates).values({
+            title: template.name || '제목 없음',
+            message: template.content || '',
+            buttonName: template.buttons?.[0]?.name || null,
+            buttonUrl: template.buttons?.[0]?.url || null,
+            createdBy: req.session.userId,
+          });
+        }
+
+        syncedTemplates.push(template);
+      }
+
+      console.log('✅ 동기화 완료:', syncedTemplates.length, '개 성공,', errors.length, '개 실패');
+
+      return res.json({
+        success: true,
+        synced: syncedTemplates.length,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `${syncedTemplates.length}개 템플릿이 동기화되었습니다`
+      });
+    } catch (error: any) {
+      console.error('❌ 템플릿 동기화 오류:', error);
+      return res.status(500).json({
+        success: false,
+        error: '동기화 중 오류가 발생했습니다'
+      });
+    }
+  });
+
   // 브랜드톡 발송
   app.post('/api/admin/brandtalk/send/:id', async (req, res) => {
     if (!req.session.userId) {

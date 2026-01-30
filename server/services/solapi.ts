@@ -177,6 +177,125 @@ class SolapiService {
   }
 
   /**
+   * 브랜드 템플릿 목록 조회
+   */
+  async getBrandTemplates() {
+    try {
+      console.log('🔍 [Solapi] 브랜드 템플릿 목록 조회 시작');
+      
+      const url = 'https://api.solapi.com/kakao/v2/brand-templates';
+      
+      const date = new Date().toISOString();
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hmacData = date + salt;
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(hmacData)
+        .digest('hex');
+
+      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+      console.log('🚀 [Solapi] API 호출:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 [Solapi] 응답 상태:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Solapi] API 오류:', errorText);
+        return {
+          success: false,
+          error: {
+            status: response.status,
+            message: errorText
+          }
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ [Solapi] 브랜드 템플릿 조회 성공:', result.data?.length || 0, '개');
+
+      return {
+        success: true,
+        data: result.data || []
+      };
+
+    } catch (error: any) {
+      console.error('❌ [Solapi] getBrandTemplates 예외:', error);
+      return {
+        success: false,
+        error: {
+          status: 500,
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * 브랜드 템플릿 상세 조회
+   */
+  async getBrandTemplateDetail(templateId: string) {
+    try {
+      console.log('🔍 [Solapi] 브랜드 템플릿 상세 조회:', templateId);
+      
+      const encodedId = encodeURIComponent(templateId);
+      const url = `https://api.solapi.com/kakao/v2/brand-templates/${encodedId}`;
+      
+      const date = new Date().toISOString();
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hmacData = date + salt;
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(hmacData)
+        .digest('hex');
+
+      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: {
+            status: response.status,
+            message: errorText
+          }
+        };
+      }
+
+      const responseData = await response.json();
+      return {
+        success: true,
+        data: responseData
+      };
+
+    } catch (error: any) {
+      return {
+        success: false,
+        error: {
+          status: 500,
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
    * 브랜드톡 발송
    */
   async sendBrandtalk(params: BrandtalkSendParams): Promise<SendResult> {
