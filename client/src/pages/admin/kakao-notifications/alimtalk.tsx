@@ -170,7 +170,6 @@ export default function AlimtalkPage() {
 
   const handleViewTemplate = (template: AlimtalkTemplate) => {
     setViewingTemplate(template);
-    setViewModalOpen(true);
   };
 
   const handleConfirmSend = async () => {
@@ -327,14 +326,6 @@ export default function AlimtalkPage() {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setViewingTemplate(template)}
-                          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="내용 보기"
-                          data-testid={`btn-view-${template.id}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
                         <Switch
                           checked={template.isActive}
                           onCheckedChange={(checked) =>
