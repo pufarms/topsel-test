@@ -4638,6 +4638,33 @@ export async function registerRoutes(
     }
   });
 
+  // 알림톡 템플릿 모드 변경 (자동/수동)
+  app.patch('/api/admin/alimtalk/templates/:id/mode', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+    const { isAuto } = req.body;
+
+    try {
+      await db.update(alimtalkTemplates)
+        .set({ 
+          isAuto,
+          updatedAt: new Date(),
+        })
+        .where(eq(alimtalkTemplates.id, parseInt(id)));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 알림톡 수동 발송
   app.post('/api/admin/alimtalk/send/:code', async (req, res) => {
     if (!req.session.userId) {

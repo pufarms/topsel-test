@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { Eye } from 'lucide-react';
 
 interface AlimtalkTemplate {
   id: number;
@@ -56,7 +57,9 @@ interface AlimtalkHistoryItem {
 export default function AlimtalkPage() {
   const [activeTab, setActiveTab] = useState('templates');
   const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<AlimtalkTemplate | null>(null);
+  const [viewingTemplate, setViewingTemplate] = useState<AlimtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const { toast } = useToast();
@@ -87,6 +90,25 @@ export default function AlimtalkPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
       toast({ title: '변경되었습니다' });
+    },
+    onError: () => {
+      toast({ title: '오류가 발생했습니다', variant: 'destructive' });
+    },
+  });
+
+  const modeMutation = useMutation({
+    mutationFn: async ({ id, isAuto }: { id: number; isAuto: boolean }) => {
+      const res = await fetch(`/api/admin/alimtalk/templates/${id}/mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAuto }),
+      });
+      if (!res.ok) throw new Error('모드 변경 실패');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
+      toast({ title: '모드가 변경되었습니다' });
     },
     onError: () => {
       toast({ title: '오류가 발생했습니다', variant: 'destructive' });
@@ -124,12 +146,14 @@ export default function AlimtalkPage() {
     },
   });
 
-  const autoTemplates = templates.filter((t) => t.isAuto);
-  const manualTemplates = templates.filter((t) => !t.isAuto);
-
   const handleSend = (template: AlimtalkTemplate) => {
     setSelectedTemplate(template);
     setSendModalOpen(true);
+  };
+
+  const handleViewTemplate = (template: AlimtalkTemplate) => {
+    setViewingTemplate(template);
+    setViewModalOpen(true);
   };
 
   const handleConfirmSend = async () => {
@@ -211,66 +235,27 @@ export default function AlimtalkPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>자동 발송 알림</CardTitle>
+              <CardTitle>전체 템플릿</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {autoTemplates.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">자동 발송 템플릿이 없습니다</p>
+              {templates.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">등록된 템플릿이 없습니다</p>
               ) : (
-                autoTemplates.map((template) => (
+                templates.map((template) => (
                   <div
                     key={template.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
-                    data-testid={`template-auto-${template.id}`}
+                    data-testid={`template-${template.id}`}
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="font-semibold">{template.templateName}</h3>
-                        <Badge variant="secondary">{template.templateCode}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {template.description}
-                      </p>
-                      <div className="text-sm text-muted-foreground">
-                        발송: {template.totalSent.toLocaleString()}건 / 비용:{' '}
-                        {template.totalCost.toLocaleString()}원
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={template.isActive}
-                        onCheckedChange={(checked) =>
-                          toggleMutation.mutate({ id: template.id, isActive: checked })
-                        }
-                        data-testid={`switch-${template.id}`}
-                      />
-                      <span className="text-sm font-medium">
-                        {template.isActive ? 'ON' : 'OFF'}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>수동 발송 알림</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {manualTemplates.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">수동 발송 템플릿이 없습니다</p>
-              ) : (
-                manualTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                    data-testid={`template-manual-${template.id}`}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="font-semibold">{template.templateName}</h3>
+                        <Badge variant={template.isAuto ? 'secondary' : 'default'}>
+                          {template.isAuto ? '자동' : '수동'}
+                        </Badge>
                         <Badge variant="outline">{template.templateCode}</Badge>
                         {!template.isActive && (
                           <Badge variant="secondary">비활성</Badge>
@@ -284,15 +269,58 @@ export default function AlimtalkPage() {
                         {template.totalCost.toLocaleString()}원
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Select
+                        value={template.isAuto ? 'auto' : 'manual'}
+                        onValueChange={(value) =>
+                          modeMutation.mutate({
+                            id: template.id,
+                            isAuto: value === 'auto',
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-24" data-testid={`select-mode-${template.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">자동</SelectItem>
+                          <SelectItem value="manual">수동</SelectItem>
+                        </SelectContent>
+                      </Select>
+
                       <Button
                         size="sm"
-                        onClick={() => handleSend(template)}
-                        disabled={!template.isActive}
-                        data-testid={`btn-send-${template.id}`}
+                        variant="ghost"
+                        onClick={() => handleViewTemplate(template)}
+                        data-testid={`btn-view-${template.id}`}
                       >
-                        발송
+                        <Eye className="w-4 h-4 mr-1" />
+                        내용
                       </Button>
+
+                      {!template.isAuto && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSend(template)}
+                          disabled={!template.isActive}
+                          data-testid={`btn-test-${template.id}`}
+                        >
+                          테스트
+                        </Button>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={template.isActive}
+                          onCheckedChange={(checked) =>
+                            toggleMutation.mutate({ id: template.id, isActive: checked })
+                          }
+                          data-testid={`switch-${template.id}`}
+                        />
+                        <span className="text-sm font-medium w-8">
+                          {template.isActive ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -307,23 +335,27 @@ export default function AlimtalkPage() {
               <CardTitle>발송 이력</CardTitle>
             </CardHeader>
             <CardContent>
-              {history.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">발송 이력이 없습니다</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">날짜</th>
-                        <th className="text-left p-2">템플릿</th>
-                        <th className="text-right p-2">대상</th>
-                        <th className="text-right p-2">성공</th>
-                        <th className="text-right p-2">실패</th>
-                        <th className="text-right p-2">비용</th>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">날짜</th>
+                      <th className="text-left p-2">템플릿</th>
+                      <th className="text-right p-2">대상</th>
+                      <th className="text-right p-2">성공</th>
+                      <th className="text-right p-2">실패</th>
+                      <th className="text-right p-2">비용</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                          발송 이력이 없습니다
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((item) => (
+                    ) : (
+                      history.map((item) => (
                         <tr key={item.id} className="border-b" data-testid={`history-row-${item.id}`}>
                           <td className="p-2">
                             {new Date(item.sentAt).toLocaleString('ko-KR')}
@@ -342,11 +374,11 @@ export default function AlimtalkPage() {
                             {item.cost.toLocaleString()}원
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -355,7 +387,7 @@ export default function AlimtalkPage() {
       <Dialog open={sendModalOpen} onOpenChange={setSendModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>알림톡 발송</DialogTitle>
+            <DialogTitle>알림톡 테스트 발송</DialogTitle>
             <DialogDescription>
               {selectedTemplate?.templateName}
             </DialogDescription>
@@ -423,6 +455,83 @@ export default function AlimtalkPage() {
             <Button onClick={handleConfirmSend} disabled={sendMutation.isPending} data-testid="btn-confirm-send">
               {sendMutation.isPending ? '발송 중...' : '발송하기'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{viewingTemplate?.templateName}</DialogTitle>
+            <DialogDescription>
+              {viewingTemplate?.isAuto ? '자동 발송 알림' : '수동 발송 알림'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">템플릿 코드</label>
+              <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+                {viewingTemplate?.templateCode}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</label>
+              <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                {viewingTemplate?.templateId}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">설명</label>
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                {viewingTemplate?.description}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">발송 통계</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">총 발송</div>
+                  <div className="text-2xl font-bold">
+                    {viewingTemplate?.totalSent.toLocaleString()}건
+                  </div>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">총 비용</div>
+                  <div className="text-2xl font-bold">
+                    {viewingTemplate?.totalCost.toLocaleString()}원
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">상태</label>
+              <div className="flex gap-2">
+                <Badge variant={viewingTemplate?.isAuto ? 'secondary' : 'default'}>
+                  {viewingTemplate?.isAuto ? '자동 발송' : '수동 발송'}
+                </Badge>
+                <Badge variant={viewingTemplate?.isActive ? 'default' : 'secondary'}>
+                  {viewingTemplate?.isActive ? 'ON' : 'OFF'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="p-4 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950 rounded">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>참고:</strong>
+                {viewingTemplate?.isAuto
+                  ? ' 이 알림은 시스템에서 자동으로 발송됩니다.'
+                  : ' 이 알림은 관련 관리 페이지에서 버튼을 클릭하여 발송할 수 있습니다.'}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setViewModalOpen(false)} data-testid="btn-close-view">닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
