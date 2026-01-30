@@ -501,65 +501,6 @@ export default function AlimtalkPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                메시지 내용
-              </label>
-              {loadingDetail ? (
-                <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                  솔라피에서 조회 중...
-                </div>
-              ) : !templateDetailData ? (
-                <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
-                  내용을 불러올 수 없습니다
-                </div>
-              ) : (
-                <div className="p-4 bg-muted rounded-lg border">
-                  <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                    {templateDetailData.templateContent || 
-                     templateDetailData.content || 
-                     '내용을 불러올 수 없습니다'}
-                  </pre>
-                </div>
-              )}
-            </div>
-
-            {templateDetailData?.templateParameter && templateDetailData.templateParameter.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  변수 목록
-                </label>
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex flex-wrap gap-2">
-                    {templateDetailData.templateParameter.map((param: string, idx: number) => (
-                      <Badge key={idx} variant="secondary">
-                        #{`{${param}}`}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {templateDetailData?.buttons && templateDetailData.buttons.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  버튼 정보
-                </label>
-                <div className="space-y-2">
-                  {templateDetailData.buttons.map((button: any, idx: number) => (
-                    <div key={idx} className="p-3 bg-muted rounded-lg">
-                      <div className="font-medium text-sm">{button.name}</div>
-                      {button.linkMo && (
-                        <div className="text-muted-foreground text-xs mt-1 break-all">
-                          {button.linkMo}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-sm font-medium mb-2 block">발송 통계</label>
