@@ -4667,7 +4667,11 @@ export async function registerRoutes(
 
   // 알림톡 템플릿 상세 조회 (솔라피 API)
   app.get('/api/admin/alimtalk/templates/:id/detail', async (req, res) => {
-    if (req.user?.role !== 'admin') {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ error: 'Permission denied' });
     }
 
