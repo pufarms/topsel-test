@@ -299,12 +299,12 @@ class SolapiService {
    * 브랜드톡 발송 (REST API 직접 호출)
    */
   async sendBrandtalk(params: BrandtalkSendParams): Promise<SendResult> {
-    if (!this.apiKey || !this.apiSecret) {
-      console.error('Solapi API 키가 설정되지 않았습니다.');
+    if (!this.messageService) {
+      console.error('Solapi SDK가 초기화되지 않았습니다.');
       return {
         successCount: 0,
         failCount: params.to.length,
-        data: { error: 'API key not configured' },
+        data: { error: 'Solapi SDK not initialized' },
       };
     }
 
@@ -318,7 +318,7 @@ class SolapiService {
     }
 
     try {
-      console.log('🚀 [Solapi] 브랜드톡 발송 시작');
+      console.log('🚀 [Solapi] 브랜드톡 발송 시작 (SDK 사용)');
       console.log('   - 수신자:', params.to.length, '명');
       console.log('   - 제목:', params.title);
 
@@ -332,11 +332,11 @@ class SolapiService {
         };
       }
 
-      // 버튼 구성
+      // 버튼 구성 (SDK 타입에 맞춤)
       const buttons = params.button ? [{
-        buttonType: 'WL',
-        buttonName: params.button.name,
-        linkMo: params.button.url,
+        linkType: 'WL' as const,
+        name: params.button.name,
+        linkMobile: params.button.url,
         linkPc: params.button.url
       }] : [];
 
@@ -347,55 +347,25 @@ class SolapiService {
         kakaoOptions: {
           pfId: this.pfId,
           bms: {
-            targeting: 'I', // I: 정보성, M: 마케팅, N: 무분류
+            targeting: 'I' as const, // I: 정보성, M: 마케팅, N: 무분류
+            chatBubbleType: 'TEXT' as const, // TEXT: 텍스트형
             content: params.message,
             buttons: buttons
           }
         }
       }));
 
-      // REST API 호출
-      const url = 'https://api.solapi.com/messages/v4/send-many';
+      console.log('📤 [Solapi] SDK send 호출');
+      console.log('   - 메시지 구조:', JSON.stringify(messages[0], null, 2));
+
+      // SDK의 send 메서드 사용 (인증 자동 처리)
+      const result = await this.messageService.send(messages);
       
-      const date = new Date().toISOString();
-      const salt = crypto.randomBytes(16).toString('hex');
-      const hmacData = date + salt;
-      const signature = crypto
-        .createHmac('sha256', this.apiSecret)
-        .update(hmacData)
-        .digest('hex');
+      console.log('✅ [Solapi] 브랜드톡 발송 완료:', JSON.stringify(result, null, 2));
 
-      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
-
-      console.log('📤 [Solapi] API 호출:', url);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messages })
-      });
-
-      console.log('📡 [Solapi] 응답 상태:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Solapi] 발송 실패:', errorText);
-        return {
-          successCount: 0,
-          failCount: params.to.length,
-          data: { error: errorText },
-        };
-      }
-
-      const result = await response.json();
-      console.log('✅ [Solapi] 브랜드톡 발송 성공:', result.groupId);
-
-      // 발송 결과 분석
-      const successCount = result.successCount || params.to.length;
-      const failCount = result.failCount || 0;
+      // 발송 결과 분석 (DetailGroupMessageResponse 타입)
+      const successCount = (result as any).successCount || params.to.length;
+      const failCount = (result as any).failCount || 0;
 
       return {
         successCount,
@@ -405,6 +375,8 @@ class SolapiService {
 
     } catch (error: any) {
       console.error('❌ [Solapi] 브랜드톡 발송 예외:', error);
+      console.error('   - 에러 메시지:', error.message);
+      console.error('   - 에러 상세:', JSON.stringify(error, null, 2));
       return {
         successCount: 0,
         failCount: params.to.length,
