@@ -4667,36 +4667,46 @@ export async function registerRoutes(
 
   // 알림톡 템플릿 상세 조회 (솔라피 API)
   app.get('/api/admin/alimtalk/templates/:id/detail', async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Permission denied' });
     }
-    const user = await storage.getUser(req.session.userId);
-    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
-      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
-    }
-
-    const { id } = req.params;
 
     try {
-      const [template] = await db.select()
+      const templateId = parseInt(req.params.id);
+      const template = await db
+        .select()
         .from(alimtalkTemplates)
-        .where(eq(alimtalkTemplates.id, parseInt(id)))
+        .where(eq(alimtalkTemplates.id, templateId))
         .limit(1);
 
-      if (!template) {
-        return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
+      if (!template || template.length === 0) {
+        return res.status(404).json({ error: 'Template not found' });
       }
 
-      const { solapiService } = await import('./services/solapi');
-      const result = await solapiService.getTemplateDetail(template.templateId);
-
-      if (!result.success) {
-        return res.status(500).json({ error: result.error });
+      const templateData = template[0];
+      
+      if (!templateData.templateId) {
+        return res.status(400).json({ error: 'No Solapi template ID' });
       }
 
-      res.json(result.data);
+      const result = await solapiService.getTemplateDetail(templateData.templateId);
+
+      if (result.success) {
+        return res.json({
+          success: true,
+          template: templateData,
+          detail: result.data
+        });
+      } else {
+        return res.status(result.error.status || 500).json({
+          error: 'Failed to load template content',
+          code: result.error.code,
+          details: result.error.message
+        });
+      }
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Server error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
