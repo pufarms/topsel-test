@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User } from "lucide-react";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -258,6 +258,73 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">통신판매번호</Label>
                   <Input value={member.mailNo || "-"} disabled className="bg-muted" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Uploaded Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                등록 서류
+              </CardTitle>
+              <CardDescription>회원가입 시 제출한 서류</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">사업자등록증</Label>
+                  {member.businessLicenseUrl ? (
+                    <div className="space-y-2">
+                      <a 
+                        href={member.businessLicenseUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-primary hover:underline text-sm"
+                        data-testid="link-business-license"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        파일 보기
+                      </a>
+                      {member.businessLicenseUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
+                        <img 
+                          src={member.businessLicenseUrl} 
+                          alt="사업자등록증" 
+                          className="max-w-full h-auto rounded-md border max-h-48 object-contain"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">등록된 파일 없음</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">통신판매신고증</Label>
+                  {member.mailFilePath ? (
+                    <div className="space-y-2">
+                      <a 
+                        href={member.mailFilePath} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-primary hover:underline text-sm"
+                        data-testid="link-mail-file"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        파일 보기
+                      </a>
+                      {member.mailFilePath.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
+                        <img 
+                          src={member.mailFilePath} 
+                          alt="통신판매신고증" 
+                          className="max-w-full h-auto rounded-md border max-h-48 object-contain"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">등록된 파일 없음</p>
+                  )}
                 </div>
               </div>
             </CardContent>
