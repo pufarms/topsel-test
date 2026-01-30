@@ -1,0 +1,170 @@
+import { SolapiMessageService } from 'solapi';
+
+export class SolapiService {
+  private messageService: SolapiMessageService;
+  private apiKey: string;
+  private apiSecret: string;
+  private sender: string;
+  private pfId: string;
+
+  constructor() {
+    this.apiKey = process.env.SOLAPI_API_KEY || '';
+    this.apiSecret = process.env.SOLAPI_API_SECRET || '';
+    this.sender = process.env.SOLAPI_SENDER || '';
+    this.pfId = process.env.KAKAO_PFID || '';
+
+    // 솔라피 공식 SDK 초기화
+    this.messageService = new SolapiMessageService(this.apiKey, this.apiSecret);
+    
+    console.log('✅ Solapi SDK 초기화 완료');
+  }
+
+  /**
+   * 템플릿 상세 조회 (솔라피 공식 SDK 사용)
+   */
+  async getTemplateDetail(templateId: string): Promise<any> {
+    try {
+      console.log('🔍 템플릿 조회 시작:', templateId);
+
+      // 솔라피 SDK의 내장 메서드 사용
+      const response = await this.messageService.getKakaoTemplates({
+        templateId: templateId
+      });
+
+      console.log('✅ 템플릿 조회 성공:', response);
+
+      return {
+        success: true,
+        data: response
+      };
+    } catch (error: any) {
+      console.error('❌ 템플릿 조회 실패:', error);
+      
+      return {
+        success: false,
+        error: {
+          status: error.statusCode || 500,
+          message: error.message || '템플릿을 불러올 수 없습니다',
+          code: error.errorCode || 'UNKNOWN_ERROR',
+          details: error
+        }
+      };
+    }
+  }
+
+  /**
+   * 알림톡 발송 (단일)
+   */
+  async sendAlimtalk(params: {
+    to: string;
+    templateId: string;
+    variables?: Record<string, string>;
+  }): Promise<any> {
+    try {
+      const response = await this.messageService.send({
+        to: params.to,
+        from: this.sender,
+        kakaoOptions: {
+          pfId: this.pfId,
+          templateId: params.templateId,
+          variables: params.variables || {}
+        }
+      });
+
+      return {
+        success: true,
+        data: response
+      };
+    } catch (error: any) {
+      console.error('❌ 알림톡 발송 실패:', error);
+      return {
+        success: false,
+        error: error.message || '발송에 실패했습니다'
+      };
+    }
+  }
+
+  /**
+   * 알림톡 대량 발송
+   */
+  async sendAlimtalkBulk(recipients: Array<{
+    to: string;
+    templateId: string;
+    variables?: Record<string, string>;
+  }>): Promise<any> {
+    try {
+      const messages = recipients.map(recipient => ({
+        to: recipient.to,
+        from: this.sender,
+        kakaoOptions: {
+          pfId: this.pfId,
+          templateId: recipient.templateId,
+          variables: recipient.variables || {}
+        }
+      }));
+
+      const response = await this.messageService.send(messages);
+
+      return {
+        success: true,
+        data: response
+      };
+    } catch (error: any) {
+      console.error('❌ 대량 발송 실패:', error);
+      return {
+        success: false,
+        error: error.message || '발송에 실패했습니다'
+      };
+    }
+  }
+
+  /**
+   * 브랜드톡 발송
+   */
+  async sendBrandtalk(params: {
+    recipients: string[];
+    title: string;
+    message: string;
+    buttonName?: string;
+    buttonUrl?: string;
+  }): Promise<any> {
+    try {
+      const messages = params.recipients.map(to => ({
+        to,
+        from: this.sender,
+        type: 'CTA',
+        kakaoOptions: {
+          pfId: this.pfId,
+          templateId: null, // 브랜드톡은 템플릿 불필요
+          ad: {
+            title: params.title,
+            message: params.message
+          },
+          buttons: params.buttonName && params.buttonUrl ? [
+            {
+              buttonName: params.buttonName,
+              buttonType: 'WL',
+              linkMo: params.buttonUrl,
+              linkPc: params.buttonUrl
+            }
+          ] : undefined
+        }
+      }));
+
+      const response = await this.messageService.send(messages);
+
+      return {
+        success: true,
+        data: response
+      };
+    } catch (error: any) {
+      console.error('❌ 브랜드톡 발송 실패:', error);
+      return {
+        success: false,
+        error: error.message || '발송에 실패했습니다'
+      };
+    }
+  }
+}
+
+export const solapiService = new SolapiService();

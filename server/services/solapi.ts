@@ -4,8 +4,6 @@
  */
 
 import { SolapiMessageService } from 'solapi';
-import axios from 'axios';
-import crypto from 'crypto';
 
 interface AlimtalkSendParams {
   to: string;
@@ -33,7 +31,6 @@ class SolapiService {
   private apiKey: string;
   private apiSecret: string;
   private pfId: string;
-  private baseUrl: string = 'https://api.solapi.com';
   private messageService: SolapiMessageService | null = null;
 
   constructor() {
@@ -47,19 +44,6 @@ class SolapiService {
       this.messageService = new SolapiMessageService(this.apiKey, this.apiSecret);
       console.log('✅ Solapi SDK 초기화 완료');
     }
-  }
-
-  /**
-   * API 인증 토큰 생성
-   */
-  private generateAuthToken(): string {
-    const date = new Date().toISOString();
-    const salt = crypto.randomBytes(32).toString('hex');
-    const signature = crypto
-      .createHmac('sha256', this.apiSecret)
-      .update(date + salt)
-      .digest('hex');
-    return `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
   }
 
   /**
@@ -95,36 +79,42 @@ class SolapiService {
   }
 
   /**
-   * 솔라피 템플릿 상세 조회
+   * 솔라피 템플릿 상세 조회 (공식 SDK 사용)
    */
   async getTemplateDetail(templateId: string): Promise<any> {
     try {
-      const encodedTemplateId = encodeURIComponent(templateId);
-      const url = `${this.baseUrl}/kakao/v2/templates/${encodedTemplateId}`;
-      const authToken = this.generateAuthToken();
-      
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
+      if (!this.messageService) {
+        return {
+          success: false,
+          error: {
+            status: 400,
+            message: 'Solapi API 키가 설정되지 않았습니다.',
+            code: 'API_NOT_CONFIGURED'
+          }
+        };
+      }
+
+      console.log('🔍 템플릿 조회 시작:', templateId);
+
+      // 솔라피 SDK의 내장 메서드 사용
+      const response = await this.messageService.getKakaoTemplates({
+        templateId: templateId
       });
-      
-      console.log('Solapi API response:', response.data);
-      
+
+      console.log('✅ 템플릿 조회 성공:', response);
+
       return {
         success: true,
-        data: response.data
+        data: response
       };
     } catch (error: any) {
-      console.error('Solapi API error:', error.response?.data);
+      console.error('❌ 템플릿 조회 실패:', error);
       return {
         success: false,
         error: {
-          status: error.response?.status || 500,
-          message: error.response?.data?.message || error.message,
-          code: error.response?.data?.errorCode || 'UNKNOWN_ERROR'
+          status: error.statusCode || 500,
+          message: error.message || '템플릿을 불러올 수 없습니다',
+          code: error.errorCode || 'UNKNOWN_ERROR'
         }
       };
     }
