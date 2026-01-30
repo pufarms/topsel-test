@@ -487,9 +487,9 @@ export default function AlimtalkPage() {
                           size="sm"
                           onClick={() => handleSend(template)}
                           disabled={!template.isActive}
-                          data-testid={`btn-test-${template.id}`}
+                          data-testid={`btn-send-${template.id}`}
                         >
-                          테스트
+                          발송
                         </Button>
                       )}
 
