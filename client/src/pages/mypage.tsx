@@ -19,7 +19,7 @@ import { PublicLayout } from "@/components/public/PublicLayout";
 const memberGradeLabels: Record<string, string> = {
   PENDING: "승인대기",
   ASSOCIATE: "준회원",
-  REGULAR: "정회원",
+  START: "스타트",
   DRIVING: "드라이빙",
   TOP: "탑셀러",
 };
