@@ -4,6 +4,8 @@
  */
 
 import { SolapiMessageService } from 'solapi';
+import axios from 'axios';
+import crypto from 'crypto';
 
 interface AlimtalkSendParams {
   to: string;
@@ -31,6 +33,7 @@ class SolapiService {
   private apiKey: string;
   private apiSecret: string;
   private pfId: string;
+  private baseUrl: string = 'https://api.solapi.com';
   private messageService: SolapiMessageService | null = null;
 
   constructor() {
@@ -44,6 +47,19 @@ class SolapiService {
       this.messageService = new SolapiMessageService(this.apiKey, this.apiSecret);
       console.log('✅ Solapi SDK 초기화 완료');
     }
+  }
+
+  /**
+   * API 인증 토큰 생성
+   */
+  private generateAuthToken(): string {
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(32).toString('hex');
+    const signature = crypto
+      .createHmac('sha256', this.apiSecret)
+      .update(date + salt)
+      .digest('hex');
+    return `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
   }
 
   /**
@@ -80,24 +96,38 @@ class SolapiService {
 
   /**
    * 솔라피 템플릿 상세 조회
-   * 현재는 API 연동이 복잡하여 데이터베이스 정보만 반환
-   * TODO: 추후 Solapi API 연동 완료 시 실제 템플릿 내용 조회
    */
-  async getTemplateDetail(templateId: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    // Solapi API 연동이 복잡하여 임시로 데이터베이스 정보만 반환
-    // 실제 템플릿 내용 조회는 추후 구현
-    console.log('[Solapi] 템플릿 ID:', templateId);
-    
-    return {
-      success: true,
-      data: {
-        templateId,
-        content: '템플릿 상세 내용은 솔라피 콘솔에서 확인해 주세요.',
-        buttons: [],
-        variables: [],
-        _note: 'Solapi API 연동 예정'
-      },
-    };
+  async getTemplateDetail(templateId: string): Promise<any> {
+    try {
+      const encodedTemplateId = encodeURIComponent(templateId);
+      const url = `${this.baseUrl}/kakao/v2/templates/${encodedTemplateId}`;
+      const authToken = this.generateAuthToken();
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      });
+      
+      console.log('Solapi API response:', response.data);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Solapi API error:', error.response?.data);
+      return {
+        success: false,
+        error: {
+          status: error.response?.status || 500,
+          message: error.response?.data?.message || error.message,
+          code: error.response?.data?.errorCode || 'UNKNOWN_ERROR'
+        }
+      };
+    }
   }
 
   /**
