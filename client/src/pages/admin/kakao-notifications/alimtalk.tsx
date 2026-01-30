@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, Save } from 'lucide-react';
+import { Eye, Save, ArrowRightLeft, Zap, Hand } from 'lucide-react';
 
 interface AlimtalkTemplate {
   id: number;
@@ -355,7 +355,7 @@ export default function AlimtalkPage() {
                     자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
                     <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
                       <SelectValue />
@@ -366,28 +366,60 @@ export default function AlimtalkPage() {
                       <SelectItem value="manual">수동</SelectItem>
                     </SelectContent>
                   </Select>
+                  
                   {selectedTemplateIds.length > 0 && (
-                    <>
-                      <span className="text-sm text-muted-foreground">{selectedTemplateIds.length}개 선택</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
-                        disabled={bulkModeMutation.isPending}
-                        data-testid="btn-bulk-auto"
-                      >
-                        자동으로
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
-                        disabled={bulkModeMutation.isPending}
-                        data-testid="btn-bulk-manual"
-                      >
-                        수동으로
-                      </Button>
-                    </>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg">
+                      <ArrowRightLeft className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">선택변경</span>
+                      <span className="text-sm text-muted-foreground">({selectedTemplateIds.length}개)</span>
+                      
+                      {templateFilter === 'manual' ? (
+                        <Button
+                          size="sm"
+                          className="bg-blue-500 hover:bg-blue-600 text-white"
+                          onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
+                          disabled={bulkModeMutation.isPending}
+                          data-testid="btn-bulk-auto"
+                        >
+                          <Zap className="w-4 h-4 mr-1" />
+                          자동으로 변경
+                        </Button>
+                      ) : templateFilter === 'auto' ? (
+                        <Button
+                          size="sm"
+                          className="bg-orange-500 hover:bg-orange-600 text-white"
+                          onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
+                          disabled={bulkModeMutation.isPending}
+                          data-testid="btn-bulk-manual"
+                        >
+                          <Hand className="w-4 h-4 mr-1" />
+                          수동으로 변경
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            className="bg-blue-500 hover:bg-blue-600 text-white"
+                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
+                            disabled={bulkModeMutation.isPending}
+                            data-testid="btn-bulk-auto"
+                          >
+                            <Zap className="w-4 h-4 mr-1" />
+                            자동으로
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-orange-500 hover:bg-orange-600 text-white"
+                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
+                            disabled={bulkModeMutation.isPending}
+                            data-testid="btn-bulk-manual"
+                          >
+                            <Hand className="w-4 h-4 mr-1" />
+                            수동으로
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
