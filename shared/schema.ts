@@ -1078,6 +1078,7 @@ export type DeletedMemberOrder = typeof deletedMemberOrders.$inferSelect;
 export const alimtalkTemplates = pgTable("alimtalk_templates", {
   id: serial("id").primaryKey(),
   templateCode: text("template_code").notNull().unique(),
+  templateId: text("template_id").notNull().unique(),
   templateName: text("template_name").notNull(),
   description: text("description"),
   isAuto: boolean("is_auto").notNull().default(false),

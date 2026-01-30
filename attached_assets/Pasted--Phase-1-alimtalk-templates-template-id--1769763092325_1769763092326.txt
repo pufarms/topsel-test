@@ -1,0 +1,60 @@
+【Phase 1: 알림톡 템플릿 데이터 수정 요청】
+
+작업 내용:
+기존에 생성된 alimtalk_templates 테이블에 template_id 컬럼 추가 및 데이터 수정
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[1] 스키마 수정 (shared/schema.ts):
+
+alimtalkTemplates 테이블에 templateId 컬럼 추가:
+
+export const alimtalkTemplates = pgTable("alimtalk_templates", {
+  id: serial("id").primaryKey(),
+  templateCode: text("template_code").notNull().unique(),
+  templateId: text("template_id").notNull().unique(),  // ← 이 줄 추가
+  templateName: text("template_name").notNull(),
+  description: text("description"),
+  isAuto: boolean("is_auto").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  totalSent: integer("total_sent").notNull().default(0),
+  totalCost: integer("total_cost").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[2] 마이그레이션 실행:
+
+npm run db:push
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[3] 기존 데이터 삭제 후 새로 삽입:
+
+-- 기존 데이터 삭제
+DELETE FROM alimtalk_templates;
+
+-- 새 데이터 삽입 (template_id 포함)
+INSERT INTO alimtalk_templates (template_code, template_id, template_name, description, is_auto, is_active) VALUES
+('SHIPPING', 'KA01TP2511060518009169OsbpimwwFx', '배송출 알림', '상품 배송 출발 시 자동 발송', true, true),
+('ORDER_PREPARE', 'KA01TP250326004530037u7XpcLxRiHA', '온후장등록 알림', '상품 준비 완료 시 자동 발송', true, true),
+('WELCOME', 'KA01TP260105024310918QmwdYf8e7tr', '회원가입 환영 인사', '신규 회원 환영 메시지', false, true),
+('ORDER_DEADLINE_9AM', 'KA01TP2511250555168545yUG6OG4FVi', '9시 주문마감 알림', '9시 주문 마감 알림 수동 발송', false, true),
+('ORDER_DEADLINE_10AM', 'KA01TP2511250548252680FKrHoVS0hl', '10시 주문마감 알림', '10시 주문 마감 알림 수동 발송', false, true),
+('ORDER_DEADLINE_10MIN', 'KA01TP250326004010708B7cnrsZEy9x', '주문 마감 10분전 알림', '주문 마감 10분 전 수동 발송', false, true),
+('WAYBILL_DOWNLOAD', 'KA01TP250401064812535rjuhD934ZTC', '운송장 다운로드 마감 안내', '운송장 다운로드 안내', false, true),
+('MEMBER_CANCEL', 'KA01TP251223000525761bcJKFJC4AAz', '회원취소 마감 알림', '회원 주문 취소 마감 알림', false, true),
+('MEMBER_CANCEL_10MIN', 'KA01TP251223000253106dnvop6WrBZu', '회원취소 마감10분전 알림', '회원 취소 마감 10분 전', false, true),
+('MEMBER_CANCEL_ALT', 'KA01TP250326004720307U6WBUzE9M1X', '회원취소 마감 알림(대체)', '회원 취소 마감 알림 대체 템플릿', false, true),
+('MEMBER_CANCEL_10MIN_ALT', 'KA01TP250326004617023Wo3Qwc9KcRu', '회원취소 마감10분전(대체)', '회원 취소 마감 10분전 대체 템플릿', false, true),
+('FORCE_CANCEL', 'KA01TP250326004307718BHnY6y6vatF', '직권 취소 알림', '관리자 직권 취소 알림', false, true);
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[4] 확인:
+
+SELECT template_code, template_id, template_name, is_auto FROM alimtalk_templates ORDER BY is_auto DESC, template_name;
+
+완료 후 알려주세요!
