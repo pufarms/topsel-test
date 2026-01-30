@@ -296,7 +296,7 @@ class SolapiService {
   }
 
   /**
-   * 브랜드톡 발송
+   * 브랜드톡 발송 (REST API 직접 호출)
    */
   async sendBrandtalk(params: BrandtalkSendParams): Promise<SendResult> {
     if (!this.apiKey || !this.apiSecret) {
@@ -308,22 +308,195 @@ class SolapiService {
       };
     }
 
-    try {
-      // TODO: 실제 Solapi API 연동
-      console.log(`[Solapi] 브랜드톡 발송 요청: ${params.to.length}건`);
-      
-      // 개발 모드에서는 성공으로 시뮬레이션
+    if (!this.pfId) {
+      console.error('카카오 PF ID가 설정되지 않았습니다.');
       return {
-        successCount: params.to.length,
-        failCount: 0,
-        data: { simulated: true, count: params.to.length },
+        successCount: 0,
+        failCount: params.to.length,
+        data: { error: 'Kakao PF ID not configured' },
       };
+    }
+
+    try {
+      console.log('🚀 [Solapi] 브랜드톡 발송 시작');
+      console.log('   - 수신자:', params.to.length, '명');
+      console.log('   - 제목:', params.title);
+
+      const senderNumber = process.env.SOLAPI_SENDER || '';
+      if (!senderNumber) {
+        console.error('발신 번호가 설정되지 않았습니다.');
+        return {
+          successCount: 0,
+          failCount: params.to.length,
+          data: { error: 'Sender number not configured' },
+        };
+      }
+
+      // 버튼 구성
+      const buttons = params.button ? [{
+        buttonType: 'WL',
+        buttonName: params.button.name,
+        linkMo: params.button.url,
+        linkPc: params.button.url
+      }] : [];
+
+      // 메시지 배열 생성
+      const messages = params.to.map(phoneNumber => ({
+        to: phoneNumber,
+        from: senderNumber,
+        kakaoOptions: {
+          pfId: this.pfId,
+          bms: {
+            targeting: 'I', // I: 정보성, M: 마케팅, N: 무분류
+            content: params.message,
+            buttons: buttons
+          }
+        }
+      }));
+
+      // REST API 호출
+      const url = 'https://api.solapi.com/messages/v4/send-many';
+      
+      const date = new Date().toISOString();
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hmacData = date + salt;
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(hmacData)
+        .digest('hex');
+
+      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+      console.log('📤 [Solapi] API 호출:', url);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messages })
+      });
+
+      console.log('📡 [Solapi] 응답 상태:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Solapi] 발송 실패:', errorText);
+        return {
+          successCount: 0,
+          failCount: params.to.length,
+          data: { error: errorText },
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ [Solapi] 브랜드톡 발송 성공:', result.groupId);
+
+      // 발송 결과 분석
+      const successCount = result.successCount || params.to.length;
+      const failCount = result.failCount || 0;
+
+      return {
+        successCount,
+        failCount,
+        data: result,
+      };
+
     } catch (error: any) {
-      console.error('[Solapi] 브랜드톡 발송 실패:', error.message);
+      console.error('❌ [Solapi] 브랜드톡 발송 예외:', error);
       return {
         successCount: 0,
         failCount: params.to.length,
         data: { error: error.message },
+      };
+    }
+  }
+
+  /**
+   * 브랜드톡 직접 발송 (템플릿 없이)
+   */
+  async sendBrandTalkDirect(params: {
+    to: string[];
+    from: string;
+    content: string;
+    buttons?: any[];
+    targeting?: string;
+  }): Promise<{ success: boolean; data?: any; error?: { message: string } }> {
+    if (!this.apiKey || !this.apiSecret) {
+      return {
+        success: false,
+        error: { message: 'API key not configured' }
+      };
+    }
+
+    if (!this.pfId) {
+      return {
+        success: false,
+        error: { message: 'Kakao PF ID not configured' }
+      };
+    }
+
+    try {
+      console.log('🚀 [Solapi] 브랜드톡 직접 발송 시작');
+      console.log('   - 수신자:', params.to.length, '명');
+
+      const messages = params.to.map(phoneNumber => ({
+        to: phoneNumber,
+        from: params.from,
+        kakaoOptions: {
+          pfId: this.pfId,
+          bms: {
+            targeting: params.targeting || 'I',
+            content: params.content,
+            buttons: params.buttons || []
+          }
+        }
+      }));
+
+      const url = 'https://api.solapi.com/messages/v4/send-many';
+      
+      const date = new Date().toISOString();
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hmacData = date + salt;
+      const signature = crypto
+        .createHmac('sha256', this.apiSecret)
+        .update(hmacData)
+        .digest('hex');
+
+      const authHeader = `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ messages })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [Solapi] 발송 실패:', errorText);
+        return {
+          success: false,
+          error: { message: errorText }
+        };
+      }
+
+      const result = await response.json();
+      console.log('✅ [Solapi] 브랜드톡 발송 성공:', result.groupId);
+
+      return {
+        success: true,
+        data: result
+      };
+
+    } catch (error: any) {
+      console.error('❌ [Solapi] 브랜드톡 발송 예외:', error);
+      return {
+        success: false,
+        error: { message: error.message || '발송 실패' }
       };
     }
   }

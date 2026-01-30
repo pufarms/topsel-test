@@ -1,0 +1,157 @@
+수정 요청
+====================================
+🔧 브랜드톡 발송 기능 구현
+====================================
+
+📋 작업 내용:
+
+1. server/services/solapi.ts에 브랜드톡 발송 메서드 추가:
+
+기존 SolapiService 클래스에 다음 메서드 추가:
+
+```typescript
+// 브랜드톡 직접 발송 (템플릿 없이)
+async sendBrandTalk(params: {
+  to: string[];           // 수신 번호 배열
+  from: string;           // 발신 번호
+  content: string;        // 메시지 내용
+  buttons?: any[];        // 버튼 배열
+  targeting?: string;     // I, M, N (기본: I)
+}) {
+  try {
+    console.log('🚀 [Solapi] 브랜드톡 발송 시작');
+    console.log('   - 수신자:', params.to.length, '명');
+
+    const messages = params.to.map(phoneNumber => ({
+      to: phoneNumber,
+      from: params.from,
+      kakaoOptions: {
+        pfId: this.kakaoPfId,
+        templateId: null,  // 템플릿 없이 직접 발송
+        variables: {},
+        bms: {
+          targeting: params.targeting || 'I',
+          content: params.content,
+          buttons: params.buttons || []
+        }
+      }
+    }));
+
+    const result = await this.solapiClient.send(messages);
+    
+    console.log('✅ [Solapi] 브랜드톡 발송 성공:', result.groupId);
+
+    return {
+      success: true,
+      data: result
+    };
+
+  } catch (error: any) {
+    console.error('❌ [Solapi] 브랜드톡 발송 실패:', error);
+    return {
+      success: false,
+      error: {
+        message: error.message || '발송 실패'
+      }
+    };
+  }
+}
+server/routes.ts에 발송 엔드포인트 구현:
+기존 POST /api/admin/brandtalk/send 엔드포인트를 아래로 교체:
+
+Copyapp.post('/api/admin/brandtalk/send', async (req, res) => {
+  try {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: '접근 권한이 없습니다' 
+      });
+    }
+
+    const { templateId, recipients, targeting } = req.body;
+
+    if (!templateId || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '템플릿과 수신자를 선택해주세요'
+      });
+    }
+
+    console.log('📥 브랜드톡 발송 요청');
+    console.log('   - 템플릿 ID:', templateId);
+    console.log('   - 수신자 수:', recipients.length);
+
+    // DB에서 템플릿 조회
+    const template = await storage.db
+      .prepare('SELECT * FROM brandtalk_templates WHERE id = ?')
+      .get(templateId);
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: '템플릿을 찾을 수 없습니다'
+      });
+    }
+
+    // 버튼 파싱
+    let buttons = [];
+    try {
+      buttons = JSON.parse(template.buttons || '[]');
+    } catch (e) {
+      console.warn('버튼 파싱 실패:', e);
+    }
+
+    // 솔라피로 발송
+    const result = await solapiService.sendBrandTalk({
+      to: recipients,
+      from: process.env.SOLAPI_SENDER || '',
+      content: template.message_content,
+      buttons: buttons,
+      targeting: targeting || 'I'
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error?.message || '발송 실패'
+      });
+    }
+
+    // 발송 이력 저장
+    const cost = recipients.length * 27; // 브랜드톡 27원/건
+
+    await storage.db
+      .prepare(`
+        INSERT INTO brandtalk_history (
+          template_id, sent_count, success_count, failed_count, 
+          total_cost, sent_at
+        ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `)
+      .run(templateId, recipients.length, recipients.length, 0, cost);
+
+    console.log('✅ 브랜드톡 발송 완료');
+
+    return res.json({
+      success: true,
+      sentCount: recipients.length,
+      cost: cost,
+      message: `${recipients.length}건 발송 완료 (${cost.toLocaleString()}원)`
+    });
+
+  } catch (error: any) {
+    console.error('❌ 브랜드톡 발송 오류:', error);
+    return res.status(500).json({
+      success: false,
+      error: '발송 중 오류가 발생했습니다'
+    });
+  }
+});
+Copy
+프론트엔드는 수정 불필요 (이미 발송 모달 구현되어 있음)
+==================================== ✅ 완료 후 테스트:
+
+브랜드톡 작성 후 저장
+[발송] 버튼 클릭
+수신자 선택
+[발송하기] 클릭
+실제 카카오톡으로 메시지 수신 확인 ====================================
