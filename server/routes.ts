@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
+import cookieParser from "cookie-parser";
 import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders } from "@shared/schema";
 import crypto from "crypto";
 import { z } from "zod";
@@ -13,6 +14,7 @@ import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
+import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
 const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
@@ -43,6 +45,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use(cookieParser());
+  
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "order-management-secret-key",
@@ -431,6 +435,14 @@ export async function registerRoutes(
         req.session.userId = user.id;
         req.session.userType = "user";
 
+        // JWT 토큰 발급
+        const token = generateToken({
+          userId: user.id,
+          username: user.username,
+          userType: "user",
+        });
+        res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
+
         const { password, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
       }
@@ -449,6 +461,16 @@ export async function registerRoutes(
         await storage.updateMemberLastLogin(member.id);
         req.session.userId = member.id;
         req.session.userType = "member";
+
+        // JWT 토큰 발급
+        const token = generateToken({
+          userId: member.id,
+          username: member.username,
+          userType: "member",
+          grade: member.grade,
+          companyName: member.companyName,
+        });
+        res.cookie("topsel_token", token, JWT_COOKIE_OPTIONS);
 
         const { password, ...memberWithoutPassword } = member;
         return res.json({ ...memberWithoutPassword, role: "member" });
@@ -469,6 +491,7 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Logout failed" });
       }
       res.clearCookie("connect.sid");
+      res.clearCookie("topsel_token", { path: "/" });
       return res.json({ message: "Logged out" });
     });
   });
