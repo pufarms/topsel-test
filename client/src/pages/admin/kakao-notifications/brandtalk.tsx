@@ -91,6 +91,7 @@ export default function BrandtalkPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<BrandtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [phoneType, setPhoneType] = useState<'phone' | 'managerPhone' | 'both'>('phone');
   const [dateFilter, setDateFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSolapiTemplates, setSelectedSolapiTemplates] = useState<string[]>([]);
@@ -130,6 +131,21 @@ export default function BrandtalkPage() {
     queryKey: ['/api/admin/brandtalk/solapi/templates'],
     enabled: solapiModalOpen,
     retry: 1,
+  });
+
+  interface Recipient {
+    id: string;
+    companyName: string;
+    representative: string;
+    grade: string;
+    phone: string | null;
+    managerName: string | null;
+    managerPhone: string | null;
+  }
+
+  const { data: recipientsData } = useQuery<{ success: boolean; recipients: Recipient[]; totalCount: number; phoneStats: { withPhone: number; withManagerPhone: number } }>({
+    queryKey: ['/api/admin/brandtalk/recipients'],
+    enabled: sendModalOpen,
   });
 
   const syncMutation = useMutation({
@@ -225,11 +241,11 @@ export default function BrandtalkPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async ({ id, recipients }: { id: number; recipients: string[] }) => {
+    mutationFn: async ({ id, targetType, selectedGrades, phoneType }: { id: number; targetType: string; selectedGrades: string[]; phoneType: string }) => {
       const res = await fetch(`/api/admin/brandtalk/send/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipients }),
+        body: JSON.stringify({ targetType, selectedGrades, phoneType }),
         credentials: 'include'
       });
       if (!res.ok) throw new Error('발송 실패');
@@ -309,9 +325,37 @@ export default function BrandtalkPage() {
 
   const handleConfirmSend = () => {
     if (!selectedTemplate) return;
-    const recipients = ['01012345678'];
-    sendMutation.mutate({ id: selectedTemplate.id, recipients });
+    sendMutation.mutate({ 
+      id: selectedTemplate.id, 
+      targetType, 
+      selectedGrades, 
+      phoneType 
+    });
   };
+
+  // 예상 수신자 수 계산
+  const getExpectedRecipientCount = () => {
+    if (!recipientsData?.recipients) return 0;
+    
+    let targetMembers = recipientsData.recipients;
+    
+    if (targetType === 'grade' && selectedGrades.length > 0) {
+      targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
+    }
+    
+    let count = 0;
+    for (const member of targetMembers) {
+      if (phoneType === 'phone' && member.phone) count++;
+      else if (phoneType === 'managerPhone' && member.managerPhone) count++;
+      else if (phoneType === 'both') {
+        if (member.phone) count++;
+        if (member.managerPhone) count++;
+      }
+    }
+    return count;
+  };
+
+  const expectedCount = getExpectedRecipientCount();
 
   const addButton = () => {
     if (editButtons.length < 5) {
@@ -711,11 +755,34 @@ export default function BrandtalkPage() {
               </div>
             )}
 
+            <div>
+              <Label className="mb-2 block">연락처 유형</Label>
+              <Select value={phoneType} onValueChange={(v: 'phone' | 'managerPhone' | 'both') => setPhoneType(v)}>
+                <SelectTrigger data-testid="select-phone-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">대표연락처</SelectItem>
+                  <SelectItem value="managerPhone">담당자연락처</SelectItem>
+                  <SelectItem value="both">둘 다</SelectItem>
+                </SelectContent>
+              </Select>
+              {recipientsData?.phoneStats && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  대표연락처: {recipientsData.phoneStats.withPhone}명 / 담당자연락처: {recipientsData.phoneStats.withManagerPhone}명
+                </p>
+              )}
+            </div>
+
             <div className="p-4 bg-muted rounded-lg">
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
+                  <span>총 회원 수:</span>
+                  <span className="font-medium">{recipientsData?.totalCount || 0}명</span>
+                </div>
+                <div className="flex justify-between">
                   <span>예상 발송 건수:</span>
-                  <span className="font-medium">1건 (테스트)</span>
+                  <span className="font-medium">{expectedCount}건</span>
                 </div>
                 <div className="flex justify-between">
                   <span>건당 비용:</span>
@@ -723,7 +790,7 @@ export default function BrandtalkPage() {
                 </div>
                 <div className="flex justify-between font-bold">
                   <span>총 예상 비용:</span>
-                  <span>{COST_PER_MESSAGE}원</span>
+                  <span>{(expectedCount * COST_PER_MESSAGE).toLocaleString()}원</span>
                 </div>
               </div>
             </div>
@@ -739,8 +806,12 @@ export default function BrandtalkPage() {
             <Button variant="outline" onClick={() => setSendModalOpen(false)} data-testid="btn-cancel-send">
               취소
             </Button>
-            <Button onClick={handleConfirmSend} disabled={sendMutation.isPending} data-testid="btn-confirm-send">
-              {sendMutation.isPending ? '발송 중...' : '발송하기'}
+            <Button 
+              onClick={handleConfirmSend} 
+              disabled={sendMutation.isPending || expectedCount === 0} 
+              data-testid="btn-confirm-send"
+            >
+              {sendMutation.isPending ? '발송 중...' : `${expectedCount}건 발송하기`}
             </Button>
           </DialogFooter>
         </DialogContent>

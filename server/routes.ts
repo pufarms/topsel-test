@@ -5051,6 +5051,47 @@ export async function registerRoutes(
     }
   });
 
+  // 브랜드톡 수신자 목록 조회 (회원 연락처)
+  app.get('/api/admin/brandtalk/recipients', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const allMembers = await storage.getAllMembers();
+      
+      // 활성 회원만 필터링하고 필요한 정보만 반환
+      const recipients = allMembers
+        .filter(m => m.status === '활성')
+        .map(m => ({
+          id: m.id,
+          companyName: m.companyName,
+          representative: m.representative,
+          grade: m.grade,
+          phone: m.phone, // 대표연락처
+          managerName: m.managerName,
+          managerPhone: m.managerPhone, // 담당자연락처
+        }));
+      
+      return res.json({
+        success: true,
+        recipients,
+        totalCount: recipients.length,
+        phoneStats: {
+          withPhone: recipients.filter(r => r.phone).length,
+          withManagerPhone: recipients.filter(r => r.managerPhone).length,
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ 수신자 목록 조회 오류:', error);
+      return res.status(500).json({ error: '수신자 목록 조회 중 오류가 발생했습니다' });
+    }
+  });
+
   // 브랜드톡 발송
   app.post('/api/admin/brandtalk/send/:id', async (req, res) => {
     if (!req.session.userId) {
@@ -5062,7 +5103,7 @@ export async function registerRoutes(
     }
 
     const { id } = req.params;
-    const { recipients } = req.body;
+    const { recipients, targetType, selectedGrades, phoneType, memberIds } = req.body;
 
     try {
       // 템플릿 조회
@@ -5075,9 +5116,53 @@ export async function registerRoutes(
         return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
       }
 
+      // 수신자 전화번호 목록 생성
+      let phoneNumbers: string[] = [];
+      
+      if (recipients && recipients.length > 0) {
+        // 직접 입력된 수신자가 있으면 사용
+        phoneNumbers = recipients;
+      } else if (memberIds || targetType) {
+        // 회원 기반 수신자 선택
+        const allMembers = await storage.getAllMembers();
+        let targetMembers = allMembers.filter(m => m.status === '활성');
+        
+        // 특정 회원만 선택한 경우
+        if (memberIds && memberIds.length > 0) {
+          targetMembers = targetMembers.filter(m => memberIds.includes(m.id));
+        }
+        // 등급별 선택
+        else if (targetType === 'grade' && selectedGrades && selectedGrades.length > 0) {
+          targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
+        }
+        
+        // 연락처 유형에 따라 전화번호 수집
+        const pType = phoneType || 'phone'; // 기본값: 대표연락처
+        
+        for (const member of targetMembers) {
+          if (pType === 'phone' && member.phone) {
+            phoneNumbers.push(member.phone.replace(/-/g, ''));
+          } else if (pType === 'managerPhone' && member.managerPhone) {
+            phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
+          } else if (pType === 'both') {
+            if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
+            if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
+          }
+        }
+        
+        // 중복 제거
+        phoneNumbers = Array.from(new Set(phoneNumbers));
+      }
+      
+      if (phoneNumbers.length === 0) {
+        return res.status(400).json({ error: '발송할 수신자가 없습니다' });
+      }
+      
+      console.log(`📤 브랜드톡 발송: ${phoneNumbers.length}명에게 발송`);
+
       // 발송
       const result = await solapiService.sendBrandtalk({
-        to: recipients,
+        to: phoneNumbers,
         title: template.title,
         message: template.message,
         button: template.buttonName && template.buttonUrl
@@ -5092,7 +5177,7 @@ export async function registerRoutes(
         templateId: template.id,
         title: template.title,
         message: template.message,
-        recipientCount: recipients.length,
+        recipientCount: phoneNumbers.length,
         successCount: result.successCount,
         failCount: result.failCount,
         cost,
@@ -5111,7 +5196,7 @@ export async function registerRoutes(
 
       res.json({
         success: true,
-        sent: recipients.length,
+        sent: phoneNumbers.length,
         successCount: result.successCount,
         failCount: result.failCount,
         cost,
