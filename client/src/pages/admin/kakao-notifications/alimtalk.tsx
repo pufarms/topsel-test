@@ -57,7 +57,6 @@ interface AlimtalkHistoryItem {
 export default function AlimtalkPage() {
   const [activeTab, setActiveTab] = useState('templates');
   const [sendModalOpen, setSendModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<AlimtalkTemplate | null>(null);
   const [viewingTemplate, setViewingTemplate] = useState<AlimtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
@@ -328,6 +327,14 @@ export default function AlimtalkPage() {
                       )}
 
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setViewingTemplate(template)}
+                          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="내용 보기"
+                          data-testid={`btn-view-${template.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <Switch
                           checked={template.isActive}
                           onCheckedChange={(checked) =>
@@ -477,27 +484,36 @@ export default function AlimtalkPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+      <Dialog open={!!viewingTemplate} onOpenChange={(open) => !open && setViewingTemplate(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{viewingTemplate?.templateName}</DialogTitle>
+            <DialogTitle>템플릿 상세 정보</DialogTitle>
             <DialogDescription>
-              {viewingTemplate?.isAuto ? '자동 발송 알림' : '수동 발송 알림'}
+              {viewingTemplate?.templateName}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">템플릿 코드</label>
-              <div className="p-3 bg-muted rounded-lg font-mono text-sm">
-                {viewingTemplate?.templateCode}
+            {/* 기본 정보 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">템플릿 코드</label>
+                <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+                  {viewingTemplate?.templateCode}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</label>
+                <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                  {viewingTemplate?.templateId}
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</label>
-              <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                {viewingTemplate?.templateId}
+              <label className="text-sm font-medium mb-2 block">이름</label>
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                {viewingTemplate?.templateName}
               </div>
             </div>
 
@@ -508,25 +524,81 @@ export default function AlimtalkPage() {
               </div>
             </div>
 
+            {/* 메시지 내용 (API에서 조회) */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">메시지 내용</label>
+              {isLoadingDetail ? (
+                <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+                  로딩 중...
+                </div>
+              ) : detailError ? (
+                <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-600 dark:text-red-400">
+                  템플릿 내용을 불러오는데 실패했습니다: {(detailError as Error).message}
+                </div>
+              ) : templateDetail?.detail?.content ? (
+                <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
+                  {templateDetail.detail.content}
+                </div>
+              ) : (
+                <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+                  메시지 내용이 없습니다
+                </div>
+              )}
+            </div>
 
+            {/* 변수 목록 */}
+            {templateDetail?.detail?.variables && templateDetail.detail.variables.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">변수 목록</label>
+                <div className="flex flex-wrap gap-2">
+                  {templateDetail.detail.variables.map((variable: string, index: number) => (
+                    <Badge key={index} variant="outline">
+                      #{`{${variable}}`}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 버튼 정보 */}
+            {templateDetail?.detail?.buttons && templateDetail.detail.buttons.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">버튼 정보</label>
+                <div className="space-y-2">
+                  {templateDetail.detail.buttons.map((button: any, index: number) => (
+                    <div key={index} className="p-3 bg-muted rounded-lg text-sm">
+                      <div className="font-medium">{button.name || button.buttonName}</div>
+                      {button.linkMobile && (
+                        <div className="text-muted-foreground text-xs mt-1">
+                          링크: {button.linkMobile}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 발송 통계 */}
             <div>
               <label className="text-sm font-medium mb-2 block">발송 통계</label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground mb-1">총 발송</div>
                   <div className="text-2xl font-bold">
-                    {viewingTemplate?.totalSent.toLocaleString()}건
+                    {viewingTemplate?.totalSent?.toLocaleString() || 0}건
                   </div>
                 </div>
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground mb-1">총 비용</div>
                   <div className="text-2xl font-bold">
-                    {viewingTemplate?.totalCost.toLocaleString()}원
+                    {viewingTemplate?.totalCost?.toLocaleString() || 0}원
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* 상태 */}
             <div>
               <label className="text-sm font-medium mb-2 block">상태</label>
               <div className="flex gap-2">
@@ -538,19 +610,10 @@ export default function AlimtalkPage() {
                 </Badge>
               </div>
             </div>
-
-            <div className="p-4 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950 rounded">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>참고:</strong>
-                {viewingTemplate?.isAuto
-                  ? ' 이 알림은 시스템에서 자동으로 발송됩니다.'
-                  : ' 이 알림은 관련 관리 페이지에서 버튼을 클릭하여 발송할 수 있습니다.'}
-              </p>
-            </div>
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setViewModalOpen(false)} data-testid="btn-close-view">닫기</Button>
+            <Button onClick={() => setViewingTemplate(null)} data-testid="btn-close-view">닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
