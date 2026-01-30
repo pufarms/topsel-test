@@ -205,10 +205,23 @@ export default function MembersPage() {
     const data = filteredMembers.map(m => ({
       "상호명": m.companyName,
       "아이디": m.username,
+      "회원명": m.memberName || "",
       "등급": memberGradeLabels[m.grade as MemberGrade] || m.grade,
+      "대표자명": m.representative || "",
+      "대표연락처": m.phone || "",
+      "이메일": m.email || "",
+      "사업자번호": m.businessNumber || "",
+      "통신판매번호": m.mailNo || "",
+      "사업장주소": m.businessAddress || "",
+      "담당자1": m.managerName || "",
+      "담당자1연락처": m.managerPhone || "",
+      "담당자2": m.manager2Name || "",
+      "담당자2연락처": m.manager2Phone || "",
+      "담당자3": m.manager3Name || "",
+      "담당자3연락처": m.manager3Phone || "",
       "예치금": m.deposit,
       "포인트": m.point,
-      "연락처": m.phone,
+      "상태": m.status,
       "가입일": formatDate(m.createdAt),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -220,9 +233,13 @@ export default function MembersPage() {
   const columns: Column<MemberWithoutPassword>[] = [
     { key: "companyName", label: "상호명", render: (m) => <span className="font-medium">{m.companyName}</span> },
     { key: "username", label: "아이디", className: "text-muted-foreground" },
+    { key: "memberName", label: "회원명", render: (m) => m.memberName || "-" },
     { key: "grade", label: "등급", render: (m) => (
       <Badge className={gradeColors[m.grade]}>{memberGradeLabels[m.grade as MemberGrade]}</Badge>
     )},
+    { key: "representative", label: "대표자", render: (m) => m.representative || "-" },
+    { key: "phone", label: "대표연락처", render: (m) => m.phone || "-" },
+    { key: "email", label: "이메일", render: (m) => m.email || "-" },
     { key: "deposit", label: "예치금", className: "text-right", render: (m) => `${formatNumber(m.deposit)}원` },
     { key: "point", label: "포인트", className: "text-right", render: (m) => `${formatNumber(m.point)}P` },
     { key: "status", label: "상태", render: (m) => (
@@ -473,6 +490,10 @@ export default function MembersPage() {
             </div>
             <p className="text-xs text-muted-foreground mb-2">@{member.username}</p>
             <div className="space-y-1">
+              <MobileCardField label="회원명" value={member.memberName || "-"} />
+              <MobileCardField label="대표자" value={member.representative || "-"} />
+              <MobileCardField label="대표연락처" value={member.phone || "-"} />
+              <MobileCardField label="이메일" value={member.email || "-"} />
               <MobileCardField label="예치금" value={`${formatNumber(member.deposit)}원`} />
               <MobileCardField label="포인트" value={`${formatNumber(member.point)}P`} />
               <MobileCardField label="가입일" value={formatDate(member.createdAt)} />

@@ -61,6 +61,10 @@ export default function MemberDetailPage() {
     phone: string;
     managerName: string;
     managerPhone: string;
+    manager2Name: string;
+    manager2Phone: string;
+    manager3Name: string;
+    manager3Phone: string;
     email: string;
     depositAdjust: string;
     pointAdjust: string;
@@ -74,6 +78,10 @@ export default function MemberDetailPage() {
     phone: "",
     managerName: "",
     managerPhone: "",
+    manager2Name: "",
+    manager2Phone: "",
+    manager3Name: "",
+    manager3Phone: "",
     email: "",
     depositAdjust: "",
     pointAdjust: "",
@@ -155,6 +163,10 @@ export default function MemberDetailPage() {
     if (formData.phone && formData.phone !== member.phone) updateData.phone = formData.phone;
     if (formData.managerName !== (member.managerName || "")) updateData.managerName = formData.managerName;
     if (formData.managerPhone !== (member.managerPhone || "")) updateData.managerPhone = formData.managerPhone;
+    if (formData.manager2Name !== (member.manager2Name || "")) updateData.manager2Name = formData.manager2Name;
+    if (formData.manager2Phone !== (member.manager2Phone || "")) updateData.manager2Phone = formData.manager2Phone;
+    if (formData.manager3Name !== (member.manager3Name || "")) updateData.manager3Name = formData.manager3Name;
+    if (formData.manager3Phone !== (member.manager3Phone || "")) updateData.manager3Phone = formData.manager3Phone;
     if (formData.email !== (member.email || "")) updateData.email = formData.email;
     if (formData.status && formData.status !== member.status) updateData.status = formData.status;
     if (formData.memo !== (member.memo || "")) updateData.memo = formData.memo;
@@ -236,8 +248,16 @@ export default function MemberDetailPage() {
                   <Input value={member.companyName} disabled className="bg-muted" />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">회원명</Label>
+                  <Input value={member.memberName || "-"} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">사업자번호</Label>
                   <Input value={member.businessNumber} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">통신판매번호</Label>
+                  <Input value={member.mailNo || "-"} disabled className="bg-muted" />
                 </div>
               </div>
             </CardContent>
@@ -301,7 +321,7 @@ export default function MemberDetailPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm">담당자명</Label>
+                  <Label className="text-sm">담당자1</Label>
                   <Input 
                     value={formData.managerName !== "" ? formData.managerName : (member.managerName || "")}
                     onChange={(e) => setFormData({...formData, managerName: e.target.value})}
@@ -309,11 +329,43 @@ export default function MemberDetailPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm">담당자연락처</Label>
+                  <Label className="text-sm">담당자1 연락처</Label>
                   <Input 
                     value={formData.managerPhone !== "" ? formData.managerPhone : (member.managerPhone || "")}
                     onChange={(e) => setFormData({...formData, managerPhone: e.target.value})}
                     data-testid="input-manager-phone"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">담당자2</Label>
+                  <Input 
+                    value={formData.manager2Name !== "" ? formData.manager2Name : (member.manager2Name || "")}
+                    onChange={(e) => setFormData({...formData, manager2Name: e.target.value})}
+                    data-testid="input-manager2-name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">담당자2 연락처</Label>
+                  <Input 
+                    value={formData.manager2Phone !== "" ? formData.manager2Phone : (member.manager2Phone || "")}
+                    onChange={(e) => setFormData({...formData, manager2Phone: e.target.value})}
+                    data-testid="input-manager2-phone"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">담당자3</Label>
+                  <Input 
+                    value={formData.manager3Name !== "" ? formData.manager3Name : (member.manager3Name || "")}
+                    onChange={(e) => setFormData({...formData, manager3Name: e.target.value})}
+                    data-testid="input-manager3-name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">담당자3 연락처</Label>
+                  <Input 
+                    value={formData.manager3Phone !== "" ? formData.manager3Phone : (member.manager3Phone || "")}
+                    onChange={(e) => setFormData({...formData, manager3Phone: e.target.value})}
+                    data-testid="input-manager3-phone"
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
