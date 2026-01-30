@@ -65,6 +65,7 @@ export default function AlimtalkPage() {
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [templateFilter, setTemplateFilter] = useState<'all' | 'auto' | 'manual'>('all');
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const { toast } = useToast();
@@ -139,6 +140,30 @@ export default function AlimtalkPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
       toast({ title: '모드가 변경되었습니다' });
+    },
+    onError: () => {
+      toast({ title: '오류가 발생했습니다', variant: 'destructive' });
+    },
+  });
+
+  const bulkModeMutation = useMutation({
+    mutationFn: async ({ ids, isAuto }: { ids: number[]; isAuto: boolean }) => {
+      const results = await Promise.all(
+        ids.map(id =>
+          fetch(`/api/admin/alimtalk/templates/${id}/mode`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isAuto }),
+          })
+        )
+      );
+      if (results.some(r => !r.ok)) throw new Error('일부 모드 변경 실패');
+      return true;
+    },
+    onSuccess: (_, { ids, isAuto }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
+      setSelectedTemplateIds([]);
+      toast({ title: `${ids.length}개 템플릿이 ${isAuto ? '자동' : '수동'}으로 변경되었습니다` });
     },
     onError: () => {
       toast({ title: '오류가 발생했습니다', variant: 'destructive' });
@@ -330,16 +355,41 @@ export default function AlimtalkPage() {
                     자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
                   </p>
                 </div>
-                <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-template-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">전체</SelectItem>
-                    <SelectItem value="auto">자동</SelectItem>
-                    <SelectItem value="manual">수동</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
+                    <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="auto">자동</SelectItem>
+                      <SelectItem value="manual">수동</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {selectedTemplateIds.length > 0 && (
+                    <>
+                      <span className="text-sm text-muted-foreground">{selectedTemplateIds.length}개 선택</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
+                        disabled={bulkModeMutation.isPending}
+                        data-testid="btn-bulk-auto"
+                      >
+                        자동으로
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
+                        disabled={bulkModeMutation.isPending}
+                        data-testid="btn-bulk-manual"
+                      >
+                        수동으로
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -363,18 +413,29 @@ export default function AlimtalkPage() {
                   .map((template) => (
                   <div
                     key={template.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
+                    className="flex items-center gap-4 p-4 border rounded-lg"
                     data-testid={`template-${template.id}`}
                   >
+                    <Checkbox
+                      checked={selectedTemplateIds.includes(template.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedTemplateIds([...selectedTemplateIds, template.id]);
+                        } else {
+                          setSelectedTemplateIds(selectedTemplateIds.filter(id => id !== template.id));
+                        }
+                      }}
+                      data-testid={`checkbox-template-${template.id}`}
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="font-semibold">{template.templateName}</h3>
+                        <Badge variant="outline">{template.templateCode}</Badge>
                         <Badge variant={template.isAuto ? 'secondary' : 'default'}>
                           {template.isAuto ? '자동' : '수동'}
                         </Badge>
-                        <Badge variant="outline">{template.templateCode}</Badge>
                         {!template.isActive && (
-                          <Badge variant="secondary">비활성</Badge>
+                          <Badge variant="destructive">비활성</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
@@ -386,24 +447,6 @@ export default function AlimtalkPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <Select
-                        value={template.isAuto ? 'auto' : 'manual'}
-                        onValueChange={(value) =>
-                          modeMutation.mutate({
-                            id: template.id,
-                            isAuto: value === 'auto',
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-24" data-testid={`select-mode-${template.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">자동</SelectItem>
-                          <SelectItem value="manual">수동</SelectItem>
-                        </SelectContent>
-                      </Select>
-
                       <Button
                         size="sm"
                         variant="ghost"
