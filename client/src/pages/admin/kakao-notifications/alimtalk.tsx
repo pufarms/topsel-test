@@ -367,7 +367,7 @@ export default function AlimtalkPage() {
                     </SelectContent>
                   </Select>
                   
-                  {selectedTemplateIds.length > 0 && (
+                  {selectedTemplateIds.length > 0 && templateFilter !== 'all' && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-lg">
                       <ArrowRightLeft className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium text-primary">선택변경</span>
@@ -384,7 +384,7 @@ export default function AlimtalkPage() {
                           <Zap className="w-4 h-4 mr-1" />
                           자동으로 변경
                         </Button>
-                      ) : templateFilter === 'auto' ? (
+                      ) : (
                         <Button
                           size="sm"
                           className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -395,29 +395,6 @@ export default function AlimtalkPage() {
                           <Hand className="w-4 h-4 mr-1" />
                           수동으로 변경
                         </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-blue-500 hover:bg-blue-600 text-white"
-                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: true })}
-                            disabled={bulkModeMutation.isPending}
-                            data-testid="btn-bulk-auto"
-                          >
-                            <Zap className="w-4 h-4 mr-1" />
-                            자동으로
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => bulkModeMutation.mutate({ ids: selectedTemplateIds, isAuto: false })}
-                            disabled={bulkModeMutation.isPending}
-                            data-testid="btn-bulk-manual"
-                          >
-                            <Hand className="w-4 h-4 mr-1" />
-                            수동으로
-                          </Button>
-                        </>
                       )}
                     </div>
                   )}
