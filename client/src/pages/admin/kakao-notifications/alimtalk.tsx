@@ -77,15 +77,22 @@ export default function AlimtalkPage() {
     queryKey: ['/api/admin/alimtalk/history'],
   });
 
-  const { data: templateDetailData, isLoading: loadingDetail } = useQuery({
+  const { data: templateDetail, isLoading: isLoadingDetail, error: detailError } = useQuery({
     queryKey: ['/api/admin/alimtalk/templates', viewingTemplate?.id, 'detail'],
     queryFn: async () => {
-      if (!viewingTemplate) return null;
-      const res = await fetch(`/api/admin/alimtalk/templates/${viewingTemplate.id}/detail`);
-      if (!res.ok) throw new Error('조회 실패');
-      return res.json();
+      if (!viewingTemplate?.id) return null;
+      const response = await fetch(`/api/admin/alimtalk/templates/${viewingTemplate.id}/detail`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to load template');
+      }
+      return response.json();
     },
-    enabled: !!viewingTemplate && viewModalOpen,
+    enabled: !!viewingTemplate?.id,
+    retry: 1,
+    staleTime: 0
   });
 
   const toggleMutation = useMutation({
