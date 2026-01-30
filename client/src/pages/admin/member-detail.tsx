@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -278,16 +278,27 @@ export default function MemberDetailPage() {
                   <Label className="text-sm text-muted-foreground">사업자등록증</Label>
                   {member.businessLicenseUrl ? (
                     <div className="space-y-2">
-                      <a 
-                        href={member.businessLicenseUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-primary hover:underline text-sm"
-                        data-testid="link-business-license"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        파일 보기
-                      </a>
+                      <div className="flex items-center gap-3">
+                        <a 
+                          href={member.businessLicenseUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-primary hover:underline text-sm"
+                          data-testid="link-business-license"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          파일 보기
+                        </a>
+                        <a 
+                          href={member.businessLicenseUrl} 
+                          download
+                          className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm"
+                          data-testid="download-business-license"
+                        >
+                          <Download className="h-4 w-4" />
+                          다운로드
+                        </a>
+                      </div>
                       {member.businessLicenseUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
                         <img 
                           src={member.businessLicenseUrl} 
@@ -304,16 +315,27 @@ export default function MemberDetailPage() {
                   <Label className="text-sm text-muted-foreground">통신판매신고증</Label>
                   {member.mailFilePath ? (
                     <div className="space-y-2">
-                      <a 
-                        href={member.mailFilePath} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-primary hover:underline text-sm"
-                        data-testid="link-mail-file"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        파일 보기
-                      </a>
+                      <div className="flex items-center gap-3">
+                        <a 
+                          href={member.mailFilePath} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-primary hover:underline text-sm"
+                          data-testid="link-mail-file"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          파일 보기
+                        </a>
+                        <a 
+                          href={member.mailFilePath} 
+                          download
+                          className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm"
+                          data-testid="download-mail-file"
+                        >
+                          <Download className="h-4 w-4" />
+                          다운로드
+                        </a>
+                      </div>
                       {member.mailFilePath.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
                         <img 
                           src={member.mailFilePath} 
