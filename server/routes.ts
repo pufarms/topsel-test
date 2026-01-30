@@ -4793,7 +4793,7 @@ export async function registerRoutes(
     }
 
     const { code } = req.params;
-    const { targetType, selectedGrades, phoneType, variables } = req.body;
+    const { targetType, selectedGrades, variables } = req.body;
 
     try {
       // 템플릿 조회
@@ -4819,25 +4819,15 @@ export async function registerRoutes(
         targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
       }
       
-      // 연락처 유형에 따라 전화번호 수집
+      // 자동 로직: 모든 연락처에 발송 (중복 제거)
       let phoneNumbers: string[] = [];
-      const pType = phoneType || 'all'; // 기본값: 모든 연락처
       
       for (const member of targetMembers) {
-        if (pType === 'all') {
-          // 모든 연락처 (대표 + 담당자1~3)
-          if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
-          if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-          if (member.manager2Phone) phoneNumbers.push(member.manager2Phone.replace(/-/g, ''));
-          if (member.manager3Phone) phoneNumbers.push(member.manager3Phone.replace(/-/g, ''));
-        } else if (pType === 'phone' && member.phone) {
-          phoneNumbers.push(member.phone.replace(/-/g, ''));
-        } else if (pType === 'managerPhone' && member.managerPhone) {
-          phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-        } else if (pType === 'both') {
-          if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
-          if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-        }
+        // 모든 연락처 수집 (대표 + 담당자1~3)
+        if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
+        if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
+        if (member.manager2Phone) phoneNumbers.push(member.manager2Phone.replace(/-/g, ''));
+        if (member.manager3Phone) phoneNumbers.push(member.manager3Phone.replace(/-/g, ''));
       }
       
       // 중복 제거
@@ -5209,7 +5199,7 @@ export async function registerRoutes(
     }
 
     const { id } = req.params;
-    const { recipients, targetType, selectedGrades, phoneType, memberIds } = req.body;
+    const { recipients, targetType, selectedGrades, memberIds } = req.body;
 
     try {
       // 템플릿 조회
@@ -5242,24 +5232,13 @@ export async function registerRoutes(
           targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
         }
         
-        // 연락처 유형에 따라 전화번호 수집
-        const pType = phoneType || 'all'; // 기본값: 모든 연락처
-        
+        // 자동 로직: 모든 연락처에 발송 (중복 제거)
         for (const member of targetMembers) {
-          if (pType === 'all') {
-            // 모든 연락처 (대표 + 담당자1~3)
-            if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
-            if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-            if (member.manager2Phone) phoneNumbers.push(member.manager2Phone.replace(/-/g, ''));
-            if (member.manager3Phone) phoneNumbers.push(member.manager3Phone.replace(/-/g, ''));
-          } else if (pType === 'phone' && member.phone) {
-            phoneNumbers.push(member.phone.replace(/-/g, ''));
-          } else if (pType === 'managerPhone' && member.managerPhone) {
-            phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-          } else if (pType === 'both') {
-            if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
-            if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
-          }
+          // 모든 연락처 수집 (대표 + 담당자1~3)
+          if (member.phone) phoneNumbers.push(member.phone.replace(/-/g, ''));
+          if (member.managerPhone) phoneNumbers.push(member.managerPhone.replace(/-/g, ''));
+          if (member.manager2Phone) phoneNumbers.push(member.manager2Phone.replace(/-/g, ''));
+          if (member.manager3Phone) phoneNumbers.push(member.manager3Phone.replace(/-/g, ''));
         }
         
         // 중복 제거

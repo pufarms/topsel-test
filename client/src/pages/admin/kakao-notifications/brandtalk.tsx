@@ -91,7 +91,6 @@ export default function BrandtalkPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<BrandtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
-  const [phoneType, setPhoneType] = useState<'all' | 'phone' | 'managerPhone' | 'both'>('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSolapiTemplates, setSelectedSolapiTemplates] = useState<string[]>([]);
@@ -243,11 +242,11 @@ export default function BrandtalkPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async ({ id, targetType, selectedGrades, phoneType }: { id: number; targetType: string; selectedGrades: string[]; phoneType: string }) => {
+    mutationFn: async ({ id, targetType, selectedGrades }: { id: number; targetType: string; selectedGrades: string[] }) => {
       const res = await fetch(`/api/admin/brandtalk/send/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetType, selectedGrades, phoneType }),
+        body: JSON.stringify({ targetType, selectedGrades }),
         credentials: 'include'
       });
       if (!res.ok) throw new Error('발송 실패');
@@ -330,8 +329,7 @@ export default function BrandtalkPage() {
     sendMutation.mutate({ 
       id: selectedTemplate.id, 
       targetType, 
-      selectedGrades, 
-      phoneType 
+      selectedGrades
     });
   };
 
@@ -345,22 +343,13 @@ export default function BrandtalkPage() {
       targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
     }
     
-    // 모든 전화번호 수집 후 중복 제거
+    // 모든 전화번호 수집 후 중복 제거 (자동 로직: 모든 연락처에 발송)
     const allPhones = new Set<string>();
     for (const member of targetMembers) {
-      if (phoneType === 'all') {
-        if (member.phone) allPhones.add(member.phone.replace(/-/g, ''));
-        if (member.managerPhone) allPhones.add(member.managerPhone.replace(/-/g, ''));
-        if (member.manager2Phone) allPhones.add(member.manager2Phone.replace(/-/g, ''));
-        if (member.manager3Phone) allPhones.add(member.manager3Phone.replace(/-/g, ''));
-      } else if (phoneType === 'phone' && member.phone) {
-        allPhones.add(member.phone.replace(/-/g, ''));
-      } else if (phoneType === 'managerPhone' && member.managerPhone) {
-        allPhones.add(member.managerPhone.replace(/-/g, ''));
-      } else if (phoneType === 'both') {
-        if (member.phone) allPhones.add(member.phone.replace(/-/g, ''));
-        if (member.managerPhone) allPhones.add(member.managerPhone.replace(/-/g, ''));
-      }
+      if (member.phone) allPhones.add(member.phone.replace(/-/g, ''));
+      if (member.managerPhone) allPhones.add(member.managerPhone.replace(/-/g, ''));
+      if (member.manager2Phone) allPhones.add(member.manager2Phone.replace(/-/g, ''));
+      if (member.manager3Phone) allPhones.add(member.manager3Phone.replace(/-/g, ''));
     }
     return allPhones.size;
   };
@@ -765,27 +754,14 @@ export default function BrandtalkPage() {
               </div>
             )}
 
-            <div>
-              <Label className="mb-2 block">연락처 유형</Label>
-              <Select value={phoneType} onValueChange={(v: 'all' | 'phone' | 'managerPhone' | 'both') => setPhoneType(v)}>
-                <SelectTrigger data-testid="select-phone-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">모든 연락처 (대표+담당자1~3)</SelectItem>
-                  <SelectItem value="phone">대표연락처만</SelectItem>
-                  <SelectItem value="managerPhone">담당자1 연락처만</SelectItem>
-                  <SelectItem value="both">대표연락처 + 담당자1</SelectItem>
-                </SelectContent>
-              </Select>
-              {recipientsData?.phoneStats && (
-                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                  <p>대표: {recipientsData.phoneStats.withPhone}명 / 담당자1: {recipientsData.phoneStats.withManagerPhone}명</p>
-                  <p>담당자2: {recipientsData.phoneStats.withManager2Phone}명 / 담당자3: {recipientsData.phoneStats.withManager3Phone}명</p>
-                  <p className="font-medium">중복 제거 후 총 연락처: {recipientsData.phoneStats.uniquePhoneCount}개</p>
-                </div>
-              )}
-            </div>
+            {recipientsData?.phoneStats && (
+              <div className="text-xs text-muted-foreground p-3 bg-muted/50 rounded-lg space-y-0.5">
+                <p className="font-medium text-foreground mb-1">등록된 연락처 현황</p>
+                <p>대표: {recipientsData.phoneStats.withPhone}명 / 담당자1: {recipientsData.phoneStats.withManagerPhone}명</p>
+                <p>담당자2: {recipientsData.phoneStats.withManager2Phone}명 / 담당자3: {recipientsData.phoneStats.withManager3Phone}명</p>
+                <p className="font-medium text-primary mt-1">중복 제거 후 총 발송 대상: {recipientsData.phoneStats.uniquePhoneCount}건</p>
+              </div>
+            )}
 
             <div className="p-4 bg-muted rounded-lg">
               <div className="text-sm space-y-1">
