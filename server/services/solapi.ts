@@ -4,6 +4,8 @@
  */
 
 import { SolapiMessageService } from 'solapi';
+import crypto from 'crypto';
+import axios from 'axios';
 
 interface AlimtalkSendParams {
   to: string;
@@ -31,6 +33,7 @@ class SolapiService {
   private apiKey: string;
   private apiSecret: string;
   private pfId: string;
+  private baseUrl: string = 'https://api.solapi.com';
   private messageService: SolapiMessageService | null = null;
 
   constructor() {
@@ -44,6 +47,20 @@ class SolapiService {
       this.messageService = new SolapiMessageService(this.apiKey, this.apiSecret);
       console.log('✅ Solapi SDK 초기화 완료');
     }
+  }
+
+  /**
+   * HMAC-SHA256 인증 헤더 생성 (Solapi 공식 형식)
+   */
+  private generateAuthHeader(): string {
+    const date = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const salt = crypto.randomBytes(32).toString('hex');
+    const hmacData = date + salt;
+    const signature = crypto
+      .createHmac('sha256', this.apiSecret)
+      .update(hmacData)
+      .digest('hex');
+    return `HMAC-SHA256 apiKey=${this.apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
   }
 
   /**
@@ -79,11 +96,11 @@ class SolapiService {
   }
 
   /**
-   * 솔라피 템플릿 상세 조회 (공식 SDK 사용)
+   * 솔라피 템플릿 상세 조회 (REST API 직접 호출)
    */
   async getTemplateDetail(templateId: string): Promise<any> {
     try {
-      if (!this.messageService) {
+      if (!this.apiKey || !this.apiSecret) {
         return {
           success: false,
           error: {
@@ -96,25 +113,33 @@ class SolapiService {
 
       console.log('🔍 템플릿 조회 시작:', templateId);
 
-      // 솔라피 SDK의 내장 메서드 사용
-      const response = await this.messageService.getKakaoTemplates({
-        templateId: templateId
+      const url = `${this.baseUrl}/kakao/v2/templates/${encodeURIComponent(templateId)}`;
+      const authHeader = this.generateAuthHeader();
+      
+      console.log('🔐 인증 헤더:', authHeader.substring(0, 80) + '...');
+
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
       });
 
-      console.log('✅ 템플릿 조회 성공:', response);
+      console.log('✅ 템플릿 조회 성공:', response.data);
 
       return {
         success: true,
-        data: response
+        data: response.data
       };
     } catch (error: any) {
-      console.error('❌ 템플릿 조회 실패:', error);
+      console.error('❌ 템플릿 조회 실패:', error.response?.data || error.message);
       return {
         success: false,
         error: {
-          status: error.statusCode || 500,
-          message: error.message || '템플릿을 불러올 수 없습니다',
-          code: error.errorCode || 'UNKNOWN_ERROR'
+          status: error.response?.status || 500,
+          message: error.response?.data?.errorMessage || error.message || '템플릿을 불러올 수 없습니다',
+          code: error.response?.data?.errorCode || 'UNKNOWN_ERROR'
         }
       };
     }
