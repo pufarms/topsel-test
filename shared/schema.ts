@@ -1111,7 +1111,7 @@ export const brandtalkTemplates = pgTable("brandtalk_templates", {
   buttonUrl: text("button_url"),
   totalSent: integer("total_sent").notNull().default(0),
   lastSentAt: timestamp("last_sent_at"),
-  createdBy: varchar("created_by").references(() => members.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1126,7 +1126,7 @@ export const brandtalkHistory = pgTable("brandtalk_history", {
   successCount: integer("success_count").notNull(),
   failCount: integer("fail_count").notNull(),
   cost: integer("cost").notNull(),
-  sentBy: varchar("sent_by").references(() => members.id).notNull(),
+  sentBy: varchar("sent_by").references(() => users.id),
   sentAt: timestamp("sent_at").notNull().defaultNow(),
   responseData: jsonb("response_data"),
 });
