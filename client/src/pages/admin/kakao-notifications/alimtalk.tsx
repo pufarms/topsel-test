@@ -64,6 +64,7 @@ export default function AlimtalkPage() {
   const [viewingTemplate, setViewingTemplate] = useState<AlimtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [phoneType, setPhoneType] = useState<'all' | 'phone' | 'managerPhone' | 'both'>('all');
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const { toast } = useToast();
@@ -144,18 +145,37 @@ export default function AlimtalkPage() {
     },
   });
 
+  interface Recipient {
+    id: string;
+    companyName: string;
+    grade: string;
+    phone: string | null;
+    managerPhone: string | null;
+    manager2Phone: string | null;
+    manager3Phone: string | null;
+  }
+
+  const { data: recipientsData } = useQuery<{ success: boolean; recipients: Recipient[]; totalCount: number; phoneStats: { withPhone: number; withManagerPhone: number; withManager2Phone: number; withManager3Phone: number; uniquePhoneCount: number } }>({
+    queryKey: ['/api/admin/alimtalk/recipients'],
+    enabled: sendModalOpen,
+  });
+
   const sendMutation = useMutation({
     mutationFn: async ({
       code,
-      recipients,
+      targetType,
+      selectedGrades,
+      phoneType,
     }: {
       code: string;
-      recipients: string[];
+      targetType: string;
+      selectedGrades: string[];
+      phoneType: string;
     }) => {
       const res = await fetch(`/api/admin/alimtalk/send/${code}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipients }),
+        body: JSON.stringify({ targetType, selectedGrades, phoneType }),
       });
       if (!res.ok) throw new Error('발송 실패');
       return res.json();
@@ -205,14 +225,45 @@ export default function AlimtalkPage() {
     setViewingTemplate(template);
   };
 
+  const getExpectedRecipientCount = () => {
+    if (!recipientsData?.recipients) return 0;
+    
+    let targetMembers = recipientsData.recipients;
+    
+    if (targetType === 'grade' && selectedGrades.length > 0) {
+      targetMembers = targetMembers.filter(m => selectedGrades.includes(m.grade));
+    }
+    
+    // 모든 전화번호 수집 후 중복 제거
+    const allPhones = new Set<string>();
+    for (const member of targetMembers) {
+      if (phoneType === 'all') {
+        if (member.phone) allPhones.add(member.phone.replace(/-/g, ''));
+        if (member.managerPhone) allPhones.add(member.managerPhone.replace(/-/g, ''));
+        if (member.manager2Phone) allPhones.add(member.manager2Phone.replace(/-/g, ''));
+        if (member.manager3Phone) allPhones.add(member.manager3Phone.replace(/-/g, ''));
+      } else if (phoneType === 'phone' && member.phone) {
+        allPhones.add(member.phone.replace(/-/g, ''));
+      } else if (phoneType === 'managerPhone' && member.managerPhone) {
+        allPhones.add(member.managerPhone.replace(/-/g, ''));
+      } else if (phoneType === 'both') {
+        if (member.phone) allPhones.add(member.phone.replace(/-/g, ''));
+        if (member.managerPhone) allPhones.add(member.managerPhone.replace(/-/g, ''));
+      }
+    }
+    return allPhones.size;
+  };
+
+  const expectedCount = getExpectedRecipientCount();
+
   const handleConfirmSend = async () => {
     if (!selectedTemplate) return;
 
-    const recipients = ['01012345678'];
-
     sendMutation.mutate({
       code: selectedTemplate.templateCode,
-      recipients,
+      targetType,
+      selectedGrades,
+      phoneType,
     });
   };
 
@@ -479,11 +530,37 @@ export default function AlimtalkPage() {
               </div>
             )}
 
+            <div>
+              <Label className="mb-2 block">연락처 유형</Label>
+              <Select value={phoneType} onValueChange={(v: 'all' | 'phone' | 'managerPhone' | 'both') => setPhoneType(v)}>
+                <SelectTrigger data-testid="select-phone-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">모든 연락처 (대표+담당자1~3)</SelectItem>
+                  <SelectItem value="phone">대표연락처만</SelectItem>
+                  <SelectItem value="managerPhone">담당자1 연락처만</SelectItem>
+                  <SelectItem value="both">대표연락처 + 담당자1</SelectItem>
+                </SelectContent>
+              </Select>
+              {recipientsData?.phoneStats && (
+                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  <p>대표: {recipientsData.phoneStats.withPhone}명 / 담당자1: {recipientsData.phoneStats.withManagerPhone}명</p>
+                  <p>담당자2: {recipientsData.phoneStats.withManager2Phone}명 / 담당자3: {recipientsData.phoneStats.withManager3Phone}명</p>
+                  <p className="font-medium">중복 제거 후 총 연락처: {recipientsData.phoneStats.uniquePhoneCount}개</p>
+                </div>
+              )}
+            </div>
+
             <div className="p-4 bg-muted rounded-lg">
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span>발송 건수:</span>
-                  <span className="font-medium">1건 (테스트)</span>
+                  <span>총 회원 수:</span>
+                  <span className="font-medium">{recipientsData?.totalCount || 0}명</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>예상 발송 건수:</span>
+                  <span className="font-medium">{expectedCount}건</span>
                 </div>
                 <div className="flex justify-between">
                   <span>건당 비용:</span>
@@ -491,7 +568,7 @@ export default function AlimtalkPage() {
                 </div>
                 <div className="flex justify-between font-bold">
                   <span>총 예상 비용:</span>
-                  <span>13원</span>
+                  <span>{(expectedCount * 13).toLocaleString()}원</span>
                 </div>
               </div>
             </div>
