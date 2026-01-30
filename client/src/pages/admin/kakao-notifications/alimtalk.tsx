@@ -64,6 +64,7 @@ export default function AlimtalkPage() {
   const [viewingTemplate, setViewingTemplate] = useState<AlimtalkTemplate | null>(null);
   const [targetType, setTargetType] = useState<'all' | 'grade'>('all');
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'auto' | 'manual'>('all');
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const { toast } = useToast();
@@ -322,16 +323,44 @@ export default function AlimtalkPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>전체 템플릿</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle>템플릿 목록</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    자동: 시스템에서 자동 발송 / 수동: 관리 페이지에서 버튼 클릭 시 발송
+                  </p>
+                </div>
+                <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-template-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    <SelectItem value="auto">자동</SelectItem>
+                    <SelectItem value="manual">수동</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {templates.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">등록된 템플릿이 없습니다</p>
+              ) : templates.filter(t => {
+                    if (templateFilter === 'auto') return t.isAuto;
+                    if (templateFilter === 'manual') return !t.isAuto;
+                    return true;
+                  }).length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  {templateFilter === 'auto' ? '자동 발송 템플릿이 없습니다' : '수동 발송 템플릿이 없습니다'}
+                </p>
               ) : (
-                templates.map((template) => (
+                templates
+                  .filter(t => {
+                    if (templateFilter === 'auto') return t.isAuto;
+                    if (templateFilter === 'manual') return !t.isAuto;
+                    return true;
+                  })
+                  .map((template) => (
                   <div
                     key={template.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
