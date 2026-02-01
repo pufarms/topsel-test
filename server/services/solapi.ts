@@ -143,25 +143,30 @@ class SolapiService {
       
       console.log('[Solapi] 발송 결과:', JSON.stringify(result, null, 2));
 
-      // 결과 분석 (타입 안전하게 처리, 실패를 기본으로)
+      // 결과 분석 (타입 안전하게 처리)
       const count = result.groupInfo?.count as any;
       
-      // Solapi 응답 필드명: total, sentTotal, sentFailed, sentSuccess, pending 등
+      // Solapi 응답 필드:
+      // - registeredSuccess: 메시지가 큐에 성공적으로 등록됨 (비동기 발송 전)
+      // - registeredFailed: 등록 실패 (잘못된 형식, API 오류 등)
+      // - sentSuccess: 실제 발송 완료 (비동기, 즉시 반환 시 0일 수 있음)
+      // - sentFailed: 발송 실패 (비동기)
       let successCount = 0;
       let failCount = params.length;
       
       if (count) {
-        // Solapi SDK 응답에서 성공/실패 수 파싱
-        successCount = count.sentSuccess || count.success || 0;
-        failCount = count.sentFailed || count.failed || count.failure || (params.length - successCount);
+        // registeredSuccess가 성공 지표 (메시지가 큐에 등록됨 = 발송 예정)
+        // sentSuccess는 비동기로 업데이트되므로 즉시 반환 시 0일 수 있음
+        successCount = count.registeredSuccess || count.sentSuccess || count.success || 0;
+        failCount = count.registeredFailed || count.sentFailed || count.failed || 0;
         
-        console.log(`[Solapi] 성공: ${successCount}, 실패: ${failCount}`);
+        console.log(`[Solapi] 등록성공: ${count.registeredSuccess || 0}, 등록실패: ${count.registeredFailed || 0}, 발송완료: ${count.sentSuccess || 0}`);
       } else {
         // count가 없으면 전체 결과를 확인
         console.warn('[Solapi] count 정보 없음, 응답 전체 확인 필요');
-        // 메시지가 추가되었으면 일단 성공으로 간주
-        if (result.groupInfo?.messageCount?.total > 0) {
-          successCount = result.groupInfo.messageCount.total;
+        // failedMessageList가 비어있으면 성공으로 간주
+        if (!result.failedMessageList || result.failedMessageList.length === 0) {
+          successCount = params.length;
           failCount = 0;
         }
       }
