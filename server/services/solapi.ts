@@ -32,6 +32,7 @@ class SolapiService {
   private apiKey: string;
   private apiSecret: string;
   private pfId: string;
+  private sender: string;
   private baseUrl: string = 'https://api.solapi.com';
   private messageService: SolapiMessageService | null = null;
 
@@ -39,6 +40,7 @@ class SolapiService {
     this.apiKey = process.env.SOLAPI_API_KEY || '';
     this.apiSecret = process.env.SOLAPI_API_SECRET || '';
     this.pfId = process.env.KAKAO_PFID || '';
+    this.sender = process.env.SOLAPI_SENDER || '';
 
     if (!this.apiKey || !this.apiSecret) {
       console.warn('\x1b[33m⚠️  Solapi API 키가 설정되지 않았습니다. 알림톡/브랜드톡 발송이 작동하지 않습니다.\x1b[0m');
@@ -84,13 +86,23 @@ class SolapiService {
       };
     }
 
+    if (!this.sender) {
+      console.error('SOLAPI_SENDER가 설정되지 않았습니다.');
+      return {
+        successCount: 0,
+        failCount: params.length,
+        data: { error: 'SOLAPI_SENDER not configured' },
+      };
+    }
+
     try {
       console.log(`[Solapi] 알림톡 발송 요청: ${params.length}건`);
+      console.log(`[Solapi] 발신번호: ${this.sender}, PFID: ${this.pfId}`);
       
       // Solapi SDK를 통한 실제 발송
       const messages = params.map(p => ({
         to: p.to.replace(/-/g, ''),
-        from: '15888707', // 발신번호 (Solapi에 등록된 번호)
+        from: this.sender.replace(/-/g, ''),
         kakaoOptions: {
           pfId: this.pfId,
           templateId: p.templateId,
@@ -104,10 +116,28 @@ class SolapiService {
       
       console.log('[Solapi] 발송 결과:', JSON.stringify(result, null, 2));
 
-      // 결과 분석 (타입 안전하게 처리)
+      // 결과 분석 (타입 안전하게 처리, 실패를 기본으로)
       const count = result.groupInfo?.count as any;
-      const successCount = count?.success || count?.successCount || params.length;
-      const failCount = count?.failure || count?.failCount || 0;
+      
+      // Solapi 응답 필드명: total, sentTotal, sentFailed, sentSuccess, pending 등
+      let successCount = 0;
+      let failCount = params.length;
+      
+      if (count) {
+        // Solapi SDK 응답에서 성공/실패 수 파싱
+        successCount = count.sentSuccess || count.success || 0;
+        failCount = count.sentFailed || count.failed || count.failure || (params.length - successCount);
+        
+        console.log(`[Solapi] 성공: ${successCount}, 실패: ${failCount}`);
+      } else {
+        // count가 없으면 전체 결과를 확인
+        console.warn('[Solapi] count 정보 없음, 응답 전체 확인 필요');
+        // 메시지가 추가되었으면 일단 성공으로 간주
+        if (result.groupInfo?.messageCount?.total > 0) {
+          successCount = result.groupInfo.messageCount.total;
+          failCount = 0;
+        }
+      }
 
       return {
         successCount,
