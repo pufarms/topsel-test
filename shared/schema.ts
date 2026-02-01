@@ -1097,7 +1097,7 @@ export const alimtalkHistory = pgTable("alimtalk_history", {
   successCount: integer("success_count").notNull(),
   failCount: integer("fail_count").notNull(),
   cost: integer("cost").notNull(),
-  sentBy: varchar("sent_by").references(() => members.id),
+  sentBy: varchar("sent_by").references(() => users.id),
   sentAt: timestamp("sent_at").notNull().defaultNow(),
   responseData: jsonb("response_data"),
 });
