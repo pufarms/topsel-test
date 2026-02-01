@@ -75,17 +75,48 @@ class SolapiService {
       };
     }
 
+    if (!this.pfId) {
+      console.error('KAKAO_PFID가 설정되지 않았습니다.');
+      return {
+        successCount: 0,
+        failCount: params.length,
+        data: { error: 'KAKAO_PFID not configured' },
+      };
+    }
+
     try {
       console.log(`[Solapi] 알림톡 발송 요청: ${params.length}건`);
       
-      // 개발 모드에서는 성공으로 시뮬레이션
+      // Solapi SDK를 통한 실제 발송
+      const messages = params.map(p => ({
+        to: p.to.replace(/-/g, ''),
+        from: '15888707', // 발신번호 (Solapi에 등록된 번호)
+        kakaoOptions: {
+          pfId: this.pfId,
+          templateId: p.templateId,
+          variables: p.variables || {},
+        },
+      }));
+
+      console.log('[Solapi] 발송 메시지:', JSON.stringify(messages, null, 2));
+
+      const result = await this.messageService.send(messages);
+      
+      console.log('[Solapi] 발송 결과:', JSON.stringify(result, null, 2));
+
+      // 결과 분석 (타입 안전하게 처리)
+      const count = result.groupInfo?.count as any;
+      const successCount = count?.success || count?.successCount || params.length;
+      const failCount = count?.failure || count?.failCount || 0;
+
       return {
-        successCount: params.length,
-        failCount: 0,
-        data: { simulated: true, count: params.length },
+        successCount,
+        failCount,
+        data: result,
       };
     } catch (error: any) {
       console.error('[Solapi] 알림톡 발송 실패:', error.message);
+      console.error('[Solapi] 오류 상세:', error);
       return {
         successCount: 0,
         failCount: params.length,
