@@ -4839,11 +4839,14 @@ export async function registerRoutes(
         return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
       }
 
-      // 테스트 발송 번호 결정 (입력값 > 관리자 번호 > 환경변수)
-      const phoneNumber = testPhone || user.phone || process.env.SOLAPI_SENDER;
+      // 테스트 발송 번호 결정 (입력값 > 관리자 번호)
+      // 주의: SOLAPI_SENDER(발신번호)는 대표번호(1588-xxxx)일 수 있어 알림톡 수신 불가
+      const phoneNumber = testPhone || user.phone;
       
       if (!phoneNumber) {
-        return res.status(400).json({ error: '테스트 발송할 전화번호가 없습니다' });
+        return res.status(400).json({ 
+          error: '테스트 발송할 전화번호가 없습니다. 관리자 계정에 휴대폰 번호를 등록하거나, 테스트 번호를 직접 입력해주세요.' 
+        });
       }
 
       // solapiService를 통해 발송

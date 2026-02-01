@@ -77,6 +77,9 @@ export default function AlimtalkPage() {
   const [newTemplateIsAuto, setNewTemplateIsAuto] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [testingTemplateCode, setTestingTemplateCode] = useState<string | null>(null);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [pendingTestCode, setPendingTestCode] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -298,11 +301,11 @@ export default function AlimtalkPage() {
   });
 
   const testMutation = useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async ({ code, testPhone }: { code: string; testPhone: string }) => {
       const res = await fetch(`/api/admin/alimtalk/test/${code}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ testPhone }),
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -313,12 +316,25 @@ export default function AlimtalkPage() {
     onSuccess: (data) => {
       toast({ title: data.success ? `테스트 발송 완료 (${data.phone})` : '발송 실패' });
       setTestingTemplateCode(null);
+      setTestDialogOpen(false);
+      setPendingTestCode(null);
     },
     onError: (error: Error) => {
       toast({ title: error.message || '테스트 발송 실패', variant: 'destructive' });
       setTestingTemplateCode(null);
     },
   });
+
+  const handleTestClick = (code: string) => {
+    setPendingTestCode(code);
+    setTestDialogOpen(true);
+  };
+
+  const executeTest = () => {
+    if (!pendingTestCode || !testPhoneNumber.trim()) return;
+    setTestingTemplateCode(pendingTestCode);
+    testMutation.mutate({ code: pendingTestCode, testPhone: testPhoneNumber.trim() });
+  };
 
   const handleSend = (template: AlimtalkTemplate) => {
     setSelectedTemplate(template);
@@ -575,10 +591,7 @@ export default function AlimtalkPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          setTestingTemplateCode(template.templateCode);
-                          testMutation.mutate(template.templateCode);
-                        }}
+                        onClick={() => handleTestClick(template.templateCode)}
                         disabled={testMutation.isPending && testingTemplateCode === template.templateCode}
                         data-testid={`btn-test-${template.id}`}
                       >
@@ -1009,6 +1022,53 @@ export default function AlimtalkPage() {
               data-testid="btn-confirm-delete"
             >
               {deleteMutation.isPending ? '삭제 중...' : '삭제'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={testDialogOpen} onOpenChange={(open) => {
+        setTestDialogOpen(open);
+        if (!open) {
+          setPendingTestCode(null);
+          setTestPhoneNumber('');
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>테스트 발송</DialogTitle>
+            <DialogDescription>
+              알림톡을 받을 휴대폰 번호를 입력하세요. (카카오톡이 설치된 번호)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="test-phone" className="text-sm font-medium mb-2 block">
+                수신 번호 <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="test-phone"
+                value={testPhoneNumber}
+                onChange={(e) => setTestPhoneNumber(e.target.value)}
+                placeholder="010-1234-5678"
+                data-testid="input-test-phone"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                카카오톡이 등록된 휴대폰 번호만 수신 가능합니다
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setTestDialogOpen(false)}>
+              취소
+            </Button>
+            <Button
+              onClick={executeTest}
+              disabled={testMutation.isPending || !testPhoneNumber.trim()}
+              data-testid="btn-confirm-test"
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              {testMutation.isPending ? '발송 중...' : '발송'}
             </Button>
           </DialogFooter>
         </DialogContent>
