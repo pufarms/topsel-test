@@ -88,7 +88,7 @@ const menuItems: MenuItem[] = [
     icon: <MessageSquare className="h-5 w-5" />,
     children: [
       { id: "kakao-alimtalk", label: "알림톡(고정)", path: "/admin/kakao-notifications/alimtalk" },
-      { id: "kakao-brandtalk", label: "브랜드톡", path: "/admin/kakao-notifications/brandtalk" },
+      { id: "kakao-friendtalk", label: "친구톡 관리", path: "/admin/kakao-notifications/brandtalk" },
     ]
   },
   { 
