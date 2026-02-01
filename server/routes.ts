@@ -1362,6 +1362,15 @@ export async function registerRoutes(
     });
   });
 
+  // 카카오채널 설정 API (프론트엔드용 - 회원가입 친구추가)
+  app.get("/api/config/kakao-channel", async (req, res) => {
+    const channelId = process.env.KAKAO_PFID || '';
+    res.json({ 
+      channelId,
+      configured: !!channelId
+    });
+  });
+
   // 포트원 V2 본인인증 검증 API
   app.post("/api/auth/get-certification", async (req, res) => {
     console.log('\x1b[36m📱 [본인인증 V2] 요청 수신\x1b[0m');

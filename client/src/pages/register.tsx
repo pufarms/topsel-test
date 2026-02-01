@@ -69,6 +69,8 @@ export default function Register() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [isKakaoFriendAdded, setIsKakaoFriendAdded] = useState(false);
+  const [kakaoChannelId, setKakaoChannelId] = useState<string>('');
   
   const passwordMatch = passwordConfirm.length > 0 ? password === passwordConfirm : null;
 
@@ -100,6 +102,15 @@ export default function Register() {
         setPortoneConfig(config);
       })
       .catch(err => console.error('포트원 설정 로드 실패:', err));
+
+    fetch('/api/config/kakao-channel')
+      .then(res => res.json())
+      .then(config => {
+        if (config.channelId) {
+          setKakaoChannelId(config.channelId);
+        }
+      })
+      .catch(err => console.error('카카오채널 설정 로드 실패:', err));
 
     return () => {
       document.head.removeChild(script);
@@ -241,6 +252,11 @@ export default function Register() {
 
     if (!agreements.agree1 || !agreements.agree2 || !agreements.agree3) {
       toast({ variant: "destructive", title: "오류", description: messages.terms_required || "필수 약관에 동의해주세요." });
+      return;
+    }
+
+    if (!isKakaoFriendAdded) {
+      toast({ variant: "destructive", title: "오류", description: "카카오채널 친구추가를 완료해주세요." });
       return;
     }
 
@@ -422,21 +438,95 @@ export default function Register() {
               </section>
 
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">{sections.verification?.title || "대표자 본인인증"}</h3>
-                <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>{sections.verification?.description || "휴대폰 본인인증을 통해 대표자 정보를 자동으로 입력합니다."}</span>
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  카카오채널 친구추가 <span className="text-destructive">*</span>
+                </h3>
+                <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 bg-[#FEE500] rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg viewBox="0 0 24 24" className="w-7 h-7" fill="#3C1E1E">
+                        <path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.68 6.78-.15.53-.52 1.9-.6 2.2-.1.37.14.37.29.27.12-.08 1.84-1.22 2.58-1.71.67.1 1.37.16 2.05.16 5.52 0 10-3.58 10-8 0-4.42-4.48-8-10-8z"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                        탑셀러 카카오채널 친구추가
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                        긴급 상품 가격정보, 할인상품 정보 등 중요 알림을 받으시려면 카카오채널 친구추가가 필요합니다.
+                      </p>
+                      {isKakaoFriendAdded ? (
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium">
+                          <Check className="w-5 h-5" />
+                          <span>친구추가 완료</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              if (kakaoChannelId) {
+                                window.open(`https://pf.kakao.com/${kakaoChannelId}`, '_blank');
+                              } else {
+                                toast({
+                                  title: "카카오채널 설정 필요",
+                                  description: "관리자에게 문의해주세요.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="bg-[#FEE500] text-[#3C1E1E] font-medium"
+                            data-testid="button-kakao-add-friend"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-5 h-5 mr-2" fill="#3C1E1E">
+                              <path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.68 6.78-.15.53-.52 1.9-.6 2.2-.1.37.14.37.29.27.12-.08 1.84-1.22 2.58-1.71.67.1 1.37.16 2.05.16 5.52 0 10-3.58 10-8 0-4.42-4.48-8-10-8z"/>
+                            </svg>
+                            카카오채널 친구추가
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="kakao-friend-confirm"
+                              checked={isKakaoFriendAdded}
+                              onCheckedChange={(checked) => setIsKakaoFriendAdded(!!checked)}
+                              data-testid="checkbox-kakao-friend"
+                            />
+                            <Label htmlFor="kakao-friend-confirm" className="text-sm cursor-pointer text-amber-700 dark:text-amber-300">
+                              친구추가를 완료했습니다
+                            </Label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </section>
+
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">{sections.verification?.title || "대표자 본인인증"}</h3>
+                {!isKakaoFriendAdded && (
+                  <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>카카오채널 친구추가를 먼저 완료해주세요.</span>
+                  </div>
+                )}
+                {isKakaoFriendAdded && (
+                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{sections.verification?.description || "휴대폰 본인인증을 통해 대표자 정보를 자동으로 입력합니다."}</span>
+                  </div>
+                )}
                 <Button 
                   type="button" 
                   onClick={handleVerification}
-                  disabled={isVerified}
+                  disabled={isVerified || !isKakaoFriendAdded}
                   className="w-full"
                   variant={isVerified ? "outline" : "default"}
                   data-testid="button-verification"
                 >
                   {isVerified ? (
                     <><Check className="mr-2 h-4 w-4" /> 본인인증 완료</>
+                  ) : !isKakaoFriendAdded ? (
+                    "카카오채널 친구추가 후 인증 가능"
                   ) : (
                     sections.verification?.button_text || "휴대폰 본인인증 하기"
                   )}
