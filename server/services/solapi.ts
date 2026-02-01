@@ -65,6 +65,33 @@ class SolapiService {
   }
 
   /**
+   * 알림톡 단일 발송 (공통 유틸리티 함수)
+   * @param templateId - 솔라피 템플릿 ID (예: KA01TP...)
+   * @param receiverPhone - 수신자 전화번호 (하이픈 포함/미포함 모두 가능)
+   * @param variables - 템플릿 변수 (예: { 이름: '홍길동', 주문번호: 'ORD001' })
+   * @returns SendResult - 발송 결과
+   * 
+   * @example
+   * // 주문관리 등에서 호출 예시
+   * const result = await solapiService.sendAlimTalk(
+   *   'KA01TP250401064812535rjuhD934ZTC',
+   *   '010-1234-5678',
+   *   { 이름: '홍길동', 주문번호: 'ORD-2024-001' }
+   * );
+   */
+  async sendAlimTalk(
+    templateId: string,
+    receiverPhone: string,
+    variables?: Record<string, string>
+  ): Promise<SendResult> {
+    return this.sendAlimtalkBulk([{
+      to: receiverPhone,
+      templateId,
+      variables: variables || {},
+    }]);
+  }
+
+  /**
    * 알림톡 대량 발송
    */
   async sendAlimtalkBulk(params: AlimtalkSendParams[]): Promise<SendResult> {

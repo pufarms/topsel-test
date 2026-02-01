@@ -4737,6 +4737,135 @@ export async function registerRoutes(
     }
   });
 
+  // 알림톡 템플릿 신규 등록
+  app.post('/api/admin/alimtalk/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    try {
+      const { templateCode, templateId, templateName, description, isAuto } = req.body;
+
+      // 필수 필드 검증
+      if (!templateCode || !templateId || !templateName) {
+        return res.status(400).json({ error: '템플릿 코드, 솔라피 ID, 템플릿 이름은 필수입니다' });
+      }
+
+      // 중복 코드 확인
+      const existing = await db.select()
+        .from(alimtalkTemplates)
+        .where(eq(alimtalkTemplates.templateCode, templateCode))
+        .limit(1);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: '이미 존재하는 템플릿 코드입니다' });
+      }
+
+      const created = await db
+        .insert(alimtalkTemplates)
+        .values({
+          templateCode,
+          templateId,
+          templateName,
+          description: description || '',
+          isAuto: isAuto ?? false,
+          isActive: true,
+          totalSent: 0,
+          totalCost: 0,
+        })
+        .returning();
+
+      return res.status(201).json(created[0]);
+    } catch (error: any) {
+      console.error('Template create error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // 알림톡 템플릿 삭제
+  app.delete('/api/admin/alimtalk/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    try {
+      const id = parseInt(req.params.id);
+
+      const deleted = await db
+        .delete(alimtalkTemplates)
+        .where(eq(alimtalkTemplates.id, id))
+        .returning();
+
+      if (!deleted || deleted.length === 0) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+
+      return res.json({ success: true, message: '템플릿이 삭제되었습니다' });
+    } catch (error: any) {
+      console.error('Template delete error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // 알림톡 테스트 발송 (관리자 번호로)
+  app.post('/api/admin/alimtalk/test/:code', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    try {
+      const { code } = req.params;
+      const { testPhone } = req.body;
+
+      // 템플릿 조회
+      const [template] = await db.select()
+        .from(alimtalkTemplates)
+        .where(eq(alimtalkTemplates.templateCode, code))
+        .limit(1);
+
+      if (!template) {
+        return res.status(404).json({ error: '템플릿을 찾을 수 없습니다' });
+      }
+
+      // 테스트 발송 번호 결정 (입력값 > 관리자 번호 > 환경변수)
+      const phoneNumber = testPhone || user.phone || process.env.SOLAPI_SENDER;
+      
+      if (!phoneNumber) {
+        return res.status(400).json({ error: '테스트 발송할 전화번호가 없습니다' });
+      }
+
+      // solapiService를 통해 발송
+      const { solapiService } = await import('./services/solapi');
+      const result = await solapiService.sendAlimTalk(
+        template.templateId,
+        phoneNumber,
+        { 테스트: '테스트 발송입니다' }
+      );
+
+      return res.json({
+        success: result.successCount > 0,
+        message: result.successCount > 0 ? '테스트 발송 완료' : '발송 실패',
+        phone: phoneNumber,
+        ...result
+      });
+    } catch (error: any) {
+      console.error('Test send error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // 알림톡 수신자 목록 조회
   app.get('/api/admin/alimtalk/recipients', async (req, res) => {
     if (!req.session.userId) {

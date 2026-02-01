@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, Save, ArrowRightLeft, Zap, Hand } from 'lucide-react';
+import { Eye, Save, ArrowRightLeft, Zap, Hand, Plus, Trash2, TestTube } from 'lucide-react';
 
 interface AlimtalkTemplate {
   id: number;
@@ -69,6 +69,14 @@ export default function AlimtalkPage() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editTemplateId, setEditTemplateId] = useState('');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newTemplateCode, setNewTemplateCode] = useState('');
+  const [newTemplateId, setNewTemplateId] = useState('');
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateDescription, setNewTemplateDescription] = useState('');
+  const [newTemplateIsAuto, setNewTemplateIsAuto] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [testingTemplateCode, setTestingTemplateCode] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -241,6 +249,77 @@ export default function AlimtalkPage() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (data: { templateCode: string; templateId: string; templateName: string; description: string; isAuto: boolean }) => {
+      const res = await fetch('/api/admin/alimtalk/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || '등록 실패');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/statistics'] });
+      toast({ title: '템플릿이 등록되었습니다' });
+      setAddDialogOpen(false);
+      setNewTemplateCode('');
+      setNewTemplateId('');
+      setNewTemplateName('');
+      setNewTemplateDescription('');
+      setNewTemplateIsAuto(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || '등록 실패', variant: 'destructive' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/alimtalk/templates/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('삭제 실패');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/templates'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/alimtalk/statistics'] });
+      toast({ title: '템플릿이 삭제되었습니다' });
+      setDeleteConfirmId(null);
+    },
+    onError: () => {
+      toast({ title: '삭제 실패', variant: 'destructive' });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await fetch(`/api/admin/alimtalk/test/${code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || '테스트 발송 실패');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: data.success ? `테스트 발송 완료 (${data.phone})` : '발송 실패' });
+      setTestingTemplateCode(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || '테스트 발송 실패', variant: 'destructive' });
+      setTestingTemplateCode(null);
+    },
+  });
+
   const handleSend = (template: AlimtalkTemplate) => {
     setSelectedTemplate(template);
     setSendModalOpen(true);
@@ -353,16 +432,25 @@ export default function AlimtalkPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <CardTitle>템플릿 목록</CardTitle>
-                  <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
-                    <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="auto">자동</SelectItem>
-                      <SelectItem value="manual">수동</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select value={templateFilter} onValueChange={(v: 'all' | 'auto' | 'manual') => setTemplateFilter(v)}>
+                      <SelectTrigger className="w-[100px]" data-testid="select-template-filter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체</SelectItem>
+                        <SelectItem value="auto">자동</SelectItem>
+                        <SelectItem value="manual">수동</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      onClick={() => setAddDialogOpen(true)}
+                      data-testid="btn-add-template"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      템플릿 추가
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border rounded-lg">
@@ -484,6 +572,20 @@ export default function AlimtalkPage() {
                         내용
                       </Button>
 
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setTestingTemplateCode(template.templateCode);
+                          testMutation.mutate(template.templateCode);
+                        }}
+                        disabled={testMutation.isPending && testingTemplateCode === template.templateCode}
+                        data-testid={`btn-test-${template.id}`}
+                      >
+                        <TestTube className="w-4 h-4 mr-1" />
+                        {testMutation.isPending && testingTemplateCode === template.templateCode ? '발송중...' : '테스트'}
+                      </Button>
+
                       {!template.isAuto && (
                         <Button
                           size="sm"
@@ -507,6 +609,16 @@ export default function AlimtalkPage() {
                           {template.isActive ? 'ON' : 'OFF'}
                         </span>
                       </div>
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirmId(template.id)}
+                        data-testid={`btn-delete-${template.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -770,6 +882,133 @@ export default function AlimtalkPage() {
             >
               <Save className="w-4 h-4 mr-2" />
               {updateMutation.isPending ? '저장 중...' : '저장'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>템플릿 추가</DialogTitle>
+            <DialogDescription>
+              솔라피에서 생성한 새 템플릿을 등록합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-code" className="text-sm font-medium mb-2 block">
+                템플릿 코드 <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="new-code"
+                value={newTemplateCode}
+                onChange={(e) => setNewTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
+                placeholder="WELCOME, SHIPPING 등 (영문 대문자, 숫자, _)"
+                data-testid="input-new-code"
+              />
+              <p className="text-xs text-muted-foreground mt-1">시스템 내부 식별자 (변경 불가)</p>
+            </div>
+            <div>
+              <Label htmlFor="new-templateId" className="text-sm font-medium mb-2 block">
+                솔라피 템플릿 ID <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="new-templateId"
+                value={newTemplateId}
+                onChange={(e) => setNewTemplateId(e.target.value)}
+                placeholder="KA01TP..."
+                className="font-mono"
+                data-testid="input-new-templateId"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-name" className="text-sm font-medium mb-2 block">
+                템플릿 이름 <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="new-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="예: 배송출발 알림"
+                data-testid="input-new-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-description" className="text-sm font-medium mb-2 block">설명</Label>
+              <Textarea
+                id="new-description"
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+                placeholder="템플릿 용도 설명"
+                rows={2}
+                data-testid="input-new-description"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Label className="text-sm font-medium">발송 유형:</Label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!newTemplateIsAuto}
+                    onChange={() => setNewTemplateIsAuto(false)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">수동</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={newTemplateIsAuto}
+                    onChange={() => setNewTemplateIsAuto(true)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">자동</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+              취소
+            </Button>
+            <Button
+              onClick={() => createMutation.mutate({
+                templateCode: newTemplateCode,
+                templateId: newTemplateId,
+                templateName: newTemplateName,
+                description: newTemplateDescription,
+                isAuto: newTemplateIsAuto,
+              })}
+              disabled={createMutation.isPending || !newTemplateCode.trim() || !newTemplateId.trim() || !newTemplateName.trim()}
+              data-testid="btn-create-template"
+            >
+              {createMutation.isPending ? '등록 중...' : '등록'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>템플릿 삭제</DialogTitle>
+            <DialogDescription>
+              정말로 이 템플릿을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
+              disabled={deleteMutation.isPending}
+              data-testid="btn-confirm-delete"
+            >
+              {deleteMutation.isPending ? '삭제 중...' : '삭제'}
             </Button>
           </DialogFooter>
         </DialogContent>
