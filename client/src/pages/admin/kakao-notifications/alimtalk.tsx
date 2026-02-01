@@ -68,6 +68,7 @@ export default function AlimtalkPage() {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editTemplateId, setEditTemplateId] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -105,6 +106,7 @@ export default function AlimtalkPage() {
     if (templateDetail) {
       setEditName(templateDetail.templateName || '');
       setEditDescription(templateDetail.description || '');
+      setEditTemplateId(templateDetail.templateId || '');
     }
   }, [templateDetail]);
 
@@ -219,11 +221,11 @@ export default function AlimtalkPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, templateName, description }: { id: number; templateName: string; description: string }) => {
+    mutationFn: async ({ id, templateName, description, templateId }: { id: number; templateName: string; description: string; templateId: string }) => {
       const res = await fetch(`/api/admin/alimtalk/templates/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateName, description }),
+        body: JSON.stringify({ templateName, description, templateId }),
       });
       if (!res.ok) throw new Error('수정 실패');
       return res.json();
@@ -673,16 +675,23 @@ export default function AlimtalkPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">템플릿 코드</Label>
-                  <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+                  <Label className="text-sm font-medium mb-2 block">템플릿 코드 (고정)</Label>
+                  <div className="p-3 bg-muted rounded-lg font-mono text-sm text-muted-foreground">
                     {viewingTemplate?.templateCode}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">시스템 내부 식별자로 수정 불가</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</Label>
-                  <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
-                    {viewingTemplate?.templateId}
-                  </div>
+                  <Label htmlFor="edit-templateId" className="text-sm font-medium mb-2 block">솔라피 템플릿 ID</Label>
+                  <Input
+                    id="edit-templateId"
+                    value={editTemplateId}
+                    onChange={(e) => setEditTemplateId(e.target.value)}
+                    placeholder="KA01TP..."
+                    className="font-mono text-sm"
+                    data-testid="input-solapi-template-id"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">솔라피에서 발급받은 템플릿 ID</p>
                 </div>
               </div>
 
@@ -751,7 +760,8 @@ export default function AlimtalkPage() {
                   updateMutation.mutate({
                     id: viewingTemplate.id,
                     templateName: editName,
-                    description: editDescription
+                    description: editDescription,
+                    templateId: editTemplateId
                   });
                 }
               }}

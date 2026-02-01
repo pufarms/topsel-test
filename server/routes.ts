@@ -4705,17 +4705,25 @@ export async function registerRoutes(
     }
 
     try {
-      const templateId = parseInt(req.params.id);
-      const { templateName, description } = req.body;
+      const id = parseInt(req.params.id);
+      const { templateName, description, templateId } = req.body;
+
+      // 업데이트할 필드 구성
+      const updateData: any = {
+        templateName,
+        description,
+        updatedAt: new Date()
+      };
+
+      // 솔라피 템플릿 ID가 제공되면 함께 업데이트
+      if (templateId) {
+        updateData.templateId = templateId;
+      }
 
       const updated = await db
         .update(alimtalkTemplates)
-        .set({
-          templateName,
-          description,
-          updatedAt: new Date()
-        })
-        .where(eq(alimtalkTemplates.id, templateId))
+        .set(updateData)
+        .where(eq(alimtalkTemplates.id, id))
         .returning();
 
       if (!updated || updated.length === 0) {
