@@ -1364,7 +1364,7 @@ export async function registerRoutes(
 
   // 카카오채널 설정 API (프론트엔드용 - 회원가입 친구추가)
   app.get("/api/config/kakao-channel", async (req, res) => {
-    const channelId = process.env.KAKAO_PFID || '';
+    const channelId = process.env.KAKAO_CHANNEL_PUBLIC_ID || '';
     res.json({ 
       channelId,
       configured: !!channelId
