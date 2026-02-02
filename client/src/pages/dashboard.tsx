@@ -979,7 +979,7 @@ export default function Dashboard() {
                                     </div>
                                     {uploadProgress.errors && uploadProgress.errors.length > 0 && (
                                       <div className="mt-3 border-t border-destructive/20 pt-3">
-                                        <h5 className="text-sm font-medium text-destructive mb-2">누락된 필수 항목:</h5>
+                                        <h5 className="text-sm font-medium text-destructive mb-2">반려 사유:</h5>
                                         <ul className="text-sm text-destructive space-y-1 max-h-40 overflow-y-auto">
                                           {uploadProgress.errors.map((error, idx) => (
                                             <li key={idx} className="flex items-start gap-1">

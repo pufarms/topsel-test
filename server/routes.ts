@@ -5314,6 +5314,7 @@ export async function registerRoutes(
         recipientPhone: string;
         recipientAddress: string;
         deliveryMessage: string;
+        productInfo: any;
       }> = [];
 
       // Track custom order numbers within this upload to detect duplicates
@@ -5372,7 +5373,14 @@ export async function registerRoutes(
           continue;
         }
 
-        // Store parsed data for insertion
+        // Check if product exists in 현재공급가상품 (product registrations)
+        const productInfo = await storage.getProductRegistrationByCode(productCode);
+        if (!productInfo) {
+          validationErrors.push(`${rowNum}번 줄: "${productName}" (${productCode})은(는) 공급되지 않는 상품입니다`);
+          continue;
+        }
+
+        // Store parsed data for insertion (including productInfo for later use)
         parsedRows.push({
           rowNum,
           productCode,
@@ -5386,13 +5394,14 @@ export async function registerRoutes(
           recipientPhone,
           recipientAddress,
           deliveryMessage,
+          productInfo,
         });
       }
 
       // STEP 2: If any validation errors, reject the entire file
       if (validationErrors.length > 0) {
         return res.status(400).json({
-          message: "필수 항목 누락으로 업로드가 반려되었습니다",
+          message: "주문 등록이 반려되었습니다",
           errors: validationErrors,
           total: rows.length,
           success: 0,
@@ -5403,9 +5412,6 @@ export async function registerRoutes(
       // STEP 3: All rows validated - proceed with insertion
       let successCount = 0;
       for (const parsedRow of parsedRows) {
-        // Look up product info by productCode
-        const productInfo = await storage.getProductRegistrationByCode(parsedRow.productCode);
-
         // Generate sequence number
         const sequenceNumber = await generateSequenceNumber(member.username);
 
@@ -5415,12 +5421,12 @@ export async function registerRoutes(
           memberId: req.session.userId,
           memberCompanyName: member.companyName,
           status: "대기",
-          categoryLarge: productInfo?.categoryLarge || null,
-          categoryMedium: productInfo?.categoryMedium || null,
-          categorySmall: productInfo?.categorySmall || null,
+          categoryLarge: parsedRow.productInfo?.categoryLarge || null,
+          categoryMedium: parsedRow.productInfo?.categoryMedium || null,
+          categorySmall: parsedRow.productInfo?.categorySmall || null,
           productCode: parsedRow.productCode,
           productName: parsedRow.productName,
-          supplyPrice: productInfo?.topPrice || null,
+          supplyPrice: parsedRow.productInfo?.topPrice || null,
           ordererName: parsedRow.ordererName,
           ordererPhone: parsedRow.ordererPhone,
           ordererAddress: parsedRow.ordererAddress || null,
