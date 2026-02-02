@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { MemberPageBanner } from "@/components/member/MemberPageBanner";
 import type { Order, Member } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -235,55 +236,10 @@ export default function Dashboard() {
       <PublicHeader />
 
       <main className="pt-14">
-        <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] text-white py-[35px]">
-          <div className="container mx-auto px-6">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">마이페이지 대시보드</h1>
-            <p className="text-blue-200 text-sm md:text-base mb-6">
-              주문, 예치금, 통계를 한눈에 관리하세요.<br className="sm:hidden" />
-              탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다.
-            </p>
-
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Building2 className="h-4 w-4 text-amber-400" />
-              <span className="text-sm">
-                {memberData?.companyName || user?.name || "회원"}님
-              </span>
-              <Badge className="bg-amber-500 text-white hover:bg-amber-600 ml-2">
-                환영합니다!
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg">
-                  <Star className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-blue-200">회원님 등급</p>
-                  <p className="font-semibold">{memberData?.grade || "준회원"}</p>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/20 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-blue-200">지난 달 매입 총액</p>
-                  <p className="font-semibold">{formatPrice(lastMonthTotal)}</p>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-blue-200">이번 달 매입 총액</p>
-                  <p className="font-semibold">{formatPrice(thisMonthTotal)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <MemberPageBanner 
+          title="마이페이지 대시보드" 
+          description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
+        />
 
         <div className="container mx-auto px-4 md:px-6 py-6">
           <div className="flex flex-col lg:flex-row gap-6">
