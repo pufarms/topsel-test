@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -178,10 +179,20 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  const { data: memberData, isLoading: memberLoading } = useQuery<Member>({
+  const { data: memberData, isLoading: memberLoading, error: memberError } = useQuery<Member | null>({
     queryKey: ["/api/member/profile"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!user,
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/login");
+    }
+  }, [authLoading, user, navigate]);
 
   if (authLoading) {
     return (
@@ -202,6 +213,11 @@ export default function Dashboard() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!memberData && !memberLoading && user) {
+    navigate("/login");
+    return null;
   }
 
   const now = new Date();
@@ -247,6 +263,8 @@ export default function Dashboard() {
         <MemberPageBanner 
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
+          memberData={memberData}
+          orders={orders}
         />
 
         <div className="container mx-auto px-4 md:px-6 py-6">

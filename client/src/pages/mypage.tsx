@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,9 +74,13 @@ export default function MyPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
-  const { data: profile, isLoading: profileLoading } = useQuery<MemberProfile>({
+  const { data: profile, isLoading: profileLoading } = useQuery<MemberProfile | null>({
     queryKey: ["/api/member/profile"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!user && user.role === "member",
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 
   const form = useForm<ProfileUpdateForm>({

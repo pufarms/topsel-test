@@ -2,29 +2,38 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Star, BarChart3 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { getQueryFn } from "@/lib/queryClient";
 import type { Member, Order } from "@shared/schema";
 
 interface MemberPageBannerProps {
   title: string;
   description?: string;
+  memberData?: Member | null;
+  orders?: Order[];
 }
 
-export function MemberPageBanner({ title, description }: MemberPageBannerProps) {
+export function MemberPageBanner({ title, description, memberData: externalMemberData, orders: externalOrders }: MemberPageBannerProps) {
   const { user } = useAuth();
 
-  const { data: memberData } = useQuery<Member>({
+  const { data: internalMemberData } = useQuery<Member | null>({
     queryKey: ["/api/member/profile"],
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!user && !externalMemberData,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 
-  const { data: orders = [] } = useQuery<Order[]>({
+  const { data: internalOrders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!user && !externalOrders,
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
+    retry: false,
   });
+
+  const memberData = externalMemberData ?? internalMemberData;
+  const orders = externalOrders ?? internalOrders;
 
   const now = new Date();
   const currentMonth = now.getMonth();
