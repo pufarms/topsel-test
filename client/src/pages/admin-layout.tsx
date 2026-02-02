@@ -162,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
     
     if (openParents.length > 0) {
-      setOpenMenus(prev => Array.from(new Set([...prev, ...openParents])));
+      setOpenMenus(openParents); // 해당 부모 메뉴만 열기
     }
   }, [location, searchParams]);
 
@@ -194,8 +194,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const toggleMenu = (id: string) => {
     setOpenMenus(prev => 
       prev.includes(id) 
-        ? prev.filter(m => m !== id) 
-        : [...prev, id]
+        ? [] // 열린 메뉴를 클릭하면 닫기
+        : [id] // 다른 메뉴를 클릭하면 해당 메뉴만 열기 (나머지는 자동 닫힘)
     );
   };
 
