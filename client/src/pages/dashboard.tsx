@@ -1068,7 +1068,7 @@ export default function Dashboard() {
                             <option>20개</option>
                             <option>50개</option>
                           </select>
-                          <span className="text-muted-foreground ml-2">{pendingOrders.length} / {pendingOrders.length} (페이지 1/1)</span>
+                          <span className="text-muted-foreground ml-2">{pendingOrders?.length || 0} / {pendingOrders?.length || 0} (페이지 1/1)</span>
                         </div>
                       </div>
 
@@ -1105,14 +1105,14 @@ export default function Dashboard() {
                                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </TableCell>
                               </TableRow>
-                            ) : pendingOrders.length === 0 ? (
+                            ) : !pendingOrders || pendingOrders.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={19} className="text-center text-muted-foreground py-12">
                                   등록된 주문이 없습니다
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              pendingOrders.map((order, index) => (
+                              (pendingOrders || []).map((order, index) => (
                                 <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                                   <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber}</TableCell>
                                   <TableCell>
