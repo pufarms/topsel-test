@@ -5299,92 +5299,149 @@ export async function registerRoutes(
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
       }
 
-      let successCount = 0;
-      let failedCount = 0;
-      const errors: string[] = [];
+      // STEP 1: Validate ALL rows first before any insertion
+      const validationErrors: string[] = [];
+      const parsedRows: Array<{
+        rowNum: number;
+        productCode: string;
+        productName: string;
+        customOrderNumber: string;
+        ordererName: string;
+        ordererPhone: string;
+        ordererAddress: string;
+        recipientName: string;
+        recipientMobile: string;
+        recipientPhone: string;
+        recipientAddress: string;
+        deliveryMessage: string;
+      }> = [];
+
+      // Track custom order numbers within this upload to detect duplicates
+      const uploadedCustomOrderNumbers = new Set<string>();
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const rowNum = i + 2; // Excel rows start at 1, and header is row 1
+        const missingFields: string[] = [];
 
-        try {
-          // Map Excel columns to order data (주문등록양식 columns)
-          const productCode = String(row['상품코드'] || row['productCode'] || '').trim();
-          const productName = String(row['상품명'] || row['productName'] || '').trim();
-          const customOrderNumber = String(row['자체주문번호'] || row['customOrderNumber'] || '').trim();
-          const ordererName = String(row['주문자명'] || row['ordererName'] || '').trim();
-          const ordererPhone = String(row['주문자전화번호'] || row['주문자 전화번호'] || row['ordererPhone'] || '').trim();
-          const ordererAddress = String(row['주문자주소'] || row['주문자 주소'] || row['ordererAddress'] || '').trim();
-          const recipientName = String(row['수령자명'] || row['recipientName'] || '').trim();
-          const recipientMobile = String(row['수령자휴대폰번호'] || row['수령자 휴대폰번호'] || row['recipientMobile'] || '').trim();
-          const recipientPhone = String(row['수령자전화번호'] || row['수령자 전화번호'] || row['recipientPhone'] || '').trim();
-          const recipientAddress = String(row['수령자주소'] || row['수령자 주소'] || row['recipientAddress'] || '').trim();
-          const deliveryMessage = String(row['배송메시지'] || row['deliveryMessage'] || '').trim();
+        // Map Excel columns to order data (주문등록양식 columns)
+        const productCode = String(row['상품코드'] || row['productCode'] || '').trim();
+        const productName = String(row['상품명'] || row['productName'] || '').trim();
+        const customOrderNumber = String(row['자체주문번호'] || row['customOrderNumber'] || '').trim();
+        const ordererName = String(row['주문자명'] || row['ordererName'] || '').trim();
+        const ordererPhone = String(row['주문자전화번호'] || row['주문자 전화번호'] || row['ordererPhone'] || '').trim();
+        const ordererAddress = String(row['주문자주소'] || row['주문자 주소'] || row['ordererAddress'] || '').trim();
+        const recipientName = String(row['수령자명'] || row['recipientName'] || '').trim();
+        const recipientMobile = String(row['수령자휴대폰번호'] || row['수령자 휴대폰번호'] || row['recipientMobile'] || '').trim();
+        const recipientPhone = String(row['수령자전화번호'] || row['수령자 전화번호'] || row['recipientPhone'] || '').trim();
+        const recipientAddress = String(row['수령자주소'] || row['수령자 주소'] || row['recipientAddress'] || '').trim();
+        const deliveryMessage = String(row['배송메시지'] || row['deliveryMessage'] || '').trim();
 
-          // Validate required fields
-          if (!productCode || !productName || !customOrderNumber || !ordererName || !ordererPhone || !recipientName || !recipientMobile || !recipientAddress) {
-            errors.push(`행 ${rowNum}: 필수 필드 누락`);
-            failedCount++;
-            continue;
-          }
+        // Check each required field individually
+        if (!productCode) missingFields.push('상품코드');
+        if (!productName) missingFields.push('상품명');
+        if (!customOrderNumber) missingFields.push('자체주문번호');
+        if (!ordererName) missingFields.push('주문자명');
+        if (!ordererPhone) missingFields.push('주문자전화번호');
+        if (!recipientName) missingFields.push('수령자명');
+        if (!recipientMobile) missingFields.push('수령자휴대폰번호');
+        if (!recipientAddress) missingFields.push('수령자주소');
 
-          // Check for duplicate customOrderNumber
-          const existingOrder = await db.select()
-            .from(pendingOrders)
-            .where(and(
-              eq(pendingOrders.memberId, req.session.userId),
-              eq(pendingOrders.customOrderNumber, customOrderNumber)
-            ));
-          
-          if (existingOrder.length > 0) {
-            errors.push(`행 ${rowNum}: 이미 사용된 자체주문번호 (${customOrderNumber})`);
-            failedCount++;
-            continue;
-          }
-
-          // Look up product info by productCode
-          const productInfo = await storage.getProductRegistrationByCode(productCode);
-
-          // Generate sequence number
-          const sequenceNumber = await generateSequenceNumber(member.username);
-
-          await db.insert(pendingOrders).values({
-            sequenceNumber,
-            orderNumber: generateOrderNumber(),
-            memberId: req.session.userId,
-            memberCompanyName: member.companyName,
-            status: "대기",
-            categoryLarge: productInfo?.categoryLarge || null,
-            categoryMedium: productInfo?.categoryMedium || null,
-            categorySmall: productInfo?.categorySmall || null,
-            productCode,
-            productName,
-            supplyPrice: productInfo?.topPrice || null,
-            ordererName,
-            ordererPhone,
-            ordererAddress: ordererAddress || null,
-            recipientName,
-            recipientMobile,
-            recipientPhone: recipientPhone || null,
-            recipientAddress,
-            deliveryMessage: deliveryMessage || null,
-            customOrderNumber,
-            trackingNumber: null,
-            courierCompany: null,
-          });
-
-          successCount++;
-        } catch (rowError: any) {
-          errors.push(`행 ${rowNum}: ${rowError.message}`);
-          failedCount++;
+        if (missingFields.length > 0) {
+          validationErrors.push(`${rowNum}번 줄: [${missingFields.join(', ')}] 누락`);
+          continue;
         }
+
+        // Check for duplicate customOrderNumber within this upload file
+        if (uploadedCustomOrderNumbers.has(customOrderNumber)) {
+          validationErrors.push(`${rowNum}번 줄: 파일 내 중복된 자체주문번호 (${customOrderNumber})`);
+          continue;
+        }
+        uploadedCustomOrderNumbers.add(customOrderNumber);
+
+        // Check for duplicate customOrderNumber in existing database
+        const existingOrder = await db.select()
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.memberId, req.session.userId),
+            eq(pendingOrders.customOrderNumber, customOrderNumber)
+          ));
+        
+        if (existingOrder.length > 0) {
+          validationErrors.push(`${rowNum}번 줄: 이미 등록된 자체주문번호 (${customOrderNumber})`);
+          continue;
+        }
+
+        // Store parsed data for insertion
+        parsedRows.push({
+          rowNum,
+          productCode,
+          productName,
+          customOrderNumber,
+          ordererName,
+          ordererPhone,
+          ordererAddress,
+          recipientName,
+          recipientMobile,
+          recipientPhone,
+          recipientAddress,
+          deliveryMessage,
+        });
+      }
+
+      // STEP 2: If any validation errors, reject the entire file
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          message: "필수 항목 누락으로 업로드가 반려되었습니다",
+          errors: validationErrors,
+          total: rows.length,
+          success: 0,
+          failed: validationErrors.length,
+        });
+      }
+
+      // STEP 3: All rows validated - proceed with insertion
+      let successCount = 0;
+      for (const parsedRow of parsedRows) {
+        // Look up product info by productCode
+        const productInfo = await storage.getProductRegistrationByCode(parsedRow.productCode);
+
+        // Generate sequence number
+        const sequenceNumber = await generateSequenceNumber(member.username);
+
+        await db.insert(pendingOrders).values({
+          sequenceNumber,
+          orderNumber: generateOrderNumber(),
+          memberId: req.session.userId,
+          memberCompanyName: member.companyName,
+          status: "대기",
+          categoryLarge: productInfo?.categoryLarge || null,
+          categoryMedium: productInfo?.categoryMedium || null,
+          categorySmall: productInfo?.categorySmall || null,
+          productCode: parsedRow.productCode,
+          productName: parsedRow.productName,
+          supplyPrice: productInfo?.topPrice || null,
+          ordererName: parsedRow.ordererName,
+          ordererPhone: parsedRow.ordererPhone,
+          ordererAddress: parsedRow.ordererAddress || null,
+          recipientName: parsedRow.recipientName,
+          recipientMobile: parsedRow.recipientMobile,
+          recipientPhone: parsedRow.recipientPhone || null,
+          recipientAddress: parsedRow.recipientAddress,
+          deliveryMessage: parsedRow.deliveryMessage || null,
+          customOrderNumber: parsedRow.customOrderNumber,
+          trackingNumber: null,
+          courierCompany: null,
+        });
+
+        successCount++;
       }
 
       res.json({
         total: rows.length,
         success: successCount,
-        failed: failedCount,
-        errors: errors.slice(0, 10), // Return first 10 errors
+        failed: 0,
+        errors: [],
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "엑셀 처리 중 오류가 발생했습니다" });

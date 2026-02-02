@@ -219,7 +219,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<{ total: number; success: number; failed: number } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ total: number; success: number; failed: number; errors?: string[] } | null>(null);
 
   // Excel upload mutation for bulk order registration
   const uploadExcelMutation = useMutation({
@@ -231,20 +231,32 @@ export default function Dashboard() {
         body: formData,
         credentials: "include",
       });
+      const data = await res.json();
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "업로드 실패");
+        // Return error data with validation errors for display
+        return { ...data, isError: true };
       }
-      return res.json();
+      return data;
     },
     onSuccess: (data) => {
-      setUploadProgress({ total: data.total, success: data.success, failed: data.failed });
-      if (data.failed === 0) {
-        toast({ title: "주문 등록 완료", description: `${data.success}건의 주문이 등록되었습니다.` });
+      if (data.isError) {
+        // Validation errors - file rejected
+        setUploadProgress({ 
+          total: data.total || 0, 
+          success: data.success || 0, 
+          failed: data.failed || 0, 
+          errors: data.errors || [] 
+        });
+        toast({ 
+          title: "업로드 반려", 
+          description: data.message || "필수 항목이 누락되었습니다", 
+          variant: "destructive" 
+        });
       } else {
-        toast({ title: "일부 주문 등록 실패", description: `성공: ${data.success}건, 실패: ${data.failed}건`, variant: "destructive" });
+        setUploadProgress({ total: data.total, success: data.success, failed: data.failed, errors: [] });
+        toast({ title: "주문 등록 완료", description: `${data.success}건의 주문이 등록되었습니다.` });
+        queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
     },
     onError: (error: any) => {
       toast({ title: "엑셀 업로드 실패", description: error.message, variant: "destructive" });
@@ -954,15 +966,30 @@ export default function Dashboard() {
                                 </div>
 
                                 {uploadProgress && (
-                                  <div className="bg-muted/50 rounded-lg p-4">
-                                    <h4 className="font-medium mb-2">업로드 결과</h4>
-                                    <div className="flex gap-4 text-sm">
+                                  <div className={`rounded-lg p-4 ${uploadProgress.failed > 0 ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'}`}>
+                                    <h4 className="font-medium mb-2">
+                                      {uploadProgress.failed > 0 ? '업로드 반려' : '업로드 결과'}
+                                    </h4>
+                                    <div className="flex gap-4 text-sm mb-2">
                                       <span>전체: {uploadProgress.total}건</span>
                                       <span className="text-emerald-600">성공: {uploadProgress.success}건</span>
                                       {uploadProgress.failed > 0 && (
                                         <span className="text-destructive">실패: {uploadProgress.failed}건</span>
                                       )}
                                     </div>
+                                    {uploadProgress.errors && uploadProgress.errors.length > 0 && (
+                                      <div className="mt-3 border-t border-destructive/20 pt-3">
+                                        <h5 className="text-sm font-medium text-destructive mb-2">누락된 필수 항목:</h5>
+                                        <ul className="text-sm text-destructive space-y-1 max-h-40 overflow-y-auto">
+                                          {uploadProgress.errors.map((error, idx) => (
+                                            <li key={idx} className="flex items-start gap-1">
+                                              <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                                              <span>{error}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
