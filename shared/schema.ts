@@ -1164,3 +1164,72 @@ export const insertBrandtalkHistorySchema = createInsertSchema(brandtalkHistory)
 
 export type InsertBrandtalkHistory = z.infer<typeof insertBrandtalkHistorySchema>;
 export type BrandtalkHistory = typeof brandtalkHistory.$inferSelect;
+
+// 주문대기 상태
+export const pendingOrderStatuses = ["대기", "처리중", "완료", "취소"] as const;
+export type PendingOrderStatus = typeof pendingOrderStatuses[number];
+
+// 주문대기 테이블
+export const pendingOrders = pgTable("pending_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderNumber: text("order_number").notNull().unique(),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  memberCompanyName: text("member_company_name").notNull(),
+  status: text("status").notNull().default("대기"),
+  
+  categoryLarge: text("category_large"),
+  categoryMedium: text("category_medium"),
+  categorySmall: text("category_small"),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  
+  ordererName: text("orderer_name").notNull(),
+  ordererPhone: text("orderer_phone").notNull(),
+  ordererAddress: text("orderer_address"),
+  
+  recipientName: text("recipient_name").notNull(),
+  recipientMobile: text("recipient_mobile").notNull(),
+  recipientPhone: text("recipient_phone"),
+  recipientAddress: text("recipient_address").notNull(),
+  
+  deliveryMessage: text("delivery_message"),
+  customOrderNumber: text("custom_order_number").notNull(),
+  
+  trackingNumber: text("tracking_number"),
+  courierCompany: text("courier_company"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPendingOrderSchema = createInsertSchema(pendingOrders).omit({
+  id: true,
+  orderNumber: true,
+  memberId: true,
+  memberCompanyName: true,
+  status: true,
+  categoryLarge: true,
+  categoryMedium: true,
+  categorySmall: true,
+  trackingNumber: true,
+  courierCompany: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const pendingOrderFormSchema = z.object({
+  productCode: z.string().min(1, "상품코드를 입력해주세요"),
+  productName: z.string().min(1, "상품명을 입력해주세요"),
+  ordererName: z.string().min(1, "주문자명을 입력해주세요"),
+  ordererPhone: z.string().min(1, "주문자 전화번호를 입력해주세요"),
+  ordererAddress: z.string().optional().or(z.literal("")),
+  recipientName: z.string().min(1, "수령자명을 입력해주세요"),
+  recipientMobile: z.string().min(1, "수령자 휴대폰번호를 입력해주세요"),
+  recipientPhone: z.string().optional().or(z.literal("")),
+  recipientAddress: z.string().min(1, "수령자 주소를 입력해주세요"),
+  deliveryMessage: z.string().optional().or(z.literal("")),
+  customOrderNumber: z.string().min(1, "자체주문번호를 입력해주세요"),
+});
+
+export type InsertPendingOrder = z.infer<typeof insertPendingOrderSchema>;
+export type PendingOrder = typeof pendingOrders.$inferSelect;

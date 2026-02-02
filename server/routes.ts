@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses } from "@shared/schema";
 import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
@@ -5060,6 +5060,221 @@ export async function registerRoutes(
         .offset(parseInt(offset as string));
 
       res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== 주문대기 (Pending Orders) API ====================
+  
+  // Generate unique order number
+  function generateOrderNumber(): string {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `ORD-${dateStr}-${randomStr}`;
+  }
+
+  // Get pending orders for member
+  app.get('/api/member/pending-orders', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    try {
+      const orders = await db.select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.memberId, req.session.userId))
+        .orderBy(desc(pendingOrders.createdAt));
+
+      res.json(orders);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create pending order (member)
+  app.post('/api/member/pending-orders', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    try {
+      const data = pendingOrderFormSchema.parse(req.body);
+
+      // Get member info
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      // Check for duplicate customOrderNumber
+      const existingOrder = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.memberId, req.session.userId),
+          eq(pendingOrders.customOrderNumber, data.customOrderNumber)
+        ));
+      
+      if (existingOrder.length > 0) {
+        return res.status(400).json({ message: "이미 사용된 자체주문번호입니다" });
+      }
+
+      // Look up product info by productCode
+      const productInfo = await storage.getProductRegistrationByCode(data.productCode);
+      
+      const orderData = {
+        orderNumber: generateOrderNumber(),
+        memberId: req.session.userId,
+        memberCompanyName: member.companyName,
+        status: "대기",
+        categoryLarge: productInfo?.categoryLarge || null,
+        categoryMedium: productInfo?.categoryMedium || null,
+        categorySmall: productInfo?.categorySmall || null,
+        productCode: data.productCode,
+        productName: data.productName,
+        ordererName: data.ordererName,
+        ordererPhone: data.ordererPhone,
+        ordererAddress: data.ordererAddress || null,
+        recipientName: data.recipientName,
+        recipientMobile: data.recipientMobile,
+        recipientPhone: data.recipientPhone || null,
+        recipientAddress: data.recipientAddress,
+        deliveryMessage: data.deliveryMessage || null,
+        customOrderNumber: data.customOrderNumber,
+        trackingNumber: null,
+        courierCompany: null,
+      };
+
+      const [newOrder] = await db.insert(pendingOrders).values(orderData).returning();
+      
+      res.status(201).json(newOrder);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Search product by code (for auto-fill categories)
+  app.get('/api/member/products/search', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    const { code } = req.query;
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ message: "상품코드를 입력해주세요" });
+    }
+
+    try {
+      const product = await storage.getProductRegistrationByCode(code);
+      if (!product) {
+        return res.status(404).json({ message: "상품을 찾을 수 없습니다" });
+      }
+
+      res.json({
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Get all pending orders
+  app.get('/api/admin/pending-orders', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { status, memberId } = req.query;
+      
+      let query = db.select().from(pendingOrders);
+      
+      if (status && typeof status === 'string') {
+        query = query.where(eq(pendingOrders.status, status)) as any;
+      }
+      
+      if (memberId && typeof memberId === 'string') {
+        query = query.where(eq(pendingOrders.memberId, memberId)) as any;
+      }
+      
+      const orders = await query.orderBy(desc(pendingOrders.createdAt));
+      res.json(orders);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Update pending order (tracking number, courier, status)
+  app.patch('/api/admin/pending-orders/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+    const { trackingNumber, courierCompany, status } = req.body;
+
+    try {
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
+      if (courierCompany !== undefined) updateData.courierCompany = courierCompany;
+      if (status !== undefined && pendingOrderStatuses.includes(status)) {
+        updateData.status = status;
+      }
+
+      const [updated] = await db.update(pendingOrders)
+        .set(updateData)
+        .where(eq(pendingOrders.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Delete pending order
+  app.delete('/api/admin/pending-orders/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const { id } = req.params;
+
+    try {
+      const [deleted] = await db.delete(pendingOrders)
+        .where(eq(pendingOrders.id, id))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
+      }
+
+      res.json({ message: "주문이 삭제되었습니다" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
