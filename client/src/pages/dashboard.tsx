@@ -235,7 +235,7 @@ export default function Dashboard() {
       <PublicHeader />
 
       <main className="pt-14">
-        <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] text-white py-16">
+        <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] text-white py-[45px]">
           <div className="container mx-auto px-6">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">마이페이지 대시보드</h1>
             <p className="text-blue-200 text-sm md:text-base mb-6">
