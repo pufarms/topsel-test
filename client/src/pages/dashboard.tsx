@@ -68,15 +68,28 @@ interface SidebarItemProps {
   activeTab: SidebarTab;
   onClick: (tab: SidebarTab) => void;
   children?: { label: string; tab: SidebarTab }[];
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-function SidebarItem({ icon, label, tab, activeTab, onClick, children }: SidebarItemProps) {
+function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, onToggle }: SidebarItemProps) {
   const isActive = activeTab === tab || children?.some(c => c.tab === activeTab);
+  const showChildren = children && (isOpen ?? isActive);
+  
+  const handleClick = () => {
+    if (children && children.length > 0) {
+      // 하위 메뉴가 있으면 토글만 수행
+      onToggle?.();
+    } else {
+      // 하위 메뉴가 없으면 탭 변경
+      onClick(tab);
+    }
+  };
   
   return (
     <div>
       <button
-        onClick={() => onClick(tab)}
+        onClick={handleClick}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium rounded-lg transition-colors",
           isActive 
@@ -89,11 +102,11 @@ function SidebarItem({ icon, label, tab, activeTab, onClick, children }: Sidebar
         {children && children.length > 0 && (
           <ChevronRight className={cn(
             "ml-auto h-4 w-4 transition-transform",
-            isActive && "rotate-90"
+            showChildren && "rotate-90"
           )} />
         )}
       </button>
-      {children && isActive && (
+      {showChildren && (
         <div className="ml-4 mt-1 space-y-1 border-l-2 border-muted pl-4">
           {children.map((child) => (
             <button
@@ -152,6 +165,12 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  
+  // 메뉴 토글 함수 (아코디언 동작)
+  const toggleMenu = (menuId: string) => {
+    setOpenMenu(prev => prev === menuId ? null : menuId);
+  };
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
@@ -292,6 +311,8 @@ export default function Dashboard() {
                       tab="order-new"
                       activeTab={activeTab}
                       onClick={setActiveTab}
+                      isOpen={openMenu === "order"}
+                      onToggle={() => toggleMenu("order")}
                       children={[
                         { label: "신규주문등록", tab: "order-new" },
                         { label: "주문조정건 확인", tab: "order-adjust" },
