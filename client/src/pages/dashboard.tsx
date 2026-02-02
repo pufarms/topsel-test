@@ -521,7 +521,7 @@ export default function Dashboard() {
   };
 
   // 본인의 행사진행 이력을 표시 (추후 API 연결 필요)
-  const memberEvents: { company: string; period: string; item: string; code: string; coupon: string }[] = [];
+  const memberEvents: { company: string; period: string; item: string; code: string; coupon: string; status: "진행중" | "종료" }[] = [];
 
   const sampleNotices = [
     { id: 1, title: "2024년 설 연휴 배송 안내", date: "2024-01-25" },
@@ -864,12 +864,13 @@ export default function Dashboard() {
                           <TableHead className="font-semibold">행사품목</TableHead>
                           <TableHead className="font-semibold">상품코드</TableHead>
                           <TableHead className="font-semibold">쿠폰</TableHead>
+                          <TableHead className="font-semibold">상태</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {memberEvents.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                               등록된 행사 이력이 없습니다
                             </TableCell>
                           </TableRow>
@@ -893,6 +894,17 @@ export default function Dashboard() {
                                 <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200">
                                   <Percent className="h-3 w-3 mr-1" />
                                   {event.coupon}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={event.status === "진행중" ? "default" : "secondary"}
+                                  className={event.status === "진행중" 
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" 
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                  }
+                                >
+                                  {event.status}
                                 </Badge>
                               </TableCell>
                             </TableRow>
