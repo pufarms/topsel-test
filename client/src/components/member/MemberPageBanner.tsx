@@ -5,6 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { getQueryFn } from "@/lib/queryClient";
 import type { Member, Order } from "@shared/schema";
 
+const memberGradeLabels: Record<string, string> = {
+  PENDING: "승인대기",
+  ASSOCIATE: "준회원",
+  START: "Start회원",
+  DRIVING: "Driving회원",
+  TOP: "Top회원",
+};
+
 interface MemberPageBannerProps {
   title: string;
   description?: string;
@@ -89,7 +97,7 @@ export function MemberPageBanner({ title, description, memberData: externalMembe
             </div>
             <div>
               <p className="text-xs text-blue-200">회원님 등급</p>
-              <p className="font-semibold">{memberData?.grade || "준회원"}</p>
+              <p className="font-semibold">{memberGradeLabels[memberData?.grade || "ASSOCIATE"] || "준회원"}</p>
             </div>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
