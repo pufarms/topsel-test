@@ -127,6 +127,7 @@ const menuItems: MenuItem[] = [
     icon: <Settings className="h-5 w-5" />,
     children: [
       { id: "site-settings", label: "사이트 설정", path: "/admin/settings/site" },
+      { id: "form-templates", label: "양식 관리", path: "/admin/settings/form-templates" },
       { id: "gallery", label: "이미지 갤러리", path: "/admin/settings/gallery" },
     ]
   },

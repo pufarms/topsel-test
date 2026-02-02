@@ -33,6 +33,7 @@ import StockStatusPage from "@/pages/admin/inventory/stock";
 import ReceivingPage from "@/pages/admin/inventory/receiving";
 import InventoryHistoryPage from "@/pages/admin/inventory/history";
 import SiteSettingsPage from "@/pages/admin/settings/site-settings";
+import FormTemplatesPage from "@/pages/admin/settings/form-templates";
 import PagesManagement from "@/pages/admin/pages";
 import AlimtalkPage from "@/pages/admin/kakao-notifications/alimtalk";
 import BrandtalkPage from "@/pages/admin/kakao-notifications/brandtalk";
@@ -188,6 +189,9 @@ function Router() {
       </Route>
       <Route path="/admin/settings/site">
         <AdminRoute><SiteSettingsPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/settings/form-templates">
+        <AdminRoute><FormTemplatesPage /></AdminRoute>
       </Route>
       <Route path="/admin/settings/gallery">
         <AdminRoute><AdminGallery /></AdminRoute>
