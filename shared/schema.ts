@@ -1172,6 +1172,7 @@ export type PendingOrderStatus = typeof pendingOrderStatuses[number];
 // 주문대기 테이블
 export const pendingOrders = pgTable("pending_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sequenceNumber: text("sequence_number").notNull().unique(),
   orderNumber: text("order_number").notNull().unique(),
   memberId: varchar("member_id").notNull().references(() => members.id),
   memberCompanyName: text("member_company_name").notNull(),
@@ -1204,6 +1205,7 @@ export const pendingOrders = pgTable("pending_orders", {
 
 export const insertPendingOrderSchema = createInsertSchema(pendingOrders).omit({
   id: true,
+  sequenceNumber: true,
   orderNumber: true,
   memberId: true,
   memberCompanyName: true,

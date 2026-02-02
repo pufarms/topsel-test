@@ -5093,6 +5093,36 @@ export async function registerRoutes(
     }
   });
 
+  // Generate sequence number: memberId + YYMMDD + 4-digit sequential number
+  // Uses MAX to find highest existing sequence and increments, avoiding race conditions
+  async function generateSequenceNumber(memberId: string): Promise<string> {
+    const now = new Date();
+    const year = String(now.getFullYear()).slice(-2); // Last 2 digits of year
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const datePrefix = `${memberId}${year}${month}${day}`;
+    
+    // Find the maximum sequence number with this prefix using MAX
+    const result = await db.select({ 
+      maxSeq: sql<string>`MAX(${pendingOrders.sequenceNumber})` 
+    })
+      .from(pendingOrders)
+      .where(
+        sql`${pendingOrders.sequenceNumber} LIKE ${datePrefix + '%'}`
+      );
+    
+    let nextNumber = 1;
+    if (result[0]?.maxSeq) {
+      // Extract the 4-digit suffix and increment
+      const currentMax = result[0].maxSeq;
+      const suffix = currentMax.slice(-4);
+      nextNumber = parseInt(suffix, 10) + 1;
+    }
+    
+    const sequentialPart = String(nextNumber).padStart(4, '0');
+    return `${datePrefix}${sequentialPart}`;
+  }
+
   // Create pending order (member)
   app.post('/api/member/pending-orders', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {
@@ -5123,30 +5153,55 @@ export async function registerRoutes(
       // Look up product info by productCode
       const productInfo = await storage.getProductRegistrationByCode(data.productCode);
       
-      const orderData = {
-        orderNumber: generateOrderNumber(),
-        memberId: req.session.userId,
-        memberCompanyName: member.companyName,
-        status: "대기",
-        categoryLarge: productInfo?.categoryLarge || null,
-        categoryMedium: productInfo?.categoryMedium || null,
-        categorySmall: productInfo?.categorySmall || null,
-        productCode: data.productCode,
-        productName: data.productName,
-        ordererName: data.ordererName,
-        ordererPhone: data.ordererPhone,
-        ordererAddress: data.ordererAddress || null,
-        recipientName: data.recipientName,
-        recipientMobile: data.recipientMobile,
-        recipientPhone: data.recipientPhone || null,
-        recipientAddress: data.recipientAddress,
-        deliveryMessage: data.deliveryMessage || null,
-        customOrderNumber: data.customOrderNumber,
-        trackingNumber: null,
-        courierCompany: null,
-      };
+      // Generate sequence number with retry logic for concurrent requests
+      let newOrder;
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          // Generate sequence number (아이디+년도2자리+월일+순번4자리)
+          const sequenceNumber = await generateSequenceNumber(member.username);
+          
+          const orderData = {
+            sequenceNumber,
+            orderNumber: generateOrderNumber(),
+            memberId: req.session.userId,
+            memberCompanyName: member.companyName,
+            status: "대기",
+            categoryLarge: productInfo?.categoryLarge || null,
+            categoryMedium: productInfo?.categoryMedium || null,
+            categorySmall: productInfo?.categorySmall || null,
+            productCode: data.productCode,
+            productName: data.productName,
+            ordererName: data.ordererName,
+            ordererPhone: data.ordererPhone,
+            ordererAddress: data.ordererAddress || null,
+            recipientName: data.recipientName,
+            recipientMobile: data.recipientMobile,
+            recipientPhone: data.recipientPhone || null,
+            recipientAddress: data.recipientAddress,
+            deliveryMessage: data.deliveryMessage || null,
+            customOrderNumber: data.customOrderNumber,
+            trackingNumber: null,
+            courierCompany: null,
+          };
 
-      const [newOrder] = await db.insert(pendingOrders).values(orderData).returning();
+          [newOrder] = await db.insert(pendingOrders).values(orderData).returning();
+          break; // Success, exit retry loop
+        } catch (insertError: any) {
+          // Check for unique constraint violation (PostgreSQL error code 23505)
+          if (insertError.code === '23505' && insertError.constraint?.includes('sequence_number')) {
+            retries--;
+            if (retries === 0) {
+              throw new Error("순번 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
+            }
+            // Small delay before retry
+            await new Promise(resolve => setTimeout(resolve, 50));
+          } else {
+            throw insertError;
+          }
+        }
+      }
       
       res.status(201).json(newOrder);
     } catch (error: any) {

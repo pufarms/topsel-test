@@ -1111,7 +1111,7 @@ export default function Dashboard() {
                             ) : (
                               pendingOrders.map((order, index) => (
                                 <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                                  <TableCell className="font-medium">{index + 1}</TableCell>
+                                  <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber}</TableCell>
                                   <TableCell>
                                     <Badge variant={order.status === "완료" ? "default" : order.status === "취소" ? "destructive" : "secondary"}>
                                       {order.status}
