@@ -100,7 +100,6 @@ const menuItems: MenuItem[] = [
       { id: "pages-basic", label: "기본페이지", path: "/admin/pages?category=기본페이지" },
       { id: "pages-main-sub", label: "메인/서브페이지", path: "/admin/pages?category=메인/서브페이지" },
       { id: "pages-mypage", label: "회원마이페이지", path: "/admin/pages?category=회원마이페이지" },
-      { id: "pages-member-order", label: "주문등록(회원)", path: "/admin/member-order-preview" },
       { id: "pages-order", label: "주문관리페이지", path: "/admin/pages?category=주문관리페이지" },
       { id: "pages-stats", label: "통계관리페이지", path: "/admin/pages?category=통계관리페이지" },
       { id: "pages-guide", label: "가이드페이지", path: "/admin/pages?category=가이드페이지" },
