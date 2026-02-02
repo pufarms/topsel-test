@@ -60,6 +60,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
+import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 import { type Order, type Member, type PendingOrder, type Category, pendingOrderFormSchema } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import MemberOrderAdjust from "@/pages/member/order-adjust";
@@ -897,183 +898,21 @@ export default function Dashboard() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4 overflow-hidden">
-                      {/* 필터 영역 */}
-                      <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-lg p-4 space-y-4">
-                        {/* 기간 선택 */}
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            <Button size="sm" variant="outline" className="h-8">오늘</Button>
-                            <Button size="sm" variant="outline" className="h-8">1주일</Button>
-                            <Button size="sm" variant="outline" className="h-8">1개월</Button>
-                          </div>
-                          <span className="text-sm text-muted-foreground">* 최대 1개월까지</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">조회 기간:</span>
-                            <input 
-                              type="date" 
-                              className="h-8 px-2 border rounded text-sm"
-                              defaultValue="2026-02-02"
-                            />
-                            <span>~</span>
-                            <input 
-                              type="date" 
-                              className="h-8 px-2 border rounded text-sm"
-                              defaultValue="2026-02-02"
-                            />
-                          </div>
-                        </div>
-
-                        {/* 검색 필터 */}
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium w-12">검색:</label>
-                            <select 
-                              className="h-8 px-2 border rounded text-sm min-w-[120px]"
-                              value={searchFilter}
-                              onChange={(e) => {
-                                setSearchFilter(e.target.value);
-                                setSearchTerm("");
-                                setSearchResults([]);
-                                setShowSearchDropdown(false);
-                              }}
-                              data-testid="select-search-filter"
-                            >
-                              <option>선택 없음</option>
-                              <option>주문자명</option>
-                              <option>수령자명</option>
-                              <option>상품명</option>
-                            </select>
-                          </div>
-                          {searchFilter !== "선택 없음" && (
-                            <div className="relative flex items-center gap-2">
-                              <Input
-                                type="text"
-                                placeholder={`${searchFilter} 검색...`}
-                                value={searchTerm}
-                                onChange={(e) => {
-                                  setSearchTerm(e.target.value);
-                                  setShowSearchDropdown(true);
-                                }}
-                                onFocus={() => setShowSearchDropdown(true)}
-                                className="h-8 w-[200px] text-sm"
-                                data-testid="input-search-term"
-                              />
-                              <Search className="h-4 w-4 text-muted-foreground" />
-                              {showSearchDropdown && searchResults.length > 0 && (
-                                <div className="absolute top-full left-0 mt-1 w-[200px] bg-white dark:bg-slate-800 border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
-                                  {searchResults.map((result, index) => (
-                                    <button
-                                      key={index}
-                                      type="button"
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 border-b last:border-b-0"
-                                      onClick={() => {
-                                        setSearchTerm(result);
-                                        setShowSearchDropdown(false);
-                                      }}
-                                      data-testid={`search-result-${index}`}
-                                    >
-                                      {result}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                              {searchTerm && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2"
-                                  onClick={() => {
-                                    setSearchTerm("");
-                                    setSearchResults([]);
-                                  }}
-                                  data-testid="button-clear-search"
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 분류 필터 (상품관리/카테고리관리 연동) */}
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium w-12">대분류</label>
-                            <select 
-                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                              value={categoryLargeFilter}
-                              onChange={(e) => {
-                                setCategoryLargeFilter(e.target.value);
-                                setCategoryMediumFilter("all");
-                                setCategorySmallFilter("all");
-                              }}
-                              data-testid="select-category-large"
-                            >
-                              <option value="all">-- 전체 대분류 --</option>
-                              {largeCategories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium">중분류</label>
-                            <select 
-                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                              value={categoryMediumFilter}
-                              onChange={(e) => {
-                                setCategoryMediumFilter(e.target.value);
-                                setCategorySmallFilter("all");
-                              }}
-                              data-testid="select-category-medium"
-                            >
-                              <option value="all">-- 전체 중분류 --</option>
-                              {filteredMediumCategories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium">소분류</label>
-                            <select 
-                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                              value={categorySmallFilter}
-                              onChange={(e) => setCategorySmallFilter(e.target.value)}
-                              data-testid="select-category-small"
-                            >
-                              <option value="all">-- 전체 소분류 --</option>
-                              {filteredSmallCategories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              className="h-8 bg-sky-500 hover:bg-sky-600"
-                              onClick={() => {
-                                // 조회는 이미 실시간 반영되므로 별도 액션 불필요
-                              }}
-                              data-testid="button-category-search"
-                            >
-                              조회
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="secondary" 
-                              className="h-8"
-                              onClick={() => {
-                                setCategoryLargeFilter("all");
-                                setCategoryMediumFilter("all");
-                                setCategorySmallFilter("all");
-                              }}
-                              data-testid="button-category-reset"
-                            >
-                              초기화
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+                      {/* 필터 영역 - 공통 필터 컴포넌트 사용 */}
+                      <MemberOrderFilter 
+                        onFilterChange={(filters) => {
+                          setCategoryLargeFilter(filters.categoryLarge);
+                          setCategoryMediumFilter(filters.categoryMedium);
+                          setCategorySmallFilter(filters.categorySmall);
+                          setSearchTerm(filters.searchTerm);
+                        }}
+                        showSearchField={true}
+                        searchOptions={[
+                          { value: "ordererName", label: "주문자명" },
+                          { value: "recipientName", label: "수령자명" },
+                          { value: "productName", label: "상품명" },
+                        ]}
+                      />
 
                       {/* 액션 버튼 및 페이지네이션 */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
