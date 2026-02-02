@@ -288,6 +288,9 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  
+  // 테이블 페이지 크기 상태 (10, 30, 100, "all")
+  const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
 
   // 검색어에 따른 필터링
   useEffect(() => {
@@ -355,6 +358,11 @@ export default function Dashboard() {
     
     return true;
   });
+  
+  // 표시할 주문 목록 (페이지 크기에 따라 자르기)
+  const displayedPendingOrders = tablePageSize === "all" 
+    ? filteredPendingOrders 
+    : filteredPendingOrders.slice(0, tablePageSize);
   
   const searchProductByCode = async (code: string) => {
     if (!code) return;
@@ -1291,20 +1299,28 @@ export default function Dashboard() {
                           </Dialog>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <span>페이지 당 항목 수:</span>
-                          <select className="h-8 px-2 border rounded text-sm">
-                            <option>10개</option>
-                            <option>20개</option>
-                            <option>50개</option>
+                          <span>표시 개수:</span>
+                          <select 
+                            className="h-8 px-2 border rounded text-sm"
+                            value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
+                            onChange={(e) => setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+                            data-testid="select-page-size"
+                          >
+                            <option value="10">10개씩</option>
+                            <option value="30">30개씩</option>
+                            <option value="100">100개씩</option>
+                            <option value="all">전체</option>
                           </select>
-                          <span className="text-muted-foreground ml-2">{pendingOrders?.length || 0} / {pendingOrders?.length || 0} (페이지 1/1)</span>
+                          <span className="text-muted-foreground ml-2">
+                            {displayedPendingOrders.length} / {filteredPendingOrders.length}건
+                          </span>
                         </div>
                       </div>
 
-                      {/* 테이블 - 주문대기리스트 형식 */}
-                      <div className="border rounded-lg overflow-x-auto">
+                      {/* 테이블 - 주문대기리스트 형식 (가로+세로 스크롤 테이블 컨테이너) */}
+                      <div className="border rounded-lg overflow-auto max-h-[600px]">
                         <Table className="min-w-[1800px]">
-                          <TableHeader>
+                          <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow className="bg-muted/50">
                               <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
@@ -1333,14 +1349,14 @@ export default function Dashboard() {
                                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </TableCell>
                               </TableRow>
-                            ) : filteredPendingOrders.length === 0 ? (
+                            ) : displayedPendingOrders.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={18} className="text-center text-muted-foreground py-12">
                                   {searchTerm ? "검색 결과가 없습니다" : "등록된 주문이 없습니다"}
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              filteredPendingOrders.map((order, index) => (
+                              displayedPendingOrders.map((order, index) => (
                                 <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                                   <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber}</TableCell>
                                   <TableCell className="text-sm">{order.categoryLarge || "-"}</TableCell>

@@ -14,10 +14,13 @@ Preferred communication style: Simple, everyday language.
    - 그리드: `grid-cols-1 sm:grid-cols-2` 등 반응형 그리드
    - 텍스트: `text-xl md:text-2xl` 등 반응형 크기
 2. **Pretendard 한글 폰트 (필수!)**: 모든 페이지에 Pretendard 폰트 적용 유지
-3. **테이블 가로 스크롤 (필수!)**: 주문/통계 관련 모든 테이블에 가로 스크롤 적용
-   - 테이블 컨테이너에 `overflow-x-auto` 클래스 필수
-   - 예: `<div className="border rounded-lg overflow-x-auto"><Table>...</Table></div>`
-   - 컬럼이 많은 테이블은 모든 컬럼을 볼 수 있도록 스크롤 지원
+3. **테이블 스크롤 (필수!)**: 주문/통계 관련 모든 테이블에 가로+세로 스크롤 적용
+   - 테이블 컨테이너에 `overflow-auto max-h-[600px]` 클래스 필수 (가로+세로 스크롤)
+   - 예: `<div className="border rounded-lg overflow-auto max-h-[600px]"><Table className="min-w-[1800px]">...</Table></div>`
+   - 테이블 헤더는 고정: `<TableHeader className="sticky top-0 z-10 bg-background">`
+   - 표시 개수 선택: "10개씩, 30개씩, 100개씩, 전체" 옵션 제공
+   - 스크롤바는 테이블 컨테이너 내부에 위치 (페이지가 아닌 테이블에)
+   - 페이지 자체는 스크롤되지 않고 테이블 내부만 스크롤
 4. **카테고리 연동 (필수!)**: 모든 대분류/중분류/소분류 필터는 "상품관리/카테고리관리"와 연동
    - 카테고리 데이터 소스: `/api/categories` 엔드포인트 (categories 테이블)
    - 카테고리 레벨: `large` (대분류), `medium` (중분류), `small` (소분류)

@@ -27,6 +27,7 @@ export default function OrdersPendingPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
 
   const { data: pendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders"],
@@ -44,10 +45,15 @@ export default function OrdersPendingPage() {
   }), []);
 
   const filteredOrders = useAdminCategoryFilter(pendingOrders, filters, getFields);
+  
+  // 표시할 주문 목록 (페이지 크기에 따라 자르기)
+  const displayedOrders = tablePageSize === "all" 
+    ? filteredOrders 
+    : filteredOrders.slice(0, tablePageSize);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedOrders(filteredOrders.map(o => o.id));
+      setSelectedOrders(displayedOrders.map(o => o.id));
     } else {
       setSelectedOrders([]);
     }
@@ -79,17 +85,29 @@ export default function OrdersPendingPage() {
             searchPlaceholder="검색어를 입력하세요"
           />
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" data-testid="button-download-orders">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>
               <span className="text-sm text-muted-foreground">
-                총 {filteredOrders.length}건
+                {displayedOrders.length} / {filteredOrders.length}건
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <span className="text-sm">표시 개수:</span>
+              <select 
+                className="h-8 px-2 border rounded text-sm"
+                value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
+                onChange={(e) => setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+                data-testid="select-page-size"
+              >
+                <option value="10">10개씩</option>
+                <option value="30">30개씩</option>
+                <option value="100">100개씩</option>
+                <option value="all">전체</option>
+              </select>
               <Button size="sm" variant="default" disabled={selectedOrders.length === 0}>
                 1차 주문마감
               </Button>
@@ -103,18 +121,18 @@ export default function OrdersPendingPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredOrders.length === 0 ? (
+          ) : displayedOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               주문 대기 내역이 없습니다.
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg overflow-auto max-h-[600px]">
               <Table className="min-w-[1600px]">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                        checked={selectedOrders.length === displayedOrders.length && displayedOrders.length > 0}
                         onCheckedChange={handleSelectAll}
                         data-testid="checkbox-select-all"
                       />
@@ -137,7 +155,7 @@ export default function OrdersPendingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order, index) => (
+                  {displayedOrders.map((order, index) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <Checkbox
