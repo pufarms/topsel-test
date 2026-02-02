@@ -924,7 +924,14 @@ export default function PagesManagement() {
                           <div className="flex items-center gap-2 shrink-0">
                             {page.status === "active" && (
                               <Button variant="ghost" size="icon" asChild>
-                                <a href={page.path} target="_blank" rel="noopener noreferrer">
+                                <a 
+                                  href={page.category === "회원마이페이지" 
+                                    ? `${page.path}${page.path.includes('?') ? '&' : '?'}preview=true`
+                                    : page.path
+                                  } 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                >
                                   <ExternalLink className="w-4 h-4" />
                                 </a>
                               </Button>

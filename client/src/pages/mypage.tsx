@@ -74,14 +74,40 @@ export default function MyPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
+  // preview 모드 확인 (early access)
+  const urlParamsEarly = new URLSearchParams(window.location.search);
+  const isPreviewModeEarly = urlParamsEarly.get("preview") === "true";
+
   const { data: profile, isLoading: profileLoading } = useQuery<MemberProfile | null>({
     queryKey: ["/api/member/profile"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: !!user && user.role === "member",
+    enabled: !!user && (user.role === "member" || isPreviewModeEarly),
     retry: false,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
+  
+  // preview 모드에서 프로필이 없을 경우 데모 데이터 사용
+  const displayProfile: MemberProfile | null = profile || (isPreviewModeEarly ? {
+    id: "preview-demo",
+    username: "preview_user",
+    grade: "ASSOCIATE",
+    companyName: "[미리보기] 샘플 업체명",
+    businessNumber: "123-45-67890",
+    businessAddress: "서울시 강남구 테헤란로 123",
+    representative: "[미리보기] 홍길동",
+    phone: "010-0000-0000",
+    email: "sample@example.com",
+    managerName: "[미리보기] 담당자",
+    managerPhone: "010-1234-5678",
+    deposit: 100000,
+    point: 5000,
+    status: "활성",
+    memo: null,
+    lastLoginAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as MemberProfile : null);
 
   const form = useForm<ProfileUpdateForm>({
     resolver: zodResolver(profileUpdateSchema),
@@ -95,13 +121,13 @@ export default function MyPage() {
       password: "",
       passwordConfirm: "",
     },
-    values: profile ? {
-      representative: profile.representative || "",
-      businessAddress: profile.businessAddress || "",
-      phone: profile.phone || "",
-      managerName: profile.managerName || "",
-      managerPhone: profile.managerPhone || "",
-      email: profile.email || "",
+    values: displayProfile ? {
+      representative: displayProfile.representative || "",
+      businessAddress: displayProfile.businessAddress || "",
+      phone: displayProfile.phone || "",
+      managerName: displayProfile.managerName || "",
+      managerPhone: displayProfile.managerPhone || "",
+      email: displayProfile.email || "",
       password: "",
       passwordConfirm: "",
     } : undefined,
@@ -145,14 +171,18 @@ export default function MyPage() {
     return null;
   }
 
-  // 관리자는 관리자 대시보드로 리다이렉트
+  // 관리자는 관리자 대시보드로 리다이렉트 (preview 모드가 아닌 경우에만)
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-  if (isAdmin) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreviewMode = urlParams.get("preview") === "true";
+  
+  if (isAdmin && !isPreviewMode) {
     navigate("/admin");
     return null;
   }
 
-  if (user.role !== "member") {
+  // preview 모드가 아니고 회원이 아닌 경우에만 로그인으로 리다이렉트
+  if (user.role !== "member" && !isPreviewMode) {
     navigate("/login");
     return null;
   }
@@ -180,20 +210,20 @@ export default function MyPage() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">상호명</p>
-                <p className="font-medium">{profile?.companyName}</p>
+                <p className="font-medium">{displayProfile?.companyName}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">사업자번호</p>
-                <p className="font-medium">{profile?.businessNumber}</p>
+                <p className="font-medium">{displayProfile?.businessNumber}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">아이디</p>
-                <p className="font-medium">{profile?.username}</p>
+                <p className="font-medium">{displayProfile?.username}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">등급</p>
                 <Badge variant="outline" className="mt-1">
-                  {profile?.grade ? memberGradeLabels[profile.grade] || profile.grade : "-"}
+                  {displayProfile?.grade ? memberGradeLabels[displayProfile.grade] || displayProfile.grade : "-"}
                 </Badge>
               </div>
               <Separator />
@@ -201,14 +231,14 @@ export default function MyPage() {
                 <Wallet className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">예치금</p>
-                  <p className="font-medium">{profile?.deposit?.toLocaleString() || 0}원</p>
+                  <p className="font-medium">{displayProfile?.deposit?.toLocaleString() || 0}원</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Coins className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">포인트</p>
-                  <p className="font-medium">{profile?.point?.toLocaleString() || 0}P</p>
+                  <p className="font-medium">{displayProfile?.point?.toLocaleString() || 0}P</p>
                 </div>
               </div>
             </CardContent>

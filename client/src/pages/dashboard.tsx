@@ -207,9 +207,12 @@ export default function Dashboard() {
     return null;
   }
 
-  // 관리자는 관리자 대시보드로 리다이렉트
+  // 관리자는 관리자 대시보드로 리다이렉트 (preview 모드가 아닌 경우에만)
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-  if (isAdmin) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreviewMode = urlParams.get("preview") === "true";
+  
+  if (isAdmin && !isPreviewMode) {
     navigate("/admin");
     return null;
   }
@@ -222,10 +225,48 @@ export default function Dashboard() {
     );
   }
 
-  if (!memberData && !memberLoading && user) {
+  // preview 모드가 아니고 회원 데이터가 없으면 로그인으로 리다이렉트
+  if (!memberData && !memberLoading && user && !isPreviewMode) {
     navigate("/login");
     return null;
   }
+
+  // preview 모드에서 관리자가 회원 데이터 없이 볼 경우 데모 데이터 사용
+  const displayMemberData: Member | null = memberData || (isPreviewMode ? {
+    id: "preview-demo",
+    username: "preview_user",
+    password: "",
+    grade: "ASSOCIATE",
+    memberName: "[미리보기] 홍길동",
+    companyName: "[미리보기] 샘플 업체명",
+    businessNumber: "123-45-67890",
+    businessAddress: "서울시 강남구 테헤란로 123",
+    representative: "[미리보기] 홍길동",
+    phone: "010-0000-0000",
+    ceoBirth: null,
+    ceoCi: null,
+    mailNo: "06234",
+    managerName: null,
+    managerPhone: null,
+    manager2Name: null,
+    manager2Phone: null,
+    manager3Name: null,
+    manager3Phone: null,
+    email: "sample@example.com",
+    deposit: 100000,
+    point: 5000,
+    status: "활성",
+    memo: null,
+    businessLicenseUrl: null,
+    mailFilePath: null,
+    profileImageUrl: null,
+    signatureData: null,
+    approvedAt: new Date(),
+    approvedBy: null,
+    lastLoginAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as Member : null);
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -270,7 +311,7 @@ export default function Dashboard() {
         <MemberPageBanner 
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
-          memberData={memberData}
+          memberData={displayMemberData}
           orders={orders}
         />
 
