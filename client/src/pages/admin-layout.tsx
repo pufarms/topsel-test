@@ -194,12 +194,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isActive = (path?: string) => {
     if (!path) return false;
-    // 쿼리 파라미터가 있는 경우 전체 URL과 비교
     const currentFullPath = location + window.location.search;
+    
+    // 쿼리 파라미터가 있는 경로는 전체 URL과 비교
     if (path.includes('?')) {
-      return path === currentFullPath || path === location + window.location.search;
+      return path === currentFullPath;
     }
-    // 쿼리 파라미터가 없는 경로는 기본 경로만 비교
+    
+    // 쿼리 파라미터가 없는 경로는 현재 URL에도 쿼리 파라미터가 없을 때만 비교
+    // 현재 URL에 쿼리 파라미터가 있으면 false 반환
+    if (window.location.search) {
+      return false;
+    }
+    
     return path === location;
   };
   const isChildActive = (children?: { path: string }[]) => 
