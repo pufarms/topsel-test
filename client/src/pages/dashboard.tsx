@@ -868,7 +868,7 @@ export default function Dashboard() {
                             }}
                           >
                             <FileDown className="h-4 w-4 mr-1" />
-                            양식파일 다운로드
+                            주문등록양식 다운
                           </Button>
                           <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
                             <DialogTrigger asChild>
