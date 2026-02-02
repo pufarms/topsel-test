@@ -1242,9 +1242,10 @@ export type PendingOrder = typeof pendingOrders.$inferSelect;
 export const formTemplates = pgTable("form_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(), // 양식 이름 (예: "주문등록양식")
-  code: text("code").notNull().unique(), // 양식 코드 (예: "order_registration")
+  code: text("code").notNull().unique(), // 양식 코드 (예: "order_registration") - 자동 생성됨
   description: text("description"), // 양식 설명
   category: text("category").notNull().default("기타"), // 카테고리 (주문관리, 재고관리, 회원관리 등)
+  templateType: text("template_type").notNull().default("download"), // 양식 유형: download(다운로드용), upload(업로드용)
   fileUrl: text("file_url"), // 업로드된 파일 URL
   fileName: text("file_name"), // 원본 파일명
   fileType: text("file_type"), // 파일 타입 (xlsx, xls, csv 등)
