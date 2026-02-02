@@ -21,24 +21,37 @@ export default function MemberOrderList() {
 
   const [categoryLargeFilter, setCategoryLargeFilter] = useState<string>("all");
   const [categoryMediumFilter, setCategoryMediumFilter] = useState<string>("all");
+  const [categorySmallFilter, setCategorySmallFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [pageSize, setPageSize] = useState<number | "all">(30);
 
   const largeCategories = categories.filter(c => c.level === "large");
   const mediumCategories = categories.filter(c => c.level === "medium");
+  const smallCategories = categories.filter(c => c.level === "small");
 
   const filteredMediumCategories = categoryLargeFilter === "all"
     ? mediumCategories
     : mediumCategories.filter(c => c.parentId === categoryLargeFilter);
 
+  const filteredSmallCategories = categoryMediumFilter === "all"
+    ? smallCategories
+    : smallCategories.filter(c => c.parentId === categoryMediumFilter);
+
   const handleLargeFilterChange = (value: string) => {
     setCategoryLargeFilter(value);
     setCategoryMediumFilter("all");
+    setCategorySmallFilter("all");
+  };
+
+  const handleMediumFilterChange = (value: string) => {
+    setCategoryMediumFilter(value);
+    setCategorySmallFilter("all");
   };
 
   const handleReset = () => {
     setCategoryLargeFilter("all");
     setCategoryMediumFilter("all");
+    setCategorySmallFilter("all");
     setStatusFilter("all");
   };
 
@@ -90,7 +103,7 @@ export default function MemberOrderList() {
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium w-12">대분류</label>
                 <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[160px]"
+                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
                   value={categoryLargeFilter}
                   onChange={(e) => handleLargeFilterChange(e.target.value)}
                   data-testid="select-list-category-large"
@@ -104,13 +117,27 @@ export default function MemberOrderList() {
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium">중분류</label>
                 <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[160px]"
+                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
                   value={categoryMediumFilter}
-                  onChange={(e) => setCategoryMediumFilter(e.target.value)}
+                  onChange={(e) => handleMediumFilterChange(e.target.value)}
                   data-testid="select-list-category-medium"
                 >
                   <option value="all">-- 전체 중분류 --</option>
                   {filteredMediumCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">소분류</label>
+                <select 
+                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
+                  value={categorySmallFilter}
+                  onChange={(e) => setCategorySmallFilter(e.target.value)}
+                  data-testid="select-list-category-small"
+                >
+                  <option value="all">-- 전체 소분류 --</option>
+                  {filteredSmallCategories.map((cat) => (
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
