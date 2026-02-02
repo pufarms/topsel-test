@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,21 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { z } from "zod";
 import { 
   Loader2, 
   LayoutDashboard,
@@ -45,8 +60,24 @@ import {
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
-import type { Order, Member } from "@shared/schema";
+import type { Order, Member, PendingOrder } from "@shared/schema";
 import { cn } from "@/lib/utils";
+
+const pendingOrderFormSchema = z.object({
+  productCode: z.string().min(1, "상품코드를 입력해주세요"),
+  productName: z.string().min(1, "상품명을 입력해주세요"),
+  ordererName: z.string().min(1, "주문자명을 입력해주세요"),
+  ordererPhone: z.string().min(1, "주문자 전화번호를 입력해주세요"),
+  ordererAddress: z.string().optional(),
+  recipientName: z.string().min(1, "수령자명을 입력해주세요"),
+  recipientMobile: z.string().min(1, "수령자 휴대폰번호를 입력해주세요"),
+  recipientPhone: z.string().optional(),
+  recipientAddress: z.string().min(1, "수령자 주소를 입력해주세요"),
+  deliveryMessage: z.string().optional(),
+  customOrderNumber: z.string().min(1, "자체주문번호를 입력해주세요"),
+});
+
+type PendingOrderFormData = z.infer<typeof pendingOrderFormSchema>;
 
 type SidebarTab = 
   | "dashboard" 
@@ -187,6 +218,70 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
+
+  const { data: pendingOrders = [], isLoading: pendingOrdersLoading, refetch: refetchPendingOrders } = useQuery<PendingOrder[]>({
+    queryKey: ["/api/member/pending-orders"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!user && user.role === "member",
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
+  });
+
+  const { toast } = useToast();
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [productSearchLoading, setProductSearchLoading] = useState(false);
+
+  const orderForm = useForm<PendingOrderFormData>({
+    resolver: zodResolver(pendingOrderFormSchema),
+    defaultValues: {
+      productCode: "",
+      productName: "",
+      ordererName: "",
+      ordererPhone: "",
+      ordererAddress: "",
+      recipientName: "",
+      recipientMobile: "",
+      recipientPhone: "",
+      recipientAddress: "",
+      deliveryMessage: "",
+      customOrderNumber: "",
+    },
+  });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: PendingOrderFormData) => {
+      const res = await apiRequest("POST", "/api/member/pending-orders", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "주문이 등록되었습니다", description: "주문대기 리스트에서 확인할 수 있습니다." });
+      setOrderDialogOpen(false);
+      orderForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "주문 등록 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const searchProductByCode = async (code: string) => {
+    if (!code) return;
+    setProductSearchLoading(true);
+    try {
+      const res = await fetch(`/api/member/products/search?code=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const product = await res.json();
+        orderForm.setValue("productName", product.productName);
+        toast({ title: "상품 조회 성공", description: `${product.productName}` });
+      } else {
+        toast({ title: "상품을 찾을 수 없습니다", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "상품 조회 실패", variant: "destructive" });
+    } finally {
+      setProductSearchLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -754,18 +849,206 @@ export default function Dashboard() {
                       {/* 액션 버튼 및 페이지네이션 */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-8">
+                          <Button size="sm" variant="outline" className="h-8" data-testid="button-download-orders">
                             <FileDown className="h-4 w-4 mr-1" />
                             다운로드
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8">
+                          <Button size="sm" variant="outline" className="h-8" data-testid="button-download-form">
                             <FileDown className="h-4 w-4 mr-1" />
                             양식파일 다운로드
                           </Button>
-                          <Button size="sm" className="h-8 bg-primary">
-                            <Plus className="h-4 w-4 mr-1" />
-                            주문 등록
-                          </Button>
+                          <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" className="h-8 bg-primary" data-testid="button-new-order">
+                                <Plus className="h-4 w-4 mr-1" />
+                                주문 등록
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                  <Plus className="h-5 w-5" />
+                                  신규 주문 등록
+                                </DialogTitle>
+                              </DialogHeader>
+                              <Form {...orderForm}>
+                                <form onSubmit={orderForm.handleSubmit((data) => createOrderMutation.mutate(data))} className="space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="productCode"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>상품코드 *</FormLabel>
+                                          <div className="flex gap-2">
+                                            <FormControl>
+                                              <Input placeholder="상품코드 입력" {...field} data-testid="input-product-code" />
+                                            </FormControl>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => searchProductByCode(field.value)}
+                                              disabled={productSearchLoading}
+                                              data-testid="button-search-product"
+                                            >
+                                              {productSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                                            </Button>
+                                          </div>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="productName"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>상품명 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="상품명 입력" {...field} data-testid="input-product-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="customOrderNumber"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>자체주문번호 * (중복불가)</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="자체주문번호 입력" {...field} data-testid="input-custom-order-number" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <div className="col-span-full">
+                                      <div className="text-sm font-medium mb-2 text-primary">주문자 정보</div>
+                                    </div>
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="ordererName"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>주문자명 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="주문자명" {...field} data-testid="input-orderer-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="ordererPhone"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>주문자 전화번호 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="010-0000-0000" {...field} data-testid="input-orderer-phone" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="ordererAddress"
+                                      render={({ field }) => (
+                                        <FormItem className="col-span-full">
+                                          <FormLabel>주문자 주소</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="주소 입력 (선택사항)" {...field} data-testid="input-orderer-address" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <div className="col-span-full">
+                                      <div className="text-sm font-medium mb-2 text-primary">수령자 정보</div>
+                                    </div>
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="recipientName"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>수령자명 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="수령자명" {...field} data-testid="input-recipient-name" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="recipientMobile"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>수령자 휴대폰번호 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="010-0000-0000" {...field} data-testid="input-recipient-mobile" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="recipientPhone"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>수령자 전화번호</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="전화번호 (선택사항)" {...field} data-testid="input-recipient-phone" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="recipientAddress"
+                                      render={({ field }) => (
+                                        <FormItem className="col-span-full">
+                                          <FormLabel>수령자 주소 *</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="배송 받을 주소" {...field} data-testid="input-recipient-address" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={orderForm.control}
+                                      name="deliveryMessage"
+                                      render={({ field }) => (
+                                        <FormItem className="col-span-full">
+                                          <FormLabel>배송메시지</FormLabel>
+                                          <FormControl>
+                                            <Textarea placeholder="배송 시 요청사항 (선택사항)" {...field} data-testid="input-delivery-message" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <div className="flex justify-end gap-2 pt-4">
+                                    <Button type="button" variant="outline" onClick={() => setOrderDialogOpen(false)} data-testid="button-cancel-order">
+                                      취소
+                                    </Button>
+                                    <Button type="submit" disabled={createOrderMutation.isPending} data-testid="button-submit-order">
+                                      {createOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                      주문 등록
+                                    </Button>
+                                  </div>
+                                </form>
+                              </Form>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span>페이지 당 항목 수:</span>
@@ -774,33 +1057,76 @@ export default function Dashboard() {
                             <option>20개</option>
                             <option>50개</option>
                           </select>
-                          <span className="text-muted-foreground ml-2">0 / 0 (페이지 1/1)</span>
+                          <span className="text-muted-foreground ml-2">{pendingOrders.length} / {pendingOrders.length} (페이지 1/1)</span>
                         </div>
                       </div>
 
-                      {/* 테이블 */}
+                      {/* 테이블 - 주문대기리스트 형식 */}
                       <div className="border rounded-lg overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/50">
+                              <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">상태</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">수령자명</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">수령자휴대폰번호</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">수령자 전화번호</TableHead>
-                              <TableHead className="font-semibold whitespace-nowrap">수령자 우편번호</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">수령자 주소</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">배송메시지</TableHead>
-                              <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
-                              <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">주문번호</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">자체주문번호</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">운송장번호</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">택배사</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            <TableRow>
-                              <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
-                                등록된 주문이 없습니다
-                              </TableCell>
-                            </TableRow>
+                            {pendingOrdersLoading ? (
+                              <TableRow>
+                                <TableCell colSpan={18} className="text-center py-12">
+                                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                </TableCell>
+                              </TableRow>
+                            ) : pendingOrders.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={18} className="text-center text-muted-foreground py-12">
+                                  등록된 주문이 없습니다
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              pendingOrders.map((order, index) => (
+                                <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
+                                  <TableCell className="font-medium">{index + 1}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={order.status === "완료" ? "default" : order.status === "취소" ? "destructive" : "secondary"}>
+                                      {order.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm">{order.categoryLarge || "-"}</TableCell>
+                                  <TableCell className="text-sm">{order.categoryMedium || "-"}</TableCell>
+                                  <TableCell className="text-sm">{order.categorySmall || "-"}</TableCell>
+                                  <TableCell className="text-sm font-mono">{order.productCode}</TableCell>
+                                  <TableCell className="text-sm">{order.productName}</TableCell>
+                                  <TableCell className="text-sm">{order.ordererName}</TableCell>
+                                  <TableCell className="text-sm">{order.ordererPhone}</TableCell>
+                                  <TableCell className="text-sm">{order.recipientName}</TableCell>
+                                  <TableCell className="text-sm">{order.recipientMobile}</TableCell>
+                                  <TableCell className="text-sm">{order.recipientPhone || "-"}</TableCell>
+                                  <TableCell className="text-sm max-w-[200px] truncate">{order.recipientAddress}</TableCell>
+                                  <TableCell className="text-sm max-w-[150px] truncate">{order.deliveryMessage || "-"}</TableCell>
+                                  <TableCell className="text-sm font-mono">{order.orderNumber}</TableCell>
+                                  <TableCell className="text-sm font-mono">{order.customOrderNumber}</TableCell>
+                                  <TableCell className="text-sm">{order.trackingNumber || "-"}</TableCell>
+                                  <TableCell className="text-sm">{order.courierCompany || "-"}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
                           </TableBody>
                         </Table>
                       </div>
