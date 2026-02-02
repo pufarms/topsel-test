@@ -234,9 +234,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <PublicHeader />
 
-      <main className="pt-16">
+      <main className="pt-14">
         <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] text-white">
-          <div className="container mx-auto px-6 py-8">
+          <div className="container mx-auto px-6 pt-10 pb-8">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">마이페이지 대시보드</h1>
             <p className="text-blue-200 text-sm md:text-base mb-6">
               주문, 예치금, 통계를 한눈에 관리하세요.<br className="sm:hidden" />
