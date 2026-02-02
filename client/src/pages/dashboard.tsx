@@ -923,7 +923,13 @@ export default function Dashboard() {
                             <FileDown className="h-4 w-4 mr-1" />
                             주문등록양식 다운
                           </Button>
-                          <Dialog open={orderDialogOpen} onOpenChange={handleCloseUploadDialog}>
+                          <Dialog open={orderDialogOpen} onOpenChange={(open) => {
+                              if (open) {
+                                setOrderDialogOpen(true);
+                              } else {
+                                handleCloseUploadDialog();
+                              }
+                            }}>
                             <DialogTrigger asChild>
                               <Button size="sm" className="h-8 bg-primary" data-testid="button-new-order">
                                 <Plus className="h-4 w-4 mr-1" />
