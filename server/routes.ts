@@ -5272,6 +5272,125 @@ export async function registerRoutes(
     }
   });
 
+  // Member: Excel upload for bulk order registration
+  const memberOrderExcelUpload = multer({ storage: multer.memoryStorage() });
+  app.post('/api/member/pending-orders/excel-upload', memberOrderExcelUpload.single('file'), async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "엑셀 파일을 업로드해주세요" });
+    }
+
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+
+      if (rows.length === 0) {
+        return res.status(400).json({ message: "데이터가 없습니다" });
+      }
+
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      let successCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 2; // Excel rows start at 1, and header is row 1
+
+        try {
+          // Map Excel columns to order data (주문등록양식 columns)
+          const productCode = String(row['상품코드'] || row['productCode'] || '').trim();
+          const productName = String(row['상품명'] || row['productName'] || '').trim();
+          const customOrderNumber = String(row['자체주문번호'] || row['customOrderNumber'] || '').trim();
+          const ordererName = String(row['주문자명'] || row['ordererName'] || '').trim();
+          const ordererPhone = String(row['주문자전화번호'] || row['주문자 전화번호'] || row['ordererPhone'] || '').trim();
+          const ordererAddress = String(row['주문자주소'] || row['주문자 주소'] || row['ordererAddress'] || '').trim();
+          const recipientName = String(row['수령자명'] || row['recipientName'] || '').trim();
+          const recipientMobile = String(row['수령자휴대폰번호'] || row['수령자 휴대폰번호'] || row['recipientMobile'] || '').trim();
+          const recipientPhone = String(row['수령자전화번호'] || row['수령자 전화번호'] || row['recipientPhone'] || '').trim();
+          const recipientAddress = String(row['수령자주소'] || row['수령자 주소'] || row['recipientAddress'] || '').trim();
+          const deliveryMessage = String(row['배송메시지'] || row['deliveryMessage'] || '').trim();
+
+          // Validate required fields
+          if (!productCode || !productName || !customOrderNumber || !ordererName || !ordererPhone || !recipientName || !recipientMobile || !recipientAddress) {
+            errors.push(`행 ${rowNum}: 필수 필드 누락`);
+            failedCount++;
+            continue;
+          }
+
+          // Check for duplicate customOrderNumber
+          const existingOrder = await db.select()
+            .from(pendingOrders)
+            .where(and(
+              eq(pendingOrders.memberId, req.session.userId),
+              eq(pendingOrders.customOrderNumber, customOrderNumber)
+            ));
+          
+          if (existingOrder.length > 0) {
+            errors.push(`행 ${rowNum}: 이미 사용된 자체주문번호 (${customOrderNumber})`);
+            failedCount++;
+            continue;
+          }
+
+          // Look up product info by productCode
+          const productInfo = await storage.getProductRegistrationByCode(productCode);
+
+          // Generate sequence number
+          const sequenceNumber = await generateSequenceNumber(member.username);
+
+          await db.insert(pendingOrders).values({
+            sequenceNumber,
+            orderNumber: generateOrderNumber(),
+            memberId: req.session.userId,
+            memberCompanyName: member.companyName,
+            status: "대기",
+            categoryLarge: productInfo?.categoryLarge || null,
+            categoryMedium: productInfo?.categoryMedium || null,
+            categorySmall: productInfo?.categorySmall || null,
+            productCode,
+            productName,
+            supplyPrice: productInfo?.topPrice || null,
+            ordererName,
+            ordererPhone,
+            ordererAddress: ordererAddress || null,
+            recipientName,
+            recipientMobile,
+            recipientPhone: recipientPhone || null,
+            recipientAddress,
+            deliveryMessage: deliveryMessage || null,
+            customOrderNumber,
+            trackingNumber: null,
+            courierCompany: null,
+          });
+
+          successCount++;
+        } catch (rowError: any) {
+          errors.push(`행 ${rowNum}: ${rowError.message}`);
+          failedCount++;
+        }
+      }
+
+      res.json({
+        total: rows.length,
+        success: successCount,
+        failed: failedCount,
+        errors: errors.slice(0, 10), // Return first 10 errors
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "엑셀 처리 중 오류가 발생했습니다" });
+    }
+  });
+
   // Search product by code (for auto-fill categories)
   app.get('/api/member/products/search', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {
