@@ -599,7 +599,7 @@ export default function Dashboard() {
               </Card>
             </aside>
 
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
               <Card>
