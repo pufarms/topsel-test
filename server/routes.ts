@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, asc, sql, and } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -5085,7 +5085,7 @@ export async function registerRoutes(
       const orders = await db.select()
         .from(pendingOrders)
         .where(eq(pendingOrders.memberId, req.session.userId))
-        .orderBy(desc(pendingOrders.createdAt));
+        .orderBy(asc(pendingOrders.sequenceNumber));
 
       res.json(orders);
     } catch (error: any) {
@@ -5264,7 +5264,7 @@ export async function registerRoutes(
         query = query.where(eq(pendingOrders.memberId, memberId)) as any;
       }
       
-      const orders = await query.orderBy(desc(pendingOrders.createdAt));
+      const orders = await query.orderBy(asc(pendingOrders.sequenceNumber));
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
