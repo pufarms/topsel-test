@@ -126,10 +126,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [openMenus, setOpenMenus] = useState<string[]>([]);
+  const [searchParams, setSearchParams] = useState(window.location.search);
+
+  // URL 변경 감지 및 searchParams 업데이트
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setSearchParams(window.location.search);
+    };
+    
+    // popstate 이벤트 리스너
+    window.addEventListener('popstate', handleUrlChange);
+    
+    // 현재 URL의 search params 동기화
+    setSearchParams(window.location.search);
+    
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, [location]);
 
   // 현재 위치에 따라 부모 메뉴 자동 열기
   useEffect(() => {
-    const currentFullPath = location + window.location.search;
+    const currentFullPath = location + searchParams;
     const openParents: string[] = [];
     
     menuItems.forEach(item => {
@@ -138,7 +156,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (child.path.includes('?')) {
             return child.path === currentFullPath;
           }
-          return child.path === location;
+          return child.path === location && !searchParams;
         });
         if (isChildActive && !openMenus.includes(item.id)) {
           openParents.push(item.id);
@@ -149,7 +167,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (openParents.length > 0) {
       setOpenMenus(prev => Array.from(new Set([...prev, ...openParents])));
     }
-  }, [location]);
+  }, [location, searchParams]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -194,7 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isActive = (path?: string) => {
     if (!path) return false;
-    const currentFullPath = location + window.location.search;
+    const currentFullPath = location + searchParams;
     
     // 쿼리 파라미터가 있는 경로는 전체 URL과 비교
     if (path.includes('?')) {
@@ -203,7 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     
     // 쿼리 파라미터가 없는 경로는 현재 URL에도 쿼리 파라미터가 없을 때만 비교
     // 현재 URL에 쿼리 파라미터가 있으면 false 반환
-    if (window.location.search) {
+    if (searchParams) {
       return false;
     }
     
