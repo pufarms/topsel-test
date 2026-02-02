@@ -128,22 +128,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [searchParams, setSearchParams] = useState(window.location.search);
 
-  // URL 변경 감지 및 searchParams 업데이트
+  // URL 변경 감지 및 searchParams 업데이트 (브라우저 뒤로/앞으로 버튼용)
   useEffect(() => {
-    const handleUrlChange = () => {
+    const handlePopState = () => {
       setSearchParams(window.location.search);
     };
     
-    // popstate 이벤트 리스너
-    window.addEventListener('popstate', handleUrlChange);
-    
-    // 현재 URL의 search params 동기화
-    setSearchParams(window.location.search);
+    // popstate 이벤트 리스너 (브라우저 네비게이션용)
+    window.addEventListener('popstate', handlePopState);
     
     return () => {
-      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [location]);
+  }, []);
 
   // 현재 위치에 따라 부모 메뉴 자동 열기
   useEffect(() => {
@@ -314,20 +311,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 e.preventDefault();
                 setMobileOpen(false);
                 
-                // 쿼리 파라미터 추출 및 상태 즉시 업데이트
+                // 쿼리 파라미터 추출
                 const queryIndex = child.path.indexOf('?');
                 const newSearchParams = queryIndex !== -1 ? child.path.substring(queryIndex) : '';
+                const basePath = child.path.split('?')[0];
+                
+                // 1. searchParams 상태 업데이트 (사이드바 하이라이트용)
                 setSearchParams(newSearchParams);
                 
-                // History API로 URL 업데이트
+                // 2. URL 업데이트 (History API)
                 window.history.pushState({}, '', child.path);
                 
-                // popstate 이벤트 발생 - 페이지 콘텐츠 업데이트 트리거
-                window.dispatchEvent(new PopStateEvent('popstate'));
+                // 3. 커스텀 이벤트 발생 (페이지 콘텐츠 업데이트용 - pages.tsx가 수신)
+                window.dispatchEvent(new CustomEvent('admin-navigate', { 
+                  detail: { path: child.path, search: newSearchParams } 
+                }));
                 
-                // 기본 경로로 이동
-                const basePath = child.path.split('?')[0];
-                navigate(basePath);
+                // 4. wouter 라우터 동기화 (location 변경 없이 현재 경로와 다를 때만)
+                if (location !== basePath) {
+                  navigate(basePath);
+                }
               };
               return (
                 <a 

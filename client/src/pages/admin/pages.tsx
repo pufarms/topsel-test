@@ -203,12 +203,32 @@ export default function PagesManagement() {
       }
     };
     
+    // 커스텀 이벤트 핸들러 (admin-layout에서 메뉴 클릭 시)
+    const handleAdminNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const search = customEvent.detail?.search || '';
+      const params = new URLSearchParams(search);
+      const category = params.get('category');
+      if (category) {
+        setCategoryFilter(category);
+        setExpandedCategories(new Set([category]));
+      } else {
+        setCategoryFilter("all");
+        setExpandedCategories(new Set(pageCategories));
+      }
+    };
+    
     // 초기 로드 시 URL 확인
     updateCategoryFromUrl();
     
-    // popstate 이벤트 리스너 등록 (브라우저 뒤로/앞으로 및 History API)
-    window.addEventListener('popstate', updateCategoryFromUrl);
-    return () => window.removeEventListener('popstate', updateCategoryFromUrl);
+    // 이벤트 리스너 등록
+    window.addEventListener('popstate', updateCategoryFromUrl); // 브라우저 뒤로/앞으로
+    window.addEventListener('admin-navigate', handleAdminNavigate); // 사이드바 메뉴 클릭
+    
+    return () => {
+      window.removeEventListener('popstate', updateCategoryFromUrl);
+      window.removeEventListener('admin-navigate', handleAdminNavigate);
+    };
   }, []);
   const [editDialog, setEditDialog] = useState<{ open: boolean; page: Page | null }>({ open: false, page: null });
   const [addDialog, setAddDialog] = useState(false);
