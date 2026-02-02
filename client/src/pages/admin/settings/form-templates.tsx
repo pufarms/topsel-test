@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Upload, Download, Trash2, Edit, FileSpreadsheet, RefreshCw, File, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Trash2, Edit, FileSpreadsheet, RefreshCw, File, CheckCircle, XCircle, Copy, Check } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { FormTemplate } from "@shared/schema";
 
@@ -23,12 +23,56 @@ const TEMPLATE_CATEGORIES = [
   "기타",
 ];
 
+const TEMPLATE_TYPES = [
+  { value: "download", label: "다운로드용" },
+  { value: "upload", label: "업로드용" },
+];
+
+const CATEGORY_CODE_MAP: Record<string, string> = {
+  "주문관리": "order",
+  "상품관리": "product",
+  "재고관리": "inventory",
+  "회원관리": "member",
+  "정산관리": "settlement",
+  "기타": "etc",
+};
+
+const korToEngMap: Record<string, string> = {
+  "주문": "order", "등록": "reg", "양식": "form", "목록": "list",
+  "상품": "product", "재고": "stock", "회원": "member", "정산": "settle",
+  "취소": "cancel", "반품": "return", "교환": "exchange", "송장": "invoice",
+  "배송": "ship", "발주": "purchase", "입고": "inbound", "출고": "outbound",
+  "매핑": "mapping", "카테고리": "category", "거래처": "partner", "현재": "current",
+  "공급": "supply", "가격": "price", "템플릿": "template", "파일": "file",
+};
+
+const generateTemplateCode = (name: string, category: string, templateType: string): string => {
+  const categoryCode = CATEGORY_CODE_MAP[category] || "etc";
+  const typeCode = templateType === "upload" ? "up" : "dl";
+  
+  let nameCode = name;
+  for (const [kor, eng] of Object.entries(korToEngMap)) {
+    nameCode = nameCode.replace(new RegExp(kor, 'g'), eng);
+  }
+  nameCode = nameCode
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  
+  const timestamp = Date.now().toString(36);
+  const randomSuffix = Math.random().toString(36).substring(2, 6);
+  return `${categoryCode}_${nameCode || "template"}_${typeCode}_${timestamp}${randomSuffix}`;
+};
+
 export default function FormTemplatesPage() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<FormTemplate | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -36,7 +80,26 @@ export default function FormTemplatesPage() {
     code: "",
     description: "",
     category: "기타",
+    templateType: "download",
   });
+
+  const handleCopyCode = async (code: string) => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error("클립보드가 지원되지 않습니다");
+      }
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      toast({ title: "코드 복사됨", description: `${code}` });
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (error) {
+      toast({ 
+        title: "복사 실패", 
+        description: "코드를 수동으로 선택하여 복사해주세요.", 
+        variant: "destructive" 
+      });
+    }
+  };
 
   const { data: templates, isLoading, refetch } = useQuery<FormTemplate[]>({
     queryKey: ["/api/admin/form-templates"],
@@ -129,15 +192,16 @@ export default function FormTemplatesPage() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", code: "", description: "", category: "기타" });
+    setFormData({ name: "", code: "", description: "", category: "기타", templateType: "download" });
   };
 
   const handleCreate = () => {
-    if (!formData.name || !formData.code) {
-      toast({ title: "입력 오류", description: "양식 이름과 코드는 필수입니다.", variant: "destructive" });
+    if (!formData.name) {
+      toast({ title: "입력 오류", description: "양식 이름은 필수입니다.", variant: "destructive" });
       return;
     }
-    createMutation.mutate(formData);
+    const generatedCode = generateTemplateCode(formData.name, formData.category, formData.templateType);
+    createMutation.mutate({ ...formData, code: generatedCode });
   };
 
   const handleEdit = (template: FormTemplate) => {
@@ -147,6 +211,7 @@ export default function FormTemplatesPage() {
       code: template.code,
       description: template.description || "",
       category: template.category,
+      templateType: template.templateType || "download",
     });
     setIsEditOpen(true);
   };
@@ -159,6 +224,7 @@ export default function FormTemplatesPage() {
         name: formData.name,
         description: formData.description,
         category: formData.category,
+        templateType: formData.templateType,
       },
     });
   };
@@ -268,7 +334,7 @@ export default function FormTemplatesPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>새 양식 등록</DialogTitle>
-                    <DialogDescription>양식 정보를 입력하세요. 파일은 등록 후 업로드할 수 있습니다.</DialogDescription>
+                    <DialogDescription>양식 정보를 입력하세요. 코드는 자동 생성됩니다.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -281,32 +347,39 @@ export default function FormTemplatesPage() {
                         data-testid="input-name"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="code">양식 코드 *</Label>
-                      <Input
-                        id="code"
-                        value={formData.code}
-                        onChange={(e) => setFormData({ ...formData, code: e.target.value.replace(/\s/g, "_").toLowerCase() })}
-                        placeholder="예: order_registration"
-                        data-testid="input-code"
-                      />
-                      <p className="text-xs text-muted-foreground">영문 소문자, 숫자, 밑줄(_)만 사용 가능. 시스템에서 양식을 식별하는 데 사용됩니다.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="category">카테고리</Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
-                      >
-                        <SelectTrigger data-testid="select-category">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TEMPLATE_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="category">카테고리</Label>
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) => setFormData({ ...formData, category: value })}
+                        >
+                          <SelectTrigger data-testid="select-category">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TEMPLATE_CATEGORIES.map((cat) => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="templateType">양식 유형</Label>
+                        <Select
+                          value={formData.templateType}
+                          onValueChange={(value) => setFormData({ ...formData, templateType: value })}
+                        >
+                          <SelectTrigger data-testid="select-template-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TEMPLATE_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="description">설명</Label>
@@ -318,6 +391,17 @@ export default function FormTemplatesPage() {
                         data-testid="input-description"
                       />
                     </div>
+                    {formData.name && (
+                      <div className="space-y-2">
+                        <Label>자동 생성될 코드 (미리보기)</Label>
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                          <code className="text-xs flex-1 break-all">
+                            {generateTemplateCode(formData.name, formData.category, formData.templateType)}
+                          </code>
+                        </div>
+                        <p className="text-xs text-muted-foreground">이 코드는 사이트 연동 시 사용됩니다.</p>
+                      </div>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => { setIsCreateOpen(false); resetForm(); }}>
@@ -346,11 +430,12 @@ export default function FormTemplatesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">양식 이름</TableHead>
-                    <TableHead className="w-[140px]">코드</TableHead>
+                    <TableHead className="w-[200px]">코드</TableHead>
+                    <TableHead className="w-[90px]">유형</TableHead>
                     <TableHead className="w-[100px]">카테고리</TableHead>
                     <TableHead>설명</TableHead>
                     <TableHead className="w-[100px]">파일</TableHead>
-                    <TableHead className="w-[80px]">버전</TableHead>
+                    <TableHead className="w-[70px]">버전</TableHead>
                     <TableHead className="w-[80px]">상태</TableHead>
                     <TableHead className="w-[150px] text-right">관리</TableHead>
                   </TableRow>
@@ -360,7 +445,30 @@ export default function FormTemplatesPage() {
                     <TableRow key={template.id} data-testid={`row-${template.code}`}>
                       <TableCell className="font-medium">{template.name}</TableCell>
                       <TableCell>
-                        <code className="text-xs bg-muted px-1 py-0.5 rounded">{template.code}</code>
+                        <div className="flex items-center gap-1">
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded max-w-[140px] truncate block" title={template.code}>
+                            {template.code}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleCopyCode(template.code)}
+                            title="코드 복사"
+                            data-testid={`button-copy-${template.code}`}
+                          >
+                            {copiedCode === template.code ? (
+                              <Check className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={template.templateType === "upload" ? "default" : "secondary"}>
+                          {template.templateType === "upload" ? "업로드" : "다운로드"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{template.category}</Badge>
@@ -476,21 +584,39 @@ export default function FormTemplatesPage() {
                 className="bg-muted"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-category">카테고리</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-              >
-                <SelectTrigger data-testid="select-edit-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEMPLATE_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">카테고리</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-templateType">양식 유형</Label>
+                <Select
+                  value={formData.templateType}
+                  onValueChange={(value) => setFormData({ ...formData, templateType: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-template-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">설명</Label>
