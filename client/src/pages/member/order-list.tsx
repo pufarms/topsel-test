@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -11,48 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Search, ClipboardList, Eye } from "lucide-react";
-import { type Category } from "@shared/schema";
+import { FileDown, ClipboardList } from "lucide-react";
+import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 
 export default function MemberOrderList() {
-  const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
-  });
-
-  const [categoryLargeFilter, setCategoryLargeFilter] = useState<string>("all");
-  const [categoryMediumFilter, setCategoryMediumFilter] = useState<string>("all");
-  const [categorySmallFilter, setCategorySmallFilter] = useState<string>("all");
+  const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [pageSize, setPageSize] = useState<number | "all">(30);
 
-  const largeCategories = categories.filter(c => c.level === "large");
-  const mediumCategories = categories.filter(c => c.level === "medium");
-  const smallCategories = categories.filter(c => c.level === "small");
-
-  const filteredMediumCategories = categoryLargeFilter === "all"
-    ? mediumCategories
-    : mediumCategories.filter(c => c.parentId === categoryLargeFilter);
-
-  const filteredSmallCategories = categoryMediumFilter === "all"
-    ? smallCategories
-    : smallCategories.filter(c => c.parentId === categoryMediumFilter);
-
-  const handleLargeFilterChange = (value: string) => {
-    setCategoryLargeFilter(value);
-    setCategoryMediumFilter("all");
-    setCategorySmallFilter("all");
-  };
-
-  const handleMediumFilterChange = (value: string) => {
-    setCategoryMediumFilter(value);
-    setCategorySmallFilter("all");
-  };
-
-  const handleReset = () => {
-    setCategoryLargeFilter("all");
-    setCategoryMediumFilter("all");
-    setCategorySmallFilter("all");
-    setStatusFilter("all");
+  const handleFilterChange = (newFilters: MemberOrderFilterState) => {
+    setFilters(newFilters);
   };
 
   const orderStatuses = [
@@ -75,112 +41,29 @@ export default function MemberOrderList() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-lg p-4 space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1">
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-list-today">오늘</Button>
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-list-week">1주일</Button>
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-list-month">1개월</Button>
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-list-3month">3개월</Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">조회 기간:</span>
-                <input 
-                  type="date" 
-                  className="h-8 px-2 border rounded text-sm"
-                  data-testid="input-list-date-start"
-                />
-                <span>~</span>
-                <input 
-                  type="date" 
-                  className="h-8 px-2 border rounded text-sm"
-                  data-testid="input-list-date-end"
-                />
-              </div>
-            </div>
+          <MemberOrderFilter 
+            onFilterChange={handleFilterChange} 
+            showSearchField={true}
+            searchOptions={[
+              { value: "orderId", label: "주문번호" },
+              { value: "productName", label: "상품명" },
+              { value: "recipientName", label: "수령자명" },
+            ]}
+          />
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium w-12">대분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categoryLargeFilter}
-                  onChange={(e) => handleLargeFilterChange(e.target.value)}
-                  data-testid="select-list-category-large"
-                >
-                  <option value="all">-- 전체 대분류 --</option>
-                  {largeCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">중분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categoryMediumFilter}
-                  onChange={(e) => handleMediumFilterChange(e.target.value)}
-                  data-testid="select-list-category-medium"
-                >
-                  <option value="all">-- 전체 중분류 --</option>
-                  {filteredMediumCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">소분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categorySmallFilter}
-                  onChange={(e) => setCategorySmallFilter(e.target.value)}
-                  data-testid="select-list-category-small"
-                >
-                  <option value="all">-- 전체 소분류 --</option>
-                  {filteredSmallCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">주문상태</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[120px]"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  data-testid="select-list-status"
-                >
-                  {orderStatuses.map((status) => (
-                    <option key={status.value} value={status.value}>{status.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">검색어</label>
-                <select className="h-8 px-2 border rounded text-sm min-w-[120px]" data-testid="select-list-search-type">
-                  <option value="orderId">주문번호</option>
-                  <option value="productName">상품명</option>
-                  <option value="recipientName">수령자명</option>
-                </select>
-                <input 
-                  type="text" 
-                  className="h-8 px-2 border rounded text-sm min-w-[200px]"
-                  placeholder="검색어를 입력하세요"
-                  data-testid="input-list-search"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600" data-testid="button-list-search">
-                  <Search className="h-4 w-4 mr-1" />
-                  조회
-                </Button>
-                <Button size="sm" variant="secondary" className="h-8" onClick={handleReset} data-testid="button-list-reset">
-                  초기화
-                </Button>
-              </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">주문상태</label>
+              <select 
+                className="h-8 px-2 border rounded text-sm min-w-[120px]"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                data-testid="select-list-status"
+              >
+                {orderStatuses.map((status) => (
+                  <option key={status.value} value={status.value}>{status.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -215,6 +98,7 @@ export default function MemberOrderList() {
                   <TableHead className="font-semibold whitespace-nowrap">주문번호</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">수량</TableHead>
@@ -225,7 +109,6 @@ export default function MemberOrderList() {
                   <TableHead className="font-semibold whitespace-nowrap">배송지</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">주문상태</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">송장번호</TableHead>
-                  <TableHead className="font-semibold whitespace-nowrap">상세</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

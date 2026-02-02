@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,46 +9,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Search, FileText } from "lucide-react";
-import { type Category } from "@shared/schema";
+import { FileDown, FileText } from "lucide-react";
+import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 
 export default function MemberOrderInvoice() {
-  const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
-  });
-
-  const [categoryLargeFilter, setCategoryLargeFilter] = useState<string>("all");
-  const [categoryMediumFilter, setCategoryMediumFilter] = useState<string>("all");
-  const [categorySmallFilter, setCategorySmallFilter] = useState<string>("all");
+  const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
 
-  const largeCategories = categories.filter(c => c.level === "large");
-  const mediumCategories = categories.filter(c => c.level === "medium");
-  const smallCategories = categories.filter(c => c.level === "small");
-
-  const filteredMediumCategories = categoryLargeFilter === "all"
-    ? mediumCategories
-    : mediumCategories.filter(c => c.parentId === categoryLargeFilter);
-
-  const filteredSmallCategories = categoryMediumFilter === "all"
-    ? smallCategories
-    : smallCategories.filter(c => c.parentId === categoryMediumFilter);
-
-  const handleLargeFilterChange = (value: string) => {
-    setCategoryLargeFilter(value);
-    setCategoryMediumFilter("all");
-    setCategorySmallFilter("all");
-  };
-
-  const handleMediumFilterChange = (value: string) => {
-    setCategoryMediumFilter(value);
-    setCategorySmallFilter("all");
-  };
-
-  const handleReset = () => {
-    setCategoryLargeFilter("all");
-    setCategoryMediumFilter("all");
-    setCategorySmallFilter("all");
+  const handleFilterChange = (newFilters: MemberOrderFilterState) => {
+    setFilters(newFilters);
   };
 
   return (
@@ -62,84 +30,7 @@ export default function MemberOrderInvoice() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-lg p-4 space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1">
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-invoice-today">오늘</Button>
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-invoice-week">1주일</Button>
-                <Button size="sm" variant="outline" className="h-8" data-testid="button-invoice-month">1개월</Button>
-              </div>
-              <span className="text-sm text-muted-foreground">* 최대 1개월까지</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">조회 기간:</span>
-                <input 
-                  type="date" 
-                  className="h-8 px-2 border rounded text-sm"
-                  data-testid="input-invoice-date-start"
-                />
-                <span>~</span>
-                <input 
-                  type="date" 
-                  className="h-8 px-2 border rounded text-sm"
-                  data-testid="input-invoice-date-end"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium w-12">대분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categoryLargeFilter}
-                  onChange={(e) => handleLargeFilterChange(e.target.value)}
-                  data-testid="select-invoice-category-large"
-                >
-                  <option value="all">-- 전체 대분류 --</option>
-                  {largeCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">중분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categoryMediumFilter}
-                  onChange={(e) => handleMediumFilterChange(e.target.value)}
-                  data-testid="select-invoice-category-medium"
-                >
-                  <option value="all">-- 전체 중분류 --</option>
-                  {filteredMediumCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">소분류</label>
-                <select 
-                  className="h-8 px-2 border rounded text-sm min-w-[140px]"
-                  value={categorySmallFilter}
-                  onChange={(e) => setCategorySmallFilter(e.target.value)}
-                  data-testid="select-invoice-category-small"
-                >
-                  <option value="all">-- 전체 소분류 --</option>
-                  {filteredSmallCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600" data-testid="button-invoice-search">
-                  <Search className="h-4 w-4 mr-1" />
-                  조회
-                </Button>
-                <Button size="sm" variant="secondary" className="h-8" onClick={handleReset} data-testid="button-invoice-reset">
-                  초기화
-                </Button>
-              </div>
-            </div>
-          </div>
+          <MemberOrderFilter onFilterChange={handleFilterChange} />
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm">
