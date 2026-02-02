@@ -322,6 +322,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 // History API로 URL 업데이트
                 window.history.pushState({}, '', child.path);
                 
+                // popstate 이벤트 발생 - 페이지 콘텐츠 업데이트 트리거
+                window.dispatchEvent(new PopStateEvent('popstate'));
+                
                 // 기본 경로로 이동
                 const basePath = child.path.split('?')[0];
                 navigate(basePath);
