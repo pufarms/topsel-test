@@ -1307,7 +1307,6 @@ export default function Dashboard() {
                           <TableHeader>
                             <TableRow className="bg-muted/50">
                               <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
-                              <TableHead className="font-semibold whitespace-nowrap">상태</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
@@ -1330,13 +1329,13 @@ export default function Dashboard() {
                           <TableBody>
                             {pendingOrdersLoading ? (
                               <TableRow>
-                                <TableCell colSpan={19} className="text-center py-12">
+                                <TableCell colSpan={18} className="text-center py-12">
                                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </TableCell>
                               </TableRow>
                             ) : filteredPendingOrders.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={19} className="text-center text-muted-foreground py-12">
+                                <TableCell colSpan={18} className="text-center text-muted-foreground py-12">
                                   {searchTerm ? "검색 결과가 없습니다" : "등록된 주문이 없습니다"}
                                 </TableCell>
                               </TableRow>
@@ -1344,11 +1343,6 @@ export default function Dashboard() {
                               filteredPendingOrders.map((order, index) => (
                                 <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                                   <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={order.status === "완료" ? "default" : order.status === "취소" ? "destructive" : "secondary"}>
-                                      {order.status}
-                                    </Badge>
-                                  </TableCell>
                                   <TableCell className="text-sm">{order.categoryLarge || "-"}</TableCell>
                                   <TableCell className="text-sm">{order.categoryMedium || "-"}</TableCell>
                                   <TableCell className="text-sm">{order.categorySmall || "-"}</TableCell>
