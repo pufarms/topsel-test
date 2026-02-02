@@ -1,64 +1,166 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShoppingCart, DollarSign } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { 
+  Loader2, 
+  LayoutDashboard,
+  User,
+  ShoppingCart,
+  MapPin,
+  Wallet,
+  BarChart3,
+  Calculator,
+  MessageSquare,
+  BookOpen,
+  ChevronRight,
+  Plus,
+  XCircle,
+  FileDown,
+  Search,
+  Clock,
+  Package,
+  Truck,
+  CheckCircle2,
+  AlertCircle,
+  CreditCard,
+  Gift,
+  Bell,
+  Calendar,
+  Percent,
+  Building2,
+  Star
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { insertOrderSchema } from "@shared/schema";
-import type { z } from "zod";
-import type { Order } from "@shared/schema";
+import type { Order, Member } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
-type OrderForm = z.infer<typeof insertOrderSchema>;
+type SidebarTab = 
+  | "dashboard" 
+  | "member-info" 
+  | "order-new" 
+  | "order-adjust" 
+  | "order-invoice" 
+  | "order-cancel" 
+  | "order-list"
+  | "address-tool"
+  | "deposit"
+  | "purchase-stats"
+  | "settlement-stats"
+  | "inquiry"
+  | "guide";
+
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  tab: SidebarTab;
+  activeTab: SidebarTab;
+  onClick: (tab: SidebarTab) => void;
+  children?: { label: string; tab: SidebarTab }[];
+}
+
+function SidebarItem({ icon, label, tab, activeTab, onClick, children }: SidebarItemProps) {
+  const isActive = activeTab === tab || children?.some(c => c.tab === activeTab);
+  
+  return (
+    <div>
+      <button
+        onClick={() => onClick(tab)}
+        className={cn(
+          "w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium rounded-lg transition-colors",
+          isActive 
+            ? "bg-primary/10 text-primary" 
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        {icon}
+        <span>{label}</span>
+        {children && children.length > 0 && (
+          <ChevronRight className={cn(
+            "ml-auto h-4 w-4 transition-transform",
+            isActive && "rotate-90"
+          )} />
+        )}
+      </button>
+      {children && isActive && (
+        <div className="ml-4 mt-1 space-y-1 border-l-2 border-muted pl-4">
+          {children.map((child) => (
+            <button
+              key={child.tab}
+              onClick={() => onClick(child.tab)}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded-md transition-colors",
+                activeTab === child.tab
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              {child.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MiniStatProps {
+  title: string;
+  value: string | number;
+  icon?: React.ReactNode;
+  color?: "default" | "blue" | "green" | "yellow" | "red" | "purple" | "orange";
+}
+
+function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
+  const colorStyles = {
+    default: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
+    blue: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+    green: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
+    yellow: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+    red: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+    purple: "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
+    orange: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300",
+  };
+
+  return (
+    <div className={cn(
+      "rounded-lg p-4 text-center transition-all hover:opacity-90",
+      colorStyles[color]
+    )}>
+      <div className="flex items-center justify-center gap-1.5 mb-2">
+        {icon && <span className="opacity-70">{icon}</span>}
+        <span className="text-xs font-medium opacity-80">{title}</span>
+      </div>
+      <span className="text-xl font-bold">{value}</span>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user, logout, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const form = useForm<OrderForm>({
-    resolver: zodResolver(insertOrderSchema),
-    defaultValues: {
-      productName: "",
-      quantity: 1,
-      price: 0,
-      recipientName: "",
-      recipientPhone: "",
-      recipientAddress: "",
-    },
-  });
+  const { user, isLoading: authLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user,
   });
 
-  const createOrderMutation = useMutation({
-    mutationFn: async (data: OrderForm) => {
-      await apiRequest("POST", "/api/orders", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      form.reset();
-      toast({ title: "주문 등록 완료", description: "주문이 성공적으로 등록되었습니다." });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "주문 등록 실패",
-        description: error.message || "다시 시도해주세요.",
-      });
-    },
+  const { data: memberData } = useQuery<Member>({
+    queryKey: ["/api/member/profile"],
+    enabled: !!user,
   });
 
   if (authLoading) {
@@ -74,238 +176,401 @@ export default function Dashboard() {
     return null;
   }
 
-  const onSubmit = async (data: OrderForm) => {
-    setIsSubmitting(true);
-    try {
-      await createOrderMutation.mutateAsync(data);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
-
   const totalOrders = orders.length;
   const totalValue = orders.reduce((sum, order) => sum + order.price * order.quantity, 0);
-
-  const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("ko-KR") + "원";
   };
 
+  const sampleEvents = [
+    { company: "농협", period: "01.15 - 01.31", item: "제주 감귤", code: "EVT001", coupon: "10%" },
+    { company: "이마트", period: "01.20 - 02.05", item: "청송 사과", code: "EVT002", coupon: "15%" },
+  ];
+
+  const sampleNotices = [
+    { id: 1, title: "2024년 설 연휴 배송 안내", date: "2024-01-25" },
+    { id: 2, title: "신규 상품 입고 안내", date: "2024-01-20" },
+    { id: 3, title: "시스템 점검 안내", date: "2024-01-15" },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <PublicHeader />
 
-      <main className="container mx-auto px-6 py-8 pt-24">
-        <h1 className="text-3xl font-bold mb-8">대시보드</h1>
+      <main className="pt-16">
+        <div className="bg-gradient-to-r from-[#1a237e] to-[#283593] text-white">
+          <div className="container mx-auto px-6 py-8">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">마이페이지 대시보드</h1>
+            <p className="text-blue-200 text-sm md:text-base mb-6">
+              주문, 예치금, 통계를 한눈에 관리하세요.<br className="sm:hidden" />
+              탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다.
+            </p>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-              <CardTitle className="text-sm font-medium">총 주문 수</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-orders">{totalOrders}건</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-              <CardTitle className="text-sm font-medium">총 주문 금액</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-value">{formatPrice(totalValue)}</div>
-            </CardContent>
-          </Card>
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
+              <Building2 className="h-4 w-4 text-amber-400" />
+              <span className="text-sm">
+                {memberData?.companyName || user?.name || "회원"}님
+              </span>
+              <Badge className="bg-amber-500 text-white hover:bg-amber-600 ml-2">
+                환영합니다!
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 rounded-lg">
+                  <Star className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-blue-200">회원님 등급</p>
+                  <p className="font-semibold">{memberData?.grade || "준회원"}</p>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-blue-200">지난 달 매입 총액</p>
+                  <p className="font-semibold">0원</p>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-blue-200">이번 달 매입 총액</p>
+                  <p className="font-semibold">{formatPrice(totalValue)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>주문 등록</CardTitle>
-              <CardDescription>새 주문을 등록하세요</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="productName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>상품명 *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="상품명" 
-                              data-testid="input-product-name"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+        <div className="container mx-auto px-4 md:px-6 py-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <aside className="lg:w-64 shrink-0">
+              <Card className="sticky top-20">
+                <CardContent className="p-3">
+                  <nav className="space-y-1">
+                    <SidebarItem
+                      icon={<LayoutDashboard className="h-4 w-4" />}
+                      label="마이페이지 대시보드"
+                      tab="dashboard"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
                     />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="quantity"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>수량 *</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                min="1"
-                                data-testid="input-quantity"
-                                {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>가격 *</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                min="0"
-                                data-testid="input-price"
-                                {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <SidebarItem
+                      icon={<User className="h-4 w-4" />}
+                      label="회원정보"
+                      tab="member-info"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<ShoppingCart className="h-4 w-4" />}
+                      label="주문관리"
+                      tab="order-new"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                      children={[
+                        { label: "신규주문등록", tab: "order-new" },
+                        { label: "주문조정건 확인", tab: "order-adjust" },
+                        { label: "송장파일 다운로드", tab: "order-invoice" },
+                        { label: "취소건 등록", tab: "order-cancel" },
+                        { label: "주문건 조회", tab: "order-list" },
+                      ]}
+                    />
+                    <SidebarItem
+                      icon={<MapPin className="h-4 w-4" />}
+                      label="주소검증,엑셀변환 이용"
+                      tab="address-tool"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<Wallet className="h-4 w-4" />}
+                      label="예치금충전"
+                      tab="deposit"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<BarChart3 className="h-4 w-4" />}
+                      label="상품매입통계"
+                      tab="purchase-stats"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<Calculator className="h-4 w-4" />}
+                      label="정산통계"
+                      tab="settlement-stats"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<MessageSquare className="h-4 w-4" />}
+                      label="문의 게시판"
+                      tab="inquiry"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                    <SidebarItem
+                      icon={<BookOpen className="h-4 w-4" />}
+                      label="이용가이드"
+                      tab="guide"
+                      activeTab={activeTab}
+                      onClick={setActiveTab}
+                    />
+                  </nav>
+                </CardContent>
+              </Card>
+            </aside>
+
+            <div className="flex-1 space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">주문현황</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <MiniStat
+                      title="주문접수"
+                      value={`${totalOrders}건`}
+                      icon={<Clock className="h-3.5 w-3.5" />}
+                      color="blue"
+                    />
+                    <MiniStat
+                      title="주문조정"
+                      value="0건"
+                      icon={<AlertCircle className="h-3.5 w-3.5" />}
+                      color="yellow"
+                    />
+                    <MiniStat
+                      title="상품준비중"
+                      value="0건"
+                      icon={<Package className="h-3.5 w-3.5" />}
+                      color="purple"
+                    />
+                    <MiniStat
+                      title="배송준비중"
+                      value="0건"
+                      icon={<Package className="h-3.5 w-3.5" />}
+                      color="orange"
+                    />
+                    <MiniStat
+                      title="회원취소"
+                      value="0건"
+                      icon={<XCircle className="h-3.5 w-3.5" />}
+                      color="red"
+                    />
+                    <MiniStat
+                      title="배송중"
+                      value="0건"
+                      icon={<Truck className="h-3.5 w-3.5" />}
+                      color="blue"
+                    />
+                    <MiniStat
+                      title="배송완료"
+                      value="0건"
+                      icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                      color="green"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button size="sm" className="gap-1.5">
+                      <Plus className="h-4 w-4" />
+                      신규주문 등록
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <XCircle className="h-4 w-4" />
+                      취소 리스트확인
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <FileDown className="h-4 w-4" />
+                      송장파일 다운
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <AlertCircle className="h-4 w-4" />
+                      취소건 등록
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <Search className="h-4 w-4" />
+                      주문건 조회
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-emerald-600" />
+                    <CardTitle className="text-base">현재 예치금, 포인터 현황</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                    <div className="border rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg">
+                          <CreditCard className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">예치금</p>
+                          <p className="text-xl font-bold">0원</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
+                          <Gift className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">포인터</p>
+                          <p className="text-xl font-bold">0원</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <FormField
-                    control={form.control}
-                    name="recipientName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>수령인 *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="수령인 이름" 
-                            data-testid="input-recipient-name"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="recipientPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>연락처 *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="010-1234-5678" 
-                            data-testid="input-recipient-phone"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="recipientAddress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>주소 *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="배송지 주소" 
-                            data-testid="input-recipient-address"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={isSubmitting}
-                    data-testid="button-create-order"
-                  >
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    주문 등록
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+                  <div className="flex justify-center">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2">
+                      <Wallet className="h-4 w-4" />
+                      예치금 충전하기
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>내 주문 목록</CardTitle>
-              <CardDescription>등록한 주문을 확인하세요</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {ordersLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : orders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-orders">
-                  등록된 주문이 없습니다
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>상품명</TableHead>
-                        <TableHead className="text-right">수량</TableHead>
-                        <TableHead className="text-right">가격</TableHead>
-                        <TableHead>수령인</TableHead>
-                        <TableHead>등록일</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {orders.map((order) => (
-                        <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                          <TableCell className="font-medium">{order.productName}</TableCell>
-                          <TableCell className="text-right">{order.quantity}</TableCell>
-                          <TableCell className="text-right">{formatPrice(order.price)}</TableCell>
-                          <TableCell>{order.recipientName}</TableCell>
-                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-blue-600" />
+                        <CardTitle className="text-base">공지사항</CardTitle>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs">
+                        더보기
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {sampleNotices.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          등록된 공지사항이 없습니다
+                        </p>
+                      ) : (
+                        sampleNotices.map((notice) => (
+                          <div 
+                            key={notice.id} 
+                            className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-muted/50 px-2 rounded cursor-pointer"
+                          >
+                            <span className="text-sm truncate flex-1">{notice.title}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{notice.date}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5 text-purple-600" />
+                        <CardTitle className="text-base">문의게시판</CardTitle>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs">
+                        더보기
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">등록된 문의가 없습니다</p>
+                      <Button variant="outline" size="sm" className="mt-3">
+                        문의하기
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Gift className="h-5 w-5 text-orange-600" />
+                      <CardTitle className="text-base">행사진행 현황</CardTitle>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {sampleEvents.length}개 진행중
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="font-semibold">업체</TableHead>
+                          <TableHead className="font-semibold">기간</TableHead>
+                          <TableHead className="font-semibold">행사품목</TableHead>
+                          <TableHead className="font-semibold">상품코드</TableHead>
+                          <TableHead className="font-semibold">쿠폰</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {sampleEvents.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              진행 중인 행사가 없습니다
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          sampleEvents.map((event, index) => (
+                            <TableRow key={index} className="hover:bg-muted/30">
+                              <TableCell className="font-medium">{event.company}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                  {event.period}
+                                </div>
+                              </TableCell>
+                              <TableCell>{event.item}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {event.code}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200">
+                                  <Percent className="h-3 w-3 mr-1" />
+                                  {event.coupon}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </main>
     </div>
