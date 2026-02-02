@@ -298,7 +298,7 @@ export default function Dashboard() {
   }, [searchTerm, searchFilter, pendingOrders]);
 
   // 필터된 주문 목록
-  const filteredPendingOrders = pendingOrders.filter(order => {
+  const filteredPendingOrders = (pendingOrders || []).filter(order => {
     if (searchFilter === "선택 없음" || !searchTerm.trim()) return true;
     
     const term = searchTerm.toLowerCase();
