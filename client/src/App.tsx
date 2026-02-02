@@ -37,6 +37,7 @@ import PagesManagement from "@/pages/admin/pages";
 import AlimtalkPage from "@/pages/admin/kakao-notifications/alimtalk";
 import BrandtalkPage from "@/pages/admin/kakao-notifications/brandtalk";
 import PublicPreviewPage from "@/pages/public-preview";
+import MemberOrderPreview from "@/pages/admin/member-order-preview";
 import MyPage from "@/pages/mypage";
 import DynamicPage from "@/pages/dynamic-page";
 import { Loader2 } from "lucide-react";
@@ -149,6 +150,9 @@ function Router() {
       </Route>
       <Route path="/admin/pages">
         <AdminRoute><PagesManagement /></AdminRoute>
+      </Route>
+      <Route path="/admin/member-order-preview">
+        <AdminRoute><MemberOrderPreview /></AdminRoute>
       </Route>
       <Route path="/admin/settings/site">
         <AdminRoute><SiteSettingsPage /></AdminRoute>

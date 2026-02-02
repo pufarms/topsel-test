@@ -15,11 +15,15 @@ export function MemberPageBanner({ title, description }: MemberPageBannerProps) 
   const { data: memberData } = useQuery<Member>({
     queryKey: ["/api/member/profile"],
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 
   const now = new Date();
