@@ -508,7 +508,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <PublicHeader />
 
-      <main className="pt-14 h-screen overflow-hidden flex flex-col">
+      <main className="pt-14">
         <MemberPageBanner 
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
@@ -516,8 +516,8 @@ export default function Dashboard() {
           orders={orders}
         />
 
-        <div className="container mx-auto px-4 md:px-6 py-6 flex-1 overflow-hidden">
-          <div className="flex flex-col lg:flex-row gap-6 h-full">
+        <div className="container mx-auto px-4 md:px-6 py-6">
+          <div className="flex flex-col lg:flex-row gap-6">
             <aside className="lg:w-64 shrink-0">
               <Card className="sticky top-20">
                 <CardContent className="p-3">
@@ -599,7 +599,7 @@ export default function Dashboard() {
               </Card>
             </aside>
 
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
               <Card>
