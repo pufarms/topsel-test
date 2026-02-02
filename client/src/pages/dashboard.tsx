@@ -207,6 +207,13 @@ export default function Dashboard() {
     return null;
   }
 
+  // 관리자는 관리자 대시보드로 리다이렉트
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  if (isAdmin) {
+    navigate("/admin");
+    return null;
+  }
+
   if (memberLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

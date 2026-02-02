@@ -145,19 +145,16 @@ export default function MyPage() {
     return null;
   }
 
+  // 관리자는 관리자 대시보드로 리다이렉트
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  if (isAdmin) {
+    navigate("/admin");
+    return null;
+  }
+
   if (user.role !== "member") {
-    return (
-      <PublicLayout>
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardContent className="pt-6 text-center">
-              <p className="text-muted-foreground">회원 전용 페이지입니다.</p>
-              <Button className="mt-4" onClick={() => navigate("/")}>홈으로 이동</Button>
-            </CardContent>
-          </Card>
-        </div>
-      </PublicLayout>
-    );
+    navigate("/login");
+    return null;
   }
 
   const onSubmit = async (data: ProfileUpdateForm) => {
