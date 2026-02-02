@@ -62,6 +62,10 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
 import { type Order, type Member, type PendingOrder, type Category, pendingOrderFormSchema } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import MemberOrderAdjust from "@/pages/member/order-adjust";
+import MemberOrderInvoice from "@/pages/member/order-invoice";
+import MemberOrderCancel from "@/pages/member/order-cancel";
+import MemberOrderList from "@/pages/member/order-list";
 
 type PendingOrderFormData = z.infer<typeof pendingOrderFormSchema>;
 
@@ -1393,6 +1397,26 @@ export default function Dashboard() {
                   </Card>
 
                 </div>
+              )}
+
+              {/* 주문조정건 확인 탭 */}
+              {activeTab === "order-adjust" && (
+                <MemberOrderAdjust />
+              )}
+
+              {/* 송장파일 다운로드 탭 */}
+              {activeTab === "order-invoice" && (
+                <MemberOrderInvoice />
+              )}
+
+              {/* 취소건 등록 탭 */}
+              {activeTab === "order-cancel" && (
+                <MemberOrderCancel />
+              )}
+
+              {/* 주문건 조회 탭 */}
+              {activeTab === "order-list" && (
+                <MemberOrderList />
               )}
             </div>
           </div>
