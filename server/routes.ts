@@ -1441,6 +1441,65 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Quick register member
+  app.post("/api/admin/members/quick-register", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    try {
+      const quickRegisterSchema = z.object({
+        companyName: z.string().min(1, "상호명을 입력해주세요"),
+        username: z.string().min(3, "아이디는 3자 이상이어야 합니다"),
+        password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
+        businessNumber: z.string().min(1, "사업자번호를 입력해주세요"),
+        representative: z.string().min(1, "대표자명을 입력해주세요"),
+        phone: z.string().min(1, "연락처를 입력해주세요"),
+        email: z.string().optional(),
+        grade: z.string().default("PENDING"),
+      });
+
+      const data = quickRegisterSchema.parse(req.body);
+
+      const existing = await storage.getMemberByUsername(data.username);
+      if (existing) {
+        return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+
+      const member = await storage.createMember({
+        username: data.username,
+        password: data.password,
+        companyName: data.companyName,
+        businessNumber: data.businessNumber,
+        representative: data.representative,
+        phone: data.phone,
+        email: data.email || undefined,
+        grade: data.grade,
+        status: "활성",
+      });
+
+      await storage.createMemberLog({
+        memberId: member.id,
+        changedBy: user.id,
+        changeType: "생성",
+        description: "관리자 간편 등록",
+      });
+
+      const { password, ...memberWithoutPassword } = member;
+      return res.status(201).json(memberWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      throw error;
+    }
+  });
+
   app.post("/api/admin/members", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });

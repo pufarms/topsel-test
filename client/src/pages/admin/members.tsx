@@ -3,8 +3,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2 } from "lucide-react";
+import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -21,6 +22,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   PageHeader,
   StatCard,
@@ -82,9 +91,47 @@ export default function MembersPage() {
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<MemberWithoutPassword | null>(null);
+  
+  const [quickRegisterOpen, setQuickRegisterOpen] = useState(false);
+  const [quickRegisterForm, setQuickRegisterForm] = useState({
+    companyName: "",
+    username: "",
+    password: "",
+    businessNumber: "",
+    representative: "",
+    phone: "",
+    email: "",
+    grade: "PENDING",
+  });
 
   const { data: members = [], isLoading } = useQuery<MemberWithoutPassword[]>({
     queryKey: ["/api/admin/members"],
+  });
+
+  const quickRegisterMutation = useMutation({
+    mutationFn: async (data: typeof quickRegisterForm) => {
+      const res = await apiRequest("POST", "/api/admin/members/quick-register", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members/stats"] });
+      toast({ title: "회원이 등록되었습니다" });
+      setQuickRegisterOpen(false);
+      setQuickRegisterForm({
+        companyName: "",
+        username: "",
+        password: "",
+        businessNumber: "",
+        representative: "",
+        phone: "",
+        email: "",
+        grade: "PENDING",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "등록 실패", description: error.message || "회원 등록 중 오류가 발생했습니다", variant: "destructive" });
+    },
   });
 
   const { data: stats } = useQuery<MemberStats>({
@@ -274,10 +321,16 @@ export default function MembersPage() {
         description="검색/등급/예치금/포인트/메모/일괄 처리"
         icon={Users}
         actions={
-          <Button size="sm" variant="outline" onClick={handleExcelDownload} data-testid="button-excel">
-            <Download className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">엑셀</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="default" onClick={() => setQuickRegisterOpen(true)} data-testid="button-quick-register">
+              <UserPlus className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">간편 등록</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExcelDownload} data-testid="button-excel">
+              <Download className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">엑셀</span>
+            </Button>
+          </div>
         }
       />
 
@@ -534,6 +587,144 @@ export default function MembersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={quickRegisterOpen} onOpenChange={setQuickRegisterOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>회원 간편 등록</DialogTitle>
+            <DialogDescription>
+              관리자가 직접 회원을 등록합니다. 필수 항목을 입력해 주세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">상호명 *</Label>
+                <Input
+                  id="companyName"
+                  value={quickRegisterForm.companyName}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, companyName: e.target.value })}
+                  placeholder="상호명 입력"
+                  data-testid="input-quick-company"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">아이디 *</Label>
+                <Input
+                  id="username"
+                  value={quickRegisterForm.username}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, username: e.target.value })}
+                  placeholder="로그인 아이디"
+                  data-testid="input-quick-username"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">비밀번호 *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={quickRegisterForm.password}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, password: e.target.value })}
+                  placeholder="비밀번호"
+                  data-testid="input-quick-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grade">등급</Label>
+                <Select
+                  value={quickRegisterForm.grade}
+                  onValueChange={(value) => setQuickRegisterForm({ ...quickRegisterForm, grade: value })}
+                >
+                  <SelectTrigger data-testid="select-quick-grade">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PENDING">보류중</SelectItem>
+                    <SelectItem value="ASSOCIATE">준회원</SelectItem>
+                    <SelectItem value="START">Start회원</SelectItem>
+                    <SelectItem value="DRIVING">Driving회원</SelectItem>
+                    <SelectItem value="TOP">Top회원</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessNumber">사업자번호 *</Label>
+                <Input
+                  id="businessNumber"
+                  value={quickRegisterForm.businessNumber}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, businessNumber: e.target.value })}
+                  placeholder="000-00-00000"
+                  data-testid="input-quick-business-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="representative">대표자명 *</Label>
+                <Input
+                  id="representative"
+                  value={quickRegisterForm.representative}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, representative: e.target.value })}
+                  placeholder="대표자명"
+                  data-testid="input-quick-representative"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">대표연락처 *</Label>
+                <Input
+                  id="phone"
+                  value={quickRegisterForm.phone}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, phone: e.target.value })}
+                  placeholder="010-0000-0000"
+                  data-testid="input-quick-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">이메일</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={quickRegisterForm.email}
+                  onChange={(e) => setQuickRegisterForm({ ...quickRegisterForm, email: e.target.value })}
+                  placeholder="email@example.com"
+                  data-testid="input-quick-email"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickRegisterOpen(false)} data-testid="button-quick-cancel">
+              취소
+            </Button>
+            <Button
+              onClick={() => quickRegisterMutation.mutate(quickRegisterForm)}
+              disabled={
+                quickRegisterMutation.isPending ||
+                !quickRegisterForm.companyName ||
+                !quickRegisterForm.username ||
+                !quickRegisterForm.password ||
+                !quickRegisterForm.businessNumber ||
+                !quickRegisterForm.representative ||
+                !quickRegisterForm.phone
+              }
+              data-testid="button-quick-submit"
+            >
+              {quickRegisterMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  등록 중...
+                </>
+              ) : (
+                "등록"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
