@@ -35,7 +35,7 @@ import {
   MessageSquare,
   BookOpen,
   ChevronRight,
-  Plus,
+    Plus,
   XCircle,
   FileDown,
   Search,
@@ -50,7 +50,9 @@ import {
   Calendar,
   Percent,
   Building2,
-  Star
+  Star,
+  Menu,
+  X
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
@@ -107,6 +109,7 @@ function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, o
     <div>
       <button
         onClick={handleClick}
+        data-testid={`sidebar-${tab}`}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-medium rounded-lg transition-colors",
           isActive 
@@ -129,6 +132,7 @@ function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, o
             <button
               key={child.tab}
               onClick={() => onClick(child.tab)}
+              data-testid={`sidebar-${child.tab}`}
               className={cn(
                 "w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded-md transition-colors",
                 activeTab === child.tab
@@ -183,6 +187,7 @@ export default function Dashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   
   const urlParams = new URLSearchParams(window.location.search);
   const isPreviewMode = urlParams.get("preview") === "true";
@@ -526,11 +531,88 @@ export default function Dashboard() {
     { id: 3, title: "시스템 점검 안내", date: "2024-01-15" },
   ];
 
+  const sidebarContent = (
+    <nav className="space-y-1">
+      <SidebarItem
+        icon={<LayoutDashboard className="h-4 w-4" />}
+        label="마이페이지 대시보드"
+        tab="dashboard"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<User className="h-4 w-4" />}
+        label="회원정보"
+        tab="member-info"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<ShoppingCart className="h-4 w-4" />}
+        label="주문관리"
+        tab="order-new"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+        isOpen={openMenu === "order"}
+        onToggle={() => toggleMenu("order")}
+        children={[
+          { label: "신규주문등록", tab: "order-new" },
+          { label: "주문조정건 확인", tab: "order-adjust" },
+          { label: "송장파일 다운로드", tab: "order-invoice" },
+          { label: "취소건 등록", tab: "order-cancel" },
+          { label: "주문건 조회", tab: "order-list" },
+        ]}
+      />
+      <SidebarItem
+        icon={<MapPin className="h-4 w-4" />}
+        label="주소검증,엑셀변환 이용"
+        tab="address-tool"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<Wallet className="h-4 w-4" />}
+        label="예치금충전"
+        tab="deposit"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<BarChart3 className="h-4 w-4" />}
+        label="상품매입통계"
+        tab="purchase-stats"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<Calculator className="h-4 w-4" />}
+        label="정산통계"
+        tab="settlement-stats"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<MessageSquare className="h-4 w-4" />}
+        label="문의 게시판"
+        tab="inquiry"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<BookOpen className="h-4 w-4" />}
+        label="이용가이드"
+        tab="guide"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+    </nav>
+  );
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <PublicHeader />
 
-      <main className="pt-14 overflow-x-hidden">
+      <div className="pt-14 overflow-x-hidden">
         <MemberPageBanner 
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
@@ -538,90 +620,42 @@ export default function Dashboard() {
           orders={orders}
         />
 
-        <div className="container mx-auto px-4 md:px-6 py-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <aside className="lg:w-64 shrink-0">
-              <Card className="sticky top-20">
-                <CardContent className="p-3">
-                  <nav className="space-y-1">
-                    <SidebarItem
-                      icon={<LayoutDashboard className="h-4 w-4" />}
-                      label="마이페이지 대시보드"
-                      tab="dashboard"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<User className="h-4 w-4" />}
-                      label="회원정보"
-                      tab="member-info"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<ShoppingCart className="h-4 w-4" />}
-                      label="주문관리"
-                      tab="order-new"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                      isOpen={openMenu === "order"}
-                      onToggle={() => toggleMenu("order")}
-                      children={[
-                        { label: "신규주문등록", tab: "order-new" },
-                        { label: "주문조정건 확인", tab: "order-adjust" },
-                        { label: "송장파일 다운로드", tab: "order-invoice" },
-                        { label: "취소건 등록", tab: "order-cancel" },
-                        { label: "주문건 조회", tab: "order-list" },
-                      ]}
-                    />
-                    <SidebarItem
-                      icon={<MapPin className="h-4 w-4" />}
-                      label="주소검증,엑셀변환 이용"
-                      tab="address-tool"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<Wallet className="h-4 w-4" />}
-                      label="예치금충전"
-                      tab="deposit"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<BarChart3 className="h-4 w-4" />}
-                      label="상품매입통계"
-                      tab="purchase-stats"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<Calculator className="h-4 w-4" />}
-                      label="정산통계"
-                      tab="settlement-stats"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<MessageSquare className="h-4 w-4" />}
-                      label="문의 게시판"
-                      tab="inquiry"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                    <SidebarItem
-                      icon={<BookOpen className="h-4 w-4" />}
-                      label="이용가이드"
-                      tab="guide"
-                      activeTab={activeTab}
-                      onClick={setActiveTab}
-                    />
-                  </nav>
-                </CardContent>
-              </Card>
-            </aside>
+        {/* Desktop Fixed Sidebar */}
+        <aside className="hidden lg:block fixed left-0 top-14 bottom-0 w-64 bg-card border-r z-30 overflow-y-auto">
+          <div className="p-4">
+            {sidebarContent}
+          </div>
+        </aside>
 
-            <div className="flex-1 min-w-0">
+        {/* Mobile Sidebar Toggle */}
+        <Button
+          size="icon"
+          variant="default"
+          className="lg:hidden fixed bottom-4 right-4 z-50 shadow-lg"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          data-testid="button-mobile-menu"
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+
+        {/* Mobile Sidebar Overlay */}
+        {mobileOpen && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={() => setMobileOpen(false)}
+              data-testid="overlay-mobile-sidebar"
+            />
+            <aside className="fixed left-0 top-14 bottom-0 w-72 bg-card border-r z-50 lg:hidden overflow-y-auto">
+              <div className="p-4">
+                {sidebarContent}
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* Main Content - offset for fixed sidebar on desktop */}
+        <main className="lg:ml-64 min-w-0 p-4 md:p-6">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
               <Card>
@@ -1164,10 +1198,8 @@ export default function Dashboard() {
               {activeTab === "order-list" && (
                 <MemberOrderList />
               )}
-            </div>
-          </div>
+          </main>
         </div>
-      </main>
-    </div>
+      </div>
   );
 }
