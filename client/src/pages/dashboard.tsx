@@ -1074,7 +1074,7 @@ export default function Dashboard() {
 
                       {/* 테이블 - 주문대기리스트 형식 */}
                       <div className="border rounded-lg overflow-x-auto">
-                        <Table>
+                        <Table className="min-w-[1800px]">
                           <TableHeader>
                             <TableRow className="bg-muted/50">
                               <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
