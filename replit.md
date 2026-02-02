@@ -18,6 +18,11 @@ Preferred communication style: Simple, everyday language.
    - 테이블 컨테이너에 `overflow-x-auto` 클래스 필수
    - 예: `<div className="border rounded-lg overflow-x-auto"><Table>...</Table></div>`
    - 컬럼이 많은 테이블은 모든 컬럼을 볼 수 있도록 스크롤 지원
+4. **카테고리 연동 (필수!)**: 모든 대분류/중분류/소분류 필터는 "상품관리/카테고리관리"와 연동
+   - 카테고리 데이터 소스: `/api/categories` 엔드포인트 (categories 테이블)
+   - 카테고리 레벨: `large` (대분류), `medium` (중분류), `small` (소분류)
+   - 계단식 필터링: 대분류 선택 → 해당 중분류만 표시 → 해당 소분류만 표시
+   - 상품관리와 연동: 상품의 카테고리는 반드시 카테고리관리에서 설정된 카테고리와 매칭되어야 함
 
 ### Topsel 디자인 시스템 (v2.0.0)
 공개 페이지 작업 시 반드시 준수해야 할 디자인 규칙:

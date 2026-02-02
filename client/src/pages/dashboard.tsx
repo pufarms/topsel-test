@@ -60,7 +60,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
-import { type Order, type Member, type PendingOrder, pendingOrderFormSchema } from "@shared/schema";
+import { type Order, type Member, type PendingOrder, type Category, pendingOrderFormSchema } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 type PendingOrderFormData = z.infer<typeof pendingOrderFormSchema>;
@@ -258,6 +258,31 @@ export default function Dashboard() {
 
   const [productCategoryInfo, setProductCategoryInfo] = useState<{categoryLarge?: string, categoryMedium?: string, categorySmall?: string, supplyPrice?: number} | null>(null);
   
+  // 카테고리 데이터 쿼리 (상품관리/카테고리관리 연동)
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  // 카테고리 필터 상태
+  const [categoryLargeFilter, setCategoryLargeFilter] = useState<string>("all");
+  const [categoryMediumFilter, setCategoryMediumFilter] = useState<string>("all");
+  const [categorySmallFilter, setCategorySmallFilter] = useState<string>("all");
+
+  // 카테고리 레벨별 분류
+  const largeCategories = categories.filter(c => c.level === "large");
+  const mediumCategories = categories.filter(c => c.level === "medium");
+  const smallCategories = categories.filter(c => c.level === "small");
+
+  // 선택된 대분류에 따른 중분류 필터링
+  const filteredMediumCategories = categoryLargeFilter === "all" 
+    ? mediumCategories 
+    : mediumCategories.filter(c => c.parentId === categoryLargeFilter);
+
+  // 선택된 중분류에 따른 소분류 필터링
+  const filteredSmallCategories = categoryMediumFilter === "all"
+    ? smallCategories
+    : smallCategories.filter(c => c.parentId === categoryMediumFilter);
+
   // 검색 필터 상태
   const [searchFilter, setSearchFilter] = useState<string>("선택 없음");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -297,18 +322,37 @@ export default function Dashboard() {
     setSearchResults(results.slice(0, 10));
   }, [searchTerm, searchFilter, pendingOrders]);
 
-  // 필터된 주문 목록
+  // 카테고리 이름으로 ID 찾기 헬퍼 함수
+  const getCategoryNameById = (id: string) => categories.find(c => c.id === id)?.name;
+
+  // 필터된 주문 목록 (검색 + 카테고리 필터)
   const filteredPendingOrders = (pendingOrders || []).filter(order => {
-    if (searchFilter === "선택 없음" || !searchTerm.trim()) return true;
-    
-    const term = searchTerm.toLowerCase();
-    if (searchFilter === "주문자명") {
-      return order.ordererName?.toLowerCase().includes(term);
-    } else if (searchFilter === "수령자명") {
-      return order.recipientName?.toLowerCase().includes(term);
-    } else if (searchFilter === "상품명") {
-      return order.productName?.toLowerCase().includes(term);
+    // 검색 필터 적용
+    if (searchFilter !== "선택 없음" && searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      if (searchFilter === "주문자명" && !order.ordererName?.toLowerCase().includes(term)) return false;
+      if (searchFilter === "수령자명" && !order.recipientName?.toLowerCase().includes(term)) return false;
+      if (searchFilter === "상품명" && !order.productName?.toLowerCase().includes(term)) return false;
     }
+    
+    // 대분류 카테고리 필터
+    if (categoryLargeFilter !== "all") {
+      const categoryName = getCategoryNameById(categoryLargeFilter);
+      if (order.categoryLarge !== categoryName) return false;
+    }
+    
+    // 중분류 카테고리 필터
+    if (categoryMediumFilter !== "all") {
+      const categoryName = getCategoryNameById(categoryMediumFilter);
+      if (order.categoryMedium !== categoryName) return false;
+    }
+    
+    // 소분류 카테고리 필터
+    if (categorySmallFilter !== "all") {
+      const categoryName = getCategoryNameById(categorySmallFilter);
+      if (order.categorySmall !== categoryName) return false;
+    }
+    
     return true;
   });
   
@@ -939,29 +983,81 @@ export default function Dashboard() {
                           )}
                         </div>
 
-                        {/* 분류 필터 */}
+                        {/* 분류 필터 (상품관리/카테고리관리 연동) */}
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium w-12">대분류</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
-                              <option>-- 전체 대분류 --</option>
+                            <select 
+                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
+                              value={categoryLargeFilter}
+                              onChange={(e) => {
+                                setCategoryLargeFilter(e.target.value);
+                                setCategoryMediumFilter("all");
+                                setCategorySmallFilter("all");
+                              }}
+                              data-testid="select-category-large"
+                            >
+                              <option value="all">-- 전체 대분류 --</option>
+                              {largeCategories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium">중분류</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
-                              <option>-- 전체 중분류 --</option>
+                            <select 
+                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
+                              value={categoryMediumFilter}
+                              onChange={(e) => {
+                                setCategoryMediumFilter(e.target.value);
+                                setCategorySmallFilter("all");
+                              }}
+                              data-testid="select-category-medium"
+                            >
+                              <option value="all">-- 전체 중분류 --</option>
+                              {filteredMediumCategories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium">소분류</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
-                              <option>-- 전체 소분류 --</option>
+                            <select 
+                              className="h-8 px-2 border rounded text-sm min-w-[140px]"
+                              value={categorySmallFilter}
+                              onChange={(e) => setCategorySmallFilter(e.target.value)}
+                              data-testid="select-category-small"
+                            >
+                              <option value="all">-- 전체 소분류 --</option>
+                              {filteredSmallCategories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600">조회</Button>
-                            <Button size="sm" variant="secondary" className="h-8">초기화</Button>
+                            <Button 
+                              size="sm" 
+                              className="h-8 bg-sky-500 hover:bg-sky-600"
+                              onClick={() => {
+                                // 조회는 이미 실시간 반영되므로 별도 액션 불필요
+                              }}
+                              data-testid="button-category-search"
+                            >
+                              조회
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              className="h-8"
+                              onClick={() => {
+                                setCategoryLargeFilter("all");
+                                setCategoryMediumFilter("all");
+                                setCategorySmallFilter("all");
+                              }}
+                              data-testid="button-category-reset"
+                            >
+                              초기화
+                            </Button>
                           </div>
                         </div>
                       </div>
