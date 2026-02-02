@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates } from "@shared/schema";
 import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
@@ -5617,6 +5617,250 @@ export async function registerRoutes(
       }
 
       res.json({ message: "주문이 삭제되었습니다" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== 양식 관리 API ====================
+  
+  const templateUpload = multer({ storage: multer.memoryStorage() });
+  
+  // 양식 목록 조회 (관리자용)
+  app.get("/api/admin/form-templates", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const templates = await db.select().from(formTemplates).orderBy(formTemplates.category, formTemplates.name);
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 단건 조회 (관리자용)
+  app.get("/api/admin/form-templates/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const [template] = await db.select().from(formTemplates).where(eq(formTemplates.id, req.params.id));
+      if (!template) {
+        return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 코드로 조회 (공개 - 다운로드용)
+  app.get("/api/form-templates/code/:code", async (req, res) => {
+    try {
+      const [template] = await db.select().from(formTemplates).where(eq(formTemplates.code, req.params.code));
+      if (!template || template.isActive !== "true") {
+        return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 생성 (관리자용)
+  app.post("/api/admin/form-templates", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { name, code, description, category } = req.body;
+      
+      if (!name || !code) {
+        return res.status(400).json({ error: "양식 이름과 코드는 필수입니다" });
+      }
+
+      // 코드 중복 체크
+      const [existing] = await db.select().from(formTemplates).where(eq(formTemplates.code, code));
+      if (existing) {
+        return res.status(400).json({ error: "이미 사용 중인 양식 코드입니다" });
+      }
+
+      const [template] = await db.insert(formTemplates).values({
+        name,
+        code,
+        description: description || null,
+        category: category || "기타",
+        uploadedBy: req.session.userId,
+      }).returning();
+
+      res.status(201).json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 수정 (관리자용)
+  app.put("/api/admin/form-templates/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { name, description, category, isActive } = req.body;
+      
+      const [template] = await db.update(formTemplates)
+        .set({
+          name,
+          description,
+          category,
+          isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(formTemplates.id, req.params.id))
+        .returning();
+
+      if (!template) {
+        return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
+      }
+
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 파일 업로드 (관리자용)
+  app.post("/api/admin/form-templates/:id/upload", templateUpload.single("file"), async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: "파일이 필요합니다" });
+    }
+
+    try {
+      // 기존 양식 확인
+      const [existing] = await db.select().from(formTemplates).where(eq(formTemplates.id, req.params.id));
+      if (!existing) {
+        return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
+      }
+
+      // R2에 파일 업로드
+      const { storagePath, publicUrl } = await uploadImage(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        "form-templates"
+      );
+
+      // 파일 확장자 추출
+      const fileType = file.originalname.split('.').pop()?.toLowerCase() || 'unknown';
+
+      // 양식 정보 업데이트
+      const [template] = await db.update(formTemplates)
+        .set({
+          fileUrl: publicUrl,
+          fileName: file.originalname,
+          fileType: fileType,
+          fileSize: file.size,
+          version: (existing.version || 1) + 1,
+          uploadedBy: req.session.userId,
+          updatedAt: new Date(),
+        })
+        .where(eq(formTemplates.id, req.params.id))
+        .returning();
+
+      res.json(template);
+    } catch (error: any) {
+      console.error("Template upload error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 양식 삭제 (관리자용)
+  app.delete("/api/admin/form-templates/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const [deleted] = await db.delete(formTemplates)
+        .where(eq(formTemplates.id, req.params.id))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
+      }
+
+      res.json({ message: "양식이 삭제되었습니다" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 초기 양식 시드 (관리자용)
+  app.post("/api/admin/form-templates/seed", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "SUPER_ADMIN 권한이 필요합니다" });
+    }
+
+    try {
+      // 기본 양식 목록 생성
+      const defaultTemplates = [
+        { name: "주문등록 양식", code: "order_registration", description: "회원 엑셀 주문 등록용 양식", category: "주문관리" },
+        { name: "상품등록 양식", code: "product_registration", description: "상품 일괄 등록용 양식", category: "상품관리" },
+        { name: "재고등록 양식", code: "stock_registration", description: "재고 일괄 등록용 양식", category: "재고관리" },
+        { name: "회원등록 양식", code: "member_registration", description: "회원 일괄 등록용 양식", category: "회원관리" },
+        { name: "상품매핑 양식", code: "product_mapping", description: "상품-자재 매핑 등록용 양식", category: "재고관리" },
+      ];
+
+      const created = [];
+      for (const template of defaultTemplates) {
+        const [existing] = await db.select().from(formTemplates).where(eq(formTemplates.code, template.code));
+        if (!existing) {
+          const [newTemplate] = await db.insert(formTemplates).values({
+            ...template,
+            uploadedBy: req.session.userId,
+          }).returning();
+          created.push(newTemplate);
+        }
+      }
+
+      res.json({ message: `${created.length}개의 양식이 생성되었습니다`, templates: created });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
