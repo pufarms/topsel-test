@@ -313,10 +313,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const handleClick = (e: React.MouseEvent) => {
                 e.preventDefault();
                 setMobileOpen(false);
-                // History API로 URL 업데이트 후 커스텀 이벤트 발생
+                
+                // 쿼리 파라미터 추출 및 상태 즉시 업데이트
+                const queryIndex = child.path.indexOf('?');
+                const newSearchParams = queryIndex !== -1 ? child.path.substring(queryIndex) : '';
+                setSearchParams(newSearchParams);
+                
+                // History API로 URL 업데이트
                 window.history.pushState({}, '', child.path);
-                window.dispatchEvent(new PopStateEvent('popstate'));
-                // 기본 경로로 이동 (쿼리 파라미터 없는 경우)
+                
+                // 기본 경로로 이동
                 const basePath = child.path.split('?')[0];
                 navigate(basePath);
               };
