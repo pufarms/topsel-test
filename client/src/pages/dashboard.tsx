@@ -853,7 +853,20 @@ export default function Dashboard() {
                             <FileDown className="h-4 w-4 mr-1" />
                             다운로드
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8" data-testid="button-download-form">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8" 
+                            data-testid="button-download-form"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = '/templates/order_registration_template.xlsx';
+                              link.download = '주문등록_양식파일.xlsx';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                          >
                             <FileDown className="h-4 w-4 mr-1" />
                             양식파일 다운로드
                           </Button>
