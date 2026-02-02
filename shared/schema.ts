@@ -1237,3 +1237,30 @@ export const pendingOrderFormSchema = z.object({
 
 export type InsertPendingOrder = z.infer<typeof insertPendingOrderSchema>;
 export type PendingOrder = typeof pendingOrders.$inferSelect;
+
+// 양식 관리 테이블
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // 양식 이름 (예: "주문등록양식")
+  code: text("code").notNull().unique(), // 양식 코드 (예: "order_registration")
+  description: text("description"), // 양식 설명
+  category: text("category").notNull().default("기타"), // 카테고리 (주문관리, 재고관리, 회원관리 등)
+  fileUrl: text("file_url"), // 업로드된 파일 URL
+  fileName: text("file_name"), // 원본 파일명
+  fileType: text("file_type"), // 파일 타입 (xlsx, xls, csv 등)
+  fileSize: integer("file_size"), // 파일 크기 (bytes)
+  isActive: text("is_active").default("true"), // 활성 상태
+  version: integer("version").default(1), // 버전
+  uploadedBy: varchar("uploaded_by").references(() => users.id), // 업로드한 관리자
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
