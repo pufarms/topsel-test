@@ -5173,6 +5173,7 @@ export async function registerRoutes(
             categorySmall: productInfo?.categorySmall || null,
             productCode: data.productCode,
             productName: data.productName,
+            supplyPrice: productInfo?.topPrice || null,
             ordererName: data.ordererName,
             ordererPhone: data.ordererPhone,
             ordererAddress: data.ordererAddress || null,

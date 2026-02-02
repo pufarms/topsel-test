@@ -1183,6 +1183,7 @@ export const pendingOrders = pgTable("pending_orders", {
   categorySmall: text("category_small"),
   productCode: text("product_code").notNull(),
   productName: text("product_name").notNull(),
+  supplyPrice: integer("supply_price"),
   
   ordererName: text("orderer_name").notNull(),
   ordererPhone: text("orderer_phone").notNull(),
@@ -1213,6 +1214,7 @@ export const insertPendingOrderSchema = createInsertSchema(pendingOrders).omit({
   categoryLarge: true,
   categoryMedium: true,
   categorySmall: true,
+  supplyPrice: true,
   trackingNumber: true,
   courierCompany: true,
   createdAt: true,

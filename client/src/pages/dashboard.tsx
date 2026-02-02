@@ -256,7 +256,7 @@ export default function Dashboard() {
     },
   });
 
-  const [productCategoryInfo, setProductCategoryInfo] = useState<{categoryLarge?: string, categoryMedium?: string, categorySmall?: string} | null>(null);
+  const [productCategoryInfo, setProductCategoryInfo] = useState<{categoryLarge?: string, categoryMedium?: string, categorySmall?: string, supplyPrice?: number} | null>(null);
   
   const searchProductByCode = async (code: string) => {
     if (!code) return;
@@ -271,6 +271,7 @@ export default function Dashboard() {
           categoryLarge: product.categoryLarge,
           categoryMedium: product.categoryMedium,
           categorySmall: product.categorySmall,
+          supplyPrice: product.topPrice,
         });
         toast({ 
           title: "상품 조회 성공", 
@@ -918,6 +919,7 @@ export default function Dashboard() {
                                           <Badge variant="outline">대분류: {productCategoryInfo.categoryLarge || "-"}</Badge>
                                           <Badge variant="outline">중분류: {productCategoryInfo.categoryMedium || "-"}</Badge>
                                           <Badge variant="outline">소분류: {productCategoryInfo.categorySmall || "-"}</Badge>
+                                          <Badge variant="secondary">공급가: {productCategoryInfo.supplyPrice?.toLocaleString() || "-"}원</Badge>
                                         </div>
                                       </div>
                                     )}
@@ -1082,6 +1084,7 @@ export default function Dashboard() {
                               <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
+                              <TableHead className="font-semibold whitespace-nowrap">공급가</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
                               <TableHead className="font-semibold whitespace-nowrap">수령자명</TableHead>
@@ -1098,13 +1101,13 @@ export default function Dashboard() {
                           <TableBody>
                             {pendingOrdersLoading ? (
                               <TableRow>
-                                <TableCell colSpan={18} className="text-center py-12">
+                                <TableCell colSpan={19} className="text-center py-12">
                                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </TableCell>
                               </TableRow>
                             ) : pendingOrders.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={18} className="text-center text-muted-foreground py-12">
+                                <TableCell colSpan={19} className="text-center text-muted-foreground py-12">
                                   등록된 주문이 없습니다
                                 </TableCell>
                               </TableRow>
@@ -1122,6 +1125,7 @@ export default function Dashboard() {
                                   <TableCell className="text-sm">{order.categorySmall || "-"}</TableCell>
                                   <TableCell className="text-sm font-mono">{order.productCode}</TableCell>
                                   <TableCell className="text-sm">{order.productName}</TableCell>
+                                  <TableCell className="text-sm text-right">{order.supplyPrice?.toLocaleString() || "-"}</TableCell>
                                   <TableCell className="text-sm">{order.ordererName}</TableCell>
                                   <TableCell className="text-sm">{order.ordererPhone}</TableCell>
                                   <TableCell className="text-sm">{order.recipientName}</TableCell>
