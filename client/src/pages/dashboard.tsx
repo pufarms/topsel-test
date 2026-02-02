@@ -943,14 +943,20 @@ export default function Dashboard() {
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium w-12">대분류</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[160px]">
+                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
                               <option>-- 전체 대분류 --</option>
                             </select>
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium">중분류</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[160px]">
+                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
                               <option>-- 전체 중분류 --</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium">소분류</label>
+                            <select className="h-8 px-2 border rounded text-sm min-w-[140px]">
+                              <option>-- 전체 소분류 --</option>
                             </select>
                           </div>
                           <div className="flex gap-2">
