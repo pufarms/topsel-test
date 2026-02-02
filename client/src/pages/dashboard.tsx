@@ -884,14 +884,14 @@ export default function Dashboard() {
                   </Card>
 
                   {/* 주문 대기 리스트 */}
-                  <Card>
+                  <Card className="overflow-hidden">
                     <CardHeader className="pb-4">
                       <div className="flex items-center gap-2">
                         <Package className="h-5 w-5 text-primary" />
                         <CardTitle className="text-base">주문 대기 리스트</CardTitle>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 overflow-hidden">
                       {/* 필터 영역 */}
                       <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-lg p-4 space-y-4">
                         {/* 기간 선택 */}
