@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import OrderStatsBanner from "@/components/order-stats-banner";
 
 export default function OrdersPreparingPage() {
   return (
@@ -6,6 +7,8 @@ export default function OrdersPreparingPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">상품준비중</h1>
       </div>
+      
+      <OrderStatsBanner />
       
       <Card>
         <CardHeader>

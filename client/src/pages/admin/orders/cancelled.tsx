@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import OrderStatsBanner from "@/components/order-stats-banner";
 
 export default function OrdersCancelledPage() {
   return (
@@ -6,6 +7,8 @@ export default function OrdersCancelledPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">취소건 관리</h1>
       </div>
+      
+      <OrderStatsBanner />
       
       <Card>
         <CardHeader>
