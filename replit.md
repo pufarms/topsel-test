@@ -14,6 +14,10 @@ Preferred communication style: Simple, everyday language.
    - 그리드: `grid-cols-1 sm:grid-cols-2` 등 반응형 그리드
    - 텍스트: `text-xl md:text-2xl` 등 반응형 크기
 2. **Pretendard 한글 폰트 (필수!)**: 모든 페이지에 Pretendard 폰트 적용 유지
+3. **테이블 가로 스크롤 (필수!)**: 주문/통계 관련 모든 테이블에 가로 스크롤 적용
+   - 테이블 컨테이너에 `overflow-x-auto` 클래스 필수
+   - 예: `<div className="border rounded-lg overflow-x-auto"><Table>...</Table></div>`
+   - 컬럼이 많은 테이블은 모든 컬럼을 볼 수 있도록 스크롤 지원
 
 ### Topsel 디자인 시스템 (v2.0.0)
 공개 페이지 작업 시 반드시 준수해야 할 디자인 규칙:
