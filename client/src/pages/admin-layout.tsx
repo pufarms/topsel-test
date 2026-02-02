@@ -215,11 +215,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Tooltip key={item.id}>
             <TooltipTrigger asChild>
               <div
-                className={`flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
-                  isChildActive(item.children)
-                    ? "bg-primary text-white ring-2 ring-white ring-offset-1 ring-offset-slate-900"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`}
+                className="flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors text-slate-300 hover:bg-slate-800 hover:text-white"
                 data-testid={`menu-${item.id}`}
               >
                 {item.icon}
@@ -249,7 +245,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div
                 className={`flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
                   isActive(item.path)
-                    ? "bg-primary text-white ring-2 ring-white ring-offset-1 ring-offset-slate-900"
+                    ? "bg-slate-700/70 text-sky-400 ring-1 ring-sky-400/50"
                     : "text-slate-300 hover:bg-slate-800 hover:text-white"
                 }`}
                 data-testid={`menu-${item.id}`}
@@ -273,11 +269,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                isChildActive(item.children)
-                  ? "bg-primary text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              }`}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white"
               data-testid={`menu-${item.id}`}
             >
               <div className="flex items-center gap-3">
@@ -310,7 +302,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   onClick={handleClick}
                   className={`block px-3 py-2 rounded-md text-sm cursor-pointer transition-colors ${
                     isActive(child.path)
-                      ? "bg-primary text-white font-medium border-l-4 border-white ml-[-4px] pl-[15px]"
+                      ? "bg-slate-700/70 text-sky-400 font-medium border-l-2 border-sky-400 ml-[-2px] pl-[13px]"
                       : "text-slate-400 hover:bg-slate-800 hover:text-white"
                   }`}
                   data-testid={`menu-${child.id}`}
@@ -329,7 +321,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <span
           className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${
             isActive(item.path)
-              ? "bg-primary text-white border-l-4 border-white ml-[-4px] pl-[11px]"
+              ? "bg-slate-700/70 text-sky-400 border-l-2 border-sky-400 ml-[-2px] pl-[13px]"
               : "text-slate-300 hover:bg-slate-800 hover:text-white"
           }`}
           data-testid={`menu-${item.id}`}
