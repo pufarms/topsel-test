@@ -117,49 +117,53 @@ export default function OrdersPendingPage() {
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : displayedOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              주문 대기 내역이 없습니다.
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-              <Table className="w-max min-w-[2200px]">
-                <TableHeader className="sticky top-0 z-10 bg-background">
+          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+            <Table className="w-max min-w-[2200px]">
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedOrders.length === displayedOrders.length && displayedOrders.length > 0}
+                      onCheckedChange={handleSelectAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">상호명(업체명)</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">공급가</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">수령자명</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">수령자휴대폰번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">수령자 전화번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">수령자 주소</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">배송메시지</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">주문번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">자체주문번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">운송장번호</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">택배사</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedOrders.length === displayedOrders.length && displayedOrders.length > 0}
-                        onCheckedChange={handleSelectAll}
-                        data-testid="checkbox-select-all"
-                      />
-                    </TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">상호명(업체명)</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">공급가</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">수령자명</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">수령자휴대폰번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">수령자 전화번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">수령자 주소</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">배송메시지</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">주문번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">자체주문번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">운송장번호</TableHead>
-                    <TableHead className="font-semibold whitespace-nowrap">택배사</TableHead>
+                    <TableCell colSpan={20} className="text-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {displayedOrders.map((order, index) => (
+                ) : displayedOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={20} className="text-center py-12 text-muted-foreground">
+                      주문 대기 내역이 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  displayedOrders.map((order, index) => (
                     <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                       <TableCell>
                         <Checkbox
@@ -188,11 +192,11 @@ export default function OrdersPendingPage() {
                       <TableCell className="text-sm">{order.trackingNumber || "-"}</TableCell>
                       <TableCell className="text-sm">{order.courierCompany || "-"}</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
