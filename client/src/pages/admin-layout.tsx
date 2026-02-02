@@ -55,7 +55,21 @@ const menuItems: MenuItem[] = [
       { id: "term-agreements", label: "약관 동의 기록", path: "/admin/term-agreements" },
     ]
   },
-  { id: "orders", label: "주문관리", icon: <ShoppingCart className="h-5 w-5" />, path: "/admin/orders" },
+  { 
+    id: "orders", 
+    label: "주문관리", 
+    icon: <ShoppingCart className="h-5 w-5" />,
+    children: [
+      { id: "orders-pending", label: "주문 대기", path: "/admin/orders/pending" },
+      { id: "orders-admin-cancel", label: "주문조정(직권취소)", path: "/admin/orders/admin-cancel" },
+      { id: "orders-preparing", label: "상품준비중", path: "/admin/orders/preparing" },
+      { id: "orders-print-waybill", label: "운송장 출력", path: "/admin/orders/print-waybill" },
+      { id: "orders-ready-to-ship", label: "배송준비중", path: "/admin/orders/ready-to-ship" },
+      { id: "orders-cancelled", label: "취소건 관리", path: "/admin/orders/cancelled" },
+      { id: "orders-shipping", label: "배송중", path: "/admin/orders/shipping" },
+      { id: "orders-completed", label: "배송완료", path: "/admin/orders/completed" },
+    ]
+  },
   { 
     id: "products", 
     label: "상품관리", 
