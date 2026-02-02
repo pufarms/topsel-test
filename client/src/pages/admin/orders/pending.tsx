@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,12 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, Trash2 } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersPendingPage() {
+  const { toast } = useToast();
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
     categoryLarge: "",
@@ -32,6 +35,48 @@ export default function OrdersPendingPage() {
   const { data: pendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
   });
+
+  const deleteSelectedMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await apiRequest("DELETE", "/api/admin/pending-orders", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "선택한 주문이 삭제되었습니다." });
+    },
+    onError: () => {
+      toast({ title: "삭제 실패", description: "주문 삭제 중 오류가 발생했습니다.", variant: "destructive" });
+    },
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/admin/pending-orders/all");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "모든 주문이 삭제되었습니다." });
+    },
+    onError: () => {
+      toast({ title: "삭제 실패", description: "전체 삭제 중 오류가 발생했습니다.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteSelected = () => {
+    if (selectedOrders.length === 0) return;
+    if (confirm(`선택한 ${selectedOrders.length}건의 주문을 삭제하시겠습니까?`)) {
+      deleteSelectedMutation.mutate(selectedOrders);
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (pendingOrders.length === 0) return;
+    if (confirm(`전체 ${pendingOrders.length}건의 주문을 모두 삭제하시겠습니까?`)) {
+      deleteAllMutation.mutate();
+    }
+  };
 
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,
@@ -90,6 +135,27 @@ export default function OrdersPendingPage() {
               <Button size="sm" variant="outline" data-testid="button-download-orders">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
+              </Button>
+              <Button 
+                size="sm" 
+                variant="destructive" 
+                onClick={handleDeleteSelected}
+                disabled={selectedOrders.length === 0 || deleteSelectedMutation.isPending}
+                data-testid="button-delete-selected"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                선택삭제 {selectedOrders.length > 0 && `(${selectedOrders.length})`}
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={handleDeleteAll}
+                disabled={pendingOrders.length === 0 || deleteAllMutation.isPending}
+                data-testid="button-delete-all"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                전체삭제
               </Button>
               <span className="text-sm text-muted-foreground">
                 {displayedOrders.length} / {filteredOrders.length}건
