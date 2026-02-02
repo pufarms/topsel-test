@@ -281,6 +281,37 @@ export default function Dashboard() {
     queryKey: ["/api/categories"],
   });
 
+  // 주문등록 양식 템플릿 조회
+  const { data: orderTemplate } = useQuery<{ fileUrl: string; fileName: string }>({
+    queryKey: ["/api/form-templates/code", "order_registration"],
+    queryFn: async () => {
+      const res = await fetch("/api/form-templates/code/order_registration");
+      if (!res.ok) throw new Error("양식을 찾을 수 없습니다");
+      return res.json();
+    },
+    enabled: isMember || isPreviewMode,
+    staleTime: 1000 * 60 * 30,
+    retry: false,
+  });
+
+  // 양식 다운로드 핸들러
+  const handleDownloadTemplate = () => {
+    if (orderTemplate?.fileUrl) {
+      const link = document.createElement('a');
+      link.href = orderTemplate.fileUrl;
+      link.download = orderTemplate.fileName || '주문등록_양식파일.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      toast({
+        title: "양식 다운로드 실패",
+        description: "등록된 주문등록 양식이 없습니다. 관리자에게 문의하세요.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // 카테고리 필터 상태
   const [categoryLargeFilter, setCategoryLargeFilter] = useState<string>("all");
   const [categoryMediumFilter, setCategoryMediumFilter] = useState<string>("all");
@@ -911,14 +942,7 @@ export default function Dashboard() {
                             variant="outline" 
                             className="h-8" 
                             data-testid="button-download-form"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = '/templates/order_registration_template.xlsx';
-                              link.download = '주문등록_양식파일.xlsx';
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
+                            onClick={handleDownloadTemplate}
                           >
                             <FileDown className="h-4 w-4 mr-1" />
                             주문등록양식 다운
@@ -1002,14 +1026,7 @@ export default function Dashboard() {
                               <div className="flex justify-between gap-2">
                                 <Button 
                                   variant="outline" 
-                                  onClick={() => {
-                                    const link = document.createElement('a');
-                                    link.href = '/templates/order_registration_template.xlsx';
-                                    link.download = '주문등록_양식파일.xlsx';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                  }}
+                                  onClick={handleDownloadTemplate}
                                   data-testid="button-download-template"
                                 >
                                   <FileDown className="h-4 w-4 mr-1" />
