@@ -258,6 +258,60 @@ export default function Dashboard() {
 
   const [productCategoryInfo, setProductCategoryInfo] = useState<{categoryLarge?: string, categoryMedium?: string, categorySmall?: string, supplyPrice?: number} | null>(null);
   
+  // 검색 필터 상태
+  const [searchFilter, setSearchFilter] = useState<string>("선택 없음");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+
+  // 검색어에 따른 필터링
+  useEffect(() => {
+    if (searchFilter === "선택 없음" || !searchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const term = searchTerm.toLowerCase();
+    let results: string[] = [];
+
+    if (searchFilter === "주문자명") {
+      results = Array.from(new Set(pendingOrders
+        .filter(order => order.ordererName?.toLowerCase().includes(term))
+        .map(order => order.ordererName)
+        .filter((name): name is string => !!name)
+      ));
+    } else if (searchFilter === "수령자명") {
+      results = Array.from(new Set(pendingOrders
+        .filter(order => order.recipientName?.toLowerCase().includes(term))
+        .map(order => order.recipientName)
+        .filter((name): name is string => !!name)
+      ));
+    } else if (searchFilter === "상품명") {
+      results = Array.from(new Set(pendingOrders
+        .filter(order => order.productName?.toLowerCase().includes(term))
+        .map(order => order.productName)
+        .filter((name): name is string => !!name)
+      ));
+    }
+
+    setSearchResults(results.slice(0, 10));
+  }, [searchTerm, searchFilter, pendingOrders]);
+
+  // 필터된 주문 목록
+  const filteredPendingOrders = pendingOrders.filter(order => {
+    if (searchFilter === "선택 없음" || !searchTerm.trim()) return true;
+    
+    const term = searchTerm.toLowerCase();
+    if (searchFilter === "주문자명") {
+      return order.ordererName?.toLowerCase().includes(term);
+    } else if (searchFilter === "수령자명") {
+      return order.recipientName?.toLowerCase().includes(term);
+    } else if (searchFilter === "상품명") {
+      return order.productName?.toLowerCase().includes(term);
+    }
+    return true;
+  });
+  
   const searchProductByCode = async (code: string) => {
     if (!code) return;
     setProductSearchLoading(true);
@@ -816,13 +870,73 @@ export default function Dashboard() {
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium w-12">검색:</label>
-                            <select className="h-8 px-2 border rounded text-sm min-w-[120px]">
+                            <select 
+                              className="h-8 px-2 border rounded text-sm min-w-[120px]"
+                              value={searchFilter}
+                              onChange={(e) => {
+                                setSearchFilter(e.target.value);
+                                setSearchTerm("");
+                                setSearchResults([]);
+                                setShowSearchDropdown(false);
+                              }}
+                              data-testid="select-search-filter"
+                            >
                               <option>선택 없음</option>
                               <option>주문자명</option>
                               <option>수령자명</option>
                               <option>상품명</option>
                             </select>
                           </div>
+                          {searchFilter !== "선택 없음" && (
+                            <div className="relative flex items-center gap-2">
+                              <Input
+                                type="text"
+                                placeholder={`${searchFilter} 검색...`}
+                                value={searchTerm}
+                                onChange={(e) => {
+                                  setSearchTerm(e.target.value);
+                                  setShowSearchDropdown(true);
+                                }}
+                                onFocus={() => setShowSearchDropdown(true)}
+                                className="h-8 w-[200px] text-sm"
+                                data-testid="input-search-term"
+                              />
+                              <Search className="h-4 w-4 text-muted-foreground" />
+                              {showSearchDropdown && searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 mt-1 w-[200px] bg-white dark:bg-slate-800 border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                                  {searchResults.map((result, index) => (
+                                    <button
+                                      key={index}
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 border-b last:border-b-0"
+                                      onClick={() => {
+                                        setSearchTerm(result);
+                                        setShowSearchDropdown(false);
+                                      }}
+                                      data-testid={`search-result-${index}`}
+                                    >
+                                      {result}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {searchTerm && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2"
+                                  onClick={() => {
+                                    setSearchTerm("");
+                                    setSearchResults([]);
+                                  }}
+                                  data-testid="button-clear-search"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* 분류 필터 */}
@@ -1118,14 +1232,14 @@ export default function Dashboard() {
                                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                 </TableCell>
                               </TableRow>
-                            ) : !pendingOrders || pendingOrders.length === 0 ? (
+                            ) : filteredPendingOrders.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={19} className="text-center text-muted-foreground py-12">
-                                  등록된 주문이 없습니다
+                                  {searchTerm ? "검색 결과가 없습니다" : "등록된 주문이 없습니다"}
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              (pendingOrders || []).map((order, index) => (
+                              filteredPendingOrders.map((order, index) => (
                                 <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                                   <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber}</TableCell>
                                   <TableCell>
