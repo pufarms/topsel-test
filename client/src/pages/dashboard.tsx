@@ -520,10 +520,8 @@ export default function Dashboard() {
     return price.toLocaleString("ko-KR") + "원";
   };
 
-  const sampleEvents = [
-    { company: "농협", period: "01.15 - 01.31", item: "제주 감귤", code: "EVT001", coupon: "10%" },
-    { company: "이마트", period: "01.20 - 02.05", item: "청송 사과", code: "EVT002", coupon: "15%" },
-  ];
+  // 본인의 행사진행 이력을 표시 (추후 API 연결 필요)
+  const memberEvents: { company: string; period: string; item: string; code: string; coupon: string }[] = [];
 
   const sampleNotices = [
     { id: 1, title: "2024년 설 연휴 배송 안내", date: "2024-01-25" },
@@ -837,13 +835,22 @@ export default function Dashboard() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Gift className="h-5 w-5 text-orange-600" />
                       <CardTitle className="text-base">행사진행 현황</CardTitle>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        data-testid="button-apply-event"
+                        onClick={() => {/* 추후 행사신청 페이지 연결 예정 */}}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        행사신청하기
+                      </Button>
                     </div>
                     <Badge variant="secondary" className="text-xs">
-                      {sampleEvents.length}개 진행중
+                      {memberEvents.length}개 진행중
                     </Badge>
                   </div>
                 </CardHeader>
@@ -860,14 +867,14 @@ export default function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sampleEvents.length === 0 ? (
+                        {memberEvents.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                              진행 중인 행사가 없습니다
+                              등록된 행사 이력이 없습니다
                             </TableCell>
                           </TableRow>
                         ) : (
-                          sampleEvents.map((event, index) => (
+                          memberEvents.map((event, index) => (
                             <TableRow key={index} className="hover:bg-muted/30">
                               <TableCell className="font-medium">{event.company}</TableCell>
                               <TableCell>
