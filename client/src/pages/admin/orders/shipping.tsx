@@ -76,11 +76,11 @@ export default function OrdersShippingPage() {
 
       <OrderStatsBanner />
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>배송중 목록</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 overflow-hidden">
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

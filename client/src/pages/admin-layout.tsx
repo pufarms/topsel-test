@@ -470,8 +470,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </>
       )}
 
-      <main className={`pt-14 transition-all ${mainPadding}`}>
-        <div className="p-3 md:p-6">
+      <main className={`pt-14 transition-all ${mainPadding} overflow-x-hidden`}>
+        <div className="p-3 md:p-6 min-w-0">
           {children}
         </div>
       </main>

@@ -73,11 +73,11 @@ export default function OrdersPrintWaybillPage() {
 
       <OrderStatsBanner />
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>운송장 출력 목록</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 overflow-hidden">
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
