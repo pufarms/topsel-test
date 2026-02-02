@@ -1,0 +1,20 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function OrdersAdminCancelPage() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">주문조정(직권취소)</h1>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>직권취소 목록</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">관리자 직권취소 관리 콘텐츠가 여기에 표시됩니다.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

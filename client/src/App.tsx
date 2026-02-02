@@ -36,6 +36,14 @@ import SiteSettingsPage from "@/pages/admin/settings/site-settings";
 import PagesManagement from "@/pages/admin/pages";
 import AlimtalkPage from "@/pages/admin/kakao-notifications/alimtalk";
 import BrandtalkPage from "@/pages/admin/kakao-notifications/brandtalk";
+import OrdersPendingPage from "@/pages/admin/orders/pending";
+import OrdersAdminCancelPage from "@/pages/admin/orders/admin-cancel";
+import OrdersPreparingPage from "@/pages/admin/orders/preparing";
+import OrdersPrintWaybillPage from "@/pages/admin/orders/print-waybill";
+import OrdersReadyToShipPage from "@/pages/admin/orders/ready-to-ship";
+import OrdersCancelledPage from "@/pages/admin/orders/cancelled";
+import OrdersShippingPage from "@/pages/admin/orders/shipping";
+import OrdersCompletedPage from "@/pages/admin/orders/completed";
 import PublicPreviewPage from "@/pages/public-preview";
 import MemberOrderPreview from "@/pages/admin/member-order-preview";
 import MyPage from "@/pages/mypage";
@@ -102,6 +110,30 @@ function Router() {
       </Route>
       <Route path="/admin/orders">
         <AdminRoute><AdminOrders /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/pending">
+        <AdminRoute><OrdersPendingPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/admin-cancel">
+        <AdminRoute><OrdersAdminCancelPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/preparing">
+        <AdminRoute><OrdersPreparingPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/print-waybill">
+        <AdminRoute><OrdersPrintWaybillPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/ready-to-ship">
+        <AdminRoute><OrdersReadyToShipPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/cancelled">
+        <AdminRoute><OrdersCancelledPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/shipping">
+        <AdminRoute><OrdersShippingPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/orders/completed">
+        <AdminRoute><OrdersCompletedPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/categories">
         <AdminRoute><CategoryManagement /></AdminRoute>
