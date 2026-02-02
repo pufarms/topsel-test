@@ -30,7 +30,7 @@ export default function OrdersPendingPage() {
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
 
   const { data: pendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/orders"],
+    queryKey: ["/api/admin/pending-orders"],
   });
 
   const getFields = useCallback((order: PendingOrder) => ({
