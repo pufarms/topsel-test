@@ -60,22 +60,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
-import type { Order, Member, PendingOrder } from "@shared/schema";
+import { type Order, type Member, type PendingOrder, pendingOrderFormSchema } from "@shared/schema";
 import { cn } from "@/lib/utils";
-
-const pendingOrderFormSchema = z.object({
-  productCode: z.string().min(1, "상품코드를 입력해주세요"),
-  productName: z.string().min(1, "상품명을 입력해주세요"),
-  ordererName: z.string().min(1, "주문자명을 입력해주세요"),
-  ordererPhone: z.string().min(1, "주문자 전화번호를 입력해주세요"),
-  ordererAddress: z.string().optional(),
-  recipientName: z.string().min(1, "수령자명을 입력해주세요"),
-  recipientMobile: z.string().min(1, "수령자 휴대폰번호를 입력해주세요"),
-  recipientPhone: z.string().optional(),
-  recipientAddress: z.string().min(1, "수령자 주소를 입력해주세요"),
-  deliveryMessage: z.string().optional(),
-  customOrderNumber: z.string().min(1, "자체주문번호를 입력해주세요"),
-});
 
 type PendingOrderFormData = z.infer<typeof pendingOrderFormSchema>;
 
@@ -200,6 +186,11 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreviewMode = urlParams.get("preview") === "true";
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+  const isMember = user && !isAdmin;
+  
   // 메뉴 토글 함수 (아코디언 동작)
   const toggleMenu = (menuId: string) => {
     setOpenMenu(prev => prev === menuId ? null : menuId);
@@ -218,11 +209,11 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
-
+  
   const { data: pendingOrders = [], isLoading: pendingOrdersLoading, refetch: refetchPendingOrders } = useQuery<PendingOrder[]>({
     queryKey: ["/api/member/pending-orders"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: !!user && user.role === "member",
+    enabled: !!user && (isMember || isPreviewMode),
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
   });
@@ -257,6 +248,7 @@ export default function Dashboard() {
       toast({ title: "주문이 등록되었습니다", description: "주문대기 리스트에서 확인할 수 있습니다." });
       setOrderDialogOpen(false);
       orderForm.reset();
+      setProductCategoryInfo(null);
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
     },
     onError: (error: any) => {
@@ -264,15 +256,26 @@ export default function Dashboard() {
     },
   });
 
+  const [productCategoryInfo, setProductCategoryInfo] = useState<{categoryLarge?: string, categoryMedium?: string, categorySmall?: string} | null>(null);
+  
   const searchProductByCode = async (code: string) => {
     if (!code) return;
     setProductSearchLoading(true);
+    setProductCategoryInfo(null);
     try {
       const res = await fetch(`/api/member/products/search?code=${encodeURIComponent(code)}`);
       if (res.ok) {
         const product = await res.json();
         orderForm.setValue("productName", product.productName);
-        toast({ title: "상품 조회 성공", description: `${product.productName}` });
+        setProductCategoryInfo({
+          categoryLarge: product.categoryLarge,
+          categoryMedium: product.categoryMedium,
+          categorySmall: product.categorySmall,
+        });
+        toast({ 
+          title: "상품 조회 성공", 
+          description: `${product.productName} (${product.categoryLarge || "-"} > ${product.categoryMedium || "-"} > ${product.categorySmall || "-"})` 
+        });
       } else {
         toast({ title: "상품을 찾을 수 없습니다", variant: "destructive" });
       }
@@ -303,10 +306,6 @@ export default function Dashboard() {
   }
 
   // 관리자는 관리자 대시보드로 리다이렉트 (preview 모드가 아닌 경우에만)
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-  const urlParams = new URLSearchParams(window.location.search);
-  const isPreviewMode = urlParams.get("preview") === "true";
-  
   if (isAdmin && !isPreviewMode) {
     navigate("/admin");
     return null;
@@ -912,6 +911,16 @@ export default function Dashboard() {
                                         </FormItem>
                                       )}
                                     />
+                                    {productCategoryInfo && (
+                                      <div className="col-span-full bg-muted/50 rounded-md p-3">
+                                        <div className="text-sm font-medium mb-2 text-muted-foreground">자동 분류 (상품코드 기반)</div>
+                                        <div className="flex flex-wrap gap-2 text-sm">
+                                          <Badge variant="outline">대분류: {productCategoryInfo.categoryLarge || "-"}</Badge>
+                                          <Badge variant="outline">중분류: {productCategoryInfo.categoryMedium || "-"}</Badge>
+                                          <Badge variant="outline">소분류: {productCategoryInfo.categorySmall || "-"}</Badge>
+                                        </div>
+                                      </div>
+                                    )}
                                     <FormField
                                       control={orderForm.control}
                                       name="customOrderNumber"
