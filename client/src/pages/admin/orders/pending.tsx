@@ -126,8 +126,8 @@ export default function OrdersPendingPage() {
               주문 대기 내역이 없습니다.
             </div>
           ) : (
-            <div className="border rounded-lg overflow-auto max-h-[600px]">
-              <Table className="min-w-[1600px]">
+            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+              <Table className="w-max min-w-[2200px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
@@ -137,26 +137,30 @@ export default function OrdersPendingPage() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="w-[100px]">순번</TableHead>
-                    <TableHead className="w-[120px]">상호명</TableHead>
-                    <TableHead className="w-[120px]">대분류</TableHead>
-                    <TableHead className="w-[120px]">중분류</TableHead>
-                    <TableHead className="w-[120px]">소분류</TableHead>
-                    <TableHead className="w-[140px]">상품코드</TableHead>
-                    <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[100px]">수량</TableHead>
-                    <TableHead className="w-[120px]">공급가</TableHead>
-                    <TableHead className="w-[100px]">주문자</TableHead>
-                    <TableHead className="w-[100px]">수령자</TableHead>
-                    <TableHead className="w-[150px]">수령자 연락처</TableHead>
-                    <TableHead className="min-w-[250px]">배송지</TableHead>
-                    <TableHead className="w-[100px]">상태</TableHead>
-                    <TableHead className="w-[150px]">등록일시</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">상호명(업체명)</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">대분류</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">중분류</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">소분류</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">상품코드</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">상품명</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">공급가</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">수령자명</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">수령자휴대폰번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">수령자 전화번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">수령자 주소</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">배송메시지</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">주문번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">자체주문번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">운송장번호</TableHead>
+                    <TableHead className="font-semibold whitespace-nowrap">택배사</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayedOrders.map((order, index) => (
-                    <TableRow key={order.id}>
+                    <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
                       <TableCell>
                         <Checkbox
                           checked={selectedOrders.includes(order.id)}
@@ -164,29 +168,25 @@ export default function OrdersPendingPage() {
                           data-testid={`checkbox-order-${order.id}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{order.sequenceNumber || index + 1}</TableCell>
-                      <TableCell>{order.memberCompanyName || "-"}</TableCell>
-                      <TableCell>{order.categoryLarge || "-"}</TableCell>
-                      <TableCell>{order.categoryMedium || "-"}</TableCell>
-                      <TableCell>{order.categorySmall || "-"}</TableCell>
-                      <TableCell className="font-mono">{order.productCode || "-"}</TableCell>
-                      <TableCell>{order.productName || "-"}</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell className="text-right">
-                        {order.supplyPrice ? order.supplyPrice.toLocaleString() + "원" : "-"}
-                      </TableCell>
-                      <TableCell>{order.ordererName || "-"}</TableCell>
-                      <TableCell>{order.recipientName || "-"}</TableCell>
-                      <TableCell>{order.recipientMobile || order.recipientPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""}>
-                        {order.recipientAddress || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">대기</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleString("ko-KR") : "-"}
-                      </TableCell>
+                      <TableCell className="font-medium font-mono text-xs">{order.sequenceNumber || index + 1}</TableCell>
+                      <TableCell className="text-sm font-medium">{order.memberCompanyName || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.categoryLarge || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.categoryMedium || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.categorySmall || "-"}</TableCell>
+                      <TableCell className="text-sm font-mono">{order.productCode || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.productName || "-"}</TableCell>
+                      <TableCell className="text-sm text-right">{order.supplyPrice?.toLocaleString() || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.ordererName || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.ordererPhone || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.recipientName || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.recipientMobile || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.recipientPhone || "-"}</TableCell>
+                      <TableCell className="text-sm max-w-[200px] truncate">{order.recipientAddress || "-"}</TableCell>
+                      <TableCell className="text-sm max-w-[150px] truncate">{order.deliveryMessage || "-"}</TableCell>
+                      <TableCell className="text-sm font-mono">{order.orderNumber || "-"}</TableCell>
+                      <TableCell className="text-sm font-mono">{order.customOrderNumber || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.trackingNumber || "-"}</TableCell>
+                      <TableCell className="text-sm">{order.courierCompany || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
