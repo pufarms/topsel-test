@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,12 @@ import {
 } from "@/components/ui/table";
 import { FileDown, Loader2 } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
-import { CategoryFilter, useCategoryFilter, type CategoryFilterState } from "@/components/category-filter";
+import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersPreparingPage() {
-  const [filters, setFilters] = useState<CategoryFilterState>({
+  const [filters, setFilters] = useState<AdminCategoryFilterState>({
+    memberId: "",
     categoryLarge: "",
     categoryMedium: "",
     categorySmall: "",
@@ -33,7 +34,8 @@ export default function OrdersPreparingPage() {
 
   const preparingOrders = allOrders.filter(o => o.status === "상품준비중");
 
-  const filteredOrders = useCategoryFilter(preparingOrders, filters, (order) => ({
+  const getFields = useCallback((order: PendingOrder) => ({
+    memberId: order.memberId || undefined,
     categoryLarge: order.categoryLarge || undefined,
     categoryMedium: order.categoryMedium || undefined,
     categorySmall: order.categorySmall || undefined,
@@ -41,7 +43,9 @@ export default function OrdersPreparingPage() {
     recipientName: order.recipientName || undefined,
     productName: order.productName || undefined,
     productCode: order.productCode || undefined,
-  }));
+  }), []);
+
+  const filteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -72,7 +76,7 @@ export default function OrdersPreparingPage() {
           <CardTitle>상품준비중 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <CategoryFilter
+          <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
           />
@@ -114,6 +118,7 @@ export default function OrdersPreparingPage() {
                       />
                     </TableHead>
                     <TableHead className="w-[100px]">순번</TableHead>
+                    <TableHead className="w-[120px]">상호명</TableHead>
                     <TableHead className="w-[120px]">대분류</TableHead>
                     <TableHead className="w-[120px]">중분류</TableHead>
                     <TableHead className="w-[120px]">소분류</TableHead>
@@ -139,6 +144,7 @@ export default function OrdersPreparingPage() {
                         />
                       </TableCell>
                       <TableCell className="font-mono text-sm">{order.sequenceNumber || index + 1}</TableCell>
+                      <TableCell>{order.memberCompanyName || "-"}</TableCell>
                       <TableCell>{order.categoryLarge || "-"}</TableCell>
                       <TableCell>{order.categoryMedium || "-"}</TableCell>
                       <TableCell>{order.categorySmall || "-"}</TableCell>

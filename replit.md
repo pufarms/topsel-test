@@ -97,6 +97,7 @@ Preferred communication style: Simple, everyday language.
 - **Stock History Tracking**: Comprehensive tracking of all stock changes with detailed records and API for filtering and download.
 - **Product Mapping**: Links products to necessary materials for inventory control. Includes hierarchical category filtering, bulk upload/download, and mapping checks before product dispatch.
 - **Admin Design System**: Standardized components and design rules for consistent UI within the admin panel.
+- **Admin Category Filter**: Specialized filter component for admin order pages with member selection (상호명 search/select), cascading category filters, and keyword search. All 8 admin order status pages use AdminCategoryFilter with 상호명 column in tables. Member filtering uses members.id (UUID) for matching orders.
 - **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` files for data import using `multer` and `xlsx`.
 - **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
 - **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
