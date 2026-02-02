@@ -505,10 +505,10 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <PublicHeader />
 
-      <main className="pt-14">
+      <main className="pt-14 overflow-x-hidden">
         <MemberPageBanner 
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
@@ -1317,9 +1317,9 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* 테이블 - 주문대기리스트 형식 (가로+세로 스크롤 테이블 컨테이너) */}
-                      <div className="border rounded-lg overflow-auto max-h-[600px]">
-                        <Table className="min-w-[1800px]">
+                      {/* 테이블 - 주문대기리스트 형식 (테이블 영역만 가로 스크롤) */}
+                      <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                        <Table className="w-max">
                           <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow className="bg-muted/50">
                               <TableHead className="font-semibold whitespace-nowrap w-12">순번</TableHead>
