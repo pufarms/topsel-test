@@ -36,7 +36,15 @@ export default function MemberOrderCancel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <MemberOrderFilter onFilterChange={handleFilterChange} />
+          <MemberOrderFilter 
+            onFilterChange={handleFilterChange}
+            showSearchField={true}
+            searchOptions={[
+              { value: "orderId", label: "주문번호" },
+              { value: "productName", label: "상품명" },
+              { value: "recipientName", label: "수령자명" },
+            ]}
+          />
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm">
