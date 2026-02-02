@@ -158,12 +158,12 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  const { data: memberData } = useQuery<Member>({
+  const { data: memberData, isLoading: memberLoading } = useQuery<Member>({
     queryKey: ["/api/member/profile"],
     enabled: !!user,
   });
 
-  if (authLoading) {
+  if (authLoading || memberLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -176,8 +176,25 @@ export default function Dashboard() {
     return null;
   }
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  const thisMonthOrders = orders.filter(order => {
+    const orderDate = new Date(order.createdAt);
+    return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+  });
+
+  const lastMonthOrders = orders.filter(order => {
+    const orderDate = new Date(order.createdAt);
+    return orderDate.getMonth() === lastMonth && orderDate.getFullYear() === lastMonthYear;
+  });
+
   const totalOrders = orders.length;
-  const totalValue = orders.reduce((sum, order) => sum + order.price * order.quantity, 0);
+  const thisMonthTotal = thisMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
+  const lastMonthTotal = lastMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("ko-KR") + "원";
@@ -233,7 +250,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-blue-200">지난 달 매입 총액</p>
-                  <p className="font-semibold">0원</p>
+                  <p className="font-semibold">{formatPrice(lastMonthTotal)}</p>
                 </div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-3">
@@ -242,7 +259,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-blue-200">이번 달 매입 총액</p>
-                  <p className="font-semibold">{formatPrice(totalValue)}</p>
+                  <p className="font-semibold">{formatPrice(thisMonthTotal)}</p>
                 </div>
               </div>
             </div>
