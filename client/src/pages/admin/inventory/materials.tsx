@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Pencil, Trash2, Download, Upload, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Download, Upload, Loader2, AlertCircle } from "lucide-react";
 import type { MaterialCategoryLarge, MaterialCategoryMedium, MaterialCategorySmall, Material, MaterialType, MaterialTypeRecord } from "@shared/schema";
 import { materialTypeLabels } from "@shared/schema";
 import * as XLSX from "xlsx";
@@ -329,11 +329,19 @@ export default function MaterialsPage() {
         body: formData,
         credentials: "include",
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "업로드 실패");
+        // 검증 오류가 있는 경우 에러 상세 정보 포함
+        if (data.errors && data.errors.length > 0) {
+          const error = new Error(data.message || "업로드 실패") as any;
+          error.errors = data.errors;
+          error.errorCount = data.errorCount;
+          error.totalRows = data.totalRows;
+          throw error;
+        }
+        throw new Error(data.message || "업로드 실패");
       }
-      return res.json();
+      return data;
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
@@ -345,15 +353,21 @@ export default function MaterialsPage() {
       if (data.newLargeCategories > 0 || data.newMediumCategories > 0 || data.newSmallCategories > 0) {
         message += ` (신규 대분류 ${data.newLargeCategories}개, 중분류 ${data.newMediumCategories}개, 소분류 ${data.newSmallCategories || 0}개 생성)`;
       }
-      toast({ title: message });
-      
-      if (data.errors && data.errors.length > 0) {
-        setUploadErrors(data.errors);
-        setUploadErrorsDialogOpen(true);
-      }
+      toast({ title: "업로드 성공", description: message });
     },
     onError: (error: any) => {
-      toast({ variant: "destructive", title: "오류", description: error.message });
+      // 검증 오류가 있으면 상세 다이얼로그 표시
+      if (error.errors && error.errors.length > 0) {
+        setUploadErrors(error.errors);
+        setUploadErrorsDialogOpen(true);
+        toast({ 
+          variant: "destructive", 
+          title: "업로드 실패", 
+          description: `${error.errorCount}개 오류 발견 - 오류를 수정 후 다시 업로드하세요.` 
+        });
+      } else {
+        toast({ variant: "destructive", title: "오류", description: error.message });
+      }
     },
   });
 
@@ -1109,21 +1123,31 @@ export default function MaterialsPage() {
       </AlertDialog>
 
       <Dialog open={uploadErrorsDialogOpen} onOpenChange={setUploadErrorsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>업로드 오류</DialogTitle>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              업로드 반려
+            </DialogTitle>
             <DialogDescription>
-              일부 행은 등록되지 않았습니다. ({uploadErrors.length}개 오류)
+              {uploadErrors.length}개 오류가 발견되어 <strong>전체 업로드가 취소</strong>되었습니다.
+              <br />
+              아래 오류를 모두 수정한 후 다시 업로드해 주세요.
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-destructive/10 p-3 rounded-md max-h-60 overflow-auto">
-            <p className="text-sm font-medium text-destructive mb-2">오류 목록</p>
-            {uploadErrors.map((err, i) => (
-              <p key={i} className="text-sm text-destructive">행 {err.row}: {err.error}</p>
-            ))}
+          <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-md max-h-80 overflow-auto">
+            <p className="text-sm font-semibold text-destructive mb-3">오류 상세 ({uploadErrors.length}건)</p>
+            <div className="space-y-2">
+              {uploadErrors.map((err, i) => (
+                <div key={i} className="text-sm bg-background/50 p-2 rounded border-l-4 border-destructive">
+                  <span className="font-medium text-destructive">[{err.row}행]</span>{" "}
+                  <span className="text-muted-foreground">{err.error}</span>
+                </div>
+              ))}
+            </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setUploadErrorsDialogOpen(false)}>확인</Button>
+            <Button variant="outline" onClick={() => setUploadErrorsDialogOpen(false)}>닫기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

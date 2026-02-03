@@ -3143,8 +3143,7 @@ export async function registerRoutes(
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
 
       const errors: { row: number; error: string }[] = [];
-      let created = 0;
-
+      
       // DB에서 재료타입 목록 조회하여 동적으로 매핑
       const activeMaterialTypes = await storage.getActiveMaterialTypes();
       const materialTypeMap: Record<string, string> = {};
@@ -3154,90 +3153,142 @@ export async function registerRoutes(
         validTypeNames.push(mt.name);
       }
 
+      // 1단계: 모든 행 검증 (등록 전 전체 검증)
+      interface ValidatedRow {
+        materialType: string;
+        largeCategoryId: string;
+        mediumCategoryId: string;
+        smallCategoryId: string | null;
+        materialCode: string;
+        materialName: string;
+        currentStock: number;
+      }
+      const validatedRows: ValidatedRow[] = [];
+      const codeSet = new Set<string>(); // 파일 내 중복 코드 체크용
+
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row || row.length < 6) continue;
         
         const [재료타입, 대분류, 중분류, 소분류, 재료코드, 재료명, 초기재고] = row;
+        const rowNum = i + 1; // 엑셀 행 번호 (헤더 포함)
         
+        // 필수값 검증
         if (!재료타입 || !대분류 || !중분류 || !재료명) {
-          errors.push({ row: i + 1, error: "필수값 누락 (재료타입, 대분류, 중분류, 재료명)" });
+          errors.push({ row: rowNum, error: "필수값 누락 (재료타입, 대분류, 중분류, 재료명)" });
           continue;
         }
 
+        // 재료타입 검증
         const materialType = materialTypeMap[String(재료타입)];
         if (!materialType) {
           const validTypesStr = validTypeNames.join("/") || "등록된 재료타입 없음";
-          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입} (${validTypesStr} 중 선택)` });
+          errors.push({ row: rowNum, error: `재료타입이 올바르지 않습니다: "${재료타입}" (${validTypesStr} 중 선택)` });
           continue;
         }
 
-        if (재료코드) {
-          const existing = await storage.getMaterialByCode(String(재료코드));
+        // 재료코드 중복 검증 (DB 및 파일 내)
+        const codeStr = 재료코드 ? String(재료코드).trim() : "";
+        if (codeStr) {
+          // 파일 내 중복 체크
+          if (codeSet.has(codeStr)) {
+            errors.push({ row: rowNum, error: `파일 내 재료코드 중복: "${codeStr}"` });
+            continue;
+          }
+          codeSet.add(codeStr);
+          
+          // DB 중복 체크
+          const existing = await storage.getMaterialByCode(codeStr);
           if (existing) {
-            errors.push({ row: i + 1, error: `재료코드 중복: ${재료코드}` });
+            errors.push({ row: rowNum, error: `이미 등록된 재료코드: "${codeStr}"` });
             continue;
           }
         }
 
-        // 대분류 확인 - 미리 설정된 카테고리만 허용
+        // 대분류 검증
         const largeCategory = await storage.getMaterialCategoryLargeByName(String(대분류));
         if (!largeCategory) {
-          errors.push({ row: i + 1, error: `대분류 카테고리 없음: "${대분류}" (미리 등록된 카테고리만 사용 가능)` });
+          errors.push({ row: rowNum, error: `대분류 카테고리 없음: "${대분류}" (미리 등록된 카테고리만 사용 가능)` });
           continue;
         }
 
-        // 중분류 확인 - 해당 대분류 하위에 있어야 함
+        // 중분류 검증
         const mediumCategory = await storage.getMaterialCategoryMediumByName(largeCategory.id, String(중분류));
         if (!mediumCategory) {
-          // 다른 대분류 아래에 같은 이름의 중분류가 있는지 확인
           const allMediumCategories = await storage.getAllMaterialCategoriesMedium();
           const existsElsewhere = allMediumCategories.find(m => m.name === String(중분류));
           if (existsElsewhere) {
-            errors.push({ row: i + 1, error: `카테고리 불일치: 중분류 "${중분류}"가 대분류 "${대분류}" 하위에 없습니다` });
+            errors.push({ row: rowNum, error: `카테고리 불일치: 중분류 "${중분류}"가 대분류 "${대분류}" 하위에 없습니다` });
           } else {
-            errors.push({ row: i + 1, error: `중분류 카테고리 없음: "${중분류}" (미리 등록된 카테고리만 사용 가능)` });
+            errors.push({ row: rowNum, error: `중분류 카테고리 없음: "${중분류}" (미리 등록된 카테고리만 사용 가능)` });
           }
           continue;
         }
 
-        // 소분류 확인 (선택사항) - 입력된 경우 해당 중분류 하위에 있어야 함
+        // 소분류 검증 (선택사항)
         let smallCategoryId: string | null = null;
         if (소분류 && String(소분류).trim()) {
           const smallCategory = await storage.getMaterialCategorySmallByName(mediumCategory.id, String(소분류));
           if (!smallCategory) {
-            // 다른 중분류 아래에 같은 이름의 소분류가 있는지 확인
             const allSmallCategories = await storage.getAllMaterialCategoriesSmall();
             const existsElsewhere = allSmallCategories.find(s => s.name === String(소분류));
             if (existsElsewhere) {
-              errors.push({ row: i + 1, error: `카테고리 불일치: 소분류 "${소분류}"가 중분류 "${중분류}" 하위에 없습니다` });
+              errors.push({ row: rowNum, error: `카테고리 불일치: 소분류 "${소분류}"가 중분류 "${중분류}" 하위에 없습니다` });
             } else {
-              errors.push({ row: i + 1, error: `소분류 카테고리 없음: "${소분류}" (미리 등록된 카테고리만 사용 가능)` });
+              errors.push({ row: rowNum, error: `소분류 카테고리 없음: "${소분류}" (미리 등록된 카테고리만 사용 가능)` });
             }
             continue;
           }
           smallCategoryId = smallCategory.id;
         }
 
-        const code = 재료코드 ? String(재료코드) : await storage.getNextMaterialCode(materialType);
+        // 재료코드 자동생성 (입력 안 된 경우)
+        const finalCode = codeStr || await storage.getNextMaterialCode(materialType);
         
-        await storage.createMaterial({
+        // 검증 통과한 행 저장
+        validatedRows.push({
           materialType,
           largeCategoryId: largeCategory.id,
           mediumCategoryId: mediumCategory.id,
           smallCategoryId,
-          materialCode: code,
+          materialCode: finalCode,
           materialName: String(재료명),
           currentStock: parseFloat(String(초기재고 || 0)) || 0,
         });
+      }
+
+      // 2단계: 오류가 있으면 전체 업로드 거부
+      if (errors.length > 0) {
+        const errorDetails = errors.map(e => `[${e.row}행] ${e.error}`).join("\n");
+        return res.status(400).json({
+          success: false,
+          message: `업로드 실패: ${errors.length}개 오류 발견\n\n오류를 수정한 후 다시 업로드해 주세요.`,
+          errorCount: errors.length,
+          totalRows: validatedRows.length + errors.length,
+          errors,
+          errorDetails,
+        });
+      }
+
+      // 3단계: 모든 검증 통과 시 일괄 등록
+      if (validatedRows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "등록할 데이터가 없습니다. 엑셀 파일을 확인해 주세요.",
+        });
+      }
+
+      let created = 0;
+      for (const row of validatedRows) {
+        await storage.createMaterial(row);
         created++;
       }
 
       return res.json({
         success: true,
-        message: `${created}개 재료가 등록되었습니다.`,
+        message: `${created}개 재료가 성공적으로 등록되었습니다.`,
         created,
-        errors,
+        errors: [],
       });
     } catch (error) {
       return res.status(400).json({ message: "엑셀 파일 처리 중 오류가 발생했습니다" });
