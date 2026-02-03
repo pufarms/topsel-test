@@ -121,75 +121,41 @@ Preferred communication style: Simple, everyday language.
 - `siteSettings`: Key-value pairs for site configuration.
 - `headerMenus`: Stores header menu items for dynamic navigation.
 - `pages`: Page definitions with categories, access levels, and JSONB content for CMS.
+- `term_agreements`: Stores user consent records with content snapshots and hashes for integrity.
 
 ### Core Features
-- **Member Mypage**: Self-service profile page for members (`/mypage`), with editable fields and read-only information, accessible only to logged-in members.
+- **Member Mypage**: Self-service profile page for members (`/mypage`).
 - **Product Management (Admin Only)**: Role-based access for product categories, registration, and status viewing.
 - **Inventory Management (Admin Only)**: Material management, product mapping, stock status, and history tracking. Supports bulk Excel uploads.
-- **Stock History Tracking**: Comprehensive tracking of all stock changes with detailed records and API for filtering and download.
-- **Product Mapping**: Links products to necessary materials for inventory control. Includes hierarchical category filtering, bulk upload/download, and mapping checks before product dispatch.
-- **Admin Design System**: Standardized components and design rules for consistent UI within the admin panel.
-- **Admin Category Filter**: Specialized filter component for admin order pages with member selection (상호명 search/select), cascading category filters, and keyword search. All 8 admin order status pages use AdminCategoryFilter with 상호명 column in tables. Member filtering uses members.id (UUID) for matching orders.
-  - **중요 규칙**: 검색 필터는 페이지 전체가 아닌 해당 리스트 테이블에만 적용됨
-  - 한 페이지에 여러 리스트 테이블이 있으면 각 테이블마다 독립적인 필터 컴포넌트 적용 필수
-  - 새로운 리스트 테이블 생성 시 반드시 해당 테이블 전용 필터 상태(state)와 컴포넌트 분리
+- **Stock History Tracking**: Comprehensive tracking of all stock changes.
+- **Product Mapping**: Links products to necessary materials for inventory control.
+- **Admin Design System**: Standardized components and design rules for consistent UI.
+- **Admin Category Filter**: Specialized filter component for admin order pages with member selection, cascading category filters, and keyword search.
 - **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` files for data import using `multer` and `xlsx`.
-- **Partial Order Upload (주문 부분 업로드)**: Excel order upload supports partial registration when validation errors exist.
-  - Flow: Upload → Validate all rows → Show results → User chooses "취소" or "정상건만 등록"
-  - Validation checks: Required fields (상품코드, 상품명, 자체주문번호, 주문자명, 주문자전화번호, 수령자명, 수령자휴대폰번호, 수령자주소), product code existence in 현재공급상품
-  - If errors exist: Shows validation_failed status with valid/error counts
-  - Partial upload: Registers only valid rows, auto-downloads error Excel with "오류사유" column
-  - Error Excel columns (주문등록 양식과 동일한 순서 + 오류사유): 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품코드, 상품명, 자체주문번호, 오류사유
-  - 회원이 오류사유 컬럼만 삭제하면 바로 재업로드 가능
-- **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
-- **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
-- **Page Management (Admin)**: CMS for dynamic page creation and management using a JSON-based content system (`pages` table). Features include a visual content editor with 9 section types, real-time preview, 8 predefined page categories, and access level control. System pages are non-deletable. Dynamic page rendering handles public paths.
-- **Term Agreement Record Keeping (Admin)**: Legal evidence system for storing user consent records (`term_agreements` table). Features include:
-  - Full terms content snapshot at time of agreement (not a reference)
-  - SHA-256 hash for content integrity verification (contentHash)
-  - Electronic signature storage with SHA-256 signature hash (signatureHash)
-  - IP address (first IP from x-forwarded-for), user agent, and timestamp recording
-  - Member identification (CEO birth, CI from identity verification, phone)
-  - Term versions from CMS for traceability
-  - Admin page for searching and viewing agreement records (/admin/term-agreements)
+- **Partial Order Upload (주문 부분 업로드)**: Excel order upload supports partial registration when validation errors exist, with an option to register only valid rows and download an error report.
+- **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general).
+- **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility and drag-and-drop ordering.
+- **Page Management (Admin)**: CMS for dynamic page creation and management with a visual content editor, real-time preview, and access level control.
+- **Term Agreement Record Keeping (Admin)**: Legal evidence system for storing user consent records with content snapshots, SHA-256 hashes for integrity, and detailed metadata.
+- **Smart Address Validation System (스마트 주소 검증 시스템)**: Automatically validates and normalizes recipient addresses during Excel order uploads using a multi-step pipeline including regex matching, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI). It auto-learns from AI results to improve efficiency.
+  - Validation Statuses: `VALID`, `WARNING`, `INVALID`.
+  - Integration: Invalid addresses cause errors in partial uploads, warnings add notes to shipping messages, and validated addresses are stored.
 
 ### Order Workflow (주문 워크플로우)
-주문은 다음 단계를 거쳐 처리됩니다. 각 단계 전환 시 SSE 이벤트가 발생하여 관리자와 회원 모두 실시간으로 현황판이 업데이트됩니다.
+Orders progress through the following stages, with SSE events updating dashboards in real-time for both administrators and members:
 
-1. **주문대기** (Pending Orders)
-   - 회원이 주문을 등록
-   - 자체주문번호(customOrderNumber)는 중복 가능 (회원이 여러 상품 주문을 분리하기 때문)
-   - 각 주문은 시스템 생성 sequenceNumber로 고유 식별
+1.  **주문대기** (Pending Orders): Member submits an order.
+2.  **주문조정** (Order Adjustment): Admin adjusts orders, including cancellation.
+3.  **상품준비중** (Product Preparation): Admin prepares products and prints waybills.
+4.  **배송준비중** (Ready for Shipping): Automatically moves here after waybill registration. Members can request cancellations.
+5.  **배송중** (In Shipping): Admin moves orders to this stage. Settlement (deposit, points) occurs here.
 
-2. **주문조정** (Order Adjustment)
-   - 관리자가 주문 통계를 기반으로 주문 조정
-   - 직권취소 처리 시 즉시 현황판에 반영
-   - 회원은 조정된 주문 리스트 확인 가능
-
-3. **상품준비중** (Product Preparation)
-   - 주문조정 완료된 주문이 이동
-   - 관리자가 운송장 출력 작업 수행
-
-4. **배송준비중** (Ready for Shipping)
-   - 운송장이 등록되면 자동으로 이동
-   - 회원: 운송파일 다운로드하여 자체 판매사이트에 등록
-   - 회원: 취소 요청 접수 가능 (취소 시 해당 주문 자동 취소 처리)
-
-5. **배송중** (In Shipping)
-   - 취소건 접수 마감 후 관리자가 배송준비중 → 배송중으로 이동
-   - **이 시점에 정산 처리**: 예치금(deposit)과 포인터(points)로 결제 처리
-   - 모든 배송 관련 업무 완료
-
-**중요 규칙**:
-- 모든 주문 상태 변경 시 SSE 이벤트 발생 (`order-updated`, `orders-deleted`, `order-created`)
-- 관리자와 해당 회원 모두에게 실시간 알림 전송
-- 현황판(Order Stats Banner) 즉시 갱신
+**Important Rule**: All order status changes trigger SSE events (`order-updated`, `orders-deleted`, `order-created`) for real-time notifications and dashboard updates.
 
 ## External Dependencies
 
 ### Database
 - **PostgreSQL**: Primary database.
-- **Drizzle Kit**: For database migrations.
 
 ### UI/UX Libraries
 - **Radix UI**: Accessible primitive components.
@@ -204,7 +170,9 @@ Preferred communication style: Simple, everyday language.
 - **memorystore**: In-memory session store for development.
 
 ### Image Storage
-- **Cloudflare R2**: S3-compatible object storage for images. Public URL: `https://pub-ecc7de5cc4bd40e3965936a44b6.r2.dev`.
+- **Cloudflare R2**: S3-compatible object storage for images.
 
 ### Other APIs
 - **Resend**: For email sending functionality.
+- **Juso.go.kr (행정안전부 주소 API)**: For delivery address verification.
+- **Anthropic Claude AI**: For detailed address normalization (optional).
