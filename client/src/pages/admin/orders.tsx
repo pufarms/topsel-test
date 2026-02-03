@@ -98,7 +98,7 @@ export default function AdminOrders() {
 
   // Use real stats from API
   const totalOrders = orderStats?.total || 0;
-  const todayOrders = orderStats?.today || 0;
+  const pendingOrders = orderStats?.pending || 0;
   const totalRevenue = orders.reduce((sum, o) => sum + o.price * o.quantity, 0);
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
 
@@ -144,12 +144,12 @@ export default function AdminOrders() {
           testId="stat-card-total"
         />
         <StatCard
-          label="오늘 주문"
-          value={todayOrders}
+          label="주문대기"
+          value={pendingOrders}
           suffix="건"
           icon={Calendar}
-          iconColor="bg-blue-500 text-white"
-          testId="stat-card-today"
+          iconColor="bg-yellow-500 text-white"
+          testId="stat-card-pending"
         />
         <StatCard
           label="총 매출"
