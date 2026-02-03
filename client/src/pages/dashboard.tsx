@@ -271,7 +271,10 @@ export default function Dashboard() {
           variant: "destructive" 
         });
       } else {
-        setUploadProgress({ total: data.total, success: data.success, failed: data.failed, errors: [] });
+        // 성공 시 다이얼로그 닫고 파일/진행상태 초기화
+        setOrderDialogOpen(false);
+        setExcelFile(null);
+        setUploadProgress(null);
         toast({ title: "주문 등록 완료", description: `${data.success}건의 주문이 등록되었습니다.` });
         queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       }
