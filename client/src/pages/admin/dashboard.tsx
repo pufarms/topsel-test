@@ -126,6 +126,18 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/orders"],
   });
 
+  // Order stats from API (real-time counts from pending_orders table)
+  const { data: orderStats } = useQuery<{
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    cancelled: number;
+    today: number;
+  }>({
+    queryKey: ["/api/order-stats"],
+  });
+
   const today = new Date();
   const formattedDate = today.toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -263,45 +275,45 @@ export default function AdminDashboard() {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <MiniStat
-              title="주문대기"
-              value={`${orders.length}건`}
-              icon={<Clock className="h-3.5 w-3.5" />}
-              color="yellow"
-            />
-            <MiniStat
-              title="주문조정(직권취소)"
-              value="0건"
-              icon={<AlertCircle className="h-3.5 w-3.5" />}
-              color="red"
-            />
-            <MiniStat
-              title="상품준비중"
-              value="0건"
+              title="전체주문"
+              value={`${orderStats?.total || 0}건`}
               icon={<Package className="h-3.5 w-3.5" />}
               color="blue"
             />
             <MiniStat
-              title="배송준비중"
-              value="0건"
+              title="주문대기"
+              value={`${orderStats?.pending || 0}건`}
+              icon={<Clock className="h-3.5 w-3.5" />}
+              color="yellow"
+            />
+            <MiniStat
+              title="처리중"
+              value={`${orderStats?.processing || 0}건`}
               icon={<Package className="h-3.5 w-3.5" />}
               color="purple"
             />
             <MiniStat
-              title="회원취소"
-              value="0건"
+              title="완료"
+              value={`${orderStats?.completed || 0}건`}
+              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+              color="green"
+            />
+            <MiniStat
+              title="취소"
+              value={`${orderStats?.cancelled || 0}건`}
               icon={<XCircle className="h-3.5 w-3.5" />}
               color="red"
             />
             <MiniStat
-              title="배송중"
-              value="0건"
-              icon={<Truck className="h-3.5 w-3.5" />}
+              title="오늘등록"
+              value={`${orderStats?.today || 0}건`}
+              icon={<Calendar className="h-3.5 w-3.5" />}
               color="orange"
             />
             <MiniStat
               title="배송완료"
               value="0건"
-              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+              icon={<Truck className="h-3.5 w-3.5" />}
               color="green"
             />
           </div>
