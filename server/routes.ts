@@ -3351,7 +3351,38 @@ export async function registerRoutes(
     const mappings = await storage.getAllProductMappings();
     const result = await Promise.all(mappings.map(async (m) => {
       const materialMappings = await storage.getProductMaterialMappings(m.productCode);
-      return { ...m, materials: materialMappings };
+      
+      // 매핑된 재료가 실제로 존재하는지 확인하여 실제 매핑 상태 계산
+      let actualMappingStatus = m.mappingStatus;
+      let missingMaterials: string[] = [];
+      
+      if (materialMappings.length > 0) {
+        // 각 매핑된 재료가 materials 테이블에 존재하는지 확인
+        for (const mm of materialMappings) {
+          const material = await storage.getMaterialByCode(mm.materialCode);
+          if (!material) {
+            missingMaterials.push(mm.materialCode);
+          }
+        }
+        
+        // 누락된 재료가 있으면 매핑 미완료로 변경
+        if (missingMaterials.length > 0) {
+          actualMappingStatus = "incomplete";
+        } else if (m.mappingStatus === "incomplete" && materialMappings.length > 0) {
+          // 모든 재료가 존재하면 완료로 변경
+          actualMappingStatus = "complete";
+        }
+      } else {
+        // 매핑된 재료가 없으면 미완료
+        actualMappingStatus = "incomplete";
+      }
+      
+      return { 
+        ...m, 
+        materials: materialMappings, 
+        mappingStatus: actualMappingStatus,
+        missingMaterials: missingMaterials.length > 0 ? missingMaterials : undefined,
+      };
     }));
     return res.json(result);
   });
@@ -3404,7 +3435,34 @@ export async function registerRoutes(
       return res.status(404).json({ message: "상품 매핑을 찾을 수 없습니다" });
     }
     const materials = await storage.getProductMaterialMappings(productCode);
-    return res.json({ ...mapping, materials });
+    
+    // 매핑된 재료가 실제로 존재하는지 확인하여 실제 매핑 상태 계산
+    let actualMappingStatus = mapping.mappingStatus;
+    let missingMaterials: string[] = [];
+    
+    if (materials.length > 0) {
+      for (const mm of materials) {
+        const material = await storage.getMaterialByCode(mm.materialCode);
+        if (!material) {
+          missingMaterials.push(mm.materialCode);
+        }
+      }
+      
+      if (missingMaterials.length > 0) {
+        actualMappingStatus = "incomplete";
+      } else if (mapping.mappingStatus === "incomplete" && materials.length > 0) {
+        actualMappingStatus = "complete";
+      }
+    } else {
+      actualMappingStatus = "incomplete";
+    }
+    
+    return res.json({ 
+      ...mapping, 
+      materials, 
+      mappingStatus: actualMappingStatus,
+      missingMaterials: missingMaterials.length > 0 ? missingMaterials : undefined,
+    });
   });
 
   // 상품 추가 (단일)
