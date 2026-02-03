@@ -134,6 +134,12 @@ Preferred communication style: Simple, everyday language.
   - 한 페이지에 여러 리스트 테이블이 있으면 각 테이블마다 독립적인 필터 컴포넌트 적용 필수
   - 새로운 리스트 테이블 생성 시 반드시 해당 테이블 전용 필터 상태(state)와 컴포넌트 분리
 - **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` files for data import using `multer` and `xlsx`.
+- **Partial Order Upload (주문 부분 업로드)**: Excel order upload supports partial registration when validation errors exist.
+  - Flow: Upload → Validate all rows → Show results → User chooses "취소" or "정상건만 등록"
+  - Validation checks: Required fields (상품코드, 상품명, 자체주문번호, 주문자명, 주문자전화번호, 수령자명, 수령자휴대폰번호, 수령자주소), product code existence in 현재공급상품
+  - If errors exist: Shows validation_failed status with valid/error counts
+  - Partial upload: Registers only valid rows, auto-downloads error Excel with "오류사유" column
+  - Error Excel columns: 상품코드, 상품명, 자체주문번호, 주문자명, 주문자전화번호, 주문자주소, 수령자명, 수령자휴대폰번호, 수령자전화번호, 수령자주소, 배송메시지, 오류사유
 - **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
 - **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
 - **Page Management (Admin)**: CMS for dynamic page creation and management using a JSON-based content system (`pages` table). Features include a visual content editor with 9 section types, real-time preview, 8 predefined page categories, and access level control. System pages are non-deletable. Dynamic page rendering handles public paths.
