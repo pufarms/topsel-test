@@ -528,7 +528,7 @@ export const insertCurrentProductSchema = createInsertSchema(currentProducts).om
 export type InsertCurrentProduct = z.infer<typeof insertCurrentProductSchema>;
 export type CurrentProduct = typeof currentProducts.$inferSelect;
 
-// 재료 타입
+// 재료 타입 (레거시 - 호환성 유지)
 export const materialTypes = ["raw", "semi", "sub"] as const;
 export type MaterialType = typeof materialTypes[number];
 
@@ -537,6 +537,27 @@ export const materialTypeLabels: Record<MaterialType, string> = {
   semi: "반재료",
   sub: "부재료",
 };
+
+// 재료 타입 테이블 (동적 관리용)
+export const materialTypesTable = pgTable("material_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMaterialTypeSchema = createInsertSchema(materialTypesTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaterialType = z.infer<typeof insertMaterialTypeSchema>;
+export type MaterialTypeRecord = typeof materialTypesTable.$inferSelect;
 
 // 재료 대분류
 export const materialCategoriesLarge = pgTable("material_categories_large", {

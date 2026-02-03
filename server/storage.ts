@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialTypeRecord, type InsertMaterialType, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialTypesTable, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -114,6 +114,15 @@ export interface IStorage {
   resumeCurrentProducts(ids: string[]): Promise<number>;
   deleteCurrentProduct(id: string): Promise<boolean>;
   bulkDeleteCurrentProducts(ids: string[]): Promise<number>;
+
+  // Material Type methods (재료 타입)
+  getAllMaterialTypes(): Promise<MaterialTypeRecord[]>;
+  getActiveMaterialTypes(): Promise<MaterialTypeRecord[]>;
+  getMaterialType(id: string): Promise<MaterialTypeRecord | undefined>;
+  getMaterialTypeByCode(code: string): Promise<MaterialTypeRecord | undefined>;
+  createMaterialType(data: InsertMaterialType): Promise<MaterialTypeRecord>;
+  updateMaterialType(id: string, data: Partial<InsertMaterialType>): Promise<MaterialTypeRecord | undefined>;
+  deleteMaterialType(id: string): Promise<boolean>;
 
   // Material Category Large methods (재료 대분류)
   getAllMaterialCategoriesLarge(): Promise<MaterialCategoryLarge[]>;
@@ -972,6 +981,45 @@ export class DatabaseStorage implements IStorage {
   async bulkDeleteCurrentProducts(ids: string[]): Promise<number> {
     const result = await db.delete(currentProducts).where(inArray(currentProducts.id, ids)).returning();
     return result.length;
+  }
+
+  // Material Type methods (재료 타입)
+  async getAllMaterialTypes(): Promise<MaterialTypeRecord[]> {
+    return db.select().from(materialTypesTable).orderBy(materialTypesTable.sortOrder);
+  }
+
+  async getActiveMaterialTypes(): Promise<MaterialTypeRecord[]> {
+    return db.select().from(materialTypesTable)
+      .where(eq(materialTypesTable.isActive, true))
+      .orderBy(materialTypesTable.sortOrder);
+  }
+
+  async getMaterialType(id: string): Promise<MaterialTypeRecord | undefined> {
+    const [type] = await db.select().from(materialTypesTable).where(eq(materialTypesTable.id, id));
+    return type;
+  }
+
+  async getMaterialTypeByCode(code: string): Promise<MaterialTypeRecord | undefined> {
+    const [type] = await db.select().from(materialTypesTable).where(eq(materialTypesTable.code, code));
+    return type;
+  }
+
+  async createMaterialType(data: InsertMaterialType): Promise<MaterialTypeRecord> {
+    const [type] = await db.insert(materialTypesTable).values(data).returning();
+    return type;
+  }
+
+  async updateMaterialType(id: string, data: Partial<InsertMaterialType>): Promise<MaterialTypeRecord | undefined> {
+    const [type] = await db.update(materialTypesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(materialTypesTable.id, id))
+      .returning();
+    return type;
+  }
+
+  async deleteMaterialType(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(materialTypesTable).where(eq(materialTypesTable.id, id)).returning();
+    return !!deleted;
   }
 
   // Material Category Large methods (재료 대분류)
