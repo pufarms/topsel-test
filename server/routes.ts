@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates } from "@shared/schema";
+import addressValidationRouter from "./address-validation";
 import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
@@ -112,6 +113,9 @@ export async function registerRoutes(
       },
     })
   );
+
+  // 주소 검증 API 라우터
+  app.use("/api/address", addressValidationRouter);
 
   // SSE 이벤트 스트림 엔드포인트
   app.get("/api/events", async (req, res) => {
