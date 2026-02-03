@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,8 +13,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Pencil, Trash2, Loader2, Package } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, Loader2, Package, RefreshCw } from "lucide-react";
 import type { MaterialTypeRecord } from "@shared/schema";
+
+function generateCode(name: string, existingCodes: string[]): string {
+  const baseCode = name
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]/g, '')
+    .slice(0, 10);
+  
+  if (baseCode && !existingCodes.includes(baseCode)) {
+    return baseCode;
+  }
+  
+  const timestamp = Date.now().toString(36).slice(-4);
+  const randomCode = `type_${timestamp}`;
+  
+  if (!existingCodes.includes(randomCode)) {
+    return randomCode;
+  }
+  
+  return `type_${Date.now().toString(36)}`;
+}
 
 export default function MaterialTypesPage() {
   const { toast } = useToast();
@@ -30,10 +50,20 @@ export default function MaterialTypesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [autoCodeEnabled, setAutoCodeEnabled] = useState(true);
 
   const { data: materialTypes = [], isLoading } = useQuery<MaterialTypeRecord[]>({
     queryKey: ["/api/material-types"],
   });
+
+  const existingCodes = materialTypes.map(t => t.code);
+
+  useEffect(() => {
+    if (!editId && autoCodeEnabled && name.trim()) {
+      const newCode = generateCode(name.trim(), existingCodes);
+      setCode(newCode);
+    }
+  }, [name, editId, autoCodeEnabled, existingCodes]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { code: string; name: string; description: string; sortOrder: number; isActive: boolean }) => {
@@ -89,6 +119,17 @@ export default function MaterialTypesPage() {
     setDescription("");
     setSortOrder("0");
     setIsActive(true);
+    setAutoCodeEnabled(true);
+  };
+
+  const regenerateCode = () => {
+    if (name.trim()) {
+      const newCode = generateCode(name.trim(), existingCodes);
+      setCode(newCode);
+    } else {
+      const newCode = `type_${Date.now().toString(36).slice(-6)}`;
+      setCode(newCode);
+    }
   };
 
   const openEdit = (type: MaterialTypeRecord) => {
@@ -294,22 +335,6 @@ export default function MaterialTypesPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>코드 *</Label>
-              <Input 
-                value={code} 
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="예: raw, semi, sub"
-                disabled={!!editId}
-                className={editId ? "bg-muted" : ""}
-                data-testid="input-code"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {editId 
-                  ? "코드는 수정할 수 없습니다 (기존 재료 데이터 보호)" 
-                  : "영문 소문자로 입력 (시스템 내부 식별용)"}
-              </p>
-            </div>
-            <div>
               <Label>이름 *</Label>
               <Input 
                 value={name} 
@@ -317,6 +342,40 @@ export default function MaterialTypesPage() {
                 placeholder="예: 원재료, 반재료, 부재료"
                 data-testid="input-name"
               />
+              <p className="text-xs text-muted-foreground mt-1">화면에 표시되는 이름</p>
+            </div>
+            <div>
+              <Label>코드 {!editId && "(자동생성)"}</Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={code} 
+                  onChange={(e) => {
+                    setCode(e.target.value);
+                    setAutoCodeEnabled(false);
+                  }}
+                  placeholder="자동 생성됨"
+                  disabled={!!editId}
+                  className={editId ? "bg-muted flex-1" : "flex-1"}
+                  data-testid="input-code"
+                />
+                {!editId && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon"
+                    onClick={regenerateCode}
+                    title="코드 재생성"
+                    data-testid="button-regenerate-code"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {editId 
+                  ? "코드는 수정할 수 없습니다 (기존 재료 데이터 보호)" 
+                  : "이름 입력 시 자동 생성됩니다 (직접 수정도 가능)"}
+              </p>
             </div>
             <div>
               <Label>설명</Label>
@@ -368,17 +427,15 @@ export default function MaterialTypesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>재료타입 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteName}" 재료타입을 삭제하시겠습니까?
-              <br />
-              이 타입을 사용하는 재료가 있을 경우 문제가 발생할 수 있습니다.
+              "{deleteName}" 재료타입을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">취소</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-delete-cancel">취소</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={confirmDelete} 
+              onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
+              data-testid="button-delete-confirm"
             >
               삭제
             </AlertDialogAction>
@@ -389,19 +446,17 @@ export default function MaterialTypesPage() {
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>선택 항목 일괄 삭제</AlertDialogTitle>
+            <AlertDialogTitle>일괄 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              선택한 {selectedIds.length}개의 재료타입을 삭제하시겠습니까?
-              <br />
-              이 작업은 되돌릴 수 없습니다.
+              선택한 {selectedIds.length}개의 재료타입을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-bulk-delete">취소</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-bulk-delete-cancel">취소</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleBulkDelete} 
+              onClick={handleBulkDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-bulk-delete"
+              data-testid="button-bulk-delete-confirm"
             >
               삭제
             </AlertDialogAction>
