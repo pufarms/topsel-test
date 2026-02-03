@@ -1217,11 +1217,12 @@ export default function ProductMappingPage() {
                   size="sm" 
                   variant="outline" 
                   onClick={() => {
-                    setMaterialSelectDialogOpen(true);
                     setMaterialSearchQuery("");
                     setMaterialFilterLarge("all");
                     setMaterialFilterMedium("all");
+                    setMaterialFilterSmall("all");
                     setMaterialCurrentPage(1);
+                    setMaterialSelectDialogOpen(true);
                   }} 
                   data-testid="button-add-material"
                 >
