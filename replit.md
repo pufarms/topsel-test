@@ -140,6 +140,12 @@ Preferred communication style: Simple, everyday language.
 - **Smart Address Validation System (스마트 주소 검증 시스템)**: Automatically validates and normalizes recipient addresses during Excel order uploads using a multi-step pipeline including regex matching, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI). It auto-learns from AI results to improve efficiency.
   - Validation Statuses: `VALID`, `WARNING`, `INVALID`.
   - Integration: Invalid addresses cause errors in partial uploads, warnings add notes to shipping messages, and validated addresses are stored.
+  - **Multi-step Fallback Validation**: If full address lookup fails:
+    1. First retry with truncated address (first 3 tokens)
+    2. Extract road address pattern (시/도 + 구/군 + 도로명 + 번호) and validate
+    3. Clean address (remove parentheses, special characters) and retry
+    4. If road address is valid but building unconfirmed → WARNING (not INVALID)
+    5. Only mark as INVALID if road address itself doesn't exist
 - **AI Address Learning Management (주소학습 관리 - Admin Settings)**: Admins can register error address patterns and AI automatically analyzes why they're errors, learns the patterns, and applies them during order validation.
   - Location: 사이트설정 > 주소학습 탭
   - Features: Stats dashboard, paginated list with search, create/edit/delete learning data, pattern test dialog, AI analysis button

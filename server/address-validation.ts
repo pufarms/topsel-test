@@ -689,6 +689,39 @@ function extractDetailAddress(originalTokens: string[], standardAddress: string)
   return "";
 }
 
+/**
+ * 주소에서 도로명 주소 패턴만 추출 (시/도 + 구/군/시 + 도로명 + 번호)
+ * 예: "부산광역시 사하구 다대로277번길 85 신세대 지큐빌 아파트" -> "부산광역시 사하구 다대로277번길 85"
+ */
+function extractRoadAddressPattern(address: string): string | null {
+  // 도로명 주소 패턴: 시/도 + 구/군/시 + 읍/면/동(선택) + 도로명(~로/~길) + 번호
+  const patterns = [
+    // 기본 패턴: 시도 + 시군구 + 도로명 + 번호
+    /^(.+(?:도|시|광역시|특별시|특별자치도|특별자치시))\s+(.+(?:시|군|구))\s+(?:(.+(?:읍|면|동))\s+)?(.+(?:로|길))\s*(\d+(?:-\d+)?)/,
+    // 세종시 등 특별한 케이스
+    /^(세종특별자치시)\s+(.+(?:로|길))\s*(\d+(?:-\d+)?)/,
+    // 시/구 직접 시작
+    /^(.+(?:시|군|구))\s+(?:(.+(?:읍|면|동))\s+)?(.+(?:로|길))\s*(\d+(?:-\d+)?)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = address.match(pattern);
+    if (match) {
+      // 매칭된 전체 도로명 주소 부분 반환
+      return match[0];
+    }
+  }
+  
+  // 번길 패턴으로 직접 추출 시도
+  const roadPattern = /(.+(?:로|길)\s*\d+(?:-\d+)?(?:번길\s*\d+(?:-\d+)?)?)/;
+  const roadMatch = address.match(roadPattern);
+  if (roadMatch) {
+    return roadMatch[1].trim();
+  }
+  
+  return null;
+}
+
 interface AddressValidationInternalResult {
   status: AddressStatus;
   standardAddress?: string;
@@ -736,6 +769,7 @@ async function validateAddress(rawAddress: string): Promise<AddressValidationInt
   const totalCount = parseInt(response.results.common.totalCount, 10);
 
   if (totalCount === 0 || !response.results.juso || response.results.juso.length === 0) {
+    // 1차 재시도: 앞쪽 토큰들로 검색
     const retryKeyword = tokens.slice(0, Math.max(3, tokens.length - 2)).join(" ");
     const retryResponse = await callJusoAPI(retryKeyword);
     
@@ -743,6 +777,57 @@ async function validateAddress(rawAddress: string): Promise<AddressValidationInt
       const trimmedParts = tokens.slice(3);
       const foundResult = retryResponse.results.juso[0];
       return processFoundAddress(foundResult, trimmedParts, tokens, false, "medium");
+    }
+    
+    // 2차 재시도: 도로명 주소 패턴 추출 시도 (시/도 + 구/군 + 도로명 + 번호)
+    const roadAddressPattern = extractRoadAddressPattern(expanded);
+    if (roadAddressPattern) {
+      const roadRetryResponse = await callJusoAPI(roadAddressPattern);
+      if (roadRetryResponse && parseInt(roadRetryResponse.results.common.totalCount, 10) > 0 && roadRetryResponse.results.juso) {
+        const foundResult = roadRetryResponse.results.juso[0];
+        const standardAddress = foundResult.roadAddrPart1;
+        // 도로명 주소는 찾았지만 건물명 확인 불가 - WARNING으로 처리
+        return {
+          status: "warning",
+          standardAddress,
+          fullAddress: rawAddress.trim(),
+          warningMessage: "도로명 주소는 확인되었으나 건물명 확인 불가 - 상세주소 확인 필요",
+          reasonCode: "W_BUILDING_NOT_CONFIRMED",
+        };
+      }
+    }
+    
+    // 3차 재시도: 괄호, 특수문자 제거 후 재검색
+    const cleanedAddress = expanded
+      .replace(/\([^)]*\)/g, '')  // 괄호 및 내용 제거
+      .replace(/[,\-]/g, ' ')     // 콤마, 하이픈을 공백으로
+      .replace(/\s+/g, ' ')       // 중복 공백 제거
+      .trim();
+    
+    if (cleanedAddress !== expanded) {
+      const cleanedTokens = cleanedAddress.split(" ").filter(t => t.length > 0);
+      const cleanedRetryResponse = await callJusoAPI(cleanedAddress);
+      
+      if (cleanedRetryResponse && parseInt(cleanedRetryResponse.results.common.totalCount, 10) > 0 && cleanedRetryResponse.results.juso) {
+        const foundResult = cleanedRetryResponse.results.juso[0];
+        return processFoundAddress(foundResult, cleanedTokens, tokens, false, "medium");
+      }
+      
+      // 정리된 주소에서 도로명 패턴 추출 재시도
+      const cleanedRoadPattern = extractRoadAddressPattern(cleanedAddress);
+      if (cleanedRoadPattern) {
+        const cleanedRoadResponse = await callJusoAPI(cleanedRoadPattern);
+        if (cleanedRoadResponse && parseInt(cleanedRoadResponse.results.common.totalCount, 10) > 0 && cleanedRoadResponse.results.juso) {
+          const foundResult = cleanedRoadResponse.results.juso[0];
+          return {
+            status: "warning",
+            standardAddress: foundResult.roadAddrPart1,
+            fullAddress: rawAddress.trim(),
+            warningMessage: "도로명 주소는 확인되었으나 건물명/상세주소 확인 불가",
+            reasonCode: "W_BUILDING_NOT_CONFIRMED",
+          };
+        }
+      }
     }
     
     return {
