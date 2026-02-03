@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -114,6 +115,9 @@ function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
 }
 
 export default function AdminDashboard() {
+  // SSE 실시간 업데이트 연결 (관리자)
+  useSSE();
+
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
