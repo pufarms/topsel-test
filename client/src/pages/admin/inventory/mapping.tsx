@@ -91,6 +91,7 @@ export default function ProductMappingPage() {
   const [materialSearchQuery, setMaterialSearchQuery] = useState("");
   const [materialFilterLarge, setMaterialFilterLarge] = useState("all");
   const [materialFilterMedium, setMaterialFilterMedium] = useState("all");
+  const [materialFilterSmall, setMaterialFilterSmall] = useState("all");
   const [materialCurrentPage, setMaterialCurrentPage] = useState(1);
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -129,10 +130,19 @@ export default function ProductMappingPage() {
     queryKey: ["/api/material-categories/medium"],
   });
 
+  const { data: materialCategoriesSmallAll = [] } = useQuery<{ id: string; name: string; mediumCategoryId: string | null; sortOrder: number }[]>({
+    queryKey: ["/api/material-categories/small"],
+  });
+
   const materialCategoriesMedium = useMemo(() => {
     if (materialFilterLarge === "all" || materialFilterLarge === "") return [];
     return materialCategoriesMediumAll.filter(c => c.largeCategoryId === materialFilterLarge);
   }, [materialCategoriesMediumAll, materialFilterLarge]);
+
+  const materialCategoriesSmall = useMemo(() => {
+    if (materialFilterMedium === "all" || materialFilterMedium === "") return [];
+    return materialCategoriesSmallAll.filter(c => c.mediumCategoryId === materialFilterMedium);
+  }, [materialCategoriesSmallAll, materialFilterMedium]);
 
   const largeCategories = useMemo(() => 
     categories.filter(c => c.level === "large"), [categories]);
@@ -252,9 +262,10 @@ export default function ProductMappingPage() {
         m.materialName.toLowerCase().includes(materialSearchQuery.toLowerCase());
       const matchesLargeCategory = materialFilterLarge === "" || materialFilterLarge === "all" || m.largeCategoryId === materialFilterLarge;
       const matchesMediumCategory = materialFilterMedium === "" || materialFilterMedium === "all" || m.mediumCategoryId === materialFilterMedium;
-      return matchesSearch && matchesLargeCategory && matchesMediumCategory;
+      const matchesSmallCategory = materialFilterSmall === "" || materialFilterSmall === "all" || m.smallCategoryId === materialFilterSmall;
+      return matchesSearch && matchesLargeCategory && matchesMediumCategory && matchesSmallCategory;
     });
-  }, [allMaterials, materialSearchQuery, materialFilterLarge, materialFilterMedium]);
+  }, [allMaterials, materialSearchQuery, materialFilterLarge, materialFilterMedium, materialFilterSmall]);
 
   const MATERIAL_PAGE_SIZE = 10;
   const materialTotalPages = Math.ceil(filteredMaterialsForSelect.length / MATERIAL_PAGE_SIZE);
@@ -1341,16 +1352,17 @@ export default function ProductMappingPage() {
               </span>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Select 
                 value={materialFilterLarge} 
                 onValueChange={(v) => {
                   setMaterialFilterLarge(v);
                   setMaterialFilterMedium("all");
+                  setMaterialFilterSmall("all");
                   setMaterialCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="w-32" data-testid="select-material-category-large">
+                <SelectTrigger className="w-28" data-testid="select-material-category-large">
                   <SelectValue placeholder="대분류" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1364,16 +1376,35 @@ export default function ProductMappingPage() {
                 value={materialFilterMedium} 
                 onValueChange={(v) => {
                   setMaterialFilterMedium(v);
+                  setMaterialFilterSmall("all");
                   setMaterialCurrentPage(1);
                 }}
                 disabled={materialFilterLarge === "all"}
               >
-                <SelectTrigger className="w-32" data-testid="select-material-category-medium">
+                <SelectTrigger className="w-28" data-testid="select-material-category-medium">
                   <SelectValue placeholder="중분류" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체</SelectItem>
                   {materialCategoriesMedium.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select 
+                value={materialFilterSmall} 
+                onValueChange={(v) => {
+                  setMaterialFilterSmall(v);
+                  setMaterialCurrentPage(1);
+                }}
+                disabled={materialFilterMedium === "all"}
+              >
+                <SelectTrigger className="w-28" data-testid="select-material-category-small">
+                  <SelectValue placeholder="소분류" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {materialCategoriesSmall.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1385,7 +1416,7 @@ export default function ProductMappingPage() {
                   setMaterialSearchQuery(e.target.value);
                   setMaterialCurrentPage(1);
                 }}
-                className="flex-1"
+                className="flex-1 min-w-[120px]"
                 data-testid="input-material-search"
               />
               <Button variant="default" size="sm" className="bg-blue-500 hover:bg-blue-600">
