@@ -5876,7 +5876,7 @@ export async function registerRoutes(
       // 상품코드 유효성 체크: 현재공급상품에 없는 상품은 주문 불가
       if (!productInfo) {
         return res.status(400).json({ 
-          message: `"${data.productName}" (${data.productCode})은(는) 현재 공급되지 않는 상품입니다. 상품코드를 확인해주세요.` 
+          message: `"${data.productName}" (${data.productCode})은(는) 현재 공급되지 않는 상품, 또는 상품코드오류입니다. 상품코드를 확인해주세요.` 
         });
       }
       
@@ -6052,7 +6052,7 @@ export async function registerRoutes(
           errorRows.push({
             rowNum,
             originalData: row,
-            errorReason: `"${productName}" (${productCode}) 공급되지 않는 상품`
+            errorReason: `"${productName}" (${productCode}) 공급되지 않는 상품, 또는 상품코드오류`
           });
           continue;
         }
