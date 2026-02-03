@@ -256,13 +256,29 @@ export default function Dashboard() {
   // 오류건 엑셀 다운로드 함수
   const downloadErrorExcel = async (errorData: Record<string, any>[]) => {
     const XLSX = await import("xlsx");
-    const ws = XLSX.utils.json_to_sheet(errorData);
+    
+    // 명시적 컬럼 순서 지정
+    const orderedColumns = [
+      '상품코드', '상품명', '자체주문번호', '주문자명', '주문자전화번호', 
+      '주문자주소', '수령자명', '수령자휴대폰번호', '수령자전화번호', 
+      '수령자주소', '배송메시지', '오류사유'
+    ];
+    
+    // 컬럼 순서에 맞게 데이터 정렬
+    const orderedData = errorData.map(row => {
+      const ordered: Record<string, any> = {};
+      orderedColumns.forEach(col => {
+        ordered[col] = row[col] || '';
+      });
+      return ordered;
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(orderedData, { header: orderedColumns });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "오류건");
     
     // 컬럼 너비 설정
     ws['!cols'] = [
-      { wch: 8 },   // 줄번호
       { wch: 15 },  // 상품코드
       { wch: 25 },  // 상품명
       { wch: 20 },  // 자체주문번호
@@ -1213,7 +1229,6 @@ export default function Dashboard() {
                                       onClick={handlePartialUpload} 
                                       disabled={uploadExcelMutation.isPending} 
                                       data-testid="button-partial-upload"
-                                      className="bg-blue-600 hover:bg-blue-700"
                                     >
                                       {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                       정상건만 등록 ({uploadProgress.validCount}건)
