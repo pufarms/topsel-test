@@ -361,7 +361,12 @@ export default function Dashboard() {
   
   // 테이블 페이지 크기 상태 (10, 30, 100, "all")
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // 필터 변경 시 페이지 초기화
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryLargeFilter, categoryMediumFilter, categorySmallFilter, searchTerm]);
 
   // 검색어에 따른 필터링
   useEffect(() => {
@@ -430,10 +435,17 @@ export default function Dashboard() {
     return true;
   });
   
-  // 표시할 주문 목록 (페이지 크기에 따라 자르기)
+  // 표시할 주문 목록 (페이지네이션 적용)
+  const totalPages = tablePageSize === "all" 
+    ? 1 
+    : Math.ceil(filteredPendingOrders.length / tablePageSize);
+  
   const displayedPendingOrders = tablePageSize === "all" 
     ? filteredPendingOrders 
-    : filteredPendingOrders.slice(0, tablePageSize);
+    : filteredPendingOrders.slice(
+        (currentPage - 1) * tablePageSize, 
+        currentPage * tablePageSize
+      );
   
 
   useEffect(() => {
@@ -1137,10 +1149,14 @@ export default function Dashboard() {
                           <select 
                             className="h-8 px-2 border rounded text-sm"
                             value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
-                            onChange={(e) => setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+                            onChange={(e) => {
+                              setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value));
+                              setCurrentPage(1);
+                            }}
                             data-testid="select-page-size"
                           >
                             <option value="10">10개씩</option>
+                            <option value="20">20개씩</option>
                             <option value="30">30개씩</option>
                             <option value="100">100개씩</option>
                             <option value="all">전체</option>
@@ -1218,10 +1234,31 @@ export default function Dashboard() {
                       </div>
 
                       {/* 페이지네이션 */}
-                      <div className="flex justify-center gap-2">
-                        <Button size="sm" variant="outline" disabled>이전</Button>
-                        <Button size="sm" variant="outline" disabled>다음</Button>
-                      </div>
+                      {tablePageSize !== "all" && totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            data-testid="button-prev-page"
+                          >
+                            이전
+                          </Button>
+                          <span className="text-sm text-muted-foreground">
+                            {currentPage} / {totalPages} 페이지
+                          </span>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            data-testid="button-next-page"
+                          >
+                            다음
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
