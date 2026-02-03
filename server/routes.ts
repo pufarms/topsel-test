@@ -2369,7 +2369,8 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
     }
     
-    const invalidProducts: { productCode: string; productName: string }[] = [];
+    const invalidProducts: { productCode: string; productName: string; reason?: string }[] = [];
+    const unmappedProducts: { productCode: string; productName: string; reason?: string }[] = [];
     const validProducts: any[] = [];
     
     // Validate all products first
@@ -2377,11 +2378,40 @@ export async function registerRoutes(
       const pr = await storage.getProductRegistration(id);
       if (!pr) continue;
       
+      // 가격 검증
       if (!pr.startPrice || !pr.drivingPrice || !pr.topPrice) {
-        invalidProducts.push({ productCode: pr.productCode, productName: pr.productName });
-      } else {
-        validProducts.push(pr);
+        invalidProducts.push({ productCode: pr.productCode, productName: pr.productName, reason: "공급가 누락" });
+        continue;
       }
+      
+      // 재료 매핑 검증
+      const materialMappings = await storage.getProductMaterialMappings(pr.productCode);
+      if (materialMappings.length === 0) {
+        unmappedProducts.push({ productCode: pr.productCode, productName: pr.productName, reason: "매핑된 재료 없음" });
+        continue;
+      }
+      
+      // 매핑된 재료가 실제로 존재하는지 확인
+      let hasMissingMaterial = false;
+      const missingCodes: string[] = [];
+      for (const mm of materialMappings) {
+        const material = await storage.getMaterialByCode(mm.materialCode);
+        if (!material) {
+          hasMissingMaterial = true;
+          missingCodes.push(mm.materialCode);
+        }
+      }
+      
+      if (hasMissingMaterial) {
+        unmappedProducts.push({ 
+          productCode: pr.productCode, 
+          productName: pr.productName, 
+          reason: `삭제된 재료: ${missingCodes.join(", ")}` 
+        });
+        continue;
+      }
+      
+      validProducts.push(pr);
     }
     
     if (invalidProducts.length > 0) {
@@ -2390,6 +2420,15 @@ export async function registerRoutes(
         error: "MISSING_PRICE",
         message: `상품코드 [${invalidProducts[0].productCode}]의 공급가가 없습니다. 마진율을 입력해주세요.`,
         data: { invalidProducts }
+      });
+    }
+    
+    if (unmappedProducts.length > 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: "UNMAPPED_MATERIALS",
+        message: `상품코드 [${unmappedProducts[0].productCode}]의 재료 매핑이 완료되지 않았습니다. (${unmappedProducts[0].reason})`,
+        data: { unmappedProducts }
       });
     }
     
@@ -2478,58 +2517,56 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품 ID 목록이 필요합니다" });
     }
     
-    let created = 0;
-    let updated = 0;
+    const unmappedProducts: { productCode: string; productName: string; reason?: string }[] = [];
+    const validProducts: any[] = [];
     
+    // 재료 매핑 검증
     for (const id of ids) {
       const product = await storage.getNextWeekProduct(id);
-      if (product) {
-        const existing = await storage.getCurrentProductByCode(product.productCode);
-        const productData = {
-          productCode: product.productCode,
-          productName: product.productName,
-          categoryLarge: product.categoryLarge,
-          categoryMedium: product.categoryMedium,
-          categorySmall: product.categorySmall,
-          weight: product.weight,
-          startPrice: product.startPrice,
-          drivingPrice: product.drivingPrice,
-          topPrice: product.topPrice,
-          supplyStatus: "supply" as const,
-          appliedAt: new Date(),
-        };
-        
-        if (existing) {
-          await storage.updateCurrentProduct(existing.id, productData);
-          updated++;
-        } else {
-          await storage.createCurrentProduct(productData);
-          created++;
+      if (!product) continue;
+      
+      const materialMappings = await storage.getProductMaterialMappings(product.productCode);
+      if (materialMappings.length === 0) {
+        unmappedProducts.push({ productCode: product.productCode, productName: product.productName, reason: "매핑된 재료 없음" });
+        continue;
+      }
+      
+      // 매핑된 재료가 실제로 존재하는지 확인
+      let hasMissingMaterial = false;
+      const missingCodes: string[] = [];
+      for (const mm of materialMappings) {
+        const material = await storage.getMaterialByCode(mm.materialCode);
+        if (!material) {
+          hasMissingMaterial = true;
+          missingCodes.push(mm.materialCode);
         }
       }
+      
+      if (hasMissingMaterial) {
+        unmappedProducts.push({ 
+          productCode: product.productCode, 
+          productName: product.productName, 
+          reason: `삭제된 재료: ${missingCodes.join(", ")}` 
+        });
+        continue;
+      }
+      
+      validProducts.push(product);
     }
     
-    return res.json({ 
-      success: true,
-      message: `${ids.length}개 상품이 현재 공급가로 적용되었습니다.`,
-      data: { total: ids.length, updated, created }
-    });
-  });
-
-  app.post("/api/next-week-products/apply-current-all", async (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    const user = await storage.getUser(req.session.userId);
-    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
-      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    if (unmappedProducts.length > 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: "UNMAPPED_MATERIALS",
+        message: `상품코드 [${unmappedProducts[0].productCode}]의 재료 매핑이 완료되지 않았습니다. (${unmappedProducts[0].reason})`,
+        data: { unmappedProducts }
+      });
     }
     
-    const allProducts = await storage.getAllNextWeekProducts();
     let created = 0;
     let updated = 0;
     
-    for (const product of allProducts) {
+    for (const product of validProducts) {
       const existing = await storage.getCurrentProductByCode(product.productCode);
       const productData = {
         productCode: product.productCode,
@@ -2556,8 +2593,96 @@ export async function registerRoutes(
     
     return res.json({ 
       success: true,
-      message: `${allProducts.length}개 상품이 현재 공급가로 적용되었습니다.`,
-      data: { total: allProducts.length, updated, created }
+      message: `${validProducts.length}개 상품이 현재 공급가로 적용되었습니다.`,
+      data: { total: validProducts.length, updated, created }
+    });
+  });
+
+  app.post("/api/next-week-products/apply-current-all", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    
+    const allProducts = await storage.getAllNextWeekProducts();
+    const unmappedProducts: { productCode: string; productName: string; reason?: string }[] = [];
+    const validProducts: any[] = [];
+    
+    // 재료 매핑 검증
+    for (const product of allProducts) {
+      const materialMappings = await storage.getProductMaterialMappings(product.productCode);
+      if (materialMappings.length === 0) {
+        unmappedProducts.push({ productCode: product.productCode, productName: product.productName, reason: "매핑된 재료 없음" });
+        continue;
+      }
+      
+      // 매핑된 재료가 실제로 존재하는지 확인
+      let hasMissingMaterial = false;
+      const missingCodes: string[] = [];
+      for (const mm of materialMappings) {
+        const material = await storage.getMaterialByCode(mm.materialCode);
+        if (!material) {
+          hasMissingMaterial = true;
+          missingCodes.push(mm.materialCode);
+        }
+      }
+      
+      if (hasMissingMaterial) {
+        unmappedProducts.push({ 
+          productCode: product.productCode, 
+          productName: product.productName, 
+          reason: `삭제된 재료: ${missingCodes.join(", ")}` 
+        });
+        continue;
+      }
+      
+      validProducts.push(product);
+    }
+    
+    if (unmappedProducts.length > 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: "UNMAPPED_MATERIALS",
+        message: `재료 매핑이 완료되지 않은 상품이 ${unmappedProducts.length}개 있습니다.`,
+        data: { unmappedProducts }
+      });
+    }
+    
+    let created = 0;
+    let updated = 0;
+    
+    for (const product of validProducts) {
+      const existing = await storage.getCurrentProductByCode(product.productCode);
+      const productData = {
+        productCode: product.productCode,
+        productName: product.productName,
+        categoryLarge: product.categoryLarge,
+        categoryMedium: product.categoryMedium,
+        categorySmall: product.categorySmall,
+        weight: product.weight,
+        startPrice: product.startPrice,
+        drivingPrice: product.drivingPrice,
+        topPrice: product.topPrice,
+        supplyStatus: "supply" as const,
+        appliedAt: new Date(),
+      };
+      
+      if (existing) {
+        await storage.updateCurrentProduct(existing.id, productData);
+        updated++;
+      } else {
+        await storage.createCurrentProduct(productData);
+        created++;
+      }
+    }
+    
+    return res.json({ 
+      success: true,
+      message: `${validProducts.length}개 상품이 현재 공급가로 적용되었습니다.`,
+      data: { total: validProducts.length, updated, created }
     });
   });
 
