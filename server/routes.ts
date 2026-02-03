@@ -5748,18 +5748,6 @@ export async function registerRoutes(
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
       }
 
-      // Check for duplicate customOrderNumber
-      const existingOrder = await db.select()
-        .from(pendingOrders)
-        .where(and(
-          eq(pendingOrders.memberId, req.session.userId),
-          eq(pendingOrders.customOrderNumber, data.customOrderNumber)
-        ));
-      
-      if (existingOrder.length > 0) {
-        return res.status(400).json({ message: "이미 사용된 자체주문번호입니다" });
-      }
-
       // Look up product info by productCode
       const productInfo = await storage.getProductRegistrationByCode(data.productCode);
       
@@ -5868,9 +5856,6 @@ export async function registerRoutes(
         productInfo: any;
       }> = [];
 
-      // Track custom order numbers within this upload to detect duplicates
-      const uploadedCustomOrderNumbers = new Set<string>();
-
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         const rowNum = i + 2; // Excel rows start at 1, and header is row 1
@@ -5901,26 +5886,6 @@ export async function registerRoutes(
 
         if (missingFields.length > 0) {
           validationErrors.push(`${rowNum}번 줄: [${missingFields.join(', ')}] 누락`);
-          continue;
-        }
-
-        // Check for duplicate customOrderNumber within this upload file
-        if (uploadedCustomOrderNumbers.has(customOrderNumber)) {
-          validationErrors.push(`${rowNum}번 줄: 파일 내 중복된 자체주문번호 (${customOrderNumber})`);
-          continue;
-        }
-        uploadedCustomOrderNumbers.add(customOrderNumber);
-
-        // Check for duplicate customOrderNumber in existing database
-        const existingOrder = await db.select()
-          .from(pendingOrders)
-          .where(and(
-            eq(pendingOrders.memberId, req.session.userId),
-            eq(pendingOrders.customOrderNumber, customOrderNumber)
-          ));
-        
-        if (existingOrder.length > 0) {
-          validationErrors.push(`${rowNum}번 줄: 이미 등록된 자체주문번호 (${customOrderNumber})`);
           continue;
         }
 
