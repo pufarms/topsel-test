@@ -5888,6 +5888,13 @@ export async function registerRoutes(
         }
       }
       
+      // SSE: 관리자에게 새 주문 알림
+      sseManager.sendToAdmins("order-created", { 
+        type: "pending-order",
+        orderId: newOrder?.id,
+        memberCompanyName: member.companyName 
+      });
+
       res.status(201).json(newOrder);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -6045,6 +6052,15 @@ export async function registerRoutes(
         successCount++;
       }
 
+      // SSE: 관리자에게 일괄 주문 등록 알림
+      if (successCount > 0) {
+        sseManager.sendToAdmins("orders-created", { 
+          type: "pending-order-bulk",
+          count: successCount,
+          memberCompanyName: member.companyName 
+        });
+      }
+
       res.json({
         total: rows.length,
         success: successCount,
@@ -6146,6 +6162,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
       }
 
+      // SSE: 해당 회원에게 주문 상태 변경 알림
+      if (updated.memberId) {
+        sseManager.sendToMember(updated.memberId, "order-updated", { 
+          type: "pending-order",
+          orderId: updated.id,
+          status: updated.status,
+          trackingNumber: updated.trackingNumber,
+          courierCompany: updated.courierCompany
+        });
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -6173,6 +6200,17 @@ export async function registerRoutes(
         .where(inArray(pendingOrders.id, ids))
         .returning();
 
+      // SSE: 해당 회원들에게 주문 삭제 알림
+      const memberIds = [...new Set(deleted.map(d => d.memberId).filter(Boolean))];
+      memberIds.forEach(memberId => {
+        if (memberId) {
+          sseManager.sendToMember(memberId, "orders-deleted", { 
+            type: "pending-order",
+            count: deleted.filter(d => d.memberId === memberId).length
+          });
+        }
+      });
+
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -6191,6 +6229,18 @@ export async function registerRoutes(
 
     try {
       const deleted = await db.delete(pendingOrders).returning();
+
+      // SSE: 해당 회원들에게 주문 삭제 알림
+      const memberIds = [...new Set(deleted.map(d => d.memberId).filter(Boolean))];
+      memberIds.forEach(memberId => {
+        if (memberId) {
+          sseManager.sendToMember(memberId, "orders-deleted", { 
+            type: "pending-order",
+            count: deleted.filter(d => d.memberId === memberId).length
+          });
+        }
+      });
+
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
