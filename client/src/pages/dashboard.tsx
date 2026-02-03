@@ -229,10 +229,11 @@ export default function Dashboard() {
   const { data: orderStats } = useQuery<{
     total: number;
     pending: number;
-    processing: number;
-    completed: number;
-    cancelled: number;
-    today: number;
+    adjustment: number;
+    preparing: number;
+    readyToShip: number;
+    memberCancelled: number;
+    shipping: number;
   }>({
     queryKey: ["/api/order-stats"],
     enabled: !!user && (isMember || isPreviewMode),
@@ -547,9 +548,11 @@ export default function Dashboard() {
   // Use real order stats from API (member's own orders only)
   const totalOrders = orderStats?.total || 0;
   const pendingOrdersCount = orderStats?.pending || 0;
-  const processingOrdersCount = orderStats?.processing || 0;
-  const completedOrdersCount = orderStats?.completed || 0;
-  const cancelledOrdersCount = orderStats?.cancelled || 0;
+  const adjustmentOrdersCount = orderStats?.adjustment || 0;
+  const preparingOrdersCount = orderStats?.preparing || 0;
+  const readyToShipOrdersCount = orderStats?.readyToShip || 0;
+  const memberCancelledOrdersCount = orderStats?.memberCancelled || 0;
+  const shippingOrdersCount = orderStats?.shipping || 0;
   
   const thisMonthTotal = thisMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
   const lastMonthTotal = lastMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
@@ -710,40 +713,44 @@ export default function Dashboard() {
                       color="blue"
                     />
                     <MiniStat
-                      title="대기중"
+                      title="주문대기"
                       value={`${pendingOrdersCount}건`}
                       icon={<Clock className="h-3.5 w-3.5" />}
                       color="yellow"
                     />
                     <MiniStat
-                      title="처리중"
-                      value={`${processingOrdersCount}건`}
+                      title="주문조정"
+                      value={`${adjustmentOrdersCount}건`}
+                      icon={<AlertCircle className="h-3.5 w-3.5" />}
+                      color="orange"
+                    />
+                    <MiniStat
+                      title="상품준비중"
+                      value={`${preparingOrdersCount}건`}
                       icon={<Package className="h-3.5 w-3.5" />}
                       color="purple"
                     />
+                    <div className="rounded-lg p-3 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 transition-all hover:opacity-90 cursor-pointer">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="opacity-70"><Truck className="h-3.5 w-3.5" /></span>
+                        <span className="text-xs font-medium opacity-80">배송준비중</span>
+                      </div>
+                      <span className="text-lg font-bold">{readyToShipOrdersCount}건</span>
+                      <div className="mt-1 text-[10px] opacity-70 leading-tight">
+                        운송장파일다운 · 회원취소건등록
+                      </div>
+                    </div>
                     <MiniStat
-                      title="완료"
-                      value={`${completedOrdersCount}건`}
-                      icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                      color="green"
-                    />
-                    <MiniStat
-                      title="취소"
-                      value={`${cancelledOrdersCount}건`}
+                      title="회원취소"
+                      value={`${memberCancelledOrdersCount}건`}
                       icon={<XCircle className="h-3.5 w-3.5" />}
                       color="red"
                     />
                     <MiniStat
-                      title="오늘등록"
-                      value={`${orderStats?.today || 0}건`}
-                      icon={<Calendar className="h-3.5 w-3.5" />}
-                      color="orange"
-                    />
-                    <MiniStat
-                      title="배송완료"
-                      value="0건"
+                      title="배송중"
+                      value={`${shippingOrdersCount}건`}
                       icon={<Truck className="h-3.5 w-3.5" />}
-                      color="blue"
+                      color="green"
                     />
                   </div>
 
