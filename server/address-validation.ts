@@ -8,9 +8,13 @@ import {
   saveAddressCorrection,
   findLearnedPattern,
   inferCorrectionType,
-  findByPattern
+  findByPattern,
+  savePatternAnalysis
 } from './address-learning';
-import { matchAndConvertByPattern } from './ai-pattern-analyzer';
+import { analyzeAddressPattern, matchAndConvertByPattern } from './ai-pattern-analyzer';
+import { db } from './db';
+import { addressLearningData } from '@shared/schema';
+import { eq, desc, ilike, or, sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -1172,5 +1176,333 @@ export async function validateSingleAddress(rawAddress: string): Promise<{
     reasonCode: result.reasonCode,
   };
 }
+
+// ==========================================
+// 주소 학습 데이터 관리 API (관리자용)
+// ==========================================
+
+// 학습 데이터 목록 조회
+router.get("/learning", async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const search = (req.query.search as string) || "";
+    const offset = (page - 1) * limit;
+
+    let query = db.select().from(addressLearningData);
+    let countQuery = db.select({ count: sql<number>`count(*)` }).from(addressLearningData);
+
+    if (search) {
+      const searchCondition = or(
+        ilike(addressLearningData.originalDetailAddress, `%${search}%`),
+        ilike(addressLearningData.correctedDetailAddress, `%${search}%`),
+        ilike(addressLearningData.errorPattern, `%${search}%`)
+      );
+      query = query.where(searchCondition) as typeof query;
+      countQuery = countQuery.where(searchCondition) as typeof countQuery;
+    }
+
+    const [data, totalResult] = await Promise.all([
+      query.orderBy(desc(addressLearningData.updatedAt)).limit(limit).offset(offset),
+      countQuery
+    ]);
+
+    const total = Number(totalResult[0]?.count || 0);
+
+    return res.json({
+      success: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error("[Address Learning] List error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "학습 데이터 조회 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 학습 데이터 추가 (수동 등록)
+router.post("/learning", async (req: Request, res: Response) => {
+  try {
+    const { 
+      originalDetailAddress, 
+      correctedDetailAddress, 
+      buildingType = "general",
+      errorPattern,
+      problemDescription,
+      patternRegex,
+      solutionDescription
+    } = req.body;
+
+    if (!originalDetailAddress || !correctedDetailAddress) {
+      return res.status(400).json({
+        success: false,
+        message: "원본 주소와 교정 주소는 필수입니다"
+      });
+    }
+
+    // 자동으로 교정 유형 추론
+    const correctionType = inferCorrectionType(originalDetailAddress, correctedDetailAddress);
+
+    const [inserted] = await db.insert(addressLearningData).values({
+      originalDetailAddress,
+      correctedDetailAddress,
+      buildingType,
+      correctionType,
+      confidenceScore: "0.95", // 수동 등록은 높은 신뢰도
+      occurrenceCount: 1,
+      successCount: 0,
+      userConfirmed: true,
+      errorPattern: errorPattern || correctionType,
+      problemDescription,
+      patternRegex,
+      solutionDescription,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    return res.json({
+      success: true,
+      message: "학습 데이터가 등록되었습니다",
+      data: inserted
+    });
+  } catch (error) {
+    console.error("[Address Learning] Create error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "학습 데이터 등록 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 학습 데이터 수정
+router.put("/learning/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { 
+      originalDetailAddress, 
+      correctedDetailAddress, 
+      buildingType,
+      errorPattern,
+      problemDescription,
+      patternRegex,
+      solutionDescription,
+      confidenceScore
+    } = req.body;
+
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+      userConfirmed: true
+    };
+
+    if (originalDetailAddress) updateData.originalDetailAddress = originalDetailAddress;
+    if (correctedDetailAddress) updateData.correctedDetailAddress = correctedDetailAddress;
+    if (buildingType) updateData.buildingType = buildingType;
+    if (errorPattern) updateData.errorPattern = errorPattern;
+    if (problemDescription !== undefined) updateData.problemDescription = problemDescription;
+    if (patternRegex !== undefined) updateData.patternRegex = patternRegex;
+    if (solutionDescription !== undefined) updateData.solutionDescription = solutionDescription;
+    if (confidenceScore !== undefined) updateData.confidenceScore = String(confidenceScore);
+
+    // 교정 유형 다시 추론
+    if (originalDetailAddress && correctedDetailAddress) {
+      updateData.correctionType = inferCorrectionType(originalDetailAddress, correctedDetailAddress);
+    }
+
+    const [updated] = await db
+      .update(addressLearningData)
+      .set(updateData)
+      .where(eq(addressLearningData.id, id))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: "학습 데이터를 찾을 수 없습니다"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "학습 데이터가 수정되었습니다",
+      data: updated
+    });
+  } catch (error) {
+    console.error("[Address Learning] Update error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "학습 데이터 수정 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 학습 데이터 삭제
+router.delete("/learning/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+
+    const [deleted] = await db
+      .delete(addressLearningData)
+      .where(eq(addressLearningData.id, id))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: "학습 데이터를 찾을 수 없습니다"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "학습 데이터가 삭제되었습니다"
+    });
+  } catch (error) {
+    console.error("[Address Learning] Delete error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "학습 데이터 삭제 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// AI로 주소 패턴 분석 요청
+router.post("/learning/analyze", async (req: Request, res: Response) => {
+  try {
+    const { originalDetailAddress, buildingType = "general" } = req.body;
+
+    if (!originalDetailAddress) {
+      return res.status(400).json({
+        success: false,
+        message: "분석할 주소가 필요합니다"
+      });
+    }
+
+    if (!isAIEnabled()) {
+      return res.status(400).json({
+        success: false,
+        message: "AI 기능이 활성화되지 않았습니다. ANTHROPIC_API_KEY를 설정해주세요."
+      });
+    }
+
+    // AI 패턴 분석 실행 (buildingType을 주소에 포함시켜 전달)
+    const addressToAnalyze = buildingType !== "general" 
+      ? `[${buildingType}] ${originalDetailAddress}` 
+      : originalDetailAddress;
+    const analysis = await analyzeAddressPattern(addressToAnalyze);
+
+    if (!analysis) {
+      return res.status(500).json({
+        success: false,
+        message: "AI 분석에 실패했습니다"
+      });
+    }
+
+    // 분석 결과 저장
+    await savePatternAnalysis(analysis);
+
+    return res.json({
+      success: true,
+      message: "AI 분석이 완료되었습니다",
+      analysis
+    });
+  } catch (error) {
+    console.error("[Address Learning] AI analyze error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "AI 분석 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 주소 패턴 테스트 (학습된 패턴으로 변환 테스트)
+router.post("/learning/test", async (req: Request, res: Response) => {
+  try {
+    const { testAddress, buildingType = "general" } = req.body;
+
+    const testAddressStr = String(testAddress || "").trim();
+    const buildingTypeStr = String(buildingType || "general");
+
+    if (!testAddressStr) {
+      return res.status(400).json({
+        success: false,
+        message: "테스트할 주소가 필요합니다"
+      });
+    }
+
+    // 1. 정규식 패턴 매칭 시도
+    const patternMatch = await findByPattern(testAddressStr, buildingTypeStr);
+    if (patternMatch) {
+      return res.json({
+        success: true,
+        matched: true,
+        method: "pattern_regex",
+        original: testAddressStr,
+        corrected: patternMatch.correctedDetailAddress,
+        pattern: patternMatch.errorPattern,
+        confidence: patternMatch.confidence
+      });
+    }
+
+    // 2. 학습된 유사 패턴 매칭
+    const learnedMatch = await findLearnedPattern(testAddressStr, buildingTypeStr);
+    if (learnedMatch.found) {
+      return res.json({
+        success: true,
+        matched: true,
+        method: "learned_similarity",
+        original: testAddressStr,
+        corrected: learnedMatch.corrected,
+        confidence: learnedMatch.confidence,
+        occurrenceCount: learnedMatch.occurrenceCount
+      });
+    }
+
+    return res.json({
+      success: true,
+      matched: false,
+      original: testAddressStr,
+      message: "매칭되는 패턴이 없습니다. AI 분석을 통해 새 패턴을 학습할 수 있습니다."
+    });
+  } catch (error) {
+    console.error("[Address Learning] Test error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "패턴 테스트 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 학습 데이터 통계
+router.get("/learning/stats", async (req: Request, res: Response) => {
+  try {
+    const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(addressLearningData);
+    const [confirmedResult] = await db.select({ count: sql<number>`count(*)` }).from(addressLearningData).where(eq(addressLearningData.userConfirmed, true));
+    const [aiAnalyzedResult] = await db.select({ count: sql<number>`count(*)` }).from(addressLearningData).where(sql`${addressLearningData.aiModel} IS NOT NULL`);
+
+    return res.json({
+      success: true,
+      stats: {
+        total: Number(totalResult?.count || 0),
+        userConfirmed: Number(confirmedResult?.count || 0),
+        aiAnalyzed: Number(aiAnalyzedResult?.count || 0),
+        aiEnabled: isAIEnabled()
+      }
+    });
+  } catch (error) {
+    console.error("[Address Learning] Stats error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "통계 조회 중 오류가 발생했습니다"
+    });
+  }
+});
 
 export default router;
