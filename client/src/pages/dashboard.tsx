@@ -253,11 +253,12 @@ export default function Dashboard() {
     errorExcelData?: Record<string, any>[];
   } | null>(null);
 
-  // 오류건 엑셀 다운로드 함수
+  // 오류건 엑셀 다운로드 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
   const downloadErrorExcel = async (errorData: Record<string, any>[]) => {
     const XLSX = await import("xlsx");
     
-    // 명시적 컬럼 순서 지정
+    // 주문등록 양식과 동일한 컬럼 순서 + 마지막에 오류사유
+    // 회원이 오류사유 컬럼만 삭제하면 바로 재업로드 가능
     const orderedColumns = [
       '상품코드', '상품명', '자체주문번호', '주문자명', '주문자전화번호', 
       '주문자주소', '수령자명', '수령자휴대폰번호', '수령자전화번호', 
@@ -275,9 +276,9 @@ export default function Dashboard() {
     
     const ws = XLSX.utils.json_to_sheet(orderedData, { header: orderedColumns });
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "오류건");
+    XLSX.utils.book_append_sheet(wb, ws, "주문등록_오류건");
     
-    // 컬럼 너비 설정
+    // 컬럼 너비 설정 (주문등록 양식과 동일)
     ws['!cols'] = [
       { wch: 15 },  // 상품코드
       { wch: 25 },  // 상품명
@@ -290,10 +291,10 @@ export default function Dashboard() {
       { wch: 15 },  // 수령자전화번호
       { wch: 40 },  // 수령자주소
       { wch: 30 },  // 배송메시지
-      { wch: 35 },  // 오류사유
+      { wch: 35 },  // 오류사유 (마지막 - 수정 후 삭제하면 바로 재업로드 가능)
     ];
     
-    XLSX.writeFile(wb, `주문등록_오류건_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `주문등록_오류건_수정후재업로드_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   // Excel upload mutation for bulk order registration

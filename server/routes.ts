@@ -6069,7 +6069,7 @@ export async function registerRoutes(
         });
       }
 
-      // 오류건 엑셀 데이터 생성 함수
+      // 오류건 엑셀 데이터 생성 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
       const generateErrorExcelData = (errRows: typeof errorRows) => {
         return errRows.map(err => ({
           '상품코드': err.originalData['상품코드'] || err.originalData['productCode'] || '',
@@ -6083,7 +6083,7 @@ export async function registerRoutes(
           '수령자전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
           '수령자주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
           '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
-          '오류사유': err.errorReason
+          '오류사유': err.errorReason  // 마지막 컬럼: 수정 후 이 컬럼만 삭제하면 바로 재업로드 가능
         }));
       };
 
