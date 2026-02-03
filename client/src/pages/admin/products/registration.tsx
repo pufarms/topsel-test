@@ -125,6 +125,7 @@ export default function ProductRegistrationPage() {
   const [searchCategoryMedium, setSearchCategoryMedium] = useState<string>("all");
   const [searchCategorySmall, setSearchCategorySmall] = useState<string>("all");
   const [searchWeight, setSearchWeight] = useState<string>("all");
+  const [searchMappingStatus, setSearchMappingStatus] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
     const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
@@ -405,6 +406,9 @@ export default function ProductRegistrationPage() {
     }
     if (searchWeight !== "all") {
       filtered = filtered.filter(p => String(p.weight) === searchWeight);
+    }
+    if (searchMappingStatus !== "all") {
+      filtered = filtered.filter(p => p.mappingStatus === searchMappingStatus);
     }
     if (searchName) {
       const searchWords = searchName.trim().toLowerCase().split(/\s+/);
@@ -1180,7 +1184,7 @@ export default function ProductRegistrationPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-0">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
             <Select value={searchCategoryLarge} onValueChange={setSearchCategoryLarge}>
               <SelectTrigger className="h-9" data-testid="select-search-large">
                 <SelectValue placeholder="대분류" />
@@ -1215,6 +1219,16 @@ export default function ProductRegistrationPage() {
               <SelectContent>
                 <SelectItem value="all">전체</SelectItem>
                 {allWeights.map(w => <SelectItem key={String(w)} value={String(w)}>{String(w)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={searchMappingStatus} onValueChange={setSearchMappingStatus}>
+              <SelectTrigger className="h-9" data-testid="select-search-mapping">
+                <SelectValue placeholder="매핑상태" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="complete">매핑완료</SelectItem>
+                <SelectItem value="incomplete">미매핑</SelectItem>
               </SelectContent>
             </Select>
             <Input placeholder="상품명" value={searchName} onChange={e => setSearchName(e.target.value)} className="h-9" data-testid="input-search-name" />
