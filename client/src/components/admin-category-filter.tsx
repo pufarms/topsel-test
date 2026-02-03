@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,13 +46,33 @@ export function AdminCategoryFilter({
   additionalFilters,
 }: AdminCategoryFilterProps) {
   const [memberId, setMemberId] = useState("");
-  const [memberSearch, setMemberSearch] = useState("");
+  const [memberSearchMode, setMemberSearchMode] = useState<"search" | "select">("select"); // 검색/선택 모드
+  const [memberSearchInput, setMemberSearchInput] = useState(""); // 검색 모드에서 입력창
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [categoryLarge, setCategoryLarge] = useState("");
   const [categoryMedium, setCategoryMedium] = useState("");
   const [categorySmall, setCategorySmall] = useState("");
   const [searchFilter, setSearchFilter] = useState("선택 없음");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const memberDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(event.target as Node)) {
+        setShowMemberDropdown(false);
+      }
+    };
+    
+    if (showMemberDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMemberDropdown]);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
@@ -81,14 +101,16 @@ export function AdminCategoryFilter({
   }, [categories, categoryMedium]);
 
   const filteredMembers = useMemo(() => {
-    if (!memberSearch.trim()) return members;
-    const search = memberSearch.toLowerCase();
-    return members.filter(m => 
-      m.companyName?.toLowerCase().includes(search) ||
-      m.memberId?.toLowerCase().includes(search) ||
-      m.ceoName?.toLowerCase().includes(search)
-    );
-  }, [members, memberSearch]);
+    if (memberSearchMode === "search" && memberSearchInput.trim()) {
+      const search = memberSearchInput.toLowerCase();
+      return members.filter(m => 
+        m.companyName?.toLowerCase().includes(search) ||
+        m.memberId?.toLowerCase().includes(search) ||
+        m.ceoName?.toLowerCase().includes(search)
+      );
+    }
+    return members;
+  }, [members, memberSearchMode, memberSearchInput]);
 
   const selectedMember = useMemo(() => 
     members.find(m => m.id === memberId),
@@ -113,7 +135,9 @@ export function AdminCategoryFilter({
 
   const handleReset = () => {
     setMemberId("");
-    setMemberSearch("");
+    setMemberSearchMode("select");
+    setMemberSearchInput("");
+    setShowMemberDropdown(false);
     setCategoryLarge("");
     setCategoryMedium("");
     setCategorySmall("");
@@ -134,7 +158,13 @@ export function AdminCategoryFilter({
 
   const handleMemberSelect = (member: Member) => {
     setMemberId(member.id);
-    setMemberSearch(member.companyName);
+    setMemberSearchInput("");
+    setShowMemberDropdown(false);
+  };
+
+  const handleSelectAllMembers = () => {
+    setMemberId("");
+    setMemberSearchInput("");
     setShowMemberDropdown(false);
   };
 
@@ -143,59 +173,119 @@ export function AdminCategoryFilter({
       {/* 1행: 회원 필터 (관리자 전용) */}
       {showMemberFilter && (
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" ref={memberDropdownRef}>
             <label className="text-sm font-medium whitespace-nowrap min-w-[50px]">회원</label>
-            <div className="relative">
-              <div className="flex items-center gap-1">
+            
+            {/* 모드 선택: 검색/선택 */}
+            <Select 
+              value={memberSearchMode} 
+              onValueChange={(v: "search" | "select") => {
+                setMemberSearchMode(v);
+                setMemberSearchInput("");
+                setMemberId("");
+                setShowMemberDropdown(false);
+              }}
+            >
+              <SelectTrigger className="h-8 w-[80px]" data-testid="select-member-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="search">검색</SelectItem>
+                <SelectItem value="select">선택</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* 검색 모드: 입력 필드 + 결과 드롭다운 */}
+            {memberSearchMode === "search" && (
+              <div className="relative">
                 <Input
-                  placeholder="상호명 검색"
-                  value={memberSearch}
+                  placeholder="상호명 입력 검색"
+                  value={memberSearchInput}
                   onChange={(e) => {
-                    setMemberSearch(e.target.value);
-                    setShowMemberDropdown(true);
+                    setMemberSearchInput(e.target.value);
+                    setShowMemberDropdown(e.target.value.length > 0);
                     if (!e.target.value) setMemberId("");
                   }}
-                  onFocus={() => setShowMemberDropdown(true)}
+                  onFocus={() => {
+                    if (memberSearchInput) setShowMemberDropdown(true);
+                  }}
                   className="h-8 w-[180px] text-sm"
                   data-testid="input-member-search"
                 />
+                {showMemberDropdown && memberSearchInput && filteredMembers.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-[280px] max-h-[250px] overflow-y-auto bg-background border rounded-md shadow-lg">
+                    {filteredMembers.slice(0, 20).map((member) => (
+                      <div
+                        key={member.id}
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm ${memberId === member.id ? 'bg-primary/10' : ''}`}
+                        onClick={() => {
+                          handleMemberSelect(member);
+                          setMemberSearchInput(member.companyName);
+                        }}
+                      >
+                        <div className="font-medium">{member.companyName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {member.memberId} {member.ceoName && `| ${member.ceoName}`}
+                        </div>
+                      </div>
+                    ))}
+                    {filteredMembers.length > 20 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground text-center border-t">
+                        외 {filteredMembers.length - 20}개 결과 (더 구체적으로 검색해주세요)
+                      </div>
+                    )}
+                  </div>
+                )}
+                {showMemberDropdown && memberSearchInput && filteredMembers.length === 0 && (
+                  <div className="absolute z-50 mt-1 w-[280px] bg-background border rounded-md shadow-lg">
+                    <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 선택 모드: 드롭다운 선택 */}
+            {memberSearchMode === "select" && (
+              <div className="relative">
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="h-8 w-8 p-0"
+                  className="h-8 w-[180px] justify-between font-normal"
                   onClick={() => setShowMemberDropdown(!showMemberDropdown)}
+                  data-testid="button-member-select"
                 >
-                  {showMemberDropdown ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  <span className="truncate">
+                    {selectedMember ? selectedMember.companyName : "전체 회원"}
+                  </span>
+                  {showMemberDropdown ? <ChevronUp className="h-4 w-4 ml-1 shrink-0" /> : <ChevronDown className="h-4 w-4 ml-1 shrink-0" />}
                 </Button>
-              </div>
-              {showMemberDropdown && filteredMembers.length > 0 && (
-                <div className="absolute z-50 mt-1 w-[250px] max-h-[200px] overflow-y-auto bg-background border rounded-md shadow-lg">
-                  <div 
-                    className="px-3 py-2 hover:bg-muted cursor-pointer text-sm border-b"
-                    onClick={() => {
-                      setMemberId("");
-                      setMemberSearch("");
-                      setShowMemberDropdown(false);
-                    }}
-                  >
-                    전체 회원
-                  </div>
-                  {filteredMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm ${memberId === member.id ? 'bg-muted' : ''}`}
-                      onClick={() => handleMemberSelect(member)}
+                {showMemberDropdown && (
+                  <div className="absolute z-50 mt-1 w-[280px] max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg">
+                    <div 
+                      className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm border-b font-medium ${!memberId ? 'bg-primary/10' : ''}`}
+                      onClick={handleSelectAllMembers}
                     >
-                      <div className="font-medium">{member.companyName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {member.memberId} {member.ceoName && `| ${member.ceoName}`}
-                      </div>
+                      전체 회원
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    {members.map((member) => (
+                      <div
+                        key={member.id}
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm ${memberId === member.id ? 'bg-primary/10' : ''}`}
+                        onClick={() => handleMemberSelect(member)}
+                      >
+                        <div className="font-medium">{member.companyName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {member.memberId} {member.ceoName && `| ${member.ceoName}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 선택된 회원 정보 표시 */}
             {selectedMember && (
               <span className="text-sm text-muted-foreground">
                 ({selectedMember.memberId})
