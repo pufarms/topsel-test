@@ -125,13 +125,13 @@ export default function ProductMappingPage() {
     queryKey: ["/api/material-categories/large"],
   });
 
-  const { data: materialCategoriesMediumAll = [] } = useQuery<{ id: string; name: string; parentId: string | null; sortOrder: number }[]>({
+  const { data: materialCategoriesMediumAll = [] } = useQuery<{ id: string; name: string; largeCategoryId: string | null; sortOrder: number }[]>({
     queryKey: ["/api/material-categories/medium"],
   });
 
   const materialCategoriesMedium = useMemo(() => {
     if (materialFilterLarge === "all" || materialFilterLarge === "") return [];
-    return materialCategoriesMediumAll.filter(c => c.parentId === materialFilterLarge);
+    return materialCategoriesMediumAll.filter(c => c.largeCategoryId === materialFilterLarge);
   }, [materialCategoriesMediumAll, materialFilterLarge]);
 
   const largeCategories = useMemo(() => 
