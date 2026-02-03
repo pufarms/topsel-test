@@ -106,17 +106,23 @@ export default function MaterialTypesPage() {
       toast({ title: "코드와 이름은 필수입니다", variant: "destructive" });
       return;
     }
-    const data = {
-      code: code.trim(),
-      name: name.trim(),
-      description: description.trim(),
-      sortOrder: parseInt(sortOrder) || 0,
-      isActive,
-    };
     if (editId) {
-      updateMutation.mutate({ id: editId, data });
+      const updateData = {
+        name: name.trim(),
+        description: description.trim(),
+        sortOrder: parseInt(sortOrder) || 0,
+        isActive,
+      };
+      updateMutation.mutate({ id: editId, data: updateData });
     } else {
-      createMutation.mutate(data);
+      const createData = {
+        code: code.trim(),
+        name: name.trim(),
+        description: description.trim(),
+        sortOrder: parseInt(sortOrder) || 0,
+        isActive,
+      };
+      createMutation.mutate(createData);
     }
   };
 
@@ -293,9 +299,15 @@ export default function MaterialTypesPage() {
                 value={code} 
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="예: raw, semi, sub"
+                disabled={!!editId}
+                className={editId ? "bg-muted" : ""}
                 data-testid="input-code"
               />
-              <p className="text-xs text-muted-foreground mt-1">영문 소문자로 입력 (시스템 내부 식별용)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {editId 
+                  ? "코드는 수정할 수 없습니다 (기존 재료 데이터 보호)" 
+                  : "영문 소문자로 입력 (시스템 내부 식별용)"}
+              </p>
             </div>
             <div>
               <Label>이름 *</Label>
