@@ -6204,6 +6204,13 @@ export async function registerRoutes(
           courierCompany: updated.courierCompany
         });
       }
+      
+      // SSE: 관리자들에게도 주문 상태 변경 알림
+      sseManager.sendToAdmins("order-updated", {
+        type: "pending-order",
+        orderId: updated.id,
+        status: updated.status
+      });
 
       res.json(updated);
     } catch (error: any) {
@@ -6242,6 +6249,12 @@ export async function registerRoutes(
           });
         }
       });
+      
+      // SSE: 관리자들에게도 주문 삭제 알림
+      sseManager.sendToAdmins("orders-deleted", {
+        type: "pending-order",
+        count: deleted.length
+      });
 
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });
     } catch (error: any) {
@@ -6271,6 +6284,12 @@ export async function registerRoutes(
             count: deleted.filter(d => d.memberId === memberId).length
           });
         }
+      });
+      
+      // SSE: 관리자들에게도 주문 삭제 알림
+      sseManager.sendToAdmins("orders-deleted", {
+        type: "pending-order",
+        count: deleted.length
       });
 
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });

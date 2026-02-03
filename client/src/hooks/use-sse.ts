@@ -77,6 +77,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       console.log("SSE: order-updated", data);
       
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrderUpdated?.(data);
@@ -87,6 +89,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       console.log("SSE: orders-deleted", data);
       
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrdersDeleted?.(data);

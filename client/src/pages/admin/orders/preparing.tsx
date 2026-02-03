@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +19,8 @@ import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterSt
 import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersPreparingPage() {
+  useSSE();
+
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
     categoryLarge: "",
