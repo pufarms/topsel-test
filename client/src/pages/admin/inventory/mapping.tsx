@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, GripVertical, Filter, Link2 } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Loader2, Search, Edit, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical, Filter, Link2 } from "lucide-react";
 import { PageHeader } from "@/components/admin";
 import type { ProductMapping, ProductMaterialMapping, Material, Category } from "@shared/schema";
 import * as XLSX from "xlsx";
@@ -256,10 +256,11 @@ export default function ProductMappingPage() {
     });
   }, [allMaterials, materialSearchQuery, materialFilterLarge, materialFilterMedium]);
 
-  const materialTotalPages = Math.ceil(filteredMaterialsForSelect.length / 20);
+  const MATERIAL_PAGE_SIZE = 10;
+  const materialTotalPages = Math.ceil(filteredMaterialsForSelect.length / MATERIAL_PAGE_SIZE);
   const paginatedMaterialsForSelect = filteredMaterialsForSelect.slice(
-    (materialCurrentPage - 1) * 20,
-    materialCurrentPage * 20
+    (materialCurrentPage - 1) * MATERIAL_PAGE_SIZE,
+    materialCurrentPage * MATERIAL_PAGE_SIZE
   );
 
   const filteredAndSortedMappings = useMemo(() => {
@@ -1437,25 +1438,68 @@ export default function ProductMappingPage() {
             </div>
 
             {materialTotalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={materialCurrentPage === 1}
+                  onClick={() => setMaterialCurrentPage(1)}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={materialCurrentPage === 1}
                   onClick={() => setMaterialCurrentPage(p => p - 1)}
+                  className="h-8 w-8 p-0"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="text-sm">
-                  {materialCurrentPage} / {materialTotalPages}
-                </span>
+                {(() => {
+                  const pages: number[] = [];
+                  const maxVisiblePages = 5;
+                  let startPage = Math.max(1, materialCurrentPage - Math.floor(maxVisiblePages / 2));
+                  let endPage = Math.min(materialTotalPages, startPage + maxVisiblePages - 1);
+                  
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+                  
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(i);
+                  }
+                  
+                  return pages.map(page => (
+                    <Button
+                      key={page}
+                      variant={page === materialCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setMaterialCurrentPage(page)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ));
+                })()}
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={materialCurrentPage === materialTotalPages}
                   onClick={() => setMaterialCurrentPage(p => p + 1)}
+                  className="h-8 w-8 p-0"
                 >
                   <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={materialCurrentPage === materialTotalPages}
+                  onClick={() => setMaterialCurrentPage(materialTotalPages)}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsRight className="w-4 h-4" />
                 </Button>
               </div>
             )}
