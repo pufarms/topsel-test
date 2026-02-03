@@ -2645,6 +2645,97 @@ export async function registerRoutes(
   });
 
   // ========================================
+  // 재료 타입 API (Material Types)
+  // ========================================
+
+  app.get("/api/material-types", async (req, res) => {
+    const { active } = req.query;
+    if (active === "true") {
+      const types = await storage.getActiveMaterialTypes();
+      return res.json(types);
+    }
+    const types = await storage.getAllMaterialTypes();
+    return res.json(types);
+  });
+
+  app.get("/api/material-types/:id", async (req, res) => {
+    const type = await storage.getMaterialType(req.params.id);
+    if (!type) {
+      return res.status(404).json({ message: "재료타입을 찾을 수 없습니다" });
+    }
+    return res.json(type);
+  });
+
+  app.post("/api/material-types", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { code, name, description, sortOrder, isActive } = req.body;
+    if (!code || !name) {
+      return res.status(400).json({ message: "코드와 이름은 필수입니다" });
+    }
+    const existing = await storage.getMaterialTypeByCode(code);
+    if (existing) {
+      return res.status(400).json({ message: "이미 존재하는 코드입니다" });
+    }
+    const type = await storage.createMaterialType({ 
+      code, 
+      name, 
+      description: description || null,
+      sortOrder: sortOrder || 0,
+      isActive: isActive !== false
+    });
+    return res.json(type);
+  });
+
+  app.put("/api/material-types/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const { code, name, description, sortOrder, isActive } = req.body;
+    if (code) {
+      const existing = await storage.getMaterialTypeByCode(code);
+      if (existing && existing.id !== req.params.id) {
+        return res.status(400).json({ message: "이미 존재하는 코드입니다" });
+      }
+    }
+    const updated = await storage.updateMaterialType(req.params.id, { 
+      code, 
+      name, 
+      description, 
+      sortOrder, 
+      isActive 
+    });
+    if (!updated) {
+      return res.status(404).json({ message: "재료타입을 찾을 수 없습니다" });
+    }
+    return res.json(updated);
+  });
+
+  app.delete("/api/material-types/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+    const deleted = await storage.deleteMaterialType(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: "재료타입을 찾을 수 없습니다" });
+    }
+    return res.json({ success: true, message: "재료타입이 삭제되었습니다." });
+  });
+
+  // ========================================
   // 재료 대분류 API (Material Categories Large)
   // ========================================
 
