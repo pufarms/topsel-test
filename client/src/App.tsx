@@ -28,6 +28,7 @@ import NextWeekProductsPage from "@/pages/admin/products/next-week-products";
 import CurrentProductsPage from "@/pages/admin/products/current-products";
 import SuspendedProductsPage from "@/pages/admin/products/suspended-products";
 import MaterialsPage from "@/pages/admin/inventory/materials";
+import MaterialTypesPage from "@/pages/admin/inventory/material-types";
 import ProductMappingPage from "@/pages/admin/inventory/mapping";
 import StockStatusPage from "@/pages/admin/inventory/stock";
 import ReceivingPage from "@/pages/admin/inventory/receiving";
@@ -153,6 +154,9 @@ function Router() {
       </Route>
       <Route path="/admin/inventory/materials">
         <AdminRoute><MaterialsPage /></AdminRoute>
+      </Route>
+      <Route path="/admin/inventory/material-types">
+        <AdminRoute><MaterialTypesPage /></AdminRoute>
       </Route>
       <Route path="/admin/inventory/mapping">
         <AdminRoute><ProductMappingPage /></AdminRoute>
