@@ -1238,7 +1238,8 @@ router.post("/learning", async (req: Request, res: Response) => {
       errorPattern,
       problemDescription,
       patternRegex,
-      solutionDescription
+      solutionDescription,
+      autoAnalyze = false
     } = req.body;
 
     if (!originalDetailAddress || !correctedDetailAddress) {
@@ -1251,27 +1252,52 @@ router.post("/learning", async (req: Request, res: Response) => {
     // 자동으로 교정 유형 추론
     const correctionType = inferCorrectionType(originalDetailAddress, correctedDetailAddress);
 
-    const [inserted] = await db.insert(addressLearningData).values({
+    // AI 자동 분석 옵션이 활성화된 경우
+    let aiAnalysisResult: any = null;
+    if (autoAnalyze && isAIEnabled()) {
+      try {
+        console.log('🤖 AI 자동 분석 시작...');
+        const addressToAnalyze = buildingType !== "general" 
+          ? `[${buildingType}] ${originalDetailAddress}` 
+          : originalDetailAddress;
+        aiAnalysisResult = await analyzeAddressPattern(addressToAnalyze);
+        console.log('✅ AI 자동 분석 완료:', aiAnalysisResult?.errorPattern);
+      } catch (aiError) {
+        console.error('AI 자동 분석 실패:', aiError);
+      }
+    }
+
+    // AI 분석 결과가 있으면 병합
+    const finalData = {
       originalDetailAddress,
       correctedDetailAddress,
       buildingType,
       correctionType,
-      confidenceScore: "0.95", // 수동 등록은 높은 신뢰도
+      confidenceScore: "0.95",
       occurrenceCount: 1,
       successCount: 0,
       userConfirmed: true,
-      errorPattern: errorPattern || correctionType,
-      problemDescription,
-      patternRegex,
-      solutionDescription,
+      errorPattern: errorPattern || aiAnalysisResult?.errorPattern || correctionType,
+      problemDescription: problemDescription || aiAnalysisResult?.problemDescription,
+      patternRegex: patternRegex || aiAnalysisResult?.patternRegex,
+      solutionDescription: solutionDescription || aiAnalysisResult?.solution,
+      similarPatterns: aiAnalysisResult?.similarPatterns ? JSON.stringify(aiAnalysisResult.similarPatterns) : null,
+      extractedMemo: aiAnalysisResult?.extractedMemo,
+      analyzedAt: aiAnalysisResult ? new Date() : null,
+      aiModel: aiAnalysisResult ? 'claude-sonnet-4' : null,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }).returning();
+    };
+
+    const [inserted] = await db.insert(addressLearningData).values(finalData).returning();
 
     return res.json({
       success: true,
-      message: "학습 데이터가 등록되었습니다",
-      data: inserted
+      message: autoAnalyze && aiAnalysisResult 
+        ? "학습 데이터가 AI 분석과 함께 등록되었습니다" 
+        : "학습 데이터가 등록되었습니다",
+      data: inserted,
+      aiAnalyzed: !!aiAnalysisResult
     });
   } catch (error) {
     console.error("[Address Learning] Create error:", error);

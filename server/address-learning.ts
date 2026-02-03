@@ -1,7 +1,7 @@
 import { db } from './db';
 import { addressLearningData } from '@shared/schema';
 import { eq, and, gte, desc, isNotNull, sql } from 'drizzle-orm';
-import { PatternAnalysisResult } from './ai-pattern-analyzer';
+import { PatternAnalysisResult, matchWithSimilarPatterns, matchAndConvertByPattern } from './ai-pattern-analyzer';
 import { compareTwoStrings } from 'string-similarity';
 
 export async function saveAddressCorrection(
@@ -215,6 +215,7 @@ export interface PatternMatchResult {
   correctedDetailAddress: string;
   errorPattern?: string;
   confidence: number;
+  matchMethod?: 'regex' | 'similar_pattern' | 'template_conversion';
 }
 
 export async function findByPattern(
@@ -227,30 +228,64 @@ export async function findByPattern(
       .from(addressLearningData)
       .where(
         and(
-          isNotNull(addressLearningData.patternRegex),
           eq(addressLearningData.buildingType, buildingType),
-          gte(addressLearningData.confidenceScore, '0.8')
+          gte(addressLearningData.confidenceScore, '0.7')
         )
       )
       .orderBy(desc(addressLearningData.occurrenceCount))
       .limit(100);
     
     for (const pattern of patterns) {
-      if (!pattern.patternRegex) continue;
-      
-      try {
-        const regex = new RegExp(pattern.patternRegex);
-        if (regex.test(detailAddress)) {
-          console.log(`🎯 정규식 패턴 매칭: ${pattern.errorPattern}`);
-          return {
-            patternRegex: pattern.patternRegex,
-            correctedDetailAddress: pattern.correctedDetailAddress,
-            errorPattern: pattern.errorPattern || undefined,
-            confidence: parseFloat(String(pattern.confidenceScore))
-          };
+      if (pattern.patternRegex) {
+        try {
+          const regex = new RegExp(pattern.patternRegex);
+          if (regex.test(detailAddress)) {
+            console.log(`🎯 정규식 패턴 매칭: ${pattern.errorPattern}`);
+            
+            const converted = matchAndConvertByPattern(
+              detailAddress, 
+              pattern.patternRegex, 
+              pattern.correctedDetailAddress
+            );
+            
+            return {
+              patternRegex: pattern.patternRegex,
+              correctedDetailAddress: converted || pattern.correctedDetailAddress,
+              errorPattern: pattern.errorPattern || undefined,
+              confidence: parseFloat(String(pattern.confidenceScore)),
+              matchMethod: 'regex'
+            };
+          }
+        } catch (regexError) {
+          console.warn(`정규식 오류 (ID: ${pattern.id}):`, regexError);
         }
-      } catch (regexError) {
-        console.warn(`정규식 오류 (ID: ${pattern.id}):`, regexError);
+      }
+      
+      if (pattern.similarPatterns) {
+        try {
+          const similarPatterns = JSON.parse(pattern.similarPatterns);
+          if (Array.isArray(similarPatterns) && similarPatterns.length > 0) {
+            const similarMatch = matchWithSimilarPatterns(
+              detailAddress,
+              similarPatterns,
+              pattern.correctedDetailAddress,
+              pattern.errorPattern || ''
+            );
+            
+            if (similarMatch.matched && similarMatch.correctedAddress) {
+              console.log(`🔍 유사 패턴 매칭 성공: ${similarMatch.errorPattern}`);
+              return {
+                patternRegex: pattern.patternRegex || '',
+                correctedDetailAddress: similarMatch.correctedAddress,
+                errorPattern: similarMatch.errorPattern,
+                confidence: similarMatch.confidence,
+                matchMethod: 'similar_pattern'
+              };
+            }
+          }
+        } catch (parseError) {
+          console.warn(`유사 패턴 파싱 오류 (ID: ${pattern.id}):`, parseError);
+        }
       }
     }
     

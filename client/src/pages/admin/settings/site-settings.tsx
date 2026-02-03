@@ -990,7 +990,8 @@ function AddressLearningManagement() {
     errorPattern: "",
     problemDescription: "",
     patternRegex: "",
-    solutionDescription: ""
+    solutionDescription: "",
+    autoAnalyze: true
   });
   
   const [testAddress, setTestAddress] = useState("");
@@ -1122,7 +1123,8 @@ function AddressLearningManagement() {
       errorPattern: "",
       problemDescription: "",
       patternRegex: "",
-      solutionDescription: ""
+      solutionDescription: "",
+      autoAnalyze: true
     });
     setEditingItem(null);
   };
@@ -1137,7 +1139,8 @@ function AddressLearningManagement() {
         errorPattern: item.errorPattern || "",
         problemDescription: item.problemDescription || "",
         patternRegex: item.patternRegex || "",
-        solutionDescription: item.solutionDescription || ""
+        solutionDescription: item.solutionDescription || "",
+        autoAnalyze: false
       });
     } else {
       resetForm();
@@ -1462,28 +1465,47 @@ function AddressLearningManagement() {
               />
             </div>
 
-            {statsData?.stats?.aiEnabled && formData.originalDetailAddress && (
-              <div className="flex items-center gap-2 pt-2 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => analyzeMutation.mutate({ 
-                    originalDetailAddress: formData.originalDetailAddress, 
-                    buildingType: formData.buildingType 
-                  })}
-                  disabled={analyzeMutation.isPending}
-                  data-testid="button-ai-analyze"
-                >
-                  {analyzeMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Brain className="w-4 h-4 mr-2" />
-                  )}
-                  AI 분석
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Claude AI가 주소 패턴을 분석하고 자동으로 필드를 채웁니다.
-                </span>
+            {statsData?.stats?.aiEnabled && (
+              <div className="space-y-3 pt-2 border-t">
+                {!editingItem && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="autoAnalyze"
+                      checked={formData.autoAnalyze}
+                      onChange={(e) => setFormData(prev => ({ ...prev, autoAnalyze: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-300"
+                      data-testid="checkbox-auto-analyze"
+                    />
+                    <Label htmlFor="autoAnalyze" className="text-sm font-normal cursor-pointer">
+                      등록 시 AI 자동 분석 (Claude AI가 오류 패턴을 분석하고 학습합니다)
+                    </Label>
+                  </div>
+                )}
+                {formData.originalDetailAddress && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => analyzeMutation.mutate({ 
+                        originalDetailAddress: formData.originalDetailAddress, 
+                        buildingType: formData.buildingType 
+                      })}
+                      disabled={analyzeMutation.isPending}
+                      data-testid="button-ai-analyze"
+                    >
+                      {analyzeMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Brain className="w-4 h-4 mr-2" />
+                      )}
+                      AI 분석
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Claude AI가 주소 패턴을 분석하고 자동으로 필드를 채웁니다.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
