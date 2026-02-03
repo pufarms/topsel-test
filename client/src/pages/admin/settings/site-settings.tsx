@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap, useAdminHeaderMenus, useCreateHeaderMenu, useUpdateHeaderMenu, useDeleteHeaderMenu, useUpdateHeaderMenuOrder, useSeedHeaderMenus } from "@/hooks/use-site-settings";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search, GripVertical } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search, GripVertical, MapPin, Brain, TestTube, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { HeaderMenu } from "@shared/schema";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
@@ -136,7 +140,7 @@ export default function SiteSettingsPage() {
           </div>
 
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
+            <TabsList className="grid w-full grid-cols-4 max-w-lg">
               <TabsTrigger value="general" data-testid="tab-general">
                 <Globe className="w-4 h-4 mr-2" />
                 일반
@@ -148,6 +152,10 @@ export default function SiteSettingsPage() {
               <TabsTrigger value="footer" data-testid="tab-footer">
                 <Layout className="w-4 h-4 mr-2 rotate-180" />
                 푸터
+              </TabsTrigger>
+              <TabsTrigger value="address" data-testid="tab-address">
+                <MapPin className="w-4 h-4 mr-2" />
+                주소학습
               </TabsTrigger>
             </TabsList>
 
@@ -355,6 +363,10 @@ export default function SiteSettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="address" className="mt-6">
+              <AddressLearningManagement />
             </TabsContent>
           </Tabs>
         </>
@@ -926,6 +938,657 @@ function SortableMenuItem({
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 주소 학습 관리 컴포넌트
+// ==========================================
+
+interface AddressLearningItem {
+  id: number;
+  originalDetailAddress: string;
+  correctedDetailAddress: string;
+  buildingType?: string;
+  correctionType?: string;
+  confidenceScore: string;
+  occurrenceCount: number;
+  successCount: number;
+  userConfirmed: boolean;
+  errorPattern?: string;
+  problemDescription?: string;
+  patternRegex?: string;
+  solutionDescription?: string;
+  aiModel?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AddressLearningStats {
+  total: number;
+  userConfirmed: number;
+  aiAnalyzed: number;
+  aiEnabled: boolean;
+}
+
+function AddressLearningManagement() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AddressLearningItem | null>(null);
+  
+  const [formData, setFormData] = useState({
+    originalDetailAddress: "",
+    correctedDetailAddress: "",
+    buildingType: "general",
+    errorPattern: "",
+    problemDescription: "",
+    patternRegex: "",
+    solutionDescription: ""
+  });
+  
+  const [testAddress, setTestAddress] = useState("");
+  const [testBuildingType, setTestBuildingType] = useState("general");
+  const [testResult, setTestResult] = useState<any>(null);
+
+  // 학습 데이터 목록 조회
+  const { data: learningData, isLoading, refetch } = useQuery<{
+    success: boolean;
+    data: AddressLearningItem[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>({
+    queryKey: ["/api/address/learning", page, search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
+      if (search) params.append("search", search);
+      const res = await fetch(`/api/address/learning?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("학습 데이터 조회 실패");
+      return res.json();
+    }
+  });
+
+  // 통계 조회
+  const { data: statsData } = useQuery<{ success: boolean; stats: AddressLearningStats }>({
+    queryKey: ["/api/address/learning/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/address/learning/stats", { credentials: "include" });
+      if (!res.ok) throw new Error("통계 조회 실패");
+      return res.json();
+    }
+  });
+
+  // 학습 데이터 생성
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/address/learning", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "등록 완료", description: "주소 학습 데이터가 등록되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning/stats"] });
+      setIsDialogOpen(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "등록 실패", description: "학습 데이터 등록에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  // 학습 데이터 수정
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
+      const res = await apiRequest("PUT", `/api/address/learning/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "수정 완료", description: "주소 학습 데이터가 수정되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning"] });
+      setIsDialogOpen(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({ title: "수정 실패", description: "학습 데이터 수정에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  // 학습 데이터 삭제
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/address/learning/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "삭제 완료", description: "학습 데이터가 삭제되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning/stats"] });
+    },
+    onError: () => {
+      toast({ title: "삭제 실패", description: "학습 데이터 삭제에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  // AI 분석
+  const analyzeMutation = useMutation({
+    mutationFn: async ({ originalDetailAddress, buildingType }: { originalDetailAddress: string; buildingType: string }) => {
+      const res = await apiRequest("POST", "/api/address/learning/analyze", { originalDetailAddress, buildingType });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "AI 분석 완료", description: "패턴이 분석되어 저장되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/address/learning/stats"] });
+      if (data.analysis) {
+        setFormData(prev => ({
+          ...prev,
+          correctedDetailAddress: data.analysis.correctedAddress || prev.correctedDetailAddress,
+          errorPattern: data.analysis.errorPattern || prev.errorPattern,
+          problemDescription: data.analysis.problemDescription || prev.problemDescription,
+          patternRegex: data.analysis.patternRegex || prev.patternRegex,
+          solutionDescription: data.analysis.solution || prev.solutionDescription
+        }));
+      }
+    },
+    onError: () => {
+      toast({ title: "AI 분석 실패", description: "AI 분석에 실패했습니다. API 키를 확인해주세요.", variant: "destructive" });
+    }
+  });
+
+  // 패턴 테스트
+  const testMutation = useMutation({
+    mutationFn: async ({ testAddress, buildingType }: { testAddress: string; buildingType: string }) => {
+      const res = await apiRequest("POST", "/api/address/learning/test", { testAddress, buildingType });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setTestResult(data);
+    },
+    onError: () => {
+      toast({ title: "테스트 실패", description: "패턴 테스트에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  const resetForm = () => {
+    setFormData({
+      originalDetailAddress: "",
+      correctedDetailAddress: "",
+      buildingType: "general",
+      errorPattern: "",
+      problemDescription: "",
+      patternRegex: "",
+      solutionDescription: ""
+    });
+    setEditingItem(null);
+  };
+
+  const handleOpenDialog = (item?: AddressLearningItem) => {
+    if (item) {
+      setEditingItem(item);
+      setFormData({
+        originalDetailAddress: item.originalDetailAddress,
+        correctedDetailAddress: item.correctedDetailAddress,
+        buildingType: item.buildingType || "general",
+        errorPattern: item.errorPattern || "",
+        problemDescription: item.problemDescription || "",
+        patternRegex: item.patternRegex || "",
+        solutionDescription: item.solutionDescription || ""
+      });
+    } else {
+      resetForm();
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!formData.originalDetailAddress || !formData.correctedDetailAddress) {
+      toast({ title: "입력 오류", description: "원본 주소와 교정 주소는 필수입니다.", variant: "destructive" });
+      return;
+    }
+    
+    if (editingItem) {
+      updateMutation.mutate({ id: editingItem.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    deleteMutation.mutate(id);
+  };
+
+  const handleSearch = () => {
+    setSearch(searchInput);
+    setPage(1);
+  };
+
+  const handleTest = () => {
+    if (!testAddress) {
+      toast({ title: "입력 오류", description: "테스트할 주소를 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    testMutation.mutate({ testAddress, buildingType: testBuildingType });
+  };
+
+  const stats = statsData?.stats;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            AI 주소 학습 관리
+          </CardTitle>
+          <CardDescription>
+            오류 주소 패턴을 등록하고 AI가 학습하도록 관리합니다. 등록된 패턴은 엑셀 주문 업로드 시 자동으로 적용됩니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold">{stats?.total || 0}</div>
+              <div className="text-sm text-muted-foreground">전체 학습 데이터</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold">{stats?.userConfirmed || 0}</div>
+              <div className="text-sm text-muted-foreground">수동 등록</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="text-2xl font-bold">{stats?.aiAnalyzed || 0}</div>
+              <div className="text-sm text-muted-foreground">AI 분석</div>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center gap-2">
+                {stats?.aiEnabled ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-500" />
+                )}
+                <span className="text-sm">{stats?.aiEnabled ? "AI 활성화" : "AI 비활성화"}</span>
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Claude AI 상태</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="flex-1 min-w-[200px]">
+              <Input
+                placeholder="원본/교정 주소, 오류 패턴 검색..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                data-testid="input-address-search"
+              />
+            </div>
+            <Button variant="outline" onClick={handleSearch} data-testid="button-search-address">
+              <Search className="w-4 h-4 mr-2" />
+              검색
+            </Button>
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-address">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              새로고침
+            </Button>
+            <Button variant="outline" onClick={() => { setTestResult(null); setIsTestDialogOpen(true); }} data-testid="button-test-pattern">
+              <TestTube className="w-4 h-4 mr-2" />
+              패턴 테스트
+            </Button>
+            <Button onClick={() => handleOpenDialog()} data-testid="button-add-address-learning">
+              <Plus className="w-4 h-4 mr-2" />
+              등록
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[200px]">원본 주소</TableHead>
+                      <TableHead className="w-[200px]">교정 주소</TableHead>
+                      <TableHead>건물유형</TableHead>
+                      <TableHead>오류패턴</TableHead>
+                      <TableHead>신뢰도</TableHead>
+                      <TableHead>횟수</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {learningData?.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          등록된 학습 데이터가 없습니다.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      learningData?.data?.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-mono text-sm max-w-[200px] truncate" title={item.originalDetailAddress}>
+                            {item.originalDetailAddress}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm max-w-[200px] truncate" title={item.correctedDetailAddress}>
+                            {item.correctedDetailAddress}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {item.buildingType === "apartment" ? "아파트" : 
+                               item.buildingType === "villa" ? "빌라" :
+                               item.buildingType === "officetel" ? "오피스텔" : "일반"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{item.errorPattern || "-"}</TableCell>
+                          <TableCell>
+                            <span className={`font-medium ${parseFloat(item.confidenceScore) >= 0.9 ? "text-green-600" : parseFloat(item.confidenceScore) >= 0.7 ? "text-yellow-600" : "text-red-600"}`}>
+                              {(parseFloat(item.confidenceScore) * 100).toFixed(0)}%
+                            </span>
+                          </TableCell>
+                          <TableCell>{item.occurrenceCount}</TableCell>
+                          <TableCell>
+                            {item.userConfirmed ? (
+                              <Badge variant="default">수동</Badge>
+                            ) : item.aiModel ? (
+                              <Badge variant="secondary">AI</Badge>
+                            ) : (
+                              <Badge variant="outline">자동</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenDialog(item)}
+                                title="수정"
+                                data-testid={`button-edit-learning-${item.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(item.id)}
+                                disabled={deleteMutation.isPending}
+                                title="삭제"
+                                data-testid={`button-delete-learning-${item.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {learningData?.pagination && learningData.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    data-testid="button-prev-page"
+                  >
+                    이전
+                  </Button>
+                  <span className="text-sm text-muted-foreground" data-testid="text-page-info">
+                    {page} / {learningData.pagination.totalPages} 페이지
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(learningData.pagination.totalPages, p + 1))}
+                    disabled={page === learningData.pagination.totalPages}
+                    data-testid="button-next-page"
+                  >
+                    다음
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "주소 학습 데이터 수정" : "주소 학습 데이터 등록"}</DialogTitle>
+            <DialogDescription>
+              오류 주소와 교정된 주소를 등록하면 향후 동일 패턴의 주소를 자동으로 교정합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="originalDetailAddress">원본 상세주소 *</Label>
+                <Input
+                  id="originalDetailAddress"
+                  value={formData.originalDetailAddress}
+                  onChange={(e) => setFormData(prev => ({ ...prev, originalDetailAddress: e.target.value }))}
+                  placeholder="예: 101-202 (부재시 문앞)"
+                  data-testid="input-original-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="correctedDetailAddress">교정 상세주소 *</Label>
+                <Input
+                  id="correctedDetailAddress"
+                  value={formData.correctedDetailAddress}
+                  onChange={(e) => setFormData(prev => ({ ...prev, correctedDetailAddress: e.target.value }))}
+                  placeholder="예: 101동 202호"
+                  data-testid="input-corrected-address"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="buildingType">건물 유형</Label>
+                <Select
+                  value={formData.buildingType}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, buildingType: v }))}
+                >
+                  <SelectTrigger data-testid="select-building-type">
+                    <SelectValue placeholder="건물 유형 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">일반</SelectItem>
+                    <SelectItem value="apartment">아파트</SelectItem>
+                    <SelectItem value="villa">빌라</SelectItem>
+                    <SelectItem value="officetel">오피스텔</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="errorPattern">오류 패턴</Label>
+                <Input
+                  id="errorPattern"
+                  value={formData.errorPattern}
+                  onChange={(e) => setFormData(prev => ({ ...prev, errorPattern: e.target.value }))}
+                  placeholder="예: hyphen_to_unit"
+                  data-testid="input-error-pattern"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="problemDescription">문제 설명</Label>
+              <Textarea
+                id="problemDescription"
+                value={formData.problemDescription}
+                onChange={(e) => setFormData(prev => ({ ...prev, problemDescription: e.target.value }))}
+                placeholder="이 주소 패턴의 문제점을 설명합니다..."
+                rows={2}
+                data-testid="textarea-problem-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="patternRegex">패턴 정규식 (고급)</Label>
+              <Input
+                id="patternRegex"
+                value={formData.patternRegex}
+                onChange={(e) => setFormData(prev => ({ ...prev, patternRegex: e.target.value }))}
+                placeholder="예: ^(\d+)\s*-\s*(\d+)$"
+                className="font-mono text-sm"
+                data-testid="input-pattern-regex"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="solutionDescription">해결 방법</Label>
+              <Textarea
+                id="solutionDescription"
+                value={formData.solutionDescription}
+                onChange={(e) => setFormData(prev => ({ ...prev, solutionDescription: e.target.value }))}
+                placeholder="이 패턴을 어떻게 교정하는지 설명합니다..."
+                rows={2}
+                data-testid="textarea-solution-description"
+              />
+            </div>
+
+            {statsData?.stats?.aiEnabled && formData.originalDetailAddress && (
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => analyzeMutation.mutate({ 
+                    originalDetailAddress: formData.originalDetailAddress, 
+                    buildingType: formData.buildingType 
+                  })}
+                  disabled={analyzeMutation.isPending}
+                  data-testid="button-ai-analyze"
+                >
+                  {analyzeMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Brain className="w-4 h-4 mr-2" />
+                  )}
+                  AI 분석
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Claude AI가 주소 패턴을 분석하고 자동으로 필드를 채웁니다.
+                </span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel-learning">
+              취소
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={createMutation.isPending || updateMutation.isPending}
+              data-testid="button-save-learning"
+            >
+              {(createMutation.isPending || updateMutation.isPending) && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              {editingItem ? "수정" : "등록"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TestTube className="w-5 h-5" />
+              패턴 테스트
+            </DialogTitle>
+            <DialogDescription>
+              주소를 입력하여 학습된 패턴으로 변환되는지 테스트합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="testAddress">테스트 주소</Label>
+              <Input
+                id="testAddress"
+                value={testAddress}
+                onChange={(e) => setTestAddress(e.target.value)}
+                placeholder="예: 101-202 부재시 문앞"
+                data-testid="input-test-address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="testBuildingType">건물 유형</Label>
+              <Select
+                value={testBuildingType}
+                onValueChange={setTestBuildingType}
+              >
+                <SelectTrigger data-testid="select-test-building-type">
+                  <SelectValue placeholder="건물 유형 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">일반</SelectItem>
+                  <SelectItem value="apartment">아파트</SelectItem>
+                  <SelectItem value="villa">빌라</SelectItem>
+                  <SelectItem value="officetel">오피스텔</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {testResult && (
+              <div className={`p-4 rounded-lg border ${testResult.matched ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" : "bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800"}`}>
+                {testResult.matched ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-medium">패턴 매칭 성공</span>
+                    </div>
+                    <div className="text-sm space-y-1">
+                      <div><span className="text-muted-foreground">원본:</span> {testResult.original}</div>
+                      <div><span className="text-muted-foreground">교정:</span> <span className="font-medium">{testResult.corrected}</span></div>
+                      <div><span className="text-muted-foreground">방식:</span> {testResult.method === "pattern_regex" ? "정규식 패턴" : testResult.method === "learned_similarity" ? "유사 패턴 학습" : "룰 기반"}</div>
+                      {testResult.confidence && (
+                        <div><span className="text-muted-foreground">신뢰도:</span> {(testResult.confidence * 100).toFixed(0)}%</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="font-medium">매칭 없음</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{testResult.message}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTestDialogOpen(false)} data-testid="button-close-test">
+              닫기
+            </Button>
+            <Button 
+              onClick={handleTest} 
+              disabled={testMutation.isPending}
+              data-testid="button-run-test"
+            >
+              {testMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              테스트
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
