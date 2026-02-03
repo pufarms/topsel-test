@@ -5134,6 +5134,90 @@ export async function registerRoutes(
     return `ORD-${dateStr}-${randomStr}`;
   }
 
+  // Get order stats for dashboard - role-based filtering
+  // Admin: sees aggregated counts from all members
+  // Member: sees only their own order counts
+  app.get('/api/order-stats', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "로그인이 필요합니다" });
+    }
+
+    try {
+      const isMember = req.session.userType === "member";
+      let isAdmin = false;
+      
+      // Check admin role if user type is "user" (not member)
+      if (req.session.userType === "user") {
+        const user = await storage.getUser(req.session.userId);
+        if (user && (user.role === "SUPER_ADMIN" || user.role === "ADMIN")) {
+          isAdmin = true;
+        }
+      }
+
+      if (!isAdmin && !isMember) {
+        return res.status(403).json({ message: "접근 권한이 없습니다" });
+      }
+
+      // Get counts by status
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+
+      // Total count
+      const totalResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin ? sql`1=1` : eq(pendingOrders.memberId, req.session.userId));
+      
+      // Pending (대기) count
+      const pendingResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? eq(pendingOrders.status, "대기")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "대기")));
+      
+      // Processing (처리중) count
+      const processingResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? eq(pendingOrders.status, "처리중")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "처리중")));
+      
+      // Completed (완료) count
+      const completedResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? eq(pendingOrders.status, "완료")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "완료")));
+      
+      // Cancelled (취소) count
+      const cancelledResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? eq(pendingOrders.status, "취소")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "취소")));
+      
+      // Today's orders count
+      const todayResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? sql`DATE(${pendingOrders.createdAt}) = ${todayStr}`
+          : and(eq(pendingOrders.memberId, req.session.userId), sql`DATE(${pendingOrders.createdAt}) = ${todayStr}`));
+
+      res.json({
+        total: totalResult[0]?.count || 0,
+        pending: pendingResult[0]?.count || 0,        // 대기
+        processing: processingResult[0]?.count || 0,  // 처리중
+        completed: completedResult[0]?.count || 0,    // 완료
+        cancelled: cancelledResult[0]?.count || 0,    // 취소
+        today: todayResult[0]?.count || 0,
+        isAdmin
+      });
+    } catch (error: any) {
+      console.error("Order stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get pending orders for member
   app.get('/api/member/pending-orders', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {

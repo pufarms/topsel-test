@@ -35,6 +35,18 @@ export default function AdminOrders() {
     queryKey: ["/api/admin/orders"],
   });
 
+  // Order stats from new API (real-time counts)
+  const { data: orderStats } = useQuery<{
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    cancelled: number;
+    today: number;
+  }>({
+    queryKey: ["/api/order-stats"],
+  });
+
   const filteredOrders = orders
     .filter(o => {
       if (searchSeller && !o.user?.name.toLowerCase().includes(searchSeller.toLowerCase())) return false;
@@ -83,12 +95,9 @@ export default function AdminOrders() {
   const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR");
   const formatPrice = (price: number) => price.toLocaleString("ko-KR") + "원";
 
-  const totalOrders = orders.length;
-  const todayOrders = orders.filter(o => {
-    const today = new Date();
-    const orderDate = new Date(o.createdAt);
-    return orderDate.toDateString() === today.toDateString();
-  }).length;
+  // Use real stats from API
+  const totalOrders = orderStats?.total || 0;
+  const todayOrders = orderStats?.today || 0;
   const totalRevenue = orders.reduce((sum, o) => sum + o.price * o.quantity, 0);
   const totalItems = orders.reduce((sum, o) => sum + o.quantity, 0);
 

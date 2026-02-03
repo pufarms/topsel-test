@@ -221,6 +221,19 @@ export default function Dashboard() {
     refetchOnWindowFocus: false,
   });
 
+  // Order stats - member sees only their own order counts
+  const { data: orderStats } = useQuery<{
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    cancelled: number;
+    today: number;
+  }>({
+    queryKey: ["/api/order-stats"],
+    enabled: !!user && (isMember || isPreviewMode),
+  });
+
   const { toast } = useToast();
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -512,7 +525,13 @@ export default function Dashboard() {
     return orderDate.getMonth() === lastMonth && orderDate.getFullYear() === lastMonthYear;
   });
 
-  const totalOrders = orders.length;
+  // Use real order stats from API (member's own orders only)
+  const totalOrders = orderStats?.total || 0;
+  const pendingOrdersCount = orderStats?.pending || 0;
+  const processingOrdersCount = orderStats?.processing || 0;
+  const completedOrdersCount = orderStats?.completed || 0;
+  const cancelledOrdersCount = orderStats?.cancelled || 0;
+  
   const thisMonthTotal = thisMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
   const lastMonthTotal = lastMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
 
@@ -666,46 +685,46 @@ export default function Dashboard() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     <MiniStat
-                      title="주문접수"
+                      title="전체주문"
                       value={`${totalOrders}건`}
-                      icon={<Clock className="h-3.5 w-3.5" />}
+                      icon={<ShoppingCart className="h-3.5 w-3.5" />}
                       color="blue"
                     />
                     <MiniStat
-                      title="주문조정"
-                      value="0건"
-                      icon={<AlertCircle className="h-3.5 w-3.5" />}
+                      title="대기중"
+                      value={`${pendingOrdersCount}건`}
+                      icon={<Clock className="h-3.5 w-3.5" />}
                       color="yellow"
                     />
                     <MiniStat
-                      title="상품준비중"
-                      value="0건"
+                      title="처리중"
+                      value={`${processingOrdersCount}건`}
                       icon={<Package className="h-3.5 w-3.5" />}
                       color="purple"
                     />
                     <MiniStat
-                      title="배송준비중"
-                      value="0건"
-                      icon={<Package className="h-3.5 w-3.5" />}
-                      color="orange"
+                      title="완료"
+                      value={`${completedOrdersCount}건`}
+                      icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                      color="green"
                     />
                     <MiniStat
-                      title="회원취소"
-                      value="0건"
+                      title="취소"
+                      value={`${cancelledOrdersCount}건`}
                       icon={<XCircle className="h-3.5 w-3.5" />}
                       color="red"
                     />
                     <MiniStat
-                      title="배송중"
-                      value="0건"
-                      icon={<Truck className="h-3.5 w-3.5" />}
-                      color="blue"
+                      title="오늘등록"
+                      value={`${orderStats?.today || 0}건`}
+                      icon={<Calendar className="h-3.5 w-3.5" />}
+                      color="orange"
                     />
                     <MiniStat
                       title="배송완료"
                       value="0건"
-                      icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                      color="green"
+                      icon={<Truck className="h-3.5 w-3.5" />}
+                      color="blue"
                     />
                   </div>
 

@@ -34,6 +34,19 @@ export default function Admin() {
     enabled: !!user && isAdminRole(user.role),
   });
 
+  // Order stats from API (real-time counts from pending_orders table)
+  const { data: orderStats } = useQuery<{
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    cancelled: number;
+    today: number;
+  }>({
+    queryKey: ["/api/order-stats"],
+    enabled: !!user && isAdminRole(user.role),
+  });
+
   const updateTierMutation = useMutation({
     mutationFn: async ({ userId, tier }: { userId: string; tier: string }) => {
       await apiRequest("PATCH", `/api/admin/users/${userId}/tier`, { tier });
@@ -150,7 +163,7 @@ export default function Admin() {
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-orders">{orders.length}건</div>
+              <div className="text-2xl font-bold" data-testid="text-total-orders">{orderStats?.total || 0}건</div>
             </CardContent>
           </Card>
         </div>
