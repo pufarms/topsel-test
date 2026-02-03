@@ -146,6 +146,38 @@ Preferred communication style: Simple, everyday language.
   - Term versions from CMS for traceability
   - Admin page for searching and viewing agreement records (/admin/term-agreements)
 
+### Order Workflow (주문 워크플로우)
+주문은 다음 단계를 거쳐 처리됩니다. 각 단계 전환 시 SSE 이벤트가 발생하여 관리자와 회원 모두 실시간으로 현황판이 업데이트됩니다.
+
+1. **주문대기** (Pending Orders)
+   - 회원이 주문을 등록
+   - 자체주문번호(customOrderNumber)는 중복 가능 (회원이 여러 상품 주문을 분리하기 때문)
+   - 각 주문은 시스템 생성 sequenceNumber로 고유 식별
+
+2. **주문조정** (Order Adjustment)
+   - 관리자가 주문 통계를 기반으로 주문 조정
+   - 직권취소 처리 시 즉시 현황판에 반영
+   - 회원은 조정된 주문 리스트 확인 가능
+
+3. **상품준비중** (Product Preparation)
+   - 주문조정 완료된 주문이 이동
+   - 관리자가 운송장 출력 작업 수행
+
+4. **배송준비중** (Ready for Shipping)
+   - 운송장이 등록되면 자동으로 이동
+   - 회원: 운송파일 다운로드하여 자체 판매사이트에 등록
+   - 회원: 취소 요청 접수 가능 (취소 시 해당 주문 자동 취소 처리)
+
+5. **배송중** (In Shipping)
+   - 취소건 접수 마감 후 관리자가 배송준비중 → 배송중으로 이동
+   - **이 시점에 정산 처리**: 예치금(deposit)과 포인터(points)로 결제 처리
+   - 모든 배송 관련 업무 완료
+
+**중요 규칙**:
+- 모든 주문 상태 변경 시 SSE 이벤트 발생 (`order-updated`, `orders-deleted`, `order-created`)
+- 관리자와 해당 회원 모두에게 실시간 알림 전송
+- 현황판(Order Stats Banner) 즉시 갱신
+
 ## External Dependencies
 
 ### Database
