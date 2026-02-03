@@ -42,6 +42,55 @@ declare module "express-session" {
 
 const MemoryStoreSession = MemoryStore(session);
 
+// SSE 이벤트 관리자
+interface SSEClient {
+  id: string;
+  res: any;
+  userId: string;
+  userType: "user" | "member";
+}
+
+class SSEManager {
+  private clients: Map<string, SSEClient> = new Map();
+
+  addClient(client: SSEClient) {
+    this.clients.set(client.id, client);
+    console.log(`SSE client connected: ${client.userId} (${client.userType}), total: ${this.clients.size}`);
+  }
+
+  removeClient(id: string) {
+    this.clients.delete(id);
+    console.log(`SSE client disconnected, total: ${this.clients.size}`);
+  }
+
+  // 특정 회원에게 이벤트 전송
+  sendToMember(memberId: string, event: string, data: any) {
+    this.clients.forEach(client => {
+      if (client.userType === "member" && client.userId === memberId) {
+        client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+    });
+  }
+
+  // 모든 관리자에게 이벤트 전송
+  sendToAdmins(event: string, data: any) {
+    this.clients.forEach(client => {
+      if (client.userType === "user") {
+        client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+    });
+  }
+
+  // 모든 클라이언트에게 이벤트 전송
+  broadcast(event: string, data: any) {
+    this.clients.forEach(client => {
+      client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    });
+  }
+}
+
+const sseManager = new SSEManager();
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -63,6 +112,43 @@ export async function registerRoutes(
       },
     })
   );
+
+  // SSE 이벤트 스트림 엔드포인트
+  app.get("/api/events", (req, res) => {
+    // 인증 확인
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    // SSE 헤더 설정
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // nginx 버퍼링 비활성화
+
+    // 초기 연결 메시지
+    res.write(`event: connected\ndata: ${JSON.stringify({ message: "SSE connected" })}\n\n`);
+
+    // 클라이언트 등록
+    const clientId = `${req.session.userId}-${Date.now()}`;
+    sseManager.addClient({
+      id: clientId,
+      res,
+      userId: req.session.userId,
+      userType: req.session.userType || "user",
+    });
+
+    // 30초마다 heartbeat 전송 (연결 유지)
+    const heartbeat = setInterval(() => {
+      res.write(`event: heartbeat\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
+    }, 30000);
+
+    // 연결 종료 시 정리
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      sseManager.removeClient(clientId);
+    });
+  });
 
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) {
