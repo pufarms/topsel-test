@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial, decimal, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1286,3 +1286,47 @@ export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
 
 export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
 export type FormTemplate = typeof formTemplates.$inferSelect;
+
+// 주소 학습 데이터 테이블 (스마트 주소 검증 시스템)
+export const addressLearningData = pgTable('address_learning_data', {
+  id: serial('id').primaryKey(),
+  
+  // 원본 주소 정보
+  originalAddress: text('original_address'),
+  originalDetailAddress: text('original_detail_address').notNull(),
+  buildingType: varchar('building_type', { length: 20 }),
+  
+  // 수정된 주소
+  correctedDetailAddress: text('corrected_detail_address').notNull(),
+  
+  // 수정 유형 (memo_separation, missing_unit_separator, hyphen_to_unit 등)
+  correctionType: varchar('correction_type', { length: 50 }),
+  
+  // 신뢰도 및 통계
+  confidenceScore: decimal('confidence_score', { precision: 3, scale: 2 }).default('0.80').notNull(),
+  occurrenceCount: integer('occurrence_count').default(1).notNull(),
+  successCount: integer('success_count').default(0).notNull(),
+  userConfirmed: boolean('user_confirmed').default(false).notNull(),
+  
+  // AI 패턴 분석 결과
+  errorPattern: varchar('error_pattern', { length: 100 }),
+  problemDescription: text('problem_description'),
+  patternRegex: varchar('pattern_regex', { length: 500 }),
+  solutionDescription: text('solution_description'),
+  similarPatterns: text('similar_patterns'),
+  extractedMemo: text('extracted_memo'),
+  analyzedAt: timestamp('analyzed_at'),
+  aiModel: varchar('ai_model', { length: 50 }),
+  
+  // 타임스탬프
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+}, (table) => ({
+  originalDetailIdx: index('idx_original_detail').on(table.originalDetailAddress),
+  buildingTypeIdx: index('idx_building_type').on(table.buildingType),
+  patternIdx: index('idx_pattern_regex').on(table.patternRegex),
+}));
+
+export type AddressLearningData = typeof addressLearningData.$inferSelect;
+export type NewAddressLearningData = typeof addressLearningData.$inferInsert;
