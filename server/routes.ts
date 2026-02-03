@@ -3057,6 +3057,36 @@ export async function registerRoutes(
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "삭제할 재료 ID 목록이 필요합니다" });
     }
+    
+    // 매핑된 재료가 있는지 확인
+    const mappedMaterials: { materialCode: string; materialName: string; products: string[] }[] = [];
+    for (const id of ids) {
+      const material = await storage.getMaterial(id);
+      if (material) {
+        const mappings = await storage.getMappingsByMaterialCode(material.materialCode);
+        if (mappings.length > 0) {
+          const productCodes = Array.from(new Set(mappings.map(m => m.productCode)));
+          mappedMaterials.push({
+            materialCode: material.materialCode,
+            materialName: material.materialName,
+            products: productCodes,
+          });
+        }
+      }
+    }
+    
+    if (mappedMaterials.length > 0) {
+      const details = mappedMaterials.map(m => 
+        `"${m.materialName}" (${m.materialCode}) → 상품: ${m.products.join(", ")}`
+      ).join("\n");
+      return res.status(400).json({ 
+        message: `${mappedMaterials.length}개 재료가 상품에 매핑되어 있어 삭제할 수 없습니다.\n\n먼저 상품관리 > 상품등록(공급가계산) 에서 해당 재료의 매핑을 해제하세요.`,
+        mappedCount: mappedMaterials.length,
+        mappedMaterials,
+        details,
+      });
+    }
+    
     const deleted = await storage.bulkDeleteMaterials(ids);
     return res.json({ success: true, message: `${deleted}개 재료가 삭제되었습니다.`, deleted });
   });
@@ -3069,6 +3099,23 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
+    
+    // 재료 정보 조회
+    const material = await storage.getMaterial(req.params.id);
+    if (!material) {
+      return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
+    }
+    
+    // 해당 재료가 상품에 매핑되어 있는지 확인
+    const mappings = await storage.getMappingsByMaterialCode(material.materialCode);
+    if (mappings.length > 0) {
+      const productCodes = Array.from(new Set(mappings.map(m => m.productCode)));
+      return res.status(400).json({ 
+        message: `이 재료는 ${productCodes.length}개 상품에 매핑되어 있어 삭제할 수 없습니다.\n\n먼저 상품관리 > 상품등록(공급가계산) 에서 해당 재료의 매핑을 해제하세요.`,
+        mappedProducts: productCodes,
+      });
+    }
+    
     const deleted = await storage.deleteMaterial(req.params.id);
     if (!deleted) {
       return res.status(404).json({ message: "재료를 찾을 수 없습니다" });

@@ -178,6 +178,7 @@ export interface IStorage {
   createProductMaterialMapping(data: InsertProductMaterialMapping): Promise<ProductMaterialMapping>;
   deleteProductMaterialMappingsByProduct(productCode: string): Promise<number>;
   replaceProductMaterialMappings(productCode: string, mappings: Omit<InsertProductMaterialMapping, "productCode">[]): Promise<ProductMaterialMapping[]>;
+  getMappingsByMaterialCode(materialCode: string): Promise<ProductMaterialMapping[]>;
 
   // Product Stock methods (재고 관리)
   getAllProductStocks(): Promise<ProductStock[]>;
@@ -1303,6 +1304,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productMappings.productCode, productCode));
     
     return result;
+  }
+
+  async getMappingsByMaterialCode(materialCode: string): Promise<ProductMaterialMapping[]> {
+    return db.select().from(productMaterialMappings)
+      .where(eq(productMaterialMappings.materialCode, materialCode));
   }
 
   // Product Stock methods
