@@ -2288,7 +2288,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "상품코드 목록이 필요합니다" });
     }
     
-    const unmappedProducts: { productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null }[] = [];
+    const unmappedProducts: { productCode: string; productName: string; categoryLarge?: string | null; categoryMedium?: string | null; categorySmall?: string | null; reason?: string }[] = [];
     const mappedProducts: { productCode: string; productName: string }[] = [];
     
     // Get all registrations once for efficiency
@@ -2308,9 +2308,47 @@ export async function registerRoutes(
           categoryLarge: registration?.categoryLarge || null,
           categoryMedium: registration?.categoryMedium || null,
           categorySmall: registration?.categorySmall || null,
+          reason: !mapping ? "매핑 없음" : "매핑 미완료",
         });
       } else {
-        mappedProducts.push({ productCode, productName });
+        // 매핑이 완료되어 있어도 실제 재료가 존재하는지 확인
+        const materialMappings = await storage.getProductMaterialMappings(productCode);
+        
+        if (materialMappings.length === 0) {
+          unmappedProducts.push({ 
+            productCode, 
+            productName,
+            categoryLarge: registration?.categoryLarge || null,
+            categoryMedium: registration?.categoryMedium || null,
+            categorySmall: registration?.categorySmall || null,
+            reason: "매핑된 재료 없음",
+          });
+        } else {
+          // 각 재료가 실제로 존재하는지 확인
+          let hasMissingMaterial = false;
+          const missingCodes: string[] = [];
+          
+          for (const mm of materialMappings) {
+            const material = await storage.getMaterialByCode(mm.materialCode);
+            if (!material) {
+              hasMissingMaterial = true;
+              missingCodes.push(mm.materialCode);
+            }
+          }
+          
+          if (hasMissingMaterial) {
+            unmappedProducts.push({ 
+              productCode, 
+              productName,
+              categoryLarge: registration?.categoryLarge || null,
+              categoryMedium: registration?.categoryMedium || null,
+              categorySmall: registration?.categorySmall || null,
+              reason: `삭제된 재료: ${missingCodes.join(", ")}`,
+            });
+          } else {
+            mappedProducts.push({ productCode, productName });
+          }
+        }
       }
     }
     
@@ -3917,9 +3955,31 @@ export async function registerRoutes(
     
     const stockMap = new Map(stocks.map(s => [s.productCode, s.currentStock]));
     
-    const result = mappings.map(m => ({
-      ...m,
-      currentStock: stockMap.get(m.productCode) || 0,
+    // 매핑 상태 검증: 매핑된 재료가 실제로 존재하는지 확인
+    const result = await Promise.all(mappings.map(async (m) => {
+      let actualMappingStatus = m.mappingStatus;
+      
+      if (m.mappingStatus === "complete") {
+        const materialMappings = await storage.getProductMaterialMappings(m.productCode);
+        
+        if (materialMappings.length === 0) {
+          actualMappingStatus = "incomplete";
+        } else {
+          for (const mm of materialMappings) {
+            const material = await storage.getMaterialByCode(mm.materialCode);
+            if (!material) {
+              actualMappingStatus = "incomplete";
+              break;
+            }
+          }
+        }
+      }
+      
+      return {
+        ...m,
+        mappingStatus: actualMappingStatus,
+        currentStock: stockMap.get(m.productCode) || 0,
+      };
     }));
     
     return res.json(result);
