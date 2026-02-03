@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates } from "@shared/schema";
-import addressValidationRouter from "./address-validation";
+import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
@@ -5999,6 +5999,8 @@ export async function registerRoutes(
         recipientAddress: string;
         deliveryMessage: string;
         productInfo: any;
+        validatedAddress?: string;
+        addressWarning?: string;
       }> = [];
       
       const errorRows: Array<{
@@ -6055,7 +6057,28 @@ export async function registerRoutes(
           continue;
         }
 
-        // Store valid row for insertion
+        // 주소 검증 (JUSO_API_KEY가 설정된 경우에만)
+        let addressValidationResult: { status: AddressStatus; standardAddress?: string; fullAddress?: string; warningMessage?: string; errorMessage?: string } | null = null;
+        if (process.env.JUSO_API_KEY && recipientAddress) {
+          try {
+            addressValidationResult = await validateSingleAddress(recipientAddress);
+            
+            // 주소 검증 실패 시 오류 처리
+            if (addressValidationResult.status === 'invalid') {
+              errorRows.push({
+                rowNum,
+                originalData: row,
+                errorReason: `주소 오류: ${addressValidationResult.errorMessage || '건물을 찾을 수 없습니다'}`
+              });
+              continue;
+            }
+          } catch (addrError: any) {
+            console.error(`주소 검증 오류 (${rowNum}번 줄):`, addrError.message);
+            // 주소 검증 API 오류는 경고만 하고 진행 (검증 비활성화 상태와 동일하게 처리)
+          }
+        }
+
+        // Store valid row for insertion (주소 검증 결과 포함)
         validRows.push({
           rowNum,
           productCode,
@@ -6070,6 +6093,8 @@ export async function registerRoutes(
           recipientAddress,
           deliveryMessage,
           productInfo,
+          validatedAddress: addressValidationResult?.fullAddress || addressValidationResult?.standardAddress,
+          addressWarning: addressValidationResult?.warningMessage,
         });
       }
 
@@ -6129,8 +6154,10 @@ export async function registerRoutes(
           recipientName: parsedRow.recipientName,
           recipientMobile: parsedRow.recipientMobile,
           recipientPhone: parsedRow.recipientPhone || null,
-          recipientAddress: parsedRow.recipientAddress,
-          deliveryMessage: parsedRow.deliveryMessage || null,
+          recipientAddress: parsedRow.validatedAddress || parsedRow.recipientAddress,
+          deliveryMessage: parsedRow.addressWarning 
+            ? `${parsedRow.deliveryMessage || ''} [주소확인필요: ${parsedRow.addressWarning}]`.trim()
+            : (parsedRow.deliveryMessage || null),
           customOrderNumber: parsedRow.customOrderNumber,
           trackingNumber: null,
           courierCompany: null,

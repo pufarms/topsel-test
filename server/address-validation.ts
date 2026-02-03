@@ -1147,4 +1147,30 @@ router.get("/search", async (req: Request, res: Response) => {
   }
 });
 
+// 개별 주소 검증을 위한 exported 함수 (엑셀 업로드 통합용)
+export async function validateSingleAddress(rawAddress: string): Promise<{
+  status: AddressStatus;
+  standardAddress?: string;
+  detailAddress?: string;
+  fullAddress?: string;
+  zipCode?: string;
+  buildingName?: string;
+  warningMessage?: string;
+  errorMessage?: string;
+  reasonCode?: string;
+}> {
+  const result = await validateAddress(rawAddress);
+  return {
+    status: result.status,
+    standardAddress: result.standardAddress,
+    detailAddress: result.detailAddress,
+    fullAddress: result.fullAddress,
+    zipCode: result.zipCode,
+    buildingName: result.buildingName,
+    warningMessage: result.warningMessage,
+    errorMessage: result.errorMessage,
+    reasonCode: result.reasonCode,
+  };
+}
+
 export default router;
