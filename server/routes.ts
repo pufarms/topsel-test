@@ -5950,6 +5950,7 @@ export async function registerRoutes(
   });
 
   // Member: Excel upload for bulk order registration
+  // confirmPartial=true: 오류건 제외하고 정상건만 등록
   const memberOrderExcelUpload = multer({ storage: multer.memoryStorage() });
   app.post('/api/member/pending-orders/excel-upload', memberOrderExcelUpload.single('file'), async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {
@@ -5959,6 +5960,9 @@ export async function registerRoutes(
     if (!req.file) {
       return res.status(400).json({ message: "엑셀 파일을 업로드해주세요" });
     }
+
+    // confirmPartial 파라미터: 오류건 제외하고 정상건만 등록할지 여부
+    const confirmPartial = req.body.confirmPartial === 'true' || req.body.confirmPartial === true;
 
     try {
       const XLSX = await import("xlsx");
@@ -5976,9 +5980,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
       }
 
-      // STEP 1: Validate ALL rows first before any insertion
-      const validationErrors: string[] = [];
-      const parsedRows: Array<{
+      // 정상건과 오류건을 분리
+      const validRows: Array<{
         rowNum: number;
         productCode: string;
         productName: string;
@@ -5992,6 +5995,12 @@ export async function registerRoutes(
         recipientAddress: string;
         deliveryMessage: string;
         productInfo: any;
+      }> = [];
+      
+      const errorRows: Array<{
+        rowNum: number;
+        originalData: Record<string, any>;
+        errorReason: string;
       }> = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -6023,19 +6032,27 @@ export async function registerRoutes(
         if (!recipientAddress) missingFields.push('수령자주소');
 
         if (missingFields.length > 0) {
-          validationErrors.push(`${rowNum}번 줄: [${missingFields.join(', ')}] 누락`);
+          errorRows.push({
+            rowNum,
+            originalData: row,
+            errorReason: `[${missingFields.join(', ')}] 누락`
+          });
           continue;
         }
 
         // Check if product exists in 현재공급가상품 (product registrations)
         const productInfo = await storage.getProductRegistrationByCode(productCode);
         if (!productInfo) {
-          validationErrors.push(`${rowNum}번 줄: "${productName}" (${productCode})은(는) 공급되지 않는 상품입니다`);
+          errorRows.push({
+            rowNum,
+            originalData: row,
+            errorReason: `"${productName}" (${productCode}) 공급되지 않는 상품`
+          });
           continue;
         }
 
-        // Store parsed data for insertion (including productInfo for later use)
-        parsedRows.push({
+        // Store valid row for insertion
+        validRows.push({
           rowNum,
           productCode,
           productName,
@@ -6052,20 +6069,39 @@ export async function registerRoutes(
         });
       }
 
-      // STEP 2: If any validation errors, reject the entire file
-      if (validationErrors.length > 0) {
-        return res.status(400).json({
-          message: "주문 등록이 반려되었습니다",
-          errors: validationErrors,
+      // 오류가 있고 confirmPartial이 아니면 검증 결과만 반환 (등록하지 않음)
+      if (errorRows.length > 0 && !confirmPartial) {
+        // 오류건 엑셀 다운로드용 데이터 생성
+        const errorExcelData = errorRows.map(err => ({
+          '줄번호': err.rowNum,
+          '상품코드': err.originalData['상품코드'] || err.originalData['productCode'] || '',
+          '상품명': err.originalData['상품명'] || err.originalData['productName'] || '',
+          '자체주문번호': err.originalData['자체주문번호'] || err.originalData['customOrderNumber'] || '',
+          '주문자명': err.originalData['주문자명'] || err.originalData['ordererName'] || '',
+          '주문자전화번호': err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '',
+          '주문자주소': err.originalData['주문자주소'] || err.originalData['주문자 주소'] || err.originalData['ordererAddress'] || '',
+          '수령자명': err.originalData['수령자명'] || err.originalData['recipientName'] || '',
+          '수령자휴대폰번호': err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '',
+          '수령자전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
+          '수령자주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
+          '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
+          '오류사유': err.errorReason
+        }));
+
+        return res.json({
+          status: 'validation_failed',
+          message: "검증 오류가 있습니다. 정상건만 등록하거나 취소하세요.",
           total: rows.length,
-          success: 0,
-          failed: validationErrors.length,
+          validCount: validRows.length,
+          errorCount: errorRows.length,
+          errors: errorRows.map(e => `${e.rowNum}번 줄: ${e.errorReason}`),
+          errorExcelData: errorExcelData,
         });
       }
 
-      // STEP 3: All rows validated - proceed with insertion
+      // 정상건만 등록 진행 (오류 없거나 confirmPartial=true)
       let successCount = 0;
-      for (const parsedRow of parsedRows) {
+      for (const parsedRow of validRows) {
         // Generate sequence number
         const sequenceNumber = await generateSequenceNumber(member.username);
 
@@ -6112,7 +6148,36 @@ export async function registerRoutes(
         });
       }
 
+      // 오류건이 있었다면 오류 엑셀 데이터도 함께 반환
+      if (errorRows.length > 0 && confirmPartial) {
+        const errorExcelData = errorRows.map(err => ({
+          '줄번호': err.rowNum,
+          '상품코드': err.originalData['상품코드'] || err.originalData['productCode'] || '',
+          '상품명': err.originalData['상품명'] || err.originalData['productName'] || '',
+          '자체주문번호': err.originalData['자체주문번호'] || err.originalData['customOrderNumber'] || '',
+          '주문자명': err.originalData['주문자명'] || err.originalData['ordererName'] || '',
+          '주문자전화번호': err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '',
+          '주문자주소': err.originalData['주문자주소'] || err.originalData['주문자 주소'] || err.originalData['ordererAddress'] || '',
+          '수령자명': err.originalData['수령자명'] || err.originalData['recipientName'] || '',
+          '수령자휴대폰번호': err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '',
+          '수령자전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
+          '수령자주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
+          '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
+          '오류사유': err.errorReason
+        }));
+
+        return res.json({
+          status: 'partial_success',
+          total: rows.length,
+          success: successCount,
+          failed: errorRows.length,
+          errors: errorRows.map(e => `${e.rowNum}번 줄: ${e.errorReason}`),
+          errorExcelData: errorExcelData,
+        });
+      }
+
       res.json({
+        status: 'success',
         total: rows.length,
         success: successCount,
         failed: 0,
