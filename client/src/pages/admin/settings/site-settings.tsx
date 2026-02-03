@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminSiteSettings, useUpdateSiteSettings, useSeedSiteSettings, settingsToMap, useAdminHeaderMenus, useCreateHeaderMenu, useUpdateHeaderMenu, useDeleteHeaderMenu, useUpdateHeaderMenuOrder, useSeedHeaderMenus } from "@/hooks/use-site-settings";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search, GripVertical, MapPin, Brain, TestTube, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Save, RefreshCw, Settings, Globe, Layout, Menu, Plus, Trash2, Edit, ArrowUp, ArrowDown, Eye, EyeOff, Search, GripVertical, MapPin, Brain, TestTube, CheckCircle, XCircle, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/admin/page-header";
 import type { HeaderMenu } from "@shared/schema";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
@@ -998,6 +998,23 @@ function AddressLearningManagement() {
   const [testBuildingType, setTestBuildingType] = useState("general");
   const [testResult, setTestResult] = useState<any>(null);
 
+  // Excel 업로드 관련 상태
+  const [isExcelDialogOpen, setIsExcelDialogOpen] = useState(false);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelPreview, setExcelPreview] = useState<{
+    columns: { index: number; name: string }[];
+    sampleData: any[];
+    totalRows: number;
+    sheetName: string;
+  } | null>(null);
+  const [selectedColumn, setSelectedColumn] = useState<number | null>(null);
+  const [excelBuildingType, setExcelBuildingType] = useState("apartment");
+  const [processResults, setProcessResults] = useState<{
+    summary?: { total: number; success: number; skipped: number; error: number };
+    results?: any[];
+  } | null>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+
   // 학습 데이터 목록 조회
   const { data: learningData, isLoading, refetch } = useQuery<{
     success: boolean;
@@ -1114,6 +1131,82 @@ function AddressLearningManagement() {
       toast({ title: "테스트 실패", description: "패턴 테스트에 실패했습니다.", variant: "destructive" });
     }
   });
+
+  // Excel 미리보기
+  const previewMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/address/learning/upload/preview", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("미리보기 실패");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        setExcelPreview(data);
+        setSelectedColumn(null);
+        setProcessResults(null);
+      } else {
+        toast({ title: "미리보기 실패", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "미리보기 실패", description: "엑셀 파일 처리에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  // Excel 처리 (AI 분석)
+  const processMutation = useMutation({
+    mutationFn: async () => {
+      if (!excelFile || selectedColumn === null) throw new Error("파일과 컬럼을 선택해주세요");
+      const formData = new FormData();
+      formData.append("file", excelFile);
+      formData.append("addressColumn", String(selectedColumn));
+      formData.append("buildingType", excelBuildingType);
+      const res = await fetch("/api/address/learning/upload/process", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("처리 실패");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "학습 완료", description: data.message });
+        setProcessResults({ summary: data.summary, results: data.results });
+        queryClient.invalidateQueries({ queryKey: ["/api/address/learning"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/address/learning/stats"] });
+      } else {
+        toast({ title: "처리 실패", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "처리 실패", description: err.message || "엑셀 처리에 실패했습니다.", variant: "destructive" });
+    }
+  });
+
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setExcelFile(file);
+      setExcelPreview(null);
+      setProcessResults(null);
+      previewMutation.mutate(file);
+    }
+  };
+
+  const resetExcelDialog = () => {
+    setExcelFile(null);
+    setExcelPreview(null);
+    setSelectedColumn(null);
+    setProcessResults(null);
+    if (excelInputRef.current) excelInputRef.current.value = "";
+  };
 
   const resetForm = () => {
     setFormData({
@@ -1242,9 +1335,13 @@ function AddressLearningManagement() {
               <TestTube className="w-4 h-4 mr-2" />
               패턴 테스트
             </Button>
-            <Button onClick={() => handleOpenDialog()} data-testid="button-add-address-learning">
+            <Button onClick={() => { resetExcelDialog(); setIsExcelDialogOpen(true); }} data-testid="button-excel-upload">
+              <Upload className="w-4 h-4 mr-2" />
+              엑셀 학습
+            </Button>
+            <Button variant="outline" onClick={() => handleOpenDialog()} data-testid="button-add-address-learning">
               <Plus className="w-4 h-4 mr-2" />
-              등록
+              수동 등록
             </Button>
           </div>
 
@@ -1607,6 +1704,201 @@ function AddressLearningManagement() {
             >
               {testMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               테스트
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isExcelDialogOpen} onOpenChange={setIsExcelDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              오류 주소 엑셀 학습
+            </DialogTitle>
+            <DialogDescription>
+              오류 주소가 담긴 엑셀 파일을 업로드하고 주소 컬럼을 선택하면 AI가 자동으로 분석하여 학습합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>엑셀 파일 업로드</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelFileChange}
+                  className="flex-1"
+                  data-testid="input-excel-file"
+                />
+                {previewMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              </div>
+              {excelFile && (
+                <p className="text-sm text-muted-foreground">
+                  선택된 파일: {excelFile.name}
+                </p>
+              )}
+            </div>
+
+            {excelPreview && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>주소 컬럼 선택</Label>
+                    <Select
+                      value={selectedColumn !== null ? String(selectedColumn) : ""}
+                      onValueChange={(v) => setSelectedColumn(parseInt(v))}
+                    >
+                      <SelectTrigger data-testid="select-address-column">
+                        <SelectValue placeholder="주소가 있는 컬럼을 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {excelPreview.columns.map((col) => (
+                          <SelectItem key={col.index} value={String(col.index)}>
+                            {col.name || `컬럼 ${col.index + 1}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>건물 유형</Label>
+                    <Select value={excelBuildingType} onValueChange={setExcelBuildingType}>
+                      <SelectTrigger data-testid="select-excel-building-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="apartment">아파트</SelectItem>
+                        <SelectItem value="villa">빌라/주택</SelectItem>
+                        <SelectItem value="officetel">오피스텔</SelectItem>
+                        <SelectItem value="general">일반</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>미리보기 (처음 5개 행)</Label>
+                    <Badge variant="outline">
+                      시트: {excelPreview.sheetName} | 총 {excelPreview.totalRows}행
+                    </Badge>
+                  </div>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">행</TableHead>
+                          {excelPreview.columns.map((col) => (
+                            <TableHead 
+                              key={col.index}
+                              className={selectedColumn === col.index ? "bg-primary/10" : ""}
+                            >
+                              {col.name || `컬럼 ${col.index + 1}`}
+                              {selectedColumn === col.index && (
+                                <Badge variant="secondary" className="ml-2">주소</Badge>
+                              )}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {excelPreview.sampleData.map((row, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs">{row._rowIndex}</TableCell>
+                            {excelPreview.columns.map((col) => (
+                              <TableCell 
+                                key={col.index}
+                                className={selectedColumn === col.index ? "bg-primary/10 font-medium" : ""}
+                              >
+                                {row[col.name] || "-"}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {processResults?.summary && (
+              <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="font-medium">학습 완료</span>
+                </div>
+                <div className="grid grid-cols-4 gap-4 text-center">
+                  <div className="p-2 bg-background rounded">
+                    <div className="text-xl font-bold">{processResults.summary.total}</div>
+                    <div className="text-xs text-muted-foreground">전체</div>
+                  </div>
+                  <div className="p-2 bg-green-50 dark:bg-green-950 rounded">
+                    <div className="text-xl font-bold text-green-600">{processResults.summary.success}</div>
+                    <div className="text-xs text-muted-foreground">학습 성공</div>
+                  </div>
+                  <div className="p-2 bg-yellow-50 dark:bg-yellow-950 rounded">
+                    <div className="text-xl font-bold text-yellow-600">{processResults.summary.skipped}</div>
+                    <div className="text-xs text-muted-foreground">건너뜀</div>
+                  </div>
+                  <div className="p-2 bg-red-50 dark:bg-red-950 rounded">
+                    <div className="text-xl font-bold text-red-600">{processResults.summary.error}</div>
+                    <div className="text-xs text-muted-foreground">오류</div>
+                  </div>
+                </div>
+
+                {processResults.results && processResults.results.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto border rounded">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead className="w-12">행</TableHead>
+                          <TableHead>주소</TableHead>
+                          <TableHead className="w-24">상태</TableHead>
+                          <TableHead>결과</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {processResults.results.map((result, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs">{result.rowIndex}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{result.originalAddress}</TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  result.status === 'success' ? 'default' :
+                                  result.status === 'skipped' ? 'secondary' : 'destructive'
+                                }
+                              >
+                                {result.status === 'success' ? '성공' :
+                                 result.status === 'skipped' ? '건너뜀' : '오류'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {result.pattern || result.message}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExcelDialogOpen(false)} data-testid="button-close-excel">
+              닫기
+            </Button>
+            <Button 
+              onClick={() => processMutation.mutate()}
+              disabled={processMutation.isPending || selectedColumn === null || !excelFile}
+              data-testid="button-process-excel"
+            >
+              {processMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              AI 학습 시작
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -143,12 +143,14 @@ Preferred communication style: Simple, everyday language.
 - **AI Address Learning Management (주소학습 관리 - Admin Settings)**: Admins can register error address patterns and AI automatically analyzes why they're errors, learns the patterns, and applies them during order validation.
   - Location: 사이트설정 > 주소학습 탭
   - Features: Stats dashboard, paginated list with search, create/edit/delete learning data, pattern test dialog, AI analysis button
-  - **Auto-Analyze Option**: When registering new patterns, AI (Claude 4.5 Sonnet) automatically analyzes the error address to understand WHY it's an error and generates:
-    - Error pattern code (HYPHEN_SEPARATED, MEMO_MIXED, etc.)
-    - Problem description (detailed Korean explanation)
-    - Pattern regex (sophisticated regex for detection)
-    - Similar patterns (5+ similar error examples for future detection)
-    - Extracted memo (separated delivery notes)
+  - **Excel Upload Learning (엑셀 학습)**: Primary method for bulk address learning
+    - Upload Excel file containing error addresses
+    - Select the column containing address data
+    - AI automatically analyzes each address to understand WHY it's an error
+    - Generates: error pattern code, problem description, pattern regex, similar patterns (5+), extracted memo
+    - All results are saved to address_learning table for future pattern matching
+    - API endpoints: POST /api/address/learning/upload/preview (get columns), POST /api/address/learning/upload/process (AI analysis)
+  - **Manual Registration (수동 등록)**: For individual error address entries with optional AI auto-analyze
   - Auto-inference: System automatically infers correctionType when creating learning data
   - High confidence: User-registered patterns get 0.95 confidence score
   - Pattern matching methods: pattern_regex (regex match), similar_pattern (structure-based matching), learned_similarity (fuzzy matching)

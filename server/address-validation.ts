@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { 
   normalizeDetailAddressWithAI, 
   isAIEnabled,
@@ -15,6 +16,8 @@ import { analyzeAddressPattern, matchAndConvertByPattern } from './ai-pattern-an
 import { db } from './db';
 import { addressLearningData } from '@shared/schema';
 import { eq, desc, ilike, or, sql } from 'drizzle-orm';
+
+const excelUpload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
@@ -1502,6 +1505,209 @@ router.post("/learning/test", async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "패턴 테스트 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 엑셀 파일 업로드하여 컬럼 미리보기 (오류주소 학습용)
+router.post("/learning/upload/preview", excelUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "파일이 없습니다" });
+    }
+
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: "빈 파일입니다" });
+    }
+
+    const headers = rows[0] as string[];
+    const sampleData = rows.slice(1, 6).map((row, idx) => {
+      const obj: Record<string, any> = { _rowIndex: idx + 2 };
+      headers.forEach((header, colIdx) => {
+        obj[header] = row[colIdx] || "";
+      });
+      return obj;
+    });
+
+    return res.json({
+      success: true,
+      columns: headers.map((name, index) => ({ index, name })),
+      sampleData,
+      totalRows: rows.length - 1,
+      sheetName
+    });
+  } catch (error) {
+    console.error("[Address Learning] Excel preview error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "엑셀 파일 처리 중 오류가 발생했습니다"
+    });
+  }
+});
+
+// 엑셀 파일의 주소들을 AI로 분석하여 학습 (일괄 처리)
+router.post("/learning/upload/process", excelUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "파일이 없습니다" });
+    }
+
+    const { addressColumn, buildingType = "apartment" } = req.body;
+    const addressColumnIndex = parseInt(addressColumn);
+
+    if (isNaN(addressColumnIndex)) {
+      return res.status(400).json({ success: false, message: "주소 컬럼을 선택해주세요" });
+    }
+
+    if (!isAIEnabled()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "AI 기능이 비활성화되어 있습니다. ANTHROPIC_API_KEY를 설정해주세요." 
+      });
+    }
+
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+    if (rows.length <= 1) {
+      return res.status(400).json({ success: false, message: "데이터가 없습니다" });
+    }
+
+    const results: Array<{
+      rowIndex: number;
+      originalAddress: string;
+      status: 'success' | 'skipped' | 'error';
+      message?: string;
+      pattern?: string;
+    }> = [];
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const address = String(row[addressColumnIndex] || "").trim();
+
+      if (!address || address.length < 3) {
+        results.push({
+          rowIndex: i + 1,
+          originalAddress: address || "(빈 값)",
+          status: 'skipped',
+          message: "주소가 너무 짧거나 비어있음"
+        });
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        const existing = await db
+          .select()
+          .from(addressLearningData)
+          .where(eq(addressLearningData.originalDetailAddress, address))
+          .limit(1);
+
+        if (existing.length > 0) {
+          results.push({
+            rowIndex: i + 1,
+            originalAddress: address,
+            status: 'skipped',
+            message: "이미 학습된 주소"
+          });
+          skippedCount++;
+          continue;
+        }
+
+        console.log(`🤖 [${i}/${rows.length - 1}] AI 분석 중: "${address}"`);
+        
+        const addressToAnalyze = buildingType !== "general" 
+          ? `[${buildingType}] ${address}` 
+          : address;
+        const aiResult = await analyzeAddressPattern(addressToAnalyze);
+
+        if (aiResult && aiResult.errorPattern) {
+          const correctionType = inferCorrectionType(address, aiResult.correctedAddress || address);
+          
+          await db.insert(addressLearningData).values({
+            originalDetailAddress: address,
+            correctedDetailAddress: aiResult.correctedAddress || address,
+            buildingType,
+            correctionType,
+            confidenceScore: "0.95",
+            occurrenceCount: 1,
+            successCount: 0,
+            userConfirmed: true,
+            errorPattern: aiResult.errorPattern,
+            problemDescription: aiResult.problemDescription,
+            patternRegex: aiResult.patternRegex,
+            solutionDescription: aiResult.solution,
+            similarPatterns: aiResult.similarPatterns ? JSON.stringify(aiResult.similarPatterns) : null,
+            extractedMemo: aiResult.extractedMemo,
+            analyzedAt: new Date(),
+            aiModel: 'claude-sonnet-4',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          results.push({
+            rowIndex: i + 1,
+            originalAddress: address,
+            status: 'success',
+            pattern: aiResult.errorPattern,
+            message: aiResult.problemDescription
+          });
+          successCount++;
+        } else {
+          results.push({
+            rowIndex: i + 1,
+            originalAddress: address,
+            status: 'skipped',
+            message: "AI가 오류 패턴을 감지하지 못함 (정상 주소일 수 있음)"
+          });
+          skippedCount++;
+        }
+
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+      } catch (err) {
+        console.error(`[${i}] 분석 오류:`, err);
+        results.push({
+          rowIndex: i + 1,
+          originalAddress: address,
+          status: 'error',
+          message: err instanceof Error ? err.message : "분석 실패"
+        });
+        errorCount++;
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `${successCount}개 학습 완료, ${skippedCount}개 건너뜀, ${errorCount}개 오류`,
+      summary: {
+        total: rows.length - 1,
+        success: successCount,
+        skipped: skippedCount,
+        error: errorCount
+      },
+      results
+    });
+
+  } catch (error) {
+    console.error("[Address Learning] Excel process error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "엑셀 처리 중 오류가 발생했습니다"
     });
   }
 });
