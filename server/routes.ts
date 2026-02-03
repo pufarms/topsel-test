@@ -5926,6 +5926,12 @@ export async function registerRoutes(
         orderId: newOrder?.id,
         memberCompanyName: member.companyName 
       });
+      
+      // SSE: 해당 회원에게도 주문 등록 확인 알림
+      sseManager.sendToMember(member.id, "order-created", {
+        type: "pending-order",
+        orderId: newOrder?.id
+      });
 
       res.status(201).json(newOrder);
     } catch (error: any) {
@@ -6090,6 +6096,12 @@ export async function registerRoutes(
           type: "pending-order-bulk",
           count: successCount,
           memberCompanyName: member.companyName 
+        });
+        
+        // SSE: 해당 회원에게도 일괄 주문 등록 확인 알림
+        sseManager.sendToMember(member.id, "orders-created", {
+          type: "pending-order-bulk",
+          count: successCount
         });
       }
 
