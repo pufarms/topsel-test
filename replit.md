@@ -140,6 +140,13 @@ Preferred communication style: Simple, everyday language.
 - **Smart Address Validation System (스마트 주소 검증 시스템)**: Automatically validates and normalizes recipient addresses during Excel order uploads using a multi-step pipeline including regex matching, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI). It auto-learns from AI results to improve efficiency.
   - Validation Statuses: `VALID`, `WARNING`, `INVALID`.
   - Integration: Invalid addresses cause errors in partial uploads, warnings add notes to shipping messages, and validated addresses are stored.
+- **AI Address Learning Management (주소학습 관리 - Admin Settings)**: Admins can manually register and manage error address patterns to improve validation accuracy.
+  - Location: 사이트설정 > 주소학습 탭
+  - Features: Stats dashboard, paginated list with search, create/edit/delete learning data, pattern test dialog, AI analysis button
+  - Auto-inference: System automatically infers correctionType (memo_separation, hyphen_to_unit, missing_dong, etc.) when creating learning data
+  - High confidence: User-registered patterns get 0.95 confidence score (vs 0.80 for AI-analyzed)
+  - Pattern matching methods: pattern_regex (exact regex match), learned_similarity (fuzzy matching based on learned patterns)
+  - API endpoints: GET/POST /api/address/learning, PUT/DELETE /api/address/learning/:id, POST /api/address/learning/analyze, POST /api/address/learning/test, GET /api/address/learning/stats
 
 ### Order Workflow (주문 워크플로우)
 Orders progress through the following stages, with SSE events updating dashboards in real-time for both administrators and members:
