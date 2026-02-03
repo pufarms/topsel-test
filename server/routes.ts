@@ -2003,7 +2003,31 @@ export async function registerRoutes(
   app.get("/api/product-registrations", async (req, res) => {
     const status = req.query.status as string || 'active';
     const prods = await storage.getAllProductRegistrations(status);
-    return res.json(prods);
+    
+    // 매핑 상태 검증: 매핑된 재료가 실제로 존재하는지 확인
+    const validatedProds = await Promise.all(prods.map(async (p) => {
+      // 매핑완료 상태인 경우에만 검증
+      if (p.mappingStatus === "complete") {
+        const materialMappings = await storage.getProductMaterialMappings(p.productCode);
+        
+        if (materialMappings.length === 0) {
+          // 매핑된 재료가 없으면 미완료
+          return { ...p, mappingStatus: "incomplete" };
+        }
+        
+        // 각 재료가 실제로 존재하는지 확인
+        for (const mm of materialMappings) {
+          const material = await storage.getMaterialByCode(mm.materialCode);
+          if (!material) {
+            // 삭제된 재료가 있으면 미완료로 변경
+            return { ...p, mappingStatus: "incomplete" };
+          }
+        }
+      }
+      return p;
+    }));
+    
+    return res.json(validatedProds);
   });
 
   app.get("/api/product-registrations/template", async (req, res) => {
