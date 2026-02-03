@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, MoreHorizontal, Pencil, Trash2, Download, Upload, Loader2 } from "lucide-react";
-import type { MaterialCategoryLarge, MaterialCategoryMedium, MaterialCategorySmall, Material, MaterialType } from "@shared/schema";
+import type { MaterialCategoryLarge, MaterialCategoryMedium, MaterialCategorySmall, Material, MaterialType, MaterialTypeRecord } from "@shared/schema";
 import { materialTypeLabels } from "@shared/schema";
 import * as XLSX from "xlsx";
 
@@ -72,6 +72,21 @@ export default function MaterialsPage() {
   const { data: allMaterials = [] } = useQuery<Material[]>({
     queryKey: ["/api/materials"],
   });
+
+  const { data: materialTypesData = [] } = useQuery<MaterialTypeRecord[]>({
+    queryKey: ["/api/material-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/material-types?active=true");
+      if (!res.ok) throw new Error("Failed to fetch material types");
+      return res.json();
+    },
+  });
+
+  const getMaterialTypeLabel = (code: string): string => {
+    const typeFromDb = materialTypesData.find(t => t.code === code);
+    if (typeFromDb) return typeFromDb.name;
+    return materialTypeLabels[code as MaterialType] || code;
+  };
 
   const filteredMediumCategories = selectedLarge 
     ? mediumCategories.filter(m => m.largeCategoryId === selectedLarge)
@@ -481,7 +496,7 @@ export default function MaterialsPage() {
 
     const headers = ["재료타입", "대분류", "중분류", "소분류", "재료코드", "재료명", "현재재고"];
     const rows = filteredMaterials.map(m => [
-      materialTypeLabels[m.materialType as MaterialType] || m.materialType,
+      getMaterialTypeLabel(m.materialType),
       largeCategories.find(c => c.id === m.largeCategoryId)?.name || "",
       mediumCategories.find(c => c.id === m.mediumCategoryId)?.name || "",
       smallCategories.find(c => c.id === m.smallCategoryId)?.name || "",
@@ -719,9 +734,17 @@ export default function MaterialsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">전체</SelectItem>
-                    <SelectItem value="raw">원재료</SelectItem>
-                    <SelectItem value="semi">반재료</SelectItem>
-                    <SelectItem value="sub">부재료</SelectItem>
+                    {materialTypesData.length > 0 ? (
+                      materialTypesData.map(type => (
+                        <SelectItem key={type.id} value={type.code}>{type.name}</SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="raw">원재료</SelectItem>
+                        <SelectItem value="semi">반재료</SelectItem>
+                        <SelectItem value="sub">부재료</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -738,7 +761,7 @@ export default function MaterialsPage() {
                   재료 목록 ({filteredMaterials.length}개)
                   {(selectedLarge || selectedMaterialType) && (
                     <span className="ml-2 text-xs">
-                      | 필터: {selectedMaterialType ? materialTypeLabels[selectedMaterialType] : ""}
+                      | 필터: {selectedMaterialType ? getMaterialTypeLabel(selectedMaterialType) : ""}
                       {selectedMaterialType && selectedLarge ? " / " : ""}
                       {selectedLarge ? getLargeCategoryName(selectedLarge) : ""}
                       {selectedMedium ? ` > ${getMediumCategoryName(selectedMedium)}` : ""}
@@ -802,7 +825,7 @@ export default function MaterialsPage() {
                             onCheckedChange={(checked) => handleSelectOne(material.id, !!checked)}
                           />
                         </td>
-                        <td className="px-3 py-2">{materialTypeLabels[material.materialType as MaterialType]}</td>
+                        <td className="px-3 py-2">{getMaterialTypeLabel(material.materialType)}</td>
                         <td className="px-3 py-2">{getLargeCategoryName(material.largeCategoryId)}</td>
                         <td className="px-3 py-2">{getMediumCategoryName(material.mediumCategoryId)}</td>
                         <td className="px-3 py-2">{getSmallCategoryName(material.smallCategoryId)}</td>
@@ -932,9 +955,17 @@ export default function MaterialsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="raw">원재료</SelectItem>
-                  <SelectItem value="semi">반재료</SelectItem>
-                  <SelectItem value="sub">부재료</SelectItem>
+                  {materialTypesData.length > 0 ? (
+                    materialTypesData.map(type => (
+                      <SelectItem key={type.id} value={type.code}>{type.name}</SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="raw">원재료</SelectItem>
+                      <SelectItem value="semi">반재료</SelectItem>
+                      <SelectItem value="sub">부재료</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
