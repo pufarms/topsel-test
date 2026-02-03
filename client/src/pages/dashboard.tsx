@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
+import { useSSE } from "@/hooks/use-sse";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -193,6 +194,9 @@ export default function Dashboard() {
   const isPreviewMode = urlParams.get("preview") === "true";
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
   const isMember = user && !isAdmin;
+
+  // SSE 실시간 업데이트 연결 (회원만)
+  useSSE({}, !!isMember);
   
   // 메뉴 토글 함수 (아코디언 동작)
   const toggleMenu = (menuId: string) => {

@@ -114,10 +114,28 @@ export async function registerRoutes(
   );
 
   // SSE 이벤트 스트림 엔드포인트
-  app.get("/api/events", (req, res) => {
+  app.get("/api/events", async (req, res) => {
     // 인증 확인
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    // userType 명시적 확인 및 설정
+    let userType: "user" | "member" = "member";
+    if (req.session.userType === "member") {
+      // 회원 확인
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+      userType = "member";
+    } else {
+      // 관리자 확인
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      userType = "user";
     }
 
     // SSE 헤더 설정
@@ -127,7 +145,7 @@ export async function registerRoutes(
     res.setHeader("X-Accel-Buffering", "no"); // nginx 버퍼링 비활성화
 
     // 초기 연결 메시지
-    res.write(`event: connected\ndata: ${JSON.stringify({ message: "SSE connected" })}\n\n`);
+    res.write(`event: connected\ndata: ${JSON.stringify({ message: "SSE connected", userType })}\n\n`);
 
     // 클라이언트 등록
     const clientId = `${req.session.userId}-${Date.now()}`;
@@ -135,19 +153,28 @@ export async function registerRoutes(
       id: clientId,
       res,
       userId: req.session.userId,
-      userType: req.session.userType || "user",
+      userType,
     });
 
     // 30초마다 heartbeat 전송 (연결 유지)
     const heartbeat = setInterval(() => {
-      res.write(`event: heartbeat\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
+      try {
+        res.write(`event: heartbeat\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
+      } catch (e) {
+        // 연결이 끊어진 경우 정리
+        clearInterval(heartbeat);
+        sseManager.removeClient(clientId);
+      }
     }, 30000);
 
     // 연결 종료 시 정리
-    req.on("close", () => {
+    const cleanup = () => {
       clearInterval(heartbeat);
       sseManager.removeClient(clientId);
-    });
+    };
+
+    req.on("close", cleanup);
+    res.on("error", cleanup);
   });
 
   app.get("/api/auth/me", async (req, res) => {

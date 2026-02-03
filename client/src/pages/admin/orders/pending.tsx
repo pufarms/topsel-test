@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +22,10 @@ import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersPendingPage() {
   const { toast } = useToast();
+  
+  // SSE 실시간 업데이트 연결
+  useSSE();
+
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
     categoryLarge: "",
