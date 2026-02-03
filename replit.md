@@ -139,7 +139,8 @@ Preferred communication style: Simple, everyday language.
   - Validation checks: Required fields (상품코드, 상품명, 자체주문번호, 주문자명, 주문자전화번호, 수령자명, 수령자휴대폰번호, 수령자주소), product code existence in 현재공급상품
   - If errors exist: Shows validation_failed status with valid/error counts
   - Partial upload: Registers only valid rows, auto-downloads error Excel with "오류사유" column
-  - Error Excel columns: 상품코드, 상품명, 자체주문번호, 주문자명, 주문자전화번호, 주문자주소, 수령자명, 수령자휴대폰번호, 수령자전화번호, 수령자주소, 배송메시지, 오류사유
+  - Error Excel columns (주문등록 양식과 동일한 순서 + 오류사유): 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품코드, 상품명, 자체주문번호, 오류사유
+  - 회원이 오류사유 컬럼만 삭제하면 바로 재업로드 가능
 - **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general) stored in `siteSettings` table, with public and admin APIs and a dedicated admin page.
 - **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility based on login status, menu types (custom/system), drag-and-drop ordering, and an "Open in new tab" option.
 - **Page Management (Admin)**: CMS for dynamic page creation and management using a JSON-based content system (`pages` table). Features include a visual content editor with 9 section types, real-time preview, 8 predefined page categories, and access level control. System pages are non-deletable. Dynamic page rendering handles public paths.

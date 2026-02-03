@@ -6070,19 +6070,20 @@ export async function registerRoutes(
       }
 
       // 오류건 엑셀 데이터 생성 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
+      // 양식 순서: 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품코드, 상품명, 자체주문번호
       const generateErrorExcelData = (errRows: typeof errorRows) => {
         return errRows.map(err => ({
+          '주문자명': err.originalData['주문자명'] || err.originalData['ordererName'] || '',
+          '주문자 전화번호': err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '',
+          '주문자 주소': err.originalData['주문자주소'] || err.originalData['주문자 주소'] || err.originalData['ordererAddress'] || '',
+          '수령자명': err.originalData['수령자명'] || err.originalData['recipientName'] || '',
+          '수령자휴대폰번호': err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '',
+          '수령자 전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
+          '수령자 주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
+          '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
           '상품코드': err.originalData['상품코드'] || err.originalData['productCode'] || '',
           '상품명': err.originalData['상품명'] || err.originalData['productName'] || '',
           '자체주문번호': err.originalData['자체주문번호'] || err.originalData['customOrderNumber'] || '',
-          '주문자명': err.originalData['주문자명'] || err.originalData['ordererName'] || '',
-          '주문자전화번호': err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '',
-          '주문자주소': err.originalData['주문자주소'] || err.originalData['주문자 주소'] || err.originalData['ordererAddress'] || '',
-          '수령자명': err.originalData['수령자명'] || err.originalData['recipientName'] || '',
-          '수령자휴대폰번호': err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '',
-          '수령자전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
-          '수령자주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
-          '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
           '오류사유': err.errorReason  // 마지막 컬럼: 수정 후 이 컬럼만 삭제하면 바로 재업로드 가능
         }));
       };
