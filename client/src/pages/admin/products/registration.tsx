@@ -1185,53 +1185,71 @@ export default function ProductRegistrationPage() {
         </CardHeader>
         <CardContent className="p-3 pt-0">
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-            <Select value={searchCategoryLarge} onValueChange={setSearchCategoryLarge}>
-              <SelectTrigger className="h-9" data-testid="select-search-large">
-                <SelectValue placeholder="대분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                {largeCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={searchCategoryMedium} onValueChange={setSearchCategoryMedium}>
-              <SelectTrigger className="h-9" data-testid="select-search-medium">
-                <SelectValue placeholder="중분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                {getFilteredMedium(searchCategoryLarge).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={searchCategorySmall} onValueChange={setSearchCategorySmall}>
-              <SelectTrigger className="h-9" data-testid="select-search-small">
-                <SelectValue placeholder="소분류" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                {getFilteredSmall(searchCategoryMedium).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={searchWeight} onValueChange={setSearchWeight}>
-              <SelectTrigger className="h-9" data-testid="select-search-weight">
-                <SelectValue placeholder="중량(수량)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                {allWeights.map(w => <SelectItem key={String(w)} value={String(w)}>{String(w)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={searchMappingStatus} onValueChange={setSearchMappingStatus}>
-              <SelectTrigger className="h-9" data-testid="select-search-mapping">
-                <SelectValue placeholder="매핑상태" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="complete">매핑완료</SelectItem>
-                <SelectItem value="incomplete">미매핑</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder="상품명" value={searchName} onChange={e => setSearchName(e.target.value)} className="h-9" data-testid="input-search-name" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">대분류</label>
+              <Select value={searchCategoryLarge} onValueChange={setSearchCategoryLarge}>
+                <SelectTrigger className="h-9" data-testid="select-search-large">
+                  <SelectValue placeholder="대분류" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {largeCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">중분류</label>
+              <Select value={searchCategoryMedium} onValueChange={setSearchCategoryMedium}>
+                <SelectTrigger className="h-9" data-testid="select-search-medium">
+                  <SelectValue placeholder="중분류" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {getFilteredMedium(searchCategoryLarge).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">소분류</label>
+              <Select value={searchCategorySmall} onValueChange={setSearchCategorySmall}>
+                <SelectTrigger className="h-9" data-testid="select-search-small">
+                  <SelectValue placeholder="소분류" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {getFilteredSmall(searchCategoryMedium).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">중량(수량)</label>
+              <Select value={searchWeight} onValueChange={setSearchWeight}>
+                <SelectTrigger className="h-9" data-testid="select-search-weight">
+                  <SelectValue placeholder="중량(수량)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {allWeights.map(w => <SelectItem key={String(w)} value={String(w)}>{String(w)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">매핑상태</label>
+              <Select value={searchMappingStatus} onValueChange={setSearchMappingStatus}>
+                <SelectTrigger className="h-9" data-testid="select-search-mapping">
+                  <SelectValue placeholder="매핑상태" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="complete">매핑완료</SelectItem>
+                  <SelectItem value="incomplete">미매핑</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">상품명</label>
+              <Input placeholder="상품명" value={searchName} onChange={e => setSearchName(e.target.value)} className="h-9" data-testid="input-search-name" />
+            </div>
           </div>
           <div className="flex gap-2 mt-2">
             <Button size="sm" onClick={handleSearch} disabled={searchMutation.isPending} data-testid="button-search">
