@@ -3081,12 +3081,19 @@ export async function registerRoutes(
     try {
       const XLSX = await import("xlsx");
       
+      // DB에서 활성 재료타입 조회
+      const activeMaterialTypes = await storage.getActiveMaterialTypes();
+      const typeNames = activeMaterialTypes.map(t => t.name);
+      const firstType = typeNames[0] || "원재료";
+      const secondType = typeNames[1] || "반재료";
+      const thirdType = typeNames[2] || "부재료";
+      
       const headers = ["재료타입", "대분류", "중분류", "소분류", "재료코드", "재료명", "초기재고"];
       const sampleData = [
-        ["원재료", "사과", "부사", "고급", "R001", "부사 정품 4다이(원물)", 0],
-        ["원재료", "사과", "부사", "", "R002", "부사 상2번(원물)", 0],
-        ["반재료", "사과", "부사", "일반", "S001", "부사 상2번(선별)", 0],
-        ["부재료", "부재료", "박스", "", "B001", "3kg 선물박스", 0],
+        [firstType, "사과", "부사", "고급", "R001", "부사 정품 4다이(원물)", 0],
+        [firstType, "사과", "부사", "", "R002", "부사 상2번(원물)", 0],
+        [secondType, "사과", "부사", "일반", "S001", "부사 상2번(선별)", 0],
+        [thirdType, "박스", "선물용", "", "B001", "3kg 선물박스", 0],
       ];
       
       const wsData = [headers, ...sampleData];
@@ -3138,11 +3145,14 @@ export async function registerRoutes(
       const errors: { row: number; error: string }[] = [];
       let created = 0;
 
-      const materialTypeMap: Record<string, string> = {
-        "원재료": "raw",
-        "반재료": "semi",
-        "부재료": "sub",
-      };
+      // DB에서 재료타입 목록 조회하여 동적으로 매핑
+      const activeMaterialTypes = await storage.getActiveMaterialTypes();
+      const materialTypeMap: Record<string, string> = {};
+      const validTypeNames: string[] = [];
+      for (const mt of activeMaterialTypes) {
+        materialTypeMap[mt.name] = mt.code;
+        validTypeNames.push(mt.name);
+      }
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
@@ -3157,7 +3167,8 @@ export async function registerRoutes(
 
         const materialType = materialTypeMap[String(재료타입)];
         if (!materialType) {
-          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입} (원재료/반재료/부재료 중 선택)` });
+          const validTypesStr = validTypeNames.join("/") || "등록된 재료타입 없음";
+          errors.push({ row: i + 1, error: `재료타입이 올바르지 않습니다: ${재료타입} (${validTypesStr} 중 선택)` });
           continue;
         }
 
