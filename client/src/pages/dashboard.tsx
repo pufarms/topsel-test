@@ -242,13 +242,52 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<{ total: number; success: number; failed: number; errors?: string[] } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ 
+    status: 'idle' | 'validation_failed' | 'partial_success' | 'success';
+    total: number; 
+    validCount: number;
+    errorCount: number;
+    success: number; 
+    failed: number; 
+    errors?: string[];
+    errorExcelData?: Record<string, any>[];
+  } | null>(null);
+
+  // 오류건 엑셀 다운로드 함수
+  const downloadErrorExcel = async (errorData: Record<string, any>[]) => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(errorData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "오류건");
+    
+    // 컬럼 너비 설정
+    ws['!cols'] = [
+      { wch: 8 },   // 줄번호
+      { wch: 15 },  // 상품코드
+      { wch: 25 },  // 상품명
+      { wch: 20 },  // 자체주문번호
+      { wch: 15 },  // 주문자명
+      { wch: 15 },  // 주문자전화번호
+      { wch: 40 },  // 주문자주소
+      { wch: 15 },  // 수령자명
+      { wch: 15 },  // 수령자휴대폰번호
+      { wch: 15 },  // 수령자전화번호
+      { wch: 40 },  // 수령자주소
+      { wch: 30 },  // 배송메시지
+      { wch: 35 },  // 오류사유
+    ];
+    
+    XLSX.writeFile(wb, `주문등록_오류건_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   // Excel upload mutation for bulk order registration
   const uploadExcelMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, confirmPartial }: { file: File; confirmPartial?: boolean }) => {
       const formData = new FormData();
       formData.append("file", file);
+      if (confirmPartial) {
+        formData.append("confirmPartial", "true");
+      }
       const res = await fetch("/api/member/pending-orders/excel-upload", {
         method: "POST",
         body: formData,
@@ -256,27 +295,38 @@ export default function Dashboard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        // Return error data with validation errors for display
-        return { ...data, isError: true };
+        throw new Error(data.message || "업로드 실패");
       }
       return data;
     },
     onSuccess: (data) => {
-      if (data.isError) {
-        // Validation errors - file rejected
+      if (data.status === 'validation_failed') {
+        // 검증 오류 - 사용자 결정 필요
         setUploadProgress({ 
-          total: data.total || 0, 
-          success: data.success || 0, 
-          failed: data.failed || 0, 
-          errors: data.errors || [] 
+          status: 'validation_failed',
+          total: data.total || 0,
+          validCount: data.validCount || 0,
+          errorCount: data.errorCount || 0,
+          success: 0, 
+          failed: data.errorCount || 0, 
+          errors: data.errors || [],
+          errorExcelData: data.errorExcelData || []
         });
+      } else if (data.status === 'partial_success') {
+        // 정상건만 등록 완료 + 오류건 다운로드
+        if (data.errorExcelData && data.errorExcelData.length > 0) {
+          downloadErrorExcel(data.errorExcelData);
+        }
+        setOrderDialogOpen(false);
+        setExcelFile(null);
+        setUploadProgress(null);
         toast({ 
-          title: "업로드 반려", 
-          description: data.message || "필수 항목이 누락되었습니다", 
-          variant: "destructive" 
+          title: "주문 등록 완료", 
+          description: `${data.success}건 등록, ${data.failed}건 오류 (오류건 다운로드됨)` 
         });
+        queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       } else {
-        // 성공 시 다이얼로그 닫고 파일/진행상태 초기화
+        // 전체 성공
         setOrderDialogOpen(false);
         setExcelFile(null);
         setUploadProgress(null);
@@ -289,10 +339,18 @@ export default function Dashboard() {
     },
   });
 
+  // 첫 업로드 (검증만)
   const handleExcelUpload = () => {
     if (excelFile) {
       setUploadProgress(null);
-      uploadExcelMutation.mutate(excelFile);
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false });
+    }
+  };
+
+  // 정상건만 등록 (오류건 다운로드)
+  const handlePartialUpload = () => {
+    if (excelFile) {
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: true });
     }
   };
 
@@ -1102,21 +1160,21 @@ export default function Dashboard() {
                                 </div>
 
                                 {uploadProgress && (
-                                  <div className={`rounded-lg p-4 ${uploadProgress.failed > 0 ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'}`}>
+                                  <div className={`rounded-lg p-4 ${uploadProgress.status === 'validation_failed' ? 'bg-amber-50 border border-amber-300 dark:bg-amber-950/30 dark:border-amber-700' : 'bg-muted/50'}`}>
                                     <h4 className="font-medium mb-2">
-                                      {uploadProgress.failed > 0 ? '업로드 반려' : '업로드 결과'}
+                                      {uploadProgress.status === 'validation_failed' ? '검증 결과' : '업로드 결과'}
                                     </h4>
-                                    <div className="flex gap-4 text-sm mb-2">
+                                    <div className="flex flex-wrap gap-4 text-sm mb-2">
                                       <span>전체: {uploadProgress.total}건</span>
-                                      <span className="text-emerald-600">성공: {uploadProgress.success}건</span>
-                                      {uploadProgress.failed > 0 && (
-                                        <span className="text-destructive">실패: {uploadProgress.failed}건</span>
+                                      <span className="text-emerald-600">정상: {uploadProgress.validCount}건</span>
+                                      {uploadProgress.errorCount > 0 && (
+                                        <span className="text-destructive">오류: {uploadProgress.errorCount}건</span>
                                       )}
                                     </div>
                                     {uploadProgress.errors && uploadProgress.errors.length > 0 && (
-                                      <div className="mt-3 border-t border-destructive/20 pt-3">
-                                        <h5 className="text-sm font-medium text-destructive mb-2">반려 사유:</h5>
-                                        <ul className="text-sm text-destructive space-y-1 max-h-40 overflow-y-auto">
+                                      <div className="mt-3 border-t border-amber-300 dark:border-amber-700 pt-3">
+                                        <h5 className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-2">오류 상세:</h5>
+                                        <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-1 max-h-40 overflow-y-auto">
                                           {uploadProgress.errors.map((error, idx) => (
                                             <li key={idx} className="flex items-start gap-1">
                                               <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
@@ -1124,6 +1182,13 @@ export default function Dashboard() {
                                             </li>
                                           ))}
                                         </ul>
+                                      </div>
+                                    )}
+                                    {uploadProgress.status === 'validation_failed' && uploadProgress.validCount > 0 && (
+                                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
+                                        <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                                          정상건 {uploadProgress.validCount}건만 등록하고, 오류건 {uploadProgress.errorCount}건은 엑셀로 다운로드할 수 있습니다.
+                                        </p>
                                       </div>
                                     )}
                                   </div>
@@ -1142,14 +1207,27 @@ export default function Dashboard() {
                                   <Button variant="outline" onClick={handleCloseUploadDialog} data-testid="button-cancel-order">
                                     취소
                                   </Button>
-                                  <Button 
-                                    onClick={handleExcelUpload} 
-                                    disabled={!excelFile || uploadExcelMutation.isPending} 
-                                    data-testid="button-submit-order"
-                                  >
-                                    {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                    업로드
-                                  </Button>
+                                  {/* 검증 실패 상태이고 정상건이 있을 때: 정상건만 등록 버튼 표시 */}
+                                  {uploadProgress?.status === 'validation_failed' && uploadProgress.validCount > 0 ? (
+                                    <Button 
+                                      onClick={handlePartialUpload} 
+                                      disabled={uploadExcelMutation.isPending} 
+                                      data-testid="button-partial-upload"
+                                      className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                      {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                      정상건만 등록 ({uploadProgress.validCount}건)
+                                    </Button>
+                                  ) : (
+                                    <Button 
+                                      onClick={handleExcelUpload} 
+                                      disabled={!excelFile || uploadExcelMutation.isPending} 
+                                      data-testid="button-submit-order"
+                                    >
+                                      {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                      업로드
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </DialogContent>
