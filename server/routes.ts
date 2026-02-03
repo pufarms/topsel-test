@@ -5738,58 +5738,63 @@ export async function registerRoutes(
         return res.status(403).json({ message: "접근 권한이 없습니다" });
       }
 
-      // Get counts by status
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString().split('T')[0];
+      const baseCondition = isAdmin ? sql`1=1` : eq(pendingOrders.memberId, req.session.userId);
 
-      // Total count
+      // Total count (전체주문)
       const totalResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
-        .where(isAdmin ? sql`1=1` : eq(pendingOrders.memberId, req.session.userId));
+        .where(baseCondition);
       
-      // Pending (대기) count
+      // Pending (주문대기) count
       const pendingResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
           ? eq(pendingOrders.status, "대기")
           : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "대기")));
       
-      // Processing (처리중) count
-      const processingResult = await db.select({ count: sql<number>`count(*)::int` })
+      // Adjustment (주문조정) count
+      const adjustmentResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "처리중")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "처리중")));
+          ? eq(pendingOrders.status, "주문조정")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "주문조정")));
       
-      // Completed (완료) count
-      const completedResult = await db.select({ count: sql<number>`count(*)::int` })
+      // Preparing (상품준비중) count
+      const preparingResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "완료")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "완료")));
+          ? eq(pendingOrders.status, "상품준비중")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "상품준비중")));
       
-      // Cancelled (취소) count
-      const cancelledResult = await db.select({ count: sql<number>`count(*)::int` })
+      // Ready to ship (배송준비중) count
+      const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "취소")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "취소")));
+          ? eq(pendingOrders.status, "배송준비중")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송준비중")));
       
-      // Today's orders count
-      const todayResult = await db.select({ count: sql<number>`count(*)::int` })
+      // Member cancelled (회원취소) count
+      const memberCancelledResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? sql`DATE(${pendingOrders.createdAt}) = ${todayStr}`
-          : and(eq(pendingOrders.memberId, req.session.userId), sql`DATE(${pendingOrders.createdAt}) = ${todayStr}`));
+          ? eq(pendingOrders.status, "회원취소")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "회원취소")));
+      
+      // Shipping (배송중) count
+      const shippingResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(pendingOrders)
+        .where(isAdmin 
+          ? eq(pendingOrders.status, "배송중")
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송중")));
 
       res.json({
-        total: totalResult[0]?.count || 0,
-        pending: pendingResult[0]?.count || 0,        // 대기
-        processing: processingResult[0]?.count || 0,  // 처리중
-        completed: completedResult[0]?.count || 0,    // 완료
-        cancelled: cancelledResult[0]?.count || 0,    // 취소
-        today: todayResult[0]?.count || 0,
+        total: totalResult[0]?.count || 0,               // 전체주문
+        pending: pendingResult[0]?.count || 0,           // 주문대기
+        adjustment: adjustmentResult[0]?.count || 0,     // 주문조정
+        preparing: preparingResult[0]?.count || 0,       // 상품준비중
+        readyToShip: readyToShipResult[0]?.count || 0,   // 배송준비중
+        memberCancelled: memberCancelledResult[0]?.count || 0, // 회원취소
+        shipping: shippingResult[0]?.count || 0,         // 배송중
         isAdmin
       });
     } catch (error: any) {

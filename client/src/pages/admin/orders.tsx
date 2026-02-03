@@ -39,10 +39,11 @@ export default function AdminOrders() {
   const { data: orderStats } = useQuery<{
     total: number;
     pending: number;
-    processing: number;
-    completed: number;
-    cancelled: number;
-    today: number;
+    adjustment: number;
+    preparing: number;
+    readyToShip: number;
+    memberCancelled: number;
+    shipping: number;
   }>({
     queryKey: ["/api/order-stats"],
   });
