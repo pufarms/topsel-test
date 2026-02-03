@@ -1341,8 +1341,12 @@ export default function ProductMappingPage() {
 
       <Dialog open={materialSelectDialogOpen} onOpenChange={setMaterialSelectDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogHeader>
             <DialogTitle className="text-lg font-bold">추가할 원재료품목</DialogTitle>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+              <span>매핑 상품:</span>
+              <span className="font-medium text-foreground">[{editProductCode}] {editProductName}</span>
+            </div>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
