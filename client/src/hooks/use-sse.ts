@@ -57,6 +57,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       console.log("SSE: order-created", data);
       
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrderCreated?.(data);
@@ -67,6 +69,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       console.log("SSE: orders-created", data);
       
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrdersCreated?.(data);
@@ -79,6 +83,7 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrderUpdated?.(data);
@@ -91,6 +96,7 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       
       optionsRef.current.onOrdersDeleted?.(data);
