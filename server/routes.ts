@@ -6344,7 +6344,7 @@ export async function registerRoutes(
             order.recipientAddress || "",
             order.deliveryMessage || "",
             order.productName || "",
-            order.quantity || 0,
+            1,
             order.customOrderNumber || "",
             order.trackingNumber || "",
             order.courierCompany || ""
@@ -6367,7 +6367,7 @@ export async function registerRoutes(
             order.recipientAddress || "",
             order.productCode || "",
             order.productName || "",
-            order.quantity || 0,
+            1,
             order.supplyPrice || 0,
             order.deliveryMessage || "",
             order.trackingNumber || "",
