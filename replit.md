@@ -8,6 +8,14 @@ This project is a Korean-language order management system designed to streamline
 
 Preferred communication style: Simple, everyday language.
 
+### 개발 원칙 (CRITICAL - 절대 잊지 말 것!)
+
+**기존 기능 보존:**
+1. **새 기능 추가/수정 시 기존 기능 손상 금지**: 다른 기능을 추가하거나 수정할 때 이미 작동하던 기능이 깨지지 않도록 반드시 확인
+2. **수정 전 영향 범위 분석**: 코드 수정 전에 해당 코드가 어디서 사용되는지 확인하고, 관련된 모든 부분이 계속 작동하는지 검증
+3. **SSE 실시간 업데이트 유지**: 주문 관련 기능 수정 시 SSE 이벤트 발송 및 쿼리 무효화 로직이 유지되는지 확인
+4. **API 호출 일관성 유지**: pending_orders 관련 페이지는 모두 `/api/admin/pending-orders` 또는 `/api/member/pending-orders` 사용
+
 ### 핵심 비즈니스 규칙 (CRITICAL - 절대 잊지 말 것!)
 
 **상품가격 체계 및 기준:**
