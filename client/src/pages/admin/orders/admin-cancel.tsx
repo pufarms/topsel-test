@@ -264,8 +264,44 @@ export default function OrdersAdminCancelPage() {
     
     const materialCodes = [...new Set(selectedProducts.map(p => p.materialCode))];
     
-    if (!confirm(`선택한 ${selectedProducts.length}개 상품의 주문을 조정하시겠습니까?\n\n공평 배분 알고리즘이 적용되어 순번이 높은 주문부터 취소됩니다.`)) {
+    const alternateShipments: { materialCode: string; alternateMaterialCode: string; alternateQuantity: number; alternateMaterialName: string }[] = [];
+    for (const materialCode of materialCodes) {
+      const selection = alternateSelections.get(materialCode);
+      if (selection && selection.useAlternate && selection.alternateMaterialCode && selection.alternateQuantity > 0) {
+        if (selection.alternateQuantity > selection.alternateMaterialStock) {
+          toast({
+            title: "재고 부족",
+            description: `${selection.alternateMaterialName}의 대체 수량이 재고보다 많습니다.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        alternateShipments.push({
+          materialCode,
+          alternateMaterialCode: selection.alternateMaterialCode,
+          alternateQuantity: selection.alternateQuantity,
+          alternateMaterialName: selection.alternateMaterialName,
+        });
+      }
+    }
+
+    let confirmMessage = `선택한 ${selectedProducts.length}개 상품의 주문을 조정하시겠습니까?\n\n공평 배분 알고리즘이 적용되어 순번이 높은 주문부터 취소됩니다.`;
+    if (alternateShipments.length > 0) {
+      confirmMessage = `대체발송 ${alternateShipments.length}건과 주문조정을 동시에 실행하시겠습니까?\n\n` +
+        alternateShipments.map(a => `• ${a.alternateMaterialName}: ${a.alternateQuantity}개 대체`).join('\n') +
+        `\n\n공평 배분 알고리즘이 적용되어 순번이 높은 주문부터 취소됩니다.`;
+    }
+    
+    if (!confirm(confirmMessage)) {
       return;
+    }
+
+    for (const shipment of alternateShipments) {
+      await executeAlternateShipmentMutation.mutateAsync({
+        materialCode: shipment.materialCode,
+        alternateMaterialCode: shipment.alternateMaterialCode,
+        alternateQuantity: shipment.alternateQuantity,
+      });
     }
 
     for (const materialCode of materialCodes) {
