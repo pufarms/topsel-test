@@ -6307,12 +6307,76 @@ export async function registerRoutes(
     const { trackingNumber, courierCompany, status } = req.body;
 
     try {
+      // 상태 변경 시 재고 복구를 위해 현재 주문 조회
+      const [currentOrder] = await db.select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.id, id));
+      
+      if (!currentOrder) {
+        return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
+      }
+
       const updateData: any = { updatedAt: new Date() };
       
       if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
       if (courierCompany !== undefined) updateData.courierCompany = courierCompany;
       if (status !== undefined && pendingOrderStatuses.includes(status)) {
         updateData.status = status;
+      }
+
+      // 재고 복구 로직: 상품준비중/배송준비중/배송중에서 대기/취소/주문조정으로 변경되는 경우
+      // 중요: 실제로 상태가 변경될 때만 재고 조정 (멱등성 보장)
+      const stockDeductedStatuses = ["상품준비중", "배송준비중", "배송중"];
+      const stockNotDeductedStatuses = ["대기", "취소", "주문조정"];
+      const currentStatus = currentOrder.status || "";
+      
+      if (status !== undefined && 
+          status !== currentStatus &&  // 실제 상태 변경인 경우만
+          stockDeductedStatuses.includes(currentStatus) &&
+          stockNotDeductedStatuses.includes(status)) {
+        // 재고 복구
+        const productCode = currentOrder.productCode || "";
+        if (productCode) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            const material = await storage.getMaterialByCode(mapping.materialCode);
+            if (material) {
+              const newStock = material.currentStock + mapping.quantity;
+              await db.update(materials)
+                .set({ 
+                  currentStock: newStock,
+                  updatedAt: new Date()
+                })
+                .where(eq(materials.materialCode, mapping.materialCode));
+            }
+          }
+          console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 복구 완료: ${productCode}`);
+        }
+      }
+      
+      // 재고 차감 로직: 대기/취소/주문조정에서 상품준비중으로 변경되는 경우
+      if (status !== undefined && 
+          status !== currentStatus &&  // 실제 상태 변경인 경우만
+          stockNotDeductedStatuses.includes(currentStatus) &&
+          status === "상품준비중") {
+        // 재고 차감
+        const productCode = currentOrder.productCode || "";
+        if (productCode) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            const material = await storage.getMaterialByCode(mapping.materialCode);
+            if (material) {
+              const newStock = Math.max(0, material.currentStock - mapping.quantity);
+              await db.update(materials)
+                .set({ 
+                  currentStock: newStock,
+                  updatedAt: new Date()
+                })
+                .where(eq(materials.materialCode, mapping.materialCode));
+            }
+          }
+          console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 차감 완료: ${productCode}`);
+        }
       }
 
       const [updated] = await db.update(pendingOrders)
@@ -6365,6 +6429,51 @@ export async function registerRoutes(
     }
 
     try {
+      // 먼저 삭제 전 주문 정보 조회 (재고 복구를 위해)
+      const ordersToDelete = await db.select()
+        .from(pendingOrders)
+        .where(inArray(pendingOrders.id, ids));
+
+      // 상품준비중, 배송준비중, 배송중 상태의 주문만 재고 복구 대상
+      const ordersForStockRestore = ordersToDelete.filter(
+        o => o.status === "상품준비중" || o.status === "배송준비중" || o.status === "배송중"
+      );
+
+      // 재고 복구 로직 실행
+      if (ordersForStockRestore.length > 0) {
+        const productOrderCounts: Record<string, number> = {};
+        for (const order of ordersForStockRestore) {
+          const productCode = order.productCode || "";
+          if (productCode) {
+            productOrderCounts[productCode] = (productOrderCounts[productCode] || 0) + 1;
+          }
+        }
+
+        const materialRestorations: Record<string, number> = {};
+        for (const [productCode, orderCount] of Object.entries(productOrderCounts)) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            const restoreAmount = mapping.quantity * orderCount;
+            materialRestorations[mapping.materialCode] = 
+              (materialRestorations[mapping.materialCode] || 0) + restoreAmount;
+          }
+        }
+
+        for (const [materialCode, restoreAmount] of Object.entries(materialRestorations)) {
+          const material = await storage.getMaterialByCode(materialCode);
+          if (material) {
+            const newStock = material.currentStock + restoreAmount;
+            await db.update(materials)
+              .set({ 
+                currentStock: newStock,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, materialCode));
+          }
+        }
+        console.log(`재고 복구 완료: ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
+      }
+
       const deleted = await db.delete(pendingOrders)
         .where(inArray(pendingOrders.id, ids))
         .returning();
@@ -6403,6 +6512,49 @@ export async function registerRoutes(
     }
 
     try {
+      // 먼저 삭제 전 모든 주문 조회 (재고 복구를 위해)
+      const allOrdersToDelete = await db.select().from(pendingOrders);
+      
+      // 상품준비중, 배송준비중, 배송중 상태의 주문만 재고 복구 대상
+      const ordersForStockRestore = allOrdersToDelete.filter(
+        o => o.status === "상품준비중" || o.status === "배송준비중" || o.status === "배송중"
+      );
+
+      // 재고 복구 로직 실행
+      if (ordersForStockRestore.length > 0) {
+        const productOrderCounts: Record<string, number> = {};
+        for (const order of ordersForStockRestore) {
+          const productCode = order.productCode || "";
+          if (productCode) {
+            productOrderCounts[productCode] = (productOrderCounts[productCode] || 0) + 1;
+          }
+        }
+
+        const materialRestorations: Record<string, number> = {};
+        for (const [productCode, orderCount] of Object.entries(productOrderCounts)) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            const restoreAmount = mapping.quantity * orderCount;
+            materialRestorations[mapping.materialCode] = 
+              (materialRestorations[mapping.materialCode] || 0) + restoreAmount;
+          }
+        }
+
+        for (const [materialCode, restoreAmount] of Object.entries(materialRestorations)) {
+          const material = await storage.getMaterialByCode(materialCode);
+          if (material) {
+            const newStock = material.currentStock + restoreAmount;
+            await db.update(materials)
+              .set({ 
+                currentStock: newStock,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, materialCode));
+          }
+        }
+        console.log(`전체 삭제 - 재고 복구 완료: ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
+      }
+
       const deleted = await db.delete(pendingOrders).returning();
 
       // SSE: 해당 회원들에게 주문 삭제 알림
@@ -6441,13 +6593,39 @@ export async function registerRoutes(
     const { id } = req.params;
 
     try {
+      // 먼저 삭제 전 주문 조회 (재고 복구를 위해)
+      const [orderToDelete] = await db.select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.id, id));
+      
+      if (!orderToDelete) {
+        return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
+      }
+
+      // 상품준비중, 배송준비중, 배송중 상태인 경우 재고 복구
+      if (orderToDelete.status === "상품준비중" || orderToDelete.status === "배송준비중" || orderToDelete.status === "배송중") {
+        const productCode = orderToDelete.productCode || "";
+        if (productCode) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            const material = await storage.getMaterialByCode(mapping.materialCode);
+            if (material) {
+              const newStock = material.currentStock + mapping.quantity;
+              await db.update(materials)
+                .set({ 
+                  currentStock: newStock,
+                  updatedAt: new Date()
+                })
+                .where(eq(materials.materialCode, mapping.materialCode));
+            }
+          }
+          console.log(`단일 주문 삭제 - 재고 복구 완료: ${productCode}`);
+        }
+      }
+
       const [deleted] = await db.delete(pendingOrders)
         .where(eq(pendingOrders.id, id))
         .returning();
-
-      if (!deleted) {
-        return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
-      }
 
       res.json({ message: "주문이 삭제되었습니다" });
     } catch (error: any) {
@@ -7202,8 +7380,8 @@ export async function registerRoutes(
       if (excludeMaterialCodes.length > 0) {
         // 상품-원재료 매핑에서 해당 원재료를 사용하는 상품코드 조회
         const mappings = await db.select()
-          .from(productMappings)
-          .where(inArray(productMappings.materialCode, excludeMaterialCodes));
+          .from(productMaterialMappings)
+          .where(inArray(productMaterialMappings.materialCode, excludeMaterialCodes));
         
         excludeProductCodes = mappings.map(m => m.productCode);
       }
@@ -7233,6 +7411,46 @@ export async function registerRoutes(
           updatedAt: new Date()
         })
         .where(inArray(pendingOrders.id, orderIds));
+
+      // 원재료 재고 차감 로직
+      // 1. 상품코드별 주문 수량 계산
+      const productOrderCounts: Record<string, number> = {};
+      for (const order of ordersToTransfer) {
+        const productCode = order.productCode || "";
+        if (productCode) {
+          productOrderCounts[productCode] = (productOrderCounts[productCode] || 0) + 1;
+        }
+      }
+
+      // 2. 각 상품의 원재료 매핑 조회 및 재고 차감
+      const materialDeductions: Record<string, number> = {};
+      
+      for (const [productCode, orderCount] of Object.entries(productOrderCounts)) {
+        // 상품-원재료 매핑 조회
+        const mappings = await storage.getProductMaterialMappings(productCode);
+        
+        for (const mapping of mappings) {
+          const deductionAmount = mapping.quantity * orderCount;
+          materialDeductions[mapping.materialCode] = 
+            (materialDeductions[mapping.materialCode] || 0) + deductionAmount;
+        }
+      }
+
+      // 3. 원재료 재고 차감 실행
+      for (const [materialCode, deductionAmount] of Object.entries(materialDeductions)) {
+        const material = await storage.getMaterialByCode(materialCode);
+        if (material) {
+          const newStock = Math.max(0, material.currentStock - deductionAmount);
+          await db.update(materials)
+            .set({ 
+              currentStock: newStock,
+              updatedAt: new Date()
+            })
+            .where(eq(materials.materialCode, materialCode));
+        }
+      }
+
+      console.log(`재고 차감 완료: ${Object.keys(materialDeductions).length}개 원재료, 총 ${ordersToTransfer.length}건 주문`);
 
       // SSE 알림
       sseManager.sendToAdmins("orders-to-preparation", {
