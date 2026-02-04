@@ -325,37 +325,6 @@ export default function OrdersAdminCancelPage() {
     }
   };
 
-  const handleExecuteAlternateShipment = async (materialCode: string) => {
-    const selection = alternateSelections.get(materialCode);
-    if (!selection || !selection.alternateMaterialCode || selection.alternateQuantity <= 0) {
-      toast({
-        title: "입력 오류",
-        description: "대체 원재료와 수량을 입력해주세요.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (selection.alternateQuantity > selection.alternateMaterialStock) {
-      toast({
-        title: "재고 부족",
-        description: "대체 수량이 대체 원재료 재고보다 많습니다.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!confirm(`${selection.alternateMaterialName}에서 ${selection.alternateQuantity}만큼 대체발송 하시겠습니까?\n\n해당 원재료의 재고가 차감됩니다.`)) {
-      return;
-    }
-
-    await executeAlternateShipmentMutation.mutateAsync({
-      materialCode,
-      alternateMaterialCode: selection.alternateMaterialCode,
-      alternateQuantity: selection.alternateQuantity,
-    });
-  };
-
   const handleDownloadAdjustmentExcel = () => {
     const rows: any[] = [];
     
@@ -471,19 +440,18 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="min-w-[200px] text-center whitespace-nowrap">대체 원재료</TableHead>
                   <TableHead className="min-w-[90px] text-center whitespace-nowrap">대체<br/>원재료 재고</TableHead>
                   <TableHead className="min-w-[100px] text-center whitespace-nowrap">대체 수량</TableHead>
-                  <TableHead className="min-w-[100px] text-center whitespace-nowrap">대체발송<br/>실행</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8">
+                    <TableCell colSpan={13} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : adjustmentData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
                     </TableCell>
                   </TableRow>
@@ -672,30 +640,6 @@ export default function OrdersAdminCancelPage() {
                                 className="w-20 text-center mx-auto"
                                 data-testid={`input-alternate-quantity-${group.materialCode}`}
                               />
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                        )}
-                        {productIndex === 0 && (
-                          <TableCell 
-                            rowSpan={group.products.length} 
-                            className="text-center align-middle border-l"
-                          >
-                            {selection?.alternateMaterialCode && selection.alternateQuantity > 0 ? (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleExecuteAlternateShipment(group.materialCode)}
-                                disabled={executeAlternateShipmentMutation.isPending}
-                                data-testid={`button-execute-alternate-${group.materialCode}`}
-                              >
-                                {executeAlternateShipmentMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "실행"
-                                )}
-                              </Button>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
