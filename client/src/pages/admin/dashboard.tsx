@@ -126,8 +126,8 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/members"],
   });
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/admin/orders"],
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/pending-orders"],
   });
 
   // Order stats from API (real-time counts from pending_orders table)
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.price * order.quantity, 0);
+  const totalRevenue = orders.reduce((sum, order) => sum + (order.supplyPrice || 0), 0);
   
   const pendingMembers = members.filter(m => m.status === "pending").length;
   const approvedMembers = members.filter(m => m.status === "approved").length;
