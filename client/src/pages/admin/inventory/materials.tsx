@@ -468,6 +468,7 @@ export default function MaterialsPage() {
         mediumCategoryId: materialMediumCategoryId,
         smallCategoryId: materialSmallCategoryId || null,
         materialName,
+        currentStock: parseFloat(materialStock) || 0,
       };
       updateMaterialMutation.mutate({ id: materialEditId, data: updateData });
     } else {

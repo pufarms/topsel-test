@@ -3308,13 +3308,14 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
       return res.status(403).json({ message: "관리자 권한이 필요합니다" });
     }
-    const { materialType, largeCategoryId, mediumCategoryId, smallCategoryId, materialName } = req.body;
+    const { materialType, largeCategoryId, mediumCategoryId, smallCategoryId, materialName, currentStock } = req.body;
     const updated = await storage.updateMaterial(req.params.id, {
       materialType,
       largeCategoryId,
       mediumCategoryId,
       smallCategoryId: smallCategoryId || null,
       materialName,
+      currentStock: currentStock !== undefined ? currentStock : undefined,
     });
     if (!updated) {
       return res.status(404).json({ message: "재료를 찾을 수 없습니다" });
