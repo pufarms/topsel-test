@@ -322,7 +322,7 @@ export default function OrdersAdminCancelPage() {
 
       for (const materialCode of materialCodes) {
         const group = adjustmentData.find(g => g.materialCode === materialCode);
-        if (group && isStillDeficit(group)) {
+        if (group) {
           const selectedProductCodes = selectedProducts
             .filter(p => p.materialCode === materialCode)
             .map(p => p.productCode);
@@ -336,17 +336,16 @@ export default function OrdersAdminCancelPage() {
               materialCode: group.materialCode,
               products: productsToAdjust
             });
-            if (result.cancelledOrderIds) {
+            if (result.adjusted && result.cancelledOrderIds) {
               totalOrdersAdjusted += result.cancelledOrderIds.length;
             }
           }
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       
       setSelectedProducts([]);
       setAlternateSelections(new Map());
@@ -355,16 +354,16 @@ export default function OrdersAdminCancelPage() {
       let summaryMessage = "";
       if (totalAlternateExecuted > 0 && totalOrdersAdjusted > 0) {
         summaryMessage = `대체발송 ${totalAlternateExecuted}건 실행, ${totalOrdersAdjusted}건 주문 조정 완료`;
-      } else if (totalAlternateExecuted > 0) {
-        summaryMessage = `대체발송 ${totalAlternateExecuted}건 실행 완료`;
+      } else if (totalAlternateExecuted > 0 && totalOrdersAdjusted === 0) {
+        summaryMessage = `대체발송 ${totalAlternateExecuted}건 실행 완료 (재고 충분으로 주문조정 불필요)`;
       } else if (totalOrdersAdjusted > 0) {
         summaryMessage = `${totalOrdersAdjusted}건 주문 조정 완료`;
       } else {
-        summaryMessage = "주문조정이 완료되었습니다.";
+        summaryMessage = "재고가 충분합니다. 조정이 필요하지 않습니다.";
       }
 
       toast({ 
-        title: "주문조정 완료", 
+        title: totalAlternateExecuted > 0 || totalOrdersAdjusted > 0 ? "처리 완료" : "조정 불필요", 
         description: summaryMessage 
       });
     } catch (error: any) {
