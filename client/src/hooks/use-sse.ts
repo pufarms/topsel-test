@@ -141,7 +141,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
+    // Only connect if enabled AND user is authenticated
+    if (enabled && user) {
       connect();
     } else {
       disconnect();
@@ -150,7 +151,7 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
     return () => {
       disconnect();
     };
-  }, [connect, disconnect, enabled]);
+  }, [connect, disconnect, enabled, user]);
 
   return { connect, disconnect };
 }
