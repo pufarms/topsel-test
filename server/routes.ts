@@ -6896,14 +6896,13 @@ export async function registerRoutes(
       const availableStock = material.currentStock;
       
       // DB에서 해당 원재료를 사용하는 모든 대기 주문의 전체 필요량 계산
-      // 상품 매핑 및 현재 상품 정보 조회
-      const allProductMappings = await storage.getAllProductMappings();
-      const allCurrentProducts = await storage.getAllCurrentProducts();
+      // 상품-재료 매핑 조회 (productMaterialMappings 테이블 사용)
+      const allMaterialMappings = await db.select()
+        .from(productMaterialMappings)
+        .where(eq(productMaterialMappings.materialCode, materialCode));
       
       // 해당 원재료를 사용하는 상품 코드 목록
-      const productCodesUsingMaterial = allProductMappings
-        .filter(pm => pm.materialCode === materialCode)
-        .map(pm => pm.productCode);
+      const productCodesUsingMaterial = allMaterialMappings.map(pm => pm.productCode);
       
       // 해당 상품들의 대기 주문 조회
       const allPendingOrders = await db.select()
@@ -6923,10 +6922,10 @@ export async function registerRoutes(
         const productCode = order.productCode;
         if (!productCode) continue;
         
-        const mapping = allProductMappings.find(pm => 
-          pm.productCode === productCode && pm.materialCode === materialCode
+        const mapping = allMaterialMappings.find(pm => 
+          pm.productCode === productCode
         );
-        const materialQuantity = mapping?.materialQuantity || 1;
+        const materialQuantity = mapping?.quantity || 1;
         
         if (!productRequirements[productCode]) {
           productRequirements[productCode] = { orderCount: 0, materialQuantity };
