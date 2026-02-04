@@ -7087,5 +7087,100 @@ export async function registerRoutes(
     }
   });
 
+  // 상품준비중으로 전송 API
+  app.post('/api/admin/orders-to-preparation', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { excludeMaterialCodes = [] } = req.body;
+
+      // 대기 상태의 주문 조회
+      const allPendingOrders = await db.select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.status, "대기"));
+
+      if (allPendingOrders.length === 0) {
+        return res.json({
+          success: true,
+          message: "전송할 주문이 없습니다.",
+          transferredCount: 0
+        });
+      }
+
+      // 제외할 원재료 코드에 해당하는 상품코드 조회
+      let excludeProductCodes: string[] = [];
+      
+      if (excludeMaterialCodes.length > 0) {
+        // 상품-원재료 매핑에서 해당 원재료를 사용하는 상품코드 조회
+        const mappings = await db.select()
+          .from(productMappings)
+          .where(inArray(productMappings.materialCode, excludeMaterialCodes));
+        
+        excludeProductCodes = mappings.map(m => m.productCode);
+      }
+
+      // 제외할 상품코드를 가진 주문 제외
+      const ordersToTransfer = excludeProductCodes.length > 0
+        ? allPendingOrders.filter(o => !excludeProductCodes.includes(o.productCode || ''))
+        : allPendingOrders;
+
+      const excludedOrders = allPendingOrders.length - ordersToTransfer.length;
+
+      if (ordersToTransfer.length === 0) {
+        return res.json({
+          success: true,
+          message: "전송할 주문이 없습니다. (모든 주문이 부족 상품에 해당)",
+          transferredCount: 0,
+          excludedCount: excludedOrders
+        });
+      }
+
+      // 주문 상태 업데이트
+      const orderIds = ordersToTransfer.map(o => o.id);
+      
+      await db.update(pendingOrders)
+        .set({ 
+          status: "상품준비중",
+          updatedAt: new Date()
+        })
+        .where(inArray(pendingOrders.id, orderIds));
+
+      // SSE 알림
+      sseManager.sendToAdmins("orders-to-preparation", {
+        type: "orders-to-preparation",
+        count: ordersToTransfer.length
+      });
+
+      // 회원들에게도 알림
+      const memberIds = [...new Set(ordersToTransfer.map(o => o.memberId).filter(Boolean))];
+      for (const memberId of memberIds) {
+        if (memberId) {
+          sseManager.sendToMember(memberId, "order-status-changed", {
+            type: "order-status-changed",
+            newStatus: "상품준비중"
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: excludedOrders > 0 
+          ? `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다. (${excludedOrders}건 제외)`
+          : `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`,
+        transferredCount: ordersToTransfer.length,
+        excludedCount: excludedOrders
+      });
+    } catch (error: any) {
+      console.error("Orders to preparation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }

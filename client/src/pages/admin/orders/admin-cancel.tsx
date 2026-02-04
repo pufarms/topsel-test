@@ -27,7 +27,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { FileDown, Loader2, AlertTriangle, Search, Check, X } from "lucide-react";
+import { FileDown, Loader2, AlertTriangle, Search, Check, X, Send } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -82,6 +90,9 @@ export default function OrdersAdminCancelPage() {
   const [selectedProducts, setSelectedProducts] = useState<{materialCode: string; productCode: string}[]>([]);
   const [alternateSelections, setAlternateSelections] = useState<Map<string, AlternateSelection>>(new Map());
   const [openPopovers, setOpenPopovers] = useState<Map<string, boolean>>(new Map());
+  const [showDeficitDialog, setShowDeficitDialog] = useState(false);
+  const [deficitMaterials, setDeficitMaterials] = useState<MaterialGroup[]>([]);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders"],
@@ -362,6 +373,60 @@ export default function OrdersAdminCancelPage() {
         description: error.message, 
         variant: "destructive" 
       });
+    }
+  };
+
+  const getAdjustedRemainingStockForTransfer = (group: MaterialGroup): number => {
+    const selection = alternateSelections.get(group.materialCode);
+    let adjustedStock = group.remainingStock;
+    if (selection?.useAlternate && selection.alternateQuantity > 0) {
+      adjustedStock += selection.alternateQuantity;
+    }
+    return adjustedStock;
+  };
+
+  const handleTransferToPreparation = async () => {
+    const deficitGroups = adjustmentData.filter(group => getAdjustedRemainingStockForTransfer(group) < 0);
+    
+    if (deficitGroups.length > 0) {
+      setDeficitMaterials(deficitGroups);
+      setShowDeficitDialog(true);
+      return;
+    }
+
+    await executeTransfer(false);
+  };
+
+  const executeTransfer = async (excludeDeficit: boolean) => {
+    setIsTransferring(true);
+    setShowDeficitDialog(false);
+    
+    try {
+      const materialCodesToExclude = excludeDeficit 
+        ? deficitMaterials.map(g => g.materialCode)
+        : [];
+
+      const result: any = await apiRequest("POST", "/api/admin/orders-to-preparation", {
+        excludeMaterialCodes: materialCodesToExclude
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+
+      toast({
+        title: "상품준비중으로 전송 완료",
+        description: result.message || `${result.transferredCount || 0}건의 주문이 상품준비중으로 전송되었습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "전송 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsTransferring(false);
+      setDeficitMaterials([]);
     }
   };
 
@@ -694,6 +759,72 @@ export default function OrdersAdminCancelPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-center py-4">
+        <Button 
+          size="lg" 
+          onClick={handleTransferToPreparation}
+          disabled={isTransferring || isLoadingAdjustment || adjustmentData.length === 0}
+          data-testid="button-transfer-to-preparation"
+        >
+          {isTransferring ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              전송 중...
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4 mr-2" />
+              상품준비중으로 전송
+            </>
+          )}
+        </Button>
+      </div>
+
+      <Dialog open={showDeficitDialog} onOpenChange={setShowDeficitDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              재고 부족 원재료 발견
+            </DialogTitle>
+            <DialogDescription>
+              다음 원재료의 재고가 부족합니다. 어떻게 진행하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2 py-4">
+            {deficitMaterials.map(group => (
+              <div key={group.materialCode} className="flex justify-between items-center p-3 border rounded-lg bg-destructive/5">
+                <div>
+                  <span className="font-medium">{group.materialName}</span>
+                  <span className="text-sm text-muted-foreground ml-2">({group.materialCode})</span>
+                </div>
+                <Badge variant="destructive">
+                  잔여재고: {getAdjustedRemainingStock(group)}
+                </Badge>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeficitDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              취소 (다시 조정)
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={() => executeTransfer(true)}
+              className="w-full sm:w-auto"
+            >
+              부족 상품 제외하고 전송
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="overflow-hidden">
         <CardHeader>
