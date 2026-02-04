@@ -2,11 +2,27 @@
 
 ## Overview
 
-This project is a Korean-language order management system designed to streamline operations for sellers and administrators. Its primary purpose is to allow sellers to efficiently submit orders and provide administrators with comprehensive tools for managing all orders and users. Key capabilities include robust role-based authentication, separate dashboards tailored for sellers and administrators, intuitive order entry forms, detailed order history tracking, and extensive user management functionalities. The system aims to enhance efficiency, reduce manual errors, and provide a centralized platform for order and user data.
+This project is a Korean-language order management system designed to streamline operations for sellers and administrators. Its primary purpose is to allow sellers to efficiently submit orders and provide administrators with comprehensive tools for managing all orders and users. Key capabilities include robust role-based authentication, separate dashboards tailored for sellers and administrators, intuitive order entry forms, detailed order history tracking, and extensive user management functionalities. The system aims to enhance efficiency, reduce manual errors, and provide a centralized platform for order and user data, with a strong emphasis on critical business rules for pricing, responsive design, and integrated category management.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+### 핵심 비즈니스 규칙 (CRITICAL - 절대 잊지 말 것!)
+
+**상품가격 체계 및 기준:**
+1. **현재공급가가 모든 기준!**: 주문관리, 정산, 통계 등 모든 실제 운영의 기준은 **현재공급가(current_products)** 테이블입니다.
+2. **상품등록/예상공급가는 준비 단계일 뿐**: 
+   - `상품등록(공급가계산)` → 1원 단위로 정밀 계산
+   - `차주 예상공급가` → 10원 올림 후 저장 (준비 단계)
+   - `현재공급가` → 실제 운영 적용 (모든 주문/정산의 기준)
+3. **10원 올림 시점**: 전송(Transmission) 단계에서 적용
+   - 상품등록 → 예상공급가 전송 시: `Math.ceil(price/10)*10` 적용 후 저장
+   - 예상공급가 → 현재공급가 전송 시: 올림된 가격 유지
+4. **주문 검증 기준**: 회원 주문 업로드 시 반드시 **현재공급가 테이블**에서 상품 존재 여부 확인
+   - `getCurrentProductByCode()` 사용 (NOT getProductRegistrationByCode)
+   - 공급중지 상품(supplyStatus === 'suspended')도 주문 불가
+5. **회원 등급별 공급가**: 주문 시 회원의 membershipTier에 따라 해당 공급가 적용 (start/driving/top)
 
 ### 필수 디자인 요구사항 (모든 페이지 적용)
 1. **반응형 웹 디자인 (필수!)**: 모든 페이지에 모바일/태블릿/데스크톱 반응형 레이아웃 적용
@@ -56,127 +72,38 @@ Preferred communication style: Simple, everyday language.
    - **중요**: 검색 필터는 페이지 전체가 아닌 해당 리스트 테이블에만 적용
    - 한 페이지에 여러 리스트 테이블이 있으면 각 테이블마다 독립적인 필터 컴포넌트 적용
 
-### Topsel 디자인 시스템 (v2.0.0)
-공개 페이지 작업 시 반드시 준수해야 할 디자인 규칙:
-
-**파일 위치**: `public/design-system/`
-- `design-system-global.css`: 글로벌 CSS 스타일시트
-- `REPLIT-STRICT-GUIDELINES.md`: 준수 사항 체크리스트
-
-**색상 팔레트 (CSS Variables)**:
-- `--primary: #5D7AF2` (주요 브랜드 색상)
-- `--navy: #111827` (섹션 배경 어두운 색)
-- `--accent-orange: #FF6B00`
-- `--accent-cyan: #22D3EE`
-- `--accent-green: #10B981`
-
-**섹션 배경 교차 규칙**:
-- White ↔ Navy 반드시 교차 (연속 금지)
-- 예: Hero(Navy) → Features(White) → Content(Navy)
-
-**반응형 브레이크포인트**:
-- xs: 375px (모바일)
-- md: 768px (태블릿)
-- lg: 1024px (데스크톱)
-- Mobile-first 접근 (`min-width` 미디어쿼리만 사용)
-
-**타이포그래피 클래스**:
-- `.h1-hero`: 32px→56px (반응형)
-- `.h2-section`: 24px→36px
-- `.h3-card`: 18px→22px
-- `.body-text`: 14px→16px
-- `.stat-number`: 32px→48px (통계용)
-
 ## System Architecture
 
 ### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter
-- **State Management**: TanStack React Query for server state, React Context for authentication
-- **UI Components**: shadcn/ui built on Radix UI, Lucide React for icons
-- **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode)
-- **Responsive Design**: Mobile-first approach with standard breakpoints
-- **Form Handling**: React Hook Form with Zod validation
-- **Build Tool**: Vite with custom path aliases
+- **Framework**: React 18 with TypeScript, Wouter for routing.
+- **State Management**: TanStack React Query for server state, React Context for authentication.
+- **UI/Styling**: shadcn/ui built on Radix UI, Lucide React for icons, Tailwind CSS with CSS variables for theming (light/dark mode), mobile-first responsive design.
+- **Form Handling**: React Hook Form with Zod validation.
+- **Build Tool**: Vite with custom path aliases.
+- **Design System**: Topsel Design System (v2.0.0) governs global styles, color palette (e.g., `--primary: #5D7AF2`, `--navy: #111827`), section background alternation (White ↔ Navy), responsive breakpoints (xs: 375px, md: 768px, lg: 1024px), and typography classes (e.g., `.h1-hero`, `.body-text`).
 
 ### Backend Architecture
-- **Framework**: Express 5 on Node.js with TypeScript
-- **Session Management**: express-session with memorystore (development)
-- **API Design**: RESTful JSON API endpoints under `/api`
-- **Authentication**: Session-based with SHA256 password hashing and role-based access control (SUPER_ADMIN, ADMIN, seller)
+- **Framework**: Express 5 on Node.js with TypeScript.
+- **Session Management**: express-session with memorystore (development).
+- **API Design**: RESTful JSON API endpoints under `/api`.
+- **Authentication**: Session-based with SHA256 password hashing and role-based access control (SUPER_ADMIN, ADMIN, seller).
 
 ### Data Layer
-- **ORM**: Drizzle ORM with PostgreSQL dialect
-- **Schema**: Shared `shared/schema.ts`
-- **Validation**: Zod schemas generated from Drizzle
-
-### Database Schema Highlights
-- `users`: User authentication and role management (SUPER_ADMIN, ADMIN, seller)
-- `orders`: Core order details and user linkage
-- `products`, `product_registrations`, `categories`: Product and category management.
-- `materials`, `material_categories_*`: Multi-level inventory management for raw, semi, and sub-materials with automatic code generation.
-- `product_mappings`, `product_material_mappings`: Links products to their required materials.
-- `members`, `member_logs`: Member (partner) management and historical changes. Members can access their own mypage.
-- `images`: Storage of various image types with categories and subcategories.
-- `siteSettings`: Key-value pairs for site configuration.
-- `headerMenus`: Stores header menu items for dynamic navigation.
-- `pages`: Page definitions with categories, access levels, and JSONB content for CMS.
-- `term_agreements`: Stores user consent records with content snapshots and hashes for integrity.
+- **ORM**: Drizzle ORM with PostgreSQL dialect.
+- **Schema**: Shared `shared/schema.ts` with Zod schemas generated from Drizzle.
+- **Database Schema Highlights**: Key tables include `users`, `orders`, `products`, `product_registrations`, `categories`, `materials`, `product_mappings`, `members`, `images`, `siteSettings`, `headerMenus`, `pages`, and `term_agreements`.
 
 ### Core Features
-- **Member Mypage**: Self-service profile page for members (`/mypage`).
-- **Product Management (Admin Only)**: Role-based access for product categories, registration, and status viewing.
-- **Inventory Management (Admin Only)**: Material management, product mapping, stock status, and history tracking. Supports bulk Excel uploads.
-- **Stock History Tracking**: Comprehensive tracking of all stock changes.
-- **Product Mapping**: Links products to necessary materials for inventory control.
+- **User Portals**: Member Mypage and Admin-specific dashboards for product, inventory, and site management.
+- **Product & Inventory Management**: Comprehensive tools for product categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
 - **Admin Design System**: Standardized components and design rules for consistent UI.
-- **Admin Category Filter**: Specialized filter component for admin order pages with member selection, cascading category filters, and keyword search.
-- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` files for data import using `multer` and `xlsx`.
-- **Partial Order Upload (주문 부분 업로드)**: Excel order upload supports partial registration when validation errors exist, with an option to register only valid rows and download an error report.
-- **Site Settings Management (Admin)**: Manages site-wide settings (header, footer, general).
-- **Header Menu Management (Site Settings - 헤더 탭)**: Manages dynamic header menus with conditional visibility and drag-and-drop ordering.
-- **Page Management (Admin)**: CMS for dynamic page creation and management with a visual content editor, real-time preview, and access level control.
-- **Term Agreement Record Keeping (Admin)**: Legal evidence system for storing user consent records with content snapshots, SHA-256 hashes for integrity, and detailed metadata.
-- **Smart Address Validation System (스마트 주소 검증 시스템)**: Automatically validates and normalizes recipient addresses during Excel order uploads using a multi-step pipeline including regex matching, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI). It auto-learns from AI results to improve efficiency.
-  - Validation Statuses: `VALID`, `WARNING`, `INVALID`.
-  - Integration: Invalid addresses cause errors in partial uploads, warnings add notes to shipping messages, and validated addresses are stored.
-  - **Multi-step Fallback Validation**: If full address lookup fails:
-    1. First retry with truncated address (first 3 tokens)
-    2. Extract road address pattern (시/도 + 구/군 + 도로명 + 번호) and validate
-    3. Clean address (remove parentheses, special characters) and retry
-    4. If road address is valid but building unconfirmed → WARNING (not INVALID)
-    5. Only mark as INVALID if road address itself doesn't exist
-- **AI Address Learning Management (주소학습 관리 - Admin Settings)**: Admins can register error address patterns and AI automatically analyzes why they're errors, learns the patterns, and applies them during order validation.
-  - Location: 사이트설정 > 주소학습 탭
-  - Features: Stats dashboard, paginated list with search, create/edit/delete learning data, pattern test dialog, AI analysis button
-  - **Excel Upload Learning (엑셀 학습)**: Primary method for bulk address learning
-    - Upload Excel file containing error addresses
-    - Select the column containing address data
-    - AI automatically analyzes each address to understand WHY it's an error
-    - Generates: error pattern code, problem description, pattern regex, similar patterns (5+), extracted memo
-    - All results are saved to address_learning table for future pattern matching
-    - API endpoints: POST /api/address/learning/upload/preview (get columns), POST /api/address/learning/upload/process (AI analysis)
-  - **Manual Registration (수동 등록)**: For individual error address entries with optional AI auto-analyze
-  - Auto-inference: System automatically infers correctionType when creating learning data
-  - High confidence: User-registered patterns get 0.95 confidence score
-  - Pattern matching methods: pattern_regex (regex match), similar_pattern (structure-based matching), learned_similarity (fuzzy matching)
-  - **Order Validation Integration**: During Excel order upload, the validation pipeline:
-    1. First checks learned patterns (regex and similar pattern matching)
-    2. Then checks exact/similarity matches from learning database
-    3. Falls back to rule-based validation
-    4. Uses AI normalization for low-confidence cases
-  - API endpoints: GET/POST /api/address/learning, PUT/DELETE /api/address/learning/:id, POST /api/address/learning/analyze, POST /api/address/learning/test, GET /api/address/learning/stats
-
-### Order Workflow (주문 워크플로우)
-Orders progress through the following stages, with SSE events updating dashboards in real-time for both administrators and members:
-
-1.  **주문대기** (Pending Orders): Member submits an order.
-2.  **주문조정** (Order Adjustment): Admin adjusts orders, including cancellation.
-3.  **상품준비중** (Product Preparation): Admin prepares products and prints waybills.
-4.  **배송준비중** (Ready for Shipping): Automatically moves here after waybill registration. Members can request cancellations.
-5.  **배송중** (In Shipping): Admin moves orders to this stage. Settlement (deposit, points) occurs here.
-
-**Important Rule**: All order status changes trigger SSE events (`order-updated`, `orders-deleted`, `order-created`) for real-time notifications and dashboard updates.
+- **Filter Components**: Dedicated `AdminCategoryFilter` and `MemberOrderFilter` for distinct user roles, enabling advanced search and cascading category selection.
+- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import (`multer`, `xlsx`), including partial order uploads with error reporting.
+- **CMS & Configuration**: Site Settings Management, Header Menu Management (dynamic, drag-and-drop), and Page Management for dynamic content with visual editor and access control.
+- **Legal Compliance**: Term Agreement Record Keeping with content snapshots and SHA-256 hashes for integrity.
+- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses during Excel order uploads, utilizing regex, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI) with a learning mechanism. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
+- **AI Address Learning Management**: Admin interface to register error address patterns, enabling AI to analyze, learn, and apply these patterns during order validation. This includes bulk Excel upload for learning and manual registration, inferring `correctionType` and assigning confidence scores.
+- **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events for both administrators and members.
 
 ## External Dependencies
 
@@ -201,4 +128,4 @@ Orders progress through the following stages, with SSE events updating dashboard
 ### Other APIs
 - **Resend**: For email sending functionality.
 - **Juso.go.kr (행정안전부 주소 API)**: For delivery address verification.
-- **Anthropic Claude AI**: For detailed address normalization (optional).
+- **Anthropic Claude AI**: For detailed address normalization.
