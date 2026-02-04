@@ -7114,6 +7114,62 @@ export async function registerRoutes(
     }
   });
 
+  // 주문복구 API - 주문조정된 주문을 다시 대기 상태로 복구
+  app.post('/api/admin/orders-restore', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { orderIds } = req.body;
+      
+      if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({ message: "복구할 주문을 선택해주세요" });
+      }
+
+      // 주문조정 상태인 주문만 복구 가능
+      const ordersToRestore = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          inArray(pendingOrders.id, orderIds),
+          eq(pendingOrders.status, "주문조정")
+        ));
+
+      if (ordersToRestore.length === 0) {
+        return res.status(400).json({ message: "복구할 수 있는 주문이 없습니다" });
+      }
+
+      // 주문 상태를 '대기'로 변경
+      await db.update(pendingOrders)
+        .set({ 
+          status: "대기",
+          updatedAt: new Date()
+        })
+        .where(inArray(pendingOrders.id, ordersToRestore.map(o => o.id)));
+
+      // SSE 알림 - 모든 관리자에게 주문 복구 알림
+      sseManager.sendToAdmins("order-restored", {
+        type: "order-restored",
+        restoredCount: ordersToRestore.length,
+        orderIds: ordersToRestore.map(o => o.id)
+      });
+
+      res.json({
+        success: true,
+        message: `${ordersToRestore.length}건의 주문이 주문대기로 복구되었습니다.`,
+        restoredCount: ordersToRestore.length,
+        restoredOrderIds: ordersToRestore.map(o => o.id)
+      });
+    } catch (error: any) {
+      console.error("Order restore error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 상품준비중으로 전송 API
   app.post('/api/admin/orders-to-preparation', async (req, res) => {
     if (!req.session.userId) {

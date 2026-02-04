@@ -122,6 +122,18 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
     });
 
+    eventSource.addEventListener("order-restored", (event) => {
+      const data = JSON.parse(event.data);
+      console.log("SSE: order-restored", data);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+    });
+
     eventSource.onerror = (error) => {
       console.error("SSE error:", error);
       

@@ -177,6 +177,41 @@ export default function OrdersAdminCancelPage() {
     },
   });
 
+  const restoreOrdersMutation = useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      return await apiRequest("POST", "/api/admin/orders-restore", { orderIds });
+    },
+    onSuccess: async (result: any) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      setSelectedOrders([]);
+      toast({ 
+        title: "주문복구 완료", 
+        description: result.message 
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "주문복구 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleRestoreOrders = () => {
+    if (selectedOrders.length === 0) {
+      toast({
+        title: "선택 필요",
+        description: "복구할 주문을 선택해주세요",
+        variant: "destructive"
+      });
+      return;
+    }
+    restoreOrdersMutation.mutate(selectedOrders);
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedOrders(filteredOrders.map(o => o.id));
@@ -846,7 +881,14 @@ export default function OrdersAdminCancelPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="default" disabled={selectedOrders.length === 0}>
+              <Button 
+                size="sm" 
+                variant="default" 
+                disabled={selectedOrders.length === 0 || restoreOrdersMutation.isPending}
+                onClick={handleRestoreOrders}
+                data-testid="button-restore-orders"
+              >
+                {restoreOrdersMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                 주문 복구
               </Button>
             </div>
