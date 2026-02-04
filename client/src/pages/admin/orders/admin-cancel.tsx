@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, AlertTriangle, CheckCircle } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
+import * as XLSX from "xlsx";
+
+interface MaterialProduct {
+  productCode: string;
+  productName: string;
+  orderCount: number;
+  materialQuantity: number;
+  requiredMaterial: number;
+  orderIds: string[];
+}
+
+interface MaterialGroup {
+  materialCode: string;
+  materialName: string;
+  materialType: string;
+  totalRequired: number;
+  currentStock: number;
+  remainingStock: number;
+  isDeficit: boolean;
+  products: MaterialProduct[];
+}
 
 export default function OrdersAdminCancelPage() {
+  const { toast } = useToast();
   useSSE();
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
@@ -30,9 +54,14 @@ export default function OrdersAdminCancelPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedMaterialCodes, setSelectedMaterialCodes] = useState<string[]>([]);
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders"],
+  });
+
+  const { data: adjustmentData = [], isLoading: isLoadingAdjustment, refetch: refetchAdjustment } = useQuery<MaterialGroup[]>({
+    queryKey: ["/api/admin/order-adjustment-stock"],
   });
 
   const adminCancelledOrders = allOrders.filter(o => o.status === "주문조정");
@@ -50,6 +79,29 @@ export default function OrdersAdminCancelPage() {
 
   const filteredOrders = useAdminCategoryFilter(adminCancelledOrders, filters, getFields);
 
+  const executeAdjustmentMutation = useMutation({
+    mutationFn: async (data: { materialCode: string; products: MaterialProduct[] }) => {
+      return await apiRequest("POST", "/api/admin/order-adjustment-execute", data);
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedMaterialCodes([]);
+      toast({ 
+        title: "주문조정 완료", 
+        description: result.message 
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "주문조정 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedOrders(filteredOrders.map(o => o.id));
@@ -66,6 +118,66 @@ export default function OrdersAdminCancelPage() {
     }
   };
 
+  const handleSelectMaterial = (materialCode: string, checked: boolean) => {
+    if (checked) {
+      setSelectedMaterialCodes([...selectedMaterialCodes, materialCode]);
+    } else {
+      setSelectedMaterialCodes(selectedMaterialCodes.filter(c => c !== materialCode));
+    }
+  };
+
+  const handleExecuteAdjustment = async () => {
+    if (selectedMaterialCodes.length === 0) return;
+    
+    if (!confirm(`선택한 ${selectedMaterialCodes.length}개 원재료 그룹의 주문을 조정하시겠습니까?\n\n공평 배분 알고리즘이 적용되어 재고 부족분만큼 주문이 자동 취소됩니다.`)) {
+      return;
+    }
+
+    for (const materialCode of selectedMaterialCodes) {
+      const group = adjustmentData.find(g => g.materialCode === materialCode);
+      if (group && group.isDeficit) {
+        await executeAdjustmentMutation.mutateAsync({
+          materialCode: group.materialCode,
+          products: group.products
+        });
+      }
+    }
+  };
+
+  const handleDownloadAdjustmentExcel = () => {
+    if (adjustmentData.length === 0) {
+      toast({ title: "데이터 없음", description: "다운로드할 데이터가 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const rows: any[] = [];
+    
+    for (const group of adjustmentData) {
+      for (let i = 0; i < group.products.length; i++) {
+        const product = group.products[i];
+        rows.push({
+          "재료명(원물,반재료)": i === 0 ? group.materialName : "",
+          "상품코드": product.productCode,
+          "상품명": product.productName,
+          "주문합계": product.orderCount,
+          "원재료": product.requiredMaterial,
+          "해당 원재료 합계": i === 0 ? group.totalRequired : "",
+          "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
+          "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
+        });
+      }
+    }
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "주문조정 재고표");
+    XLSX.writeFile(wb, `주문조정_재고표_${new Date().toISOString().split("T")[0]}.xlsx`);
+    
+    toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
+  };
+
+  const deficitGroups = adjustmentData.filter(g => g.isDeficit);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -75,8 +187,159 @@ export default function OrdersAdminCancelPage() {
       <OrderStatsBanner />
 
       <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle>원재료 기반 주문조정 재고표</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={handleDownloadAdjustmentExcel}
+              data-testid="button-download-adjustment"
+            >
+              <FileDown className="h-4 w-4 mr-1" />
+              엑셀 다운로드
+            </Button>
+            <Button 
+              size="sm" 
+              variant="default" 
+              disabled={selectedMaterialCodes.length === 0 || executeAdjustmentMutation.isPending}
+              onClick={handleExecuteAdjustment}
+              data-testid="button-execute-adjustment"
+            >
+              {executeAdjustmentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              주문조정 실행
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 overflow-hidden">
+          {deficitGroups.length > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <span className="text-sm text-destructive font-medium">
+                재고 부족 원재료: {deficitGroups.length}개 그룹 (체크하여 주문조정 실행 가능)
+              </span>
+            </div>
+          )}
+
+          {isLoadingAdjustment ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : adjustmentData.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              주문대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
+              <Table className="min-w-[1200px]">
+                <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableRow>
+                    <TableHead className="w-12 text-center">선택</TableHead>
+                    <TableHead className="w-[200px]">재료명(원물,반재료)</TableHead>
+                    <TableHead className="w-[140px]">상품코드</TableHead>
+                    <TableHead className="min-w-[200px]">상품명</TableHead>
+                    <TableHead className="w-[80px] text-right">주문합계</TableHead>
+                    <TableHead className="w-[80px] text-right">원재료</TableHead>
+                    <TableHead className="w-[100px] text-right">원재료 합계</TableHead>
+                    <TableHead className="w-[100px] text-right">원재료 재고</TableHead>
+                    <TableHead className="w-[100px] text-right">잔여재고</TableHead>
+                    <TableHead className="w-[80px] text-center">상태</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adjustmentData.map((group) => (
+                    group.products.map((product, productIndex) => (
+                      <TableRow 
+                        key={`${group.materialCode}-${product.productCode}`}
+                        className={group.isDeficit ? "bg-destructive/5" : ""}
+                      >
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-r"
+                          >
+                            <Checkbox
+                              checked={selectedMaterialCodes.includes(group.materialCode)}
+                              onCheckedChange={(checked) => handleSelectMaterial(group.materialCode, !!checked)}
+                              disabled={!group.isDeficit}
+                              data-testid={`checkbox-material-${group.materialCode}`}
+                            />
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="font-medium align-middle border-r bg-muted/30"
+                          >
+                            {group.materialName}
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {group.materialType === "raw" ? "원물" : group.materialType === "semi" ? "반재료" : group.materialType}
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell className="font-mono text-sm">{product.productCode}</TableCell>
+                        <TableCell>{product.productName}</TableCell>
+                        <TableCell className="text-right font-medium">{product.orderCount}</TableCell>
+                        <TableCell className="text-right">{product.requiredMaterial}</TableCell>
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-right font-bold align-middle border-l bg-muted/30"
+                          >
+                            {group.totalRequired}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-right align-middle border-l"
+                          >
+                            {group.currentStock}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className={`text-right font-bold align-middle border-l ${
+                              group.isDeficit ? "text-destructive" : "text-green-600"
+                            }`}
+                          >
+                            {group.remainingStock}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            {group.isDeficit ? (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                부족
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
+                                <CheckCircle className="h-3 w-3" />
+                                충분
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>주문조정(직권취소)</CardTitle>
+          <CardTitle>주문조정(직권취소) 내역</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
           <AdminCategoryFilter
@@ -110,9 +373,9 @@ export default function OrdersAdminCancelPage() {
               직권취소 내역이 없습니다.
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
               <Table className="min-w-[1600px]">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox

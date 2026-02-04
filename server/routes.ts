@@ -6698,5 +6698,299 @@ export async function registerRoutes(
     }
   });
 
+  // 주문조정 재고표 API - 원재료 기반 주문 데이터 조회
+  app.get('/api/admin/order-adjustment-stock', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      // 1. 주문대기 상태의 주문들을 상품코드별로 그룹화
+      const pendingOrdersList = await db.select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.status, "주문대기"));
+      
+      // 상품코드별 주문 합계 계산
+      const productOrderSummary: Record<string, {
+        productCode: string;
+        productName: string;
+        orderCount: number;
+        orders: typeof pendingOrdersList;
+      }> = {};
+      
+      for (const order of pendingOrdersList) {
+        const code = order.productCode || "";
+        if (!code) continue;
+        
+        if (!productOrderSummary[code]) {
+          productOrderSummary[code] = {
+            productCode: code,
+            productName: order.productName || "",
+            orderCount: 0,
+            orders: []
+          };
+        }
+        productOrderSummary[code].orderCount++;
+        productOrderSummary[code].orders.push(order);
+      }
+
+      // 2. 모든 상품-재료 매핑 조회
+      const allMappings = await storage.getAllProductMappings();
+      const productMaterialMap: Record<string, {
+        productCode: string;
+        productName: string;
+        materials: { materialCode: string; materialName: string; materialType: string; quantity: number }[];
+      }> = {};
+      
+      for (const mapping of allMappings) {
+        const materials = await storage.getProductMaterialMappings(mapping.productCode);
+        productMaterialMap[mapping.productCode] = {
+          productCode: mapping.productCode,
+          productName: mapping.productName,
+          materials: materials.map(m => ({
+            materialCode: m.materialCode,
+            materialName: m.materialName,
+            materialType: m.materialType,
+            quantity: m.quantity
+          }))
+        };
+      }
+
+      // 3. 모든 원재료 재고 조회
+      const allMaterials = await storage.getMaterialsByCategory();
+      const materialStockMap: Record<string, { materialName: string; materialType: string; currentStock: number }> = {};
+      for (const m of allMaterials) {
+        materialStockMap[m.materialCode] = {
+          materialName: m.materialName,
+          materialType: m.materialType,
+          currentStock: m.currentStock
+        };
+      }
+
+      // 4. 원재료 기준으로 상품 그룹화 및 계산
+      // 원재료별로 그룹화: { [materialKey]: { products: [...], totalRequired, stock, remaining } }
+      const materialGroups: Record<string, {
+        materialCode: string;
+        materialName: string;
+        materialType: string;
+        products: {
+          productCode: string;
+          productName: string;
+          orderCount: number;
+          materialQuantity: number; // 상품 1개당 필요 원재료 수량
+          requiredMaterial: number; // 주문수량 × 필요수량
+          orders: typeof pendingOrdersList;
+        }[];
+        totalRequired: number; // 해당 원재료 합계
+        currentStock: number; // 원재료 재고
+        remainingStock: number; // 재고합산(잔여재고)
+      }> = {};
+
+      // 주문이 있는 상품들에 대해서만 처리
+      for (const [productCode, summary] of Object.entries(productOrderSummary)) {
+        const mapping = productMaterialMap[productCode];
+        if (!mapping || mapping.materials.length === 0) continue;
+
+        // 첫 번째 원재료만 사용 (주요 원재료)
+        // TODO: 여러 원재료가 있는 경우 로직 확장 가능
+        const primaryMaterial = mapping.materials[0];
+        if (!primaryMaterial) continue;
+
+        const materialKey = `${primaryMaterial.materialCode}_${primaryMaterial.materialName}`;
+        
+        if (!materialGroups[materialKey]) {
+          const stockInfo = materialStockMap[primaryMaterial.materialCode];
+          materialGroups[materialKey] = {
+            materialCode: primaryMaterial.materialCode,
+            materialName: primaryMaterial.materialName,
+            materialType: primaryMaterial.materialType,
+            products: [],
+            totalRequired: 0,
+            currentStock: stockInfo?.currentStock || 0,
+            remainingStock: 0
+          };
+        }
+
+        const requiredMaterial = summary.orderCount * primaryMaterial.quantity;
+        materialGroups[materialKey].products.push({
+          productCode: summary.productCode,
+          productName: summary.productName,
+          orderCount: summary.orderCount,
+          materialQuantity: primaryMaterial.quantity,
+          requiredMaterial: requiredMaterial,
+          orders: summary.orders
+        });
+        materialGroups[materialKey].totalRequired += requiredMaterial;
+      }
+
+      // 잔여재고 계산
+      for (const group of Object.values(materialGroups)) {
+        group.remainingStock = group.currentStock - group.totalRequired;
+      }
+
+      // 5. 결과를 배열로 변환하여 반환
+      const result = Object.values(materialGroups).map(group => ({
+        materialCode: group.materialCode,
+        materialName: group.materialName,
+        materialType: group.materialType,
+        totalRequired: group.totalRequired,
+        currentStock: group.currentStock,
+        remainingStock: group.remainingStock,
+        isDeficit: group.remainingStock < 0,
+        products: group.products.map(p => ({
+          productCode: p.productCode,
+          productName: p.productName,
+          orderCount: p.orderCount,
+          materialQuantity: p.materialQuantity,
+          requiredMaterial: p.requiredMaterial,
+          orderIds: p.orders.map(o => o.id)
+        }))
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Order adjustment stock error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 주문조정 실행 API - 공평 배분 알고리즘 적용
+  app.post('/api/admin/order-adjustment-execute', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { materialCode, products } = req.body;
+      
+      if (!materialCode || !products || !Array.isArray(products)) {
+        return res.status(400).json({ message: "잘못된 요청입니다" });
+      }
+
+      // 원재료 재고 조회
+      const material = await storage.getMaterialByCode(materialCode);
+      if (!material) {
+        return res.status(404).json({ message: "원재료를 찾을 수 없습니다" });
+      }
+
+      const availableStock = material.currentStock;
+      
+      // 전체 필요량 계산
+      let totalRequired = 0;
+      for (const p of products) {
+        totalRequired += p.orderCount * p.materialQuantity;
+      }
+
+      if (totalRequired <= availableStock) {
+        return res.json({ 
+          message: "재고가 충분합니다. 조정이 필요하지 않습니다.",
+          adjusted: false 
+        });
+      }
+
+      // 공평 배분 알고리즘
+      // 1. 충족 비율 계산
+      const fulfillmentRatio = availableStock / totalRequired;
+      
+      // 2. 각 상품별 조정 수량 계산 (내림 처리)
+      const adjustedProducts: {
+        productCode: string;
+        originalCount: number;
+        adjustedCount: number;
+        cancelCount: number;
+        orderIds: string[];
+      }[] = [];
+
+      let totalAdjustedMaterial = 0;
+      
+      for (const p of products) {
+        const adjustedCount = Math.floor(p.orderCount * fulfillmentRatio);
+        const cancelCount = p.orderCount - adjustedCount;
+        
+        adjustedProducts.push({
+          productCode: p.productCode,
+          originalCount: p.orderCount,
+          adjustedCount: adjustedCount,
+          cancelCount: cancelCount,
+          orderIds: p.orderIds
+        });
+        
+        totalAdjustedMaterial += adjustedCount * p.materialQuantity;
+      }
+
+      // 3. 재고 초과 방지 검증
+      if (totalAdjustedMaterial > availableStock) {
+        // 추가 조정 필요 - 가장 많이 사용하는 상품부터 1개씩 감소
+        adjustedProducts.sort((a, b) => {
+          const aMatQty = products.find(p => p.productCode === a.productCode)?.materialQuantity || 0;
+          const bMatQty = products.find(p => p.productCode === b.productCode)?.materialQuantity || 0;
+          return bMatQty - aMatQty;
+        });
+        
+        while (totalAdjustedMaterial > availableStock) {
+          for (const ap of adjustedProducts) {
+            if (ap.adjustedCount > 0 && totalAdjustedMaterial > availableStock) {
+              const matQty = products.find(p => p.productCode === ap.productCode)?.materialQuantity || 1;
+              ap.adjustedCount--;
+              ap.cancelCount++;
+              totalAdjustedMaterial -= matQty;
+            }
+          }
+        }
+      }
+
+      // 4. 주문 상태 업데이트 (취소할 주문들)
+      const cancelledOrderIds: string[] = [];
+      
+      for (const ap of adjustedProducts) {
+        if (ap.cancelCount > 0) {
+          // cancelCount 개수만큼 주문을 '주문조정' 상태로 변경
+          const orderIdsToCancel = ap.orderIds.slice(0, ap.cancelCount);
+          
+          for (const orderId of orderIdsToCancel) {
+            await db.update(pendingOrders)
+              .set({ 
+                status: "주문조정",
+                updatedAt: new Date()
+              })
+              .where(eq(pendingOrders.id, orderId));
+            cancelledOrderIds.push(orderId);
+          }
+        }
+      }
+
+      // SSE 알림
+      sseManager.sendToAdmins("order-adjusted", {
+        type: "order-adjustment",
+        materialCode,
+        cancelledCount: cancelledOrderIds.length
+      });
+
+      res.json({
+        adjusted: true,
+        message: `${cancelledOrderIds.length}건의 주문이 조정되었습니다.`,
+        adjustedProducts,
+        cancelledOrderIds,
+        summary: {
+          availableStock,
+          totalRequired,
+          fulfillmentRatio: Math.round(fulfillmentRatio * 100) / 100,
+          usedStock: totalAdjustedMaterial
+        }
+      });
+    } catch (error: any) {
+      console.error("Order adjustment execute error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }
