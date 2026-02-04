@@ -6293,6 +6293,105 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Download preparing orders as Excel (with format selection)
+  app.post('/api/admin/orders/download-preparing', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { orderIds } = req.body;
+      const format = req.query.format as string || "default";
+
+      if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({ message: "다운로드할 주문을 선택해주세요" });
+      }
+
+      // Fetch orders - only allow 상품준비중 status for this endpoint
+      const orders = await db
+        .select()
+        .from(pendingOrders)
+        .where(and(
+          inArray(pendingOrders.id, orderIds),
+          eq(pendingOrders.status, "상품준비중")
+        ));
+
+      if (orders.length === 0) {
+        return res.status(404).json({ message: "상품준비중 상태의 주문을 찾을 수 없습니다" });
+      }
+
+      const XLSX = await import("xlsx");
+      let wsData: any[][];
+
+      if (format === "lotte") {
+        // 롯데 양식: 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품명, 수량, 주문번호, 운송장번호, 택배사
+        wsData = [
+          ["주문자명", "주문자 전화번호", "주문자 주소", "수령자명", "수령자휴대폰번호", "수령자 전화번호", "수령자 주소", "배송메시지", "상품명", "수량", "주문번호", "운송장번호", "택배사"]
+        ];
+        
+        for (const order of orders) {
+          wsData.push([
+            order.ordererName || "",
+            order.ordererPhone || "",
+            order.ordererAddress || "",
+            order.recipientName || "",
+            order.recipientMobile || "",
+            order.recipientPhone || "",
+            order.recipientAddress || "",
+            order.deliveryMessage || "",
+            order.productName || "",
+            order.quantity || 0,
+            order.orderNumber || "",
+            order.trackingNumber || "",
+            order.courierCompany || ""
+          ]);
+        }
+      } else {
+        // 기본 양식
+        wsData = [
+          ["순번", "상호명", "주문번호", "주문자명", "수령자명", "수령자 전화번호", "수령자 주소", "상품코드", "상품명", "수량", "단가", "배송메시지", "운송장번호", "택배사", "상태"]
+        ];
+        
+        for (const order of orders) {
+          wsData.push([
+            order.sequenceNumber || "",
+            order.memberName || "",
+            order.orderNumber || "",
+            order.ordererName || "",
+            order.recipientName || "",
+            order.recipientPhone || "",
+            order.recipientAddress || "",
+            order.productCode || "",
+            order.productName || "",
+            order.quantity || 0,
+            order.unitPrice || 0,
+            order.deliveryMessage || "",
+            order.trackingNumber || "",
+            order.courierCompany || "",
+            order.status || ""
+          ]);
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, "상품준비중");
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const formatName = format === "lotte" ? "롯데" : "기본";
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename=preparing_orders_${formatName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Download error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin: Update pending order (tracking number, courier, status)
   app.patch('/api/admin/pending-orders/:id', async (req, res) => {
     if (!req.session.userId) {

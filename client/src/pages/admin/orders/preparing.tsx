@@ -23,7 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -47,6 +53,7 @@ export default function OrdersPreparingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showRestoreSelectedDialog, setShowRestoreSelectedDialog] = useState(false);
   const [showRestoreAllDialog, setShowRestoreAllDialog] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -114,6 +121,46 @@ export default function OrdersPreparingPage() {
     setSelectedOrders([]);
   };
 
+  const handleDownload = async (format: "default" | "lotte") => {
+    const orderIds = selectedOrders.length > 0 ? selectedOrders : filteredOrders.map(o => o.id);
+    
+    if (orderIds.length === 0) {
+      toast({ title: "다운로드할 주문이 없습니다.", variant: "destructive" });
+      return;
+    }
+    
+    setIsDownloading(true);
+    try {
+
+      const response = await fetch(`/api/admin/orders/download-preparing?format=${format}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error("다운로드 실패");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const formatName = format === "lotte" ? "롯데" : "기본";
+      a.download = `상품준비중_${formatName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({ title: "다운로드 완료", description: `${orderIds.length}건 다운로드 (${formatName} 양식)` });
+    } catch (error) {
+      toast({ title: "다운로드 실패", description: "엑셀 다운로드 중 오류가 발생했습니다.", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedOrders(displayedOrders.map(o => o.id));
@@ -161,10 +208,33 @@ export default function OrdersPreparingPage() {
 
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" data-testid="button-download-orders">
-                <FileDown className="h-4 w-4 mr-1" />
-                엑셀 다운로드
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={isDownloading} data-testid="button-download-orders">
+                    {isDownloading ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4 mr-1" />
+                    )}
+                    엑셀 다운로드
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem 
+                    onClick={() => handleDownload("default")}
+                    data-testid="menu-download-default"
+                  >
+                    기본 양식
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleDownload("lotte")}
+                    data-testid="menu-download-lotte"
+                  >
+                    롯데 양식
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 variant="destructive"
