@@ -623,15 +623,15 @@ export default function ProductRegistrationPage() {
         merged.totalCost = totalCost;
         
         if (merged.startMarginRate != null) {
-          merged.startPrice = Math.round(totalCost * (1 + merged.startMarginRate / 100));
+          merged.startPrice = Math.ceil(totalCost * (1 + merged.startMarginRate / 100) / 10) * 10;
           merged.startMargin = merged.startPrice - totalCost;
         }
         if (merged.drivingMarginRate != null) {
-          merged.drivingPrice = Math.round(totalCost * (1 + merged.drivingMarginRate / 100));
+          merged.drivingPrice = Math.ceil(totalCost * (1 + merged.drivingMarginRate / 100) / 10) * 10;
           merged.drivingMargin = merged.drivingPrice - totalCost;
         }
         if (merged.topMarginRate != null) {
-          merged.topPrice = Math.round(totalCost * (1 + merged.topMarginRate / 100));
+          merged.topPrice = Math.ceil(totalCost * (1 + merged.topMarginRate / 100) / 10) * 10;
           merged.topMargin = merged.topPrice - totalCost;
         }
         
@@ -789,15 +789,15 @@ export default function ProductRegistrationPage() {
     p.totalCost = totalCost;
     
     if (p.startMarginRate != null) {
-      p.startPrice = Math.round(totalCost * (1 + p.startMarginRate / 100));
+      p.startPrice = Math.ceil(totalCost * (1 + p.startMarginRate / 100) / 10) * 10;
       p.startMargin = p.startPrice - totalCost;
     }
     if (p.drivingMarginRate != null) {
-      p.drivingPrice = Math.round(totalCost * (1 + p.drivingMarginRate / 100));
+      p.drivingPrice = Math.ceil(totalCost * (1 + p.drivingMarginRate / 100) / 10) * 10;
       p.drivingMargin = p.drivingPrice - totalCost;
     }
     if (p.topMarginRate != null) {
-      p.topPrice = Math.round(totalCost * (1 + p.topMarginRate / 100));
+      p.topPrice = Math.ceil(totalCost * (1 + p.topMarginRate / 100) / 10) * 10;
       p.topMargin = p.topPrice - totalCost;
     }
     
