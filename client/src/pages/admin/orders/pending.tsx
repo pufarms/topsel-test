@@ -51,9 +51,12 @@ export default function OrdersPendingPage() {
   const [summaryPageSize, setSummaryPageSize] = useState<number | "all">(30);
   const [summaryCurrentPage, setSummaryCurrentPage] = useState(1);
 
-  const { data: pendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
+  const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
   });
+
+  // 주문대기 페이지는 "대기" 상태만 표시
+  const pendingOrders = allPendingOrders.filter(o => o.status === "대기");
 
   const deleteSelectedMutation = useMutation({
     mutationFn: async (ids: string[]) => {

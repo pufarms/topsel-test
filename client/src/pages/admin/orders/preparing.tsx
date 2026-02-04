@@ -32,11 +32,12 @@ export default function OrdersPreparingPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
 
-  const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/orders"],
+  const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
+    queryKey: ["/api/admin/pending-orders"],
   });
 
-  const preparingOrders = allOrders.filter(o => o.status === "상품준비중");
+  // 상품준비중 페이지는 "상품준비중" 상태만 표시
+  const preparingOrders = allPendingOrders.filter(o => o.status === "상품준비중");
 
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,
