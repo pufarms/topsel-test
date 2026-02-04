@@ -6895,24 +6895,66 @@ export async function registerRoutes(
 
       const availableStock = material.currentStock;
       
-      // 전체 필요량 계산
-      let totalRequired = 0;
-      for (const p of products) {
-        totalRequired += p.orderCount * p.materialQuantity;
+      // DB에서 해당 원재료를 사용하는 모든 대기 주문의 전체 필요량 계산
+      // 상품 매핑 및 현재 상품 정보 조회
+      const allProductMappings = await storage.getProductMappings();
+      const allCurrentProducts = await storage.getAllCurrentProducts();
+      
+      // 해당 원재료를 사용하는 상품 코드 목록
+      const productCodesUsingMaterial = allProductMappings
+        .filter(pm => pm.materialCode === materialCode)
+        .map(pm => pm.productCode);
+      
+      // 해당 상품들의 대기 주문 조회
+      const allPendingOrders = await db.select()
+        .from(pendingOrders)
+        .where(
+          and(
+            eq(pendingOrders.status, "대기"),
+            inArray(pendingOrders.productCode, productCodesUsingMaterial)
+          )
+        );
+      
+      // 전체 필요량 계산 (모든 대기 주문 기준)
+      let fullTotalRequired = 0;
+      const productRequirements: { [productCode: string]: { orderCount: number; materialQuantity: number } } = {};
+      
+      for (const order of allPendingOrders) {
+        const productCode = order.productCode;
+        if (!productCode) continue;
+        
+        const mapping = allProductMappings.find(pm => 
+          pm.productCode === productCode && pm.materialCode === materialCode
+        );
+        const materialQuantity = mapping?.materialQuantity || 1;
+        
+        if (!productRequirements[productCode]) {
+          productRequirements[productCode] = { orderCount: 0, materialQuantity };
+        }
+        productRequirements[productCode].orderCount++;
+        fullTotalRequired += materialQuantity;
       }
-
-      if (totalRequired <= availableStock) {
+      
+      // 전체 기준으로 부족 여부 확인
+      const deficit = fullTotalRequired - availableStock;
+      
+      if (deficit <= 0) {
         return res.json({ 
           message: "재고가 충분합니다. 조정이 필요하지 않습니다.",
           adjusted: false 
         });
       }
 
-      // 공평 배분 알고리즘
-      // 1. 충족 비율 계산
-      const fulfillmentRatio = availableStock / totalRequired;
+      // 선택된 상품의 필요량 계산
+      let selectedTotalRequired = 0;
+      for (const p of products) {
+        selectedTotalRequired += p.orderCount * p.materialQuantity;
+      }
       
-      // 2. 각 상품별 조정 수량 계산 (내림 처리)
+      // 부족량만큼 선택된 상품에서 취소
+      // 취소해야 할 원재료 수량 = deficit
+      let remainingDeficit = deficit;
+      
       const adjustedProducts: {
         productCode: string;
         originalCount: number;
@@ -6920,46 +6962,28 @@ export async function registerRoutes(
         cancelCount: number;
         orderIds: string[];
       }[] = [];
-
-      let totalAdjustedMaterial = 0;
       
-      for (const p of products) {
-        const adjustedCount = Math.floor(p.orderCount * fulfillmentRatio);
-        const cancelCount = p.orderCount - adjustedCount;
+      // 상품별로 취소 수량 계산 (원재료 사용량이 많은 상품부터)
+      const sortedProducts = [...products].sort((a, b) => b.materialQuantity - a.materialQuantity);
+      
+      for (const p of sortedProducts) {
+        let cancelCount = 0;
+        
+        while (remainingDeficit > 0 && cancelCount < p.orderCount) {
+          cancelCount++;
+          remainingDeficit -= p.materialQuantity;
+        }
         
         adjustedProducts.push({
           productCode: p.productCode,
           originalCount: p.orderCount,
-          adjustedCount: adjustedCount,
+          adjustedCount: p.orderCount - cancelCount,
           cancelCount: cancelCount,
           orderIds: p.orderIds
         });
-        
-        totalAdjustedMaterial += adjustedCount * p.materialQuantity;
       }
 
-      // 3. 재고 초과 방지 검증
-      if (totalAdjustedMaterial > availableStock) {
-        // 추가 조정 필요 - 가장 많이 사용하는 상품부터 1개씩 감소
-        adjustedProducts.sort((a, b) => {
-          const aMatQty = products.find(p => p.productCode === a.productCode)?.materialQuantity || 0;
-          const bMatQty = products.find(p => p.productCode === b.productCode)?.materialQuantity || 0;
-          return bMatQty - aMatQty;
-        });
-        
-        while (totalAdjustedMaterial > availableStock) {
-          for (const ap of adjustedProducts) {
-            if (ap.adjustedCount > 0 && totalAdjustedMaterial > availableStock) {
-              const matQty = products.find(p => p.productCode === ap.productCode)?.materialQuantity || 1;
-              ap.adjustedCount--;
-              ap.cancelCount++;
-              totalAdjustedMaterial -= matQty;
-            }
-          }
-        }
-      }
-
-      // 4. 주문 상태 업데이트 (취소할 주문들)
+      // 주문 상태 업데이트 (취소할 주문들)
       const cancelledOrderIds: string[] = [];
       
       for (const ap of adjustedProducts) {
@@ -6986,6 +7010,8 @@ export async function registerRoutes(
         cancelledCount: cancelledOrderIds.length
       });
 
+      const usedStock = fullTotalRequired - deficit + remainingDeficit;
+
       res.json({
         adjusted: true,
         message: `${cancelledOrderIds.length}건의 주문이 조정되었습니다.`,
@@ -6993,9 +7019,10 @@ export async function registerRoutes(
         cancelledOrderIds,
         summary: {
           availableStock,
-          totalRequired,
-          fulfillmentRatio: Math.round(fulfillmentRatio * 100) / 100,
-          usedStock: totalAdjustedMaterial
+          fullTotalRequired,
+          deficit,
+          remainingDeficit,
+          usedStock
         }
       });
     } catch (error: any) {
