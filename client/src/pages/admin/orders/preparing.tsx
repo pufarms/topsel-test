@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, Trash2 } from "lucide-react";
+import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -34,6 +34,7 @@ export default function OrdersPreparingPage() {
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -69,9 +70,15 @@ export default function OrdersPreparingPage() {
 
   const filteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
   
+  const totalPages = tablePageSize === "all" ? 1 : Math.ceil(filteredOrders.length / tablePageSize);
   const displayedOrders = tablePageSize === "all" 
     ? filteredOrders 
-    : filteredOrders.slice(0, tablePageSize);
+    : filteredOrders.slice((currentPage - 1) * tablePageSize, currentPage * tablePageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    setSelectedOrders([]);
+  };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -136,7 +143,10 @@ export default function OrdersPreparingPage() {
               <select 
                 className="h-8 px-2 border rounded text-sm"
                 value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
-                onChange={(e) => setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+                onChange={(e) => {
+                  setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value));
+                  setCurrentPage(1);
+                }}
                 data-testid="select-page-size"
               >
                 <option value="10">10개씩</option>
@@ -223,6 +233,34 @@ export default function OrdersPreparingPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+
+          {tablePageSize !== "all" && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                이전
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                {currentPage} / {totalPages} 페이지
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+                data-testid="button-next-page"
+              >
+                다음
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </CardContent>
