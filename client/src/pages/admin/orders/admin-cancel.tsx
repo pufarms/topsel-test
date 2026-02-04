@@ -178,6 +178,7 @@ export default function OrdersAdminCancelPage() {
         "해당 원재료 합계": "",
         "원재료 재고(원물,반재료)": "",
         "재고합산(잔여재고)": "",
+        "대체발송": "",
         "대체 원재료": "",
         "대체 원재료 재고": "",
       });
@@ -195,6 +196,7 @@ export default function OrdersAdminCancelPage() {
             "해당 원재료 합계": i === 0 ? group.totalRequired : "",
             "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
             "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
+            "대체발송": "",
             "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
             "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
           });
@@ -270,6 +272,7 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="min-w-[90px] text-center whitespace-nowrap">해당<br/>원재료 합계</TableHead>
                   <TableHead className="min-w-[120px] text-center whitespace-nowrap">원재료 재고<br/>(원물,반재료)</TableHead>
                   <TableHead className="min-w-[100px] text-center whitespace-nowrap">재고합산<br/>(잔여재고)</TableHead>
+                  <TableHead className="min-w-[80px] text-center whitespace-nowrap">대체발송</TableHead>
                   <TableHead className="min-w-[120px] text-center whitespace-nowrap">대체 원재료</TableHead>
                   <TableHead className="min-w-[90px] text-center whitespace-nowrap">대체<br/>원재료 재고</TableHead>
                 </TableRow>
@@ -277,13 +280,13 @@ export default function OrdersAdminCancelPage() {
               <TableBody>
                 {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8">
+                    <TableCell colSpan={12} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : adjustmentData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
                     </TableCell>
                   </TableRow>
@@ -341,6 +344,17 @@ export default function OrdersAdminCancelPage() {
                             }`}
                           >
                             {group.remainingStock}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            <Checkbox
+                              disabled={!group.isDeficit}
+                              data-testid={`checkbox-alternate-${group.materialCode}`}
+                            />
                           </TableCell>
                         )}
                         {productIndex === 0 && (
