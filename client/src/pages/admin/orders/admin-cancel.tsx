@@ -146,9 +146,12 @@ export default function OrdersAdminCancelPage() {
     }) => {
       return await apiRequest("POST", "/api/admin/alternate-shipment-execute", data);
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: any, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      const newSelections = new Map(alternateSelections);
+      newSelections.delete(variables.materialCode);
+      setAlternateSelections(newSelections);
       toast({ 
         title: "대체발송 완료", 
         description: result.message 
