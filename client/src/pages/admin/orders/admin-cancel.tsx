@@ -72,6 +72,7 @@ interface AlternateSelection {
   alternateMaterialStock: number;
   alternateQuantity: number;
   useAlternate: boolean;
+  isApplied?: boolean;
 }
 
 export default function OrdersAdminCancelPage() {
@@ -93,6 +94,7 @@ export default function OrdersAdminCancelPage() {
   const [showDeficitDialog, setShowDeficitDialog] = useState(false);
   const [deficitMaterials, setDeficitMaterials] = useState<MaterialGroup[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [applyingMaterials, setApplyingMaterials] = useState<Set<string>>(new Set());
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -161,21 +163,65 @@ export default function OrdersAdminCancelPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       const newSelections = new Map(alternateSelections);
-      newSelections.delete(variables.materialCode);
+      const existing = newSelections.get(variables.materialCode);
+      if (existing) {
+        newSelections.set(variables.materialCode, { 
+          ...existing, 
+          isApplied: true,
+          alternateQuantity: 0,
+          alternateMaterialStock: Math.max(0, existing.alternateMaterialStock - variables.alternateQuantity)
+        });
+      }
       setAlternateSelections(newSelections);
+      setApplyingMaterials(prev => {
+        const next = new Set(prev);
+        next.delete(variables.materialCode);
+        return next;
+      });
       toast({ 
-        title: "대체발송 완료", 
+        title: "대체 수량 적용 완료", 
         description: result.message 
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      setApplyingMaterials(prev => {
+        const next = new Set(prev);
+        next.delete(variables.materialCode);
+        return next;
+      });
       toast({ 
-        title: "대체발송 실패", 
+        title: "대체 수량 적용 실패", 
         description: error.message, 
         variant: "destructive" 
       });
     },
   });
+
+  const handleApplyAlternateQuantity = (materialCode: string) => {
+    const selection = alternateSelections.get(materialCode);
+    if (!selection || !selection.alternateMaterialCode || selection.alternateQuantity <= 0) {
+      toast({
+        title: "입력 오류",
+        description: "대체 수량을 올바르게 입력해주세요.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (selection.alternateQuantity > selection.alternateMaterialStock) {
+      toast({
+        title: "재고 부족",
+        description: `${selection.alternateMaterialName}의 대체 수량이 재고(${selection.alternateMaterialStock})보다 많습니다.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    setApplyingMaterials(prev => new Set(prev).add(materialCode));
+    executeAlternateShipmentMutation.mutate({
+      materialCode,
+      alternateMaterialCode: selection.alternateMaterialCode,
+      alternateQuantity: selection.alternateQuantity
+    });
+  };
 
   const restoreOrdersMutation = useMutation({
     mutationFn: async (orderIds: string[]) => {
@@ -770,15 +816,34 @@ export default function OrdersAdminCancelPage() {
                             className="text-center align-middle border-l"
                           >
                             {selection?.alternateMaterialCode ? (
-                              <Input
-                                type="number"
-                                min={0}
-                                max={selection.alternateMaterialStock}
-                                value={selection.alternateQuantity || ""}
-                                onChange={(e) => handleAlternateQuantityChange(group.materialCode, Number(e.target.value) || 0)}
-                                className="w-20 text-center mx-auto"
-                                data-testid={`input-alternate-quantity-${group.materialCode}`}
-                              />
+                              <div className="flex items-center justify-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={selection.alternateMaterialStock}
+                                  value={selection.alternateQuantity || ""}
+                                  onChange={(e) => handleAlternateQuantityChange(group.materialCode, Number(e.target.value) || 0)}
+                                  className="w-16 text-center"
+                                  disabled={applyingMaterials.has(group.materialCode)}
+                                  data-testid={`input-alternate-quantity-${group.materialCode}`}
+                                />
+                                {selection.alternateQuantity > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="h-8 px-2 text-xs"
+                                    disabled={applyingMaterials.has(group.materialCode)}
+                                    onClick={() => handleApplyAlternateQuantity(group.materialCode)}
+                                    data-testid={`button-apply-alternate-${group.materialCode}`}
+                                  >
+                                    {applyingMaterials.has(group.materialCode) ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      "적용"
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
