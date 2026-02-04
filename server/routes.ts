@@ -7076,7 +7076,7 @@ export async function registerRoutes(
             inArray(pendingOrders.productCode, selectedProductCodes)
           )
         )
-        .orderBy(pendingOrders.sequence);
+        .orderBy(pendingOrders.sequenceNumber);
       
       if (targetOrders.length === 0) {
         return res.json({ 
@@ -7091,7 +7091,7 @@ export async function registerRoutes(
         memberId: string | null;
         productCode: string | null;
         productName: string | null;
-        sequence: number | null;
+        sequenceNum: number;
         materialQuantity: number;
         keepOrder: boolean;
       }
@@ -7103,7 +7103,7 @@ export async function registerRoutes(
           memberId: order.memberId,
           productCode: order.productCode,
           productName: order.productName,
-          sequence: order.sequence,
+          sequenceNum: parseInt(order.sequenceNumber, 10) || 0,
           materialQuantity: mapping?.quantity || 1,
           keepOrder: true
         };
@@ -7158,22 +7158,23 @@ export async function registerRoutes(
       }
 
       // 4. 각 그룹별로 유지 건수 계산 (내림 적용)
-      for (const group of groupMap.values()) {
+      const groupList = Array.from(groupMap.values());
+      for (const group of groupList) {
         group.keepCount = Math.floor(group.originalCount * ratio);
         group.cancelCount = group.originalCount - group.keepCount;
         
         // 주문을 순번 오름차순으로 정렬 (낮은 번호 = 빠른 주문 = 유지 우선)
-        group.orders.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        group.orders.sort((a: OrderWithMaterial, b: OrderWithMaterial) => a.sequenceNum - b.sequenceNum);
         
         // 유지할 주문과 취소할 주문 결정
-        group.orders.forEach((order, idx) => {
+        group.orders.forEach((order: OrderWithMaterial, idx: number) => {
           order.keepOrder = idx < group.keepCount;
         });
       }
 
       // 5. 조정 후 총 소모량 검증
       let totalConsumed = 0;
-      for (const group of groupMap.values()) {
+      for (const group of groupList) {
         totalConsumed += group.keepCount * group.materialQuantity;
       }
       
@@ -7183,7 +7184,7 @@ export async function registerRoutes(
       if (totalConsumed > availableStock) {
         // 모든 "유지" 주문을 순번 내림차순으로 정렬 (큰 번호 = 늦은 주문)
         const allKeptOrders: OrderWithMaterial[] = [];
-        for (const group of groupMap.values()) {
+        for (const group of groupList) {
           for (const order of group.orders) {
             if (order.keepOrder) {
               allKeptOrders.push(order);
@@ -7191,7 +7192,7 @@ export async function registerRoutes(
           }
         }
         
-        allKeptOrders.sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+        allKeptOrders.sort((a: OrderWithMaterial, b: OrderWithMaterial) => b.sequenceNum - a.sequenceNum);
         
         // 끝번호부터 추가 취소
         for (const order of allKeptOrders) {
@@ -7222,7 +7223,7 @@ export async function registerRoutes(
           ordersToCancel.push(order);
         }
       }
-      ordersToCancel.sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+      ordersToCancel.sort((a: OrderWithMaterial, b: OrderWithMaterial) => b.sequenceNum - a.sequenceNum);
       
       // 상태 업데이트
       for (const order of ordersToCancel) {
@@ -7243,7 +7244,7 @@ export async function registerRoutes(
       });
 
       // 조정 결과 요약 (그룹별)
-      const adjustedGroups = Array.from(groupMap.values()).map(g => ({
+      const adjustedGroups = groupList.map(g => ({
         memberId: g.memberId,
         productCode: g.productCode,
         originalCount: g.originalCount,
