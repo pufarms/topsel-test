@@ -76,7 +76,7 @@ export default function OrdersAdminCancelPage() {
 
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>직권취소 목록</CardTitle>
+          <CardTitle>주문조정(직권취소)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
           <AdminCategoryFilter
