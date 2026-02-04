@@ -296,32 +296,72 @@ export default function OrdersAdminCancelPage() {
       return;
     }
 
-    for (const shipment of alternateShipments) {
-      await executeAlternateShipmentMutation.mutateAsync({
-        materialCode: shipment.materialCode,
-        alternateMaterialCode: shipment.alternateMaterialCode,
-        alternateQuantity: shipment.alternateQuantity,
-      });
-    }
+    try {
+      let totalAlternateExecuted = 0;
+      let totalOrdersAdjusted = 0;
 
-    for (const materialCode of materialCodes) {
-      const group = adjustmentData.find(g => g.materialCode === materialCode);
-      if (group && isStillDeficit(group)) {
-        const selectedProductCodes = selectedProducts
-          .filter(p => p.materialCode === materialCode)
-          .map(p => p.productCode);
-        
-        const productsToAdjust = group.products.filter(p => 
-          selectedProductCodes.includes(p.productCode)
-        );
-        
-        if (productsToAdjust.length > 0) {
-          await executeAdjustmentMutation.mutateAsync({
-            materialCode: group.materialCode,
-            products: productsToAdjust
-          });
+      for (const shipment of alternateShipments) {
+        await apiRequest("POST", "/api/admin/alternate-shipment-execute", {
+          materialCode: shipment.materialCode,
+          alternateMaterialCode: shipment.alternateMaterialCode,
+          alternateQuantity: shipment.alternateQuantity,
+        });
+        totalAlternateExecuted++;
+      }
+
+      for (const materialCode of materialCodes) {
+        const group = adjustmentData.find(g => g.materialCode === materialCode);
+        if (group && isStillDeficit(group)) {
+          const selectedProductCodes = selectedProducts
+            .filter(p => p.materialCode === materialCode)
+            .map(p => p.productCode);
+          
+          const productsToAdjust = group.products.filter(p => 
+            selectedProductCodes.includes(p.productCode)
+          );
+          
+          if (productsToAdjust.length > 0) {
+            const result: any = await apiRequest("POST", "/api/admin/order-adjustment-execute", {
+              materialCode: group.materialCode,
+              products: productsToAdjust
+            });
+            if (result.cancelledOrderIds) {
+              totalOrdersAdjusted += result.cancelledOrderIds.length;
+            }
+          }
         }
       }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      
+      setSelectedProducts([]);
+      setAlternateSelections(new Map());
+      setOpenPopovers(new Map());
+
+      let summaryMessage = "";
+      if (totalAlternateExecuted > 0 && totalOrdersAdjusted > 0) {
+        summaryMessage = `대체발송 ${totalAlternateExecuted}건 실행, ${totalOrdersAdjusted}건 주문 조정 완료`;
+      } else if (totalAlternateExecuted > 0) {
+        summaryMessage = `대체발송 ${totalAlternateExecuted}건 실행 완료`;
+      } else if (totalOrdersAdjusted > 0) {
+        summaryMessage = `${totalOrdersAdjusted}건 주문 조정 완료`;
+      } else {
+        summaryMessage = "주문조정이 완료되었습니다.";
+      }
+
+      toast({ 
+        title: "주문조정 완료", 
+        description: summaryMessage 
+      });
+    } catch (error: any) {
+      toast({ 
+        title: "주문조정 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     }
   };
 
