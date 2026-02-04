@@ -38,6 +38,8 @@ interface MaterialGroup {
   currentStock: number;
   remainingStock: number;
   isDeficit: boolean;
+  alternateMaterialName?: string;
+  alternateMaterialStock?: number;
   products: MaterialProduct[];
 }
 
@@ -174,6 +176,8 @@ export default function OrdersAdminCancelPage() {
         "주문합계": "",
         "원재료": "",
         "해당 원재료 합계": "",
+        "대체 원재료": "",
+        "대체 원재료 재고": "",
         "원재료 재고(원물,반재료)": "",
         "재고합산(잔여재고)": "",
       });
@@ -189,8 +193,10 @@ export default function OrdersAdminCancelPage() {
             "주문합계": product.orderCount,
             "원재료": product.requiredMaterial,
             "해당 원재료 합계": i === 0 ? group.totalRequired : "",
+            "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
+            "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
             "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
-            "재고합산(잔여재고)": i === 0 ? (group.isDeficit ? group.remainingStock : group.remainingStock) : "",
+            "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
           });
         }
       }
@@ -252,31 +258,33 @@ export default function OrdersAdminCancelPage() {
           )}
 
           <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
-            <Table className="min-w-[1200px]">
+            <Table className="w-full table-fixed">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
-                  <TableHead className="w-[180px]">재료명(원물,반재료)</TableHead>
-                  <TableHead className="w-[140px]">상품코드</TableHead>
-                  <TableHead className="min-w-[200px]">상품명</TableHead>
-                  <TableHead className="w-[100px] text-center">주문조정선택</TableHead>
-                  <TableHead className="w-[80px] text-right">주문합계</TableHead>
-                  <TableHead className="w-[80px] text-right">원재료</TableHead>
-                  <TableHead className="w-[100px] text-right">해당 원재료 합계</TableHead>
-                  <TableHead className="w-[130px] text-right">원재료 재고(원물,반재료)</TableHead>
-                  <TableHead className="w-[100px] text-right">재고합산(잔여재고)</TableHead>
+                  <TableHead className="w-[140px]">재료명(원물,반재료)</TableHead>
+                  <TableHead className="w-[100px]">상품코드</TableHead>
+                  <TableHead className="w-[240px]">상품명</TableHead>
+                  <TableHead className="w-[70px] text-center">주문조정<br/>선택</TableHead>
+                  <TableHead className="w-[60px] text-center">주문<br/>합계</TableHead>
+                  <TableHead className="w-[60px] text-center">원재료</TableHead>
+                  <TableHead className="w-[70px] text-center">해당<br/>원재료<br/>합계</TableHead>
+                  <TableHead className="w-[100px] text-center">대체 원재료</TableHead>
+                  <TableHead className="w-[70px] text-center">대체<br/>원재료<br/>재고</TableHead>
+                  <TableHead className="w-[90px] text-center">원재료 재고<br/>(원물,반재료)</TableHead>
+                  <TableHead className="w-[80px] text-center">재고합산<br/>(잔여재고)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={11} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : adjustmentData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      주문대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -289,7 +297,7 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="font-medium align-middle border-r bg-muted/30"
+                            className="font-medium align-middle border-r bg-muted/30 text-sm"
                           >
                             {group.materialName}
                             <div className="text-xs text-muted-foreground mt-1">
@@ -297,8 +305,8 @@ export default function OrdersAdminCancelPage() {
                             </div>
                           </TableCell>
                         )}
-                        <TableCell className="font-mono text-sm">{product.productCode}</TableCell>
-                        <TableCell>{product.productName}</TableCell>
+                        <TableCell className="font-mono text-xs">{product.productCode}</TableCell>
+                        <TableCell className="text-sm truncate" title={product.productName}>{product.productName}</TableCell>
                         <TableCell className="text-center">
                           <Checkbox
                             checked={isProductSelected(group.materialCode, product.productCode)}
@@ -307,12 +315,12 @@ export default function OrdersAdminCancelPage() {
                             data-testid={`checkbox-product-${product.productCode}`}
                           />
                         </TableCell>
-                        <TableCell className="text-right font-medium">{product.orderCount}</TableCell>
-                        <TableCell className="text-right">{product.requiredMaterial}</TableCell>
+                        <TableCell className="text-center font-medium">{product.orderCount}</TableCell>
+                        <TableCell className="text-center">{product.requiredMaterial}</TableCell>
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="text-right font-bold align-middle border-l bg-muted/30"
+                            className="text-center font-bold align-middle border-l bg-muted/30"
                           >
                             {group.totalRequired}
                           </TableCell>
@@ -320,7 +328,23 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="text-right align-middle border-l"
+                            className="text-center align-middle border-l text-sm"
+                          >
+                            {group.alternateMaterialName || "-"}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            {group.alternateMaterialStock ?? "-"}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
                           >
                             {group.currentStock}
                           </TableCell>
@@ -328,11 +352,11 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className={`text-right font-bold align-middle border-l ${
+                            className={`text-center font-bold align-middle border-l ${
                               group.isDeficit ? "text-destructive" : "text-green-600"
                             }`}
                           >
-                            {group.isDeficit ? group.remainingStock : group.remainingStock}
+                            {group.remainingStock}
                           </TableCell>
                         )}
                       </TableRow>
