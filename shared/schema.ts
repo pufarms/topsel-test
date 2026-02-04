@@ -1186,8 +1186,13 @@ export const insertBrandtalkHistorySchema = createInsertSchema(brandtalkHistory)
 export type InsertBrandtalkHistory = z.infer<typeof insertBrandtalkHistorySchema>;
 export type BrandtalkHistory = typeof brandtalkHistory.$inferSelect;
 
-// 주문대기 상태
-export const pendingOrderStatuses = ["대기", "처리중", "완료", "취소"] as const;
+// 주문 상태 (4단계 워크플로우 + 예외 상태)
+// 1. 대기 (주문조정 단계)
+// 2. 상품준비중 (운송장 출력 단계)
+// 3. 배송준비중 (회원취소건 접수 단계)
+// 4. 배송중
+// 예외: 주문조정, 취소
+export const pendingOrderStatuses = ["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소"] as const;
 export type PendingOrderStatus = typeof pendingOrderStatuses[number];
 
 // 주문대기 테이블

@@ -31,11 +31,12 @@ export default function OrdersCancelledPage() {
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
-  const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/orders"],
+  const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
+    queryKey: ["/api/admin/pending-orders"],
   });
 
-  const cancelledOrders = allOrders.filter(o => o.status === "회원취소");
+  // 취소 페이지는 "취소" 상태만 표시
+  const cancelledOrders = allPendingOrders.filter(o => o.status === "취소");
 
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,

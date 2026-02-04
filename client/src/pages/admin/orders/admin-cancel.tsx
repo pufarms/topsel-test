@@ -94,8 +94,8 @@ export default function OrdersAdminCancelPage() {
   const [deficitMaterials, setDeficitMaterials] = useState<MaterialGroup[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
 
-  const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/orders"],
+  const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
+    queryKey: ["/api/admin/pending-orders"],
   });
 
   const { data: adjustmentData = [], isLoading: isLoadingAdjustment } = useQuery<MaterialGroup[]>({
@@ -110,7 +110,8 @@ export default function OrdersAdminCancelPage() {
     return allMaterials.filter(m => m.materialType === "raw" || m.materialType === "semi");
   }, [allMaterials]);
 
-  const adminCancelledOrders = allOrders.filter(o => o.status === "주문조정");
+  // 주문조정 페이지는 "주문조정" 상태만 표시
+  const adminCancelledOrders = allPendingOrders.filter(o => o.status === "주문조정");
 
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,
@@ -130,9 +131,8 @@ export default function OrdersAdminCancelPage() {
       return await apiRequest("POST", "/api/admin/order-adjustment-execute", data);
     },
     onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       setSelectedProducts([]);
       toast({ 
@@ -343,7 +343,7 @@ export default function OrdersAdminCancelPage() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
@@ -410,7 +410,7 @@ export default function OrdersAdminCancelPage() {
         excludeMaterialCodes: materialCodesToExclude
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
 
