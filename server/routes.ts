@@ -6382,9 +6382,14 @@ export async function registerRoutes(
       XLSX.utils.book_append_sheet(wb, ws, "상품준비중");
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
-      const formatName = format === "lotte" ? "롯데" : "기본";
+      const formatName = format === "lotte" ? "lotte" : "default";
+      const koreanFormatName = format === "lotte" ? "롯데" : "기본";
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const asciiFilename = `preparing_orders_${formatName}_${dateStr}.xlsx`;
+      const koreanFilename = `상품준비중_${koreanFormatName}_${dateStr}.xlsx`;
+      
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename=preparing_orders_${formatName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(koreanFilename)}`);
       res.send(buffer);
     } catch (error: any) {
       console.error("Download error:", error);
