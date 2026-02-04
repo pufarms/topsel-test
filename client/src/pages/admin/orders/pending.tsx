@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, Trash2 } from "lucide-react";
+import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -36,6 +36,7 @@ export default function OrdersPendingPage() {
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: pendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -96,10 +97,21 @@ export default function OrdersPendingPage() {
 
   const filteredOrders = useAdminCategoryFilter(pendingOrders, filters, getFields);
   
-  // 표시할 주문 목록 (페이지 크기에 따라 자르기)
+  // 페이지네이션 계산
+  const totalPages = tablePageSize === "all" 
+    ? 1 
+    : Math.ceil(filteredOrders.length / tablePageSize);
+  
+  // 페이지 크기 변경 시 첫 페이지로 이동
+  const handlePageSizeChange = (newSize: number | "all") => {
+    setTablePageSize(newSize);
+    setCurrentPage(1);
+  };
+  
+  // 표시할 주문 목록 (현재 페이지에 해당하는 데이터)
   const displayedOrders = tablePageSize === "all" 
     ? filteredOrders 
-    : filteredOrders.slice(0, tablePageSize);
+    : filteredOrders.slice((currentPage - 1) * tablePageSize, currentPage * tablePageSize);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -171,7 +183,7 @@ export default function OrdersPendingPage() {
               <select 
                 className="h-8 px-2 border rounded text-sm"
                 value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
-                onChange={(e) => setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+                onChange={(e) => handlePageSizeChange(e.target.value === "all" ? "all" : parseInt(e.target.value))}
                 data-testid="select-page-size"
               >
                 <option value="10">10개씩</option>
@@ -179,12 +191,6 @@ export default function OrdersPendingPage() {
                 <option value="100">100개씩</option>
                 <option value="all">전체</option>
               </select>
-              <Button size="sm" variant="default" disabled={selectedOrders.length === 0}>
-                1차 주문마감
-              </Button>
-              <Button size="sm" variant="secondary" disabled={selectedOrders.length === 0}>
-                2차 주문마감
-              </Button>
             </div>
           </div>
 
@@ -268,6 +274,76 @@ export default function OrdersPendingPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* 페이지 네비게이션 */}
+          {tablePageSize !== "all" && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                data-testid="button-first-page"
+              >
+                처음
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pages = [];
+                  const startPage = Math.max(1, currentPage - 2);
+                  const endPage = Math.min(totalPages, currentPage + 2);
+                  
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        size="sm"
+                        variant={i === currentPage ? "default" : "outline"}
+                        onClick={() => setCurrentPage(i)}
+                        data-testid={`button-page-${i}`}
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                data-testid="button-next-page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                data-testid="button-last-page"
+              >
+                마지막
+              </Button>
+              
+              <span className="text-sm text-muted-foreground ml-2">
+                {currentPage} / {totalPages} 페이지
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
