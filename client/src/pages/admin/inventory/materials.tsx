@@ -1043,18 +1043,17 @@ export default function MaterialsPage() {
               />
             </div>
             <div>
-              <Label>재고</Label>
-              {!materialEditId ? (
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={materialStock}
-                  onChange={(e) => setMaterialStock(e.target.value)}
-                  placeholder="초기재고 (기본: 0)"
-                  data-testid="input-material-stock"
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground py-2">{parseFloat(materialStock).toFixed(1)} (입고 관리 페이지에서 변경)</p>
+              <Label>현재 재고</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={materialStock}
+                onChange={(e) => setMaterialStock(e.target.value)}
+                placeholder={materialEditId ? "재고 수량" : "초기재고 (기본: 0)"}
+                data-testid="input-material-stock"
+              />
+              {materialEditId && (
+                <p className="text-xs text-muted-foreground mt-1">현재 재고를 직접 조정할 수 있습니다.</p>
               )}
             </div>
           </div>
