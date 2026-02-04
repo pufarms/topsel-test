@@ -176,10 +176,10 @@ export default function OrdersAdminCancelPage() {
         "주문합계": "",
         "원재료": "",
         "해당 원재료 합계": "",
-        "대체 원재료": "",
-        "대체 원재료 재고": "",
         "원재료 재고(원물,반재료)": "",
         "재고합산(잔여재고)": "",
+        "대체 원재료": "",
+        "대체 원재료 재고": "",
       });
     } else {
       for (const group of adjustmentData) {
@@ -193,10 +193,10 @@ export default function OrdersAdminCancelPage() {
             "주문합계": product.orderCount,
             "원재료": product.requiredMaterial,
             "해당 원재료 합계": i === 0 ? group.totalRequired : "",
-            "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
-            "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
             "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
             "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
+            "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
+            "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
           });
         }
       }
@@ -268,10 +268,10 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="w-[60px] text-center">주문<br/>합계</TableHead>
                   <TableHead className="w-[60px] text-center">원재료</TableHead>
                   <TableHead className="w-[70px] text-center">해당<br/>원재료<br/>합계</TableHead>
-                  <TableHead className="w-[100px] text-center">대체 원재료</TableHead>
-                  <TableHead className="w-[70px] text-center">대체<br/>원재료<br/>재고</TableHead>
                   <TableHead className="w-[90px] text-center">원재료 재고<br/>(원물,반재료)</TableHead>
                   <TableHead className="w-[80px] text-center">재고합산<br/>(잔여재고)</TableHead>
+                  <TableHead className="w-[100px] text-center">대체 원재료</TableHead>
+                  <TableHead className="w-[70px] text-center">대체<br/>원재료<br/>재고</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -328,22 +328,6 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="text-center align-middle border-l text-sm"
-                          >
-                            {group.alternateMaterialName || "-"}
-                          </TableCell>
-                        )}
-                        {productIndex === 0 && (
-                          <TableCell 
-                            rowSpan={group.products.length} 
-                            className="text-center align-middle border-l"
-                          >
-                            {group.alternateMaterialStock ?? "-"}
-                          </TableCell>
-                        )}
-                        {productIndex === 0 && (
-                          <TableCell 
-                            rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
                             {group.currentStock}
@@ -357,6 +341,22 @@ export default function OrdersAdminCancelPage() {
                             }`}
                           >
                             {group.remainingStock}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l text-sm"
+                          >
+                            {group.alternateMaterialName || "-"}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            {group.alternateMaterialStock ?? "-"}
                           </TableCell>
                         )}
                       </TableRow>
