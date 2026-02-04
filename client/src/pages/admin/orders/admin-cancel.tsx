@@ -181,6 +181,7 @@ export default function OrdersAdminCancelPage() {
         "대체발송": "",
         "대체 원재료": "",
         "대체 원재료 재고": "",
+        "대체 수량": "",
       });
     } else {
       for (const group of adjustmentData) {
@@ -199,6 +200,7 @@ export default function OrdersAdminCancelPage() {
             "대체발송": "",
             "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
             "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
+            "대체 수량": "",
           });
         }
       }
@@ -275,18 +277,19 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="min-w-[80px] text-center whitespace-nowrap">대체발송</TableHead>
                   <TableHead className="min-w-[120px] text-center whitespace-nowrap">대체 원재료</TableHead>
                   <TableHead className="min-w-[90px] text-center whitespace-nowrap">대체<br/>원재료 재고</TableHead>
+                  <TableHead className="min-w-[80px] text-center whitespace-nowrap">대체 수량</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8">
+                    <TableCell colSpan={13} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : adjustmentData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
                     </TableCell>
                   </TableRow>
@@ -371,6 +374,14 @@ export default function OrdersAdminCancelPage() {
                             className="text-center align-middle border-l"
                           >
                             {group.alternateMaterialStock ?? "-"}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            -
                           </TableCell>
                         )}
                       </TableRow>
