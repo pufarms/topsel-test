@@ -6007,7 +6007,7 @@ export async function registerRoutes(
         recipientPhone: string;
         recipientAddress: string;
         deliveryMessage: string;
-        productInfo: any;
+        currentProduct: any;
         validatedAddress?: string;
         addressWarning?: string;
       }> = [];
@@ -6055,13 +6055,23 @@ export async function registerRoutes(
           continue;
         }
 
-        // Check if product exists in 현재공급가상품 (product registrations)
-        const productInfo = await storage.getProductRegistrationByCode(productCode);
-        if (!productInfo) {
+        // Check if product exists in 현재공급가상품 (current_products) - NOT product_registrations
+        const currentProduct = await storage.getCurrentProductByCode(productCode);
+        if (!currentProduct) {
           errorRows.push({
             rowNum,
             originalData: row,
-            errorReason: `"${productName}" (${productCode}) 공급되지 않는 상품, 또는 상품코드오류`
+            errorReason: `"${productName}" (${productCode}) 현재 공급되지 않는 상품입니다. (현재공급가에 없음)`
+          });
+          continue;
+        }
+        
+        // 상품이 공급중지 상태인지 확인
+        if (currentProduct.supplyStatus === 'suspended') {
+          errorRows.push({
+            rowNum,
+            originalData: row,
+            errorReason: `"${productName}" (${productCode}) 공급중지된 상품입니다.`
           });
           continue;
         }
@@ -6101,7 +6111,7 @@ export async function registerRoutes(
           recipientPhone,
           recipientAddress,
           deliveryMessage,
-          productInfo,
+          currentProduct,
           validatedAddress: addressValidationResult?.fullAddress || addressValidationResult?.standardAddress,
           addressWarning: addressValidationResult?.warningMessage,
         });
@@ -6145,18 +6155,27 @@ export async function registerRoutes(
         // Generate sequence number
         const sequenceNumber = await generateSequenceNumber(member.username);
 
+        // 회원 등급에 따른 공급가 결정 (start/driving/top)
+        const memberTier = member.membershipTier || 'top';
+        let supplyPrice = parsedRow.currentProduct.topPrice;
+        if (memberTier === 'start') {
+          supplyPrice = parsedRow.currentProduct.startPrice;
+        } else if (memberTier === 'driving') {
+          supplyPrice = parsedRow.currentProduct.drivingPrice;
+        }
+
         await db.insert(pendingOrders).values({
           sequenceNumber,
           orderNumber: generateOrderNumber(),
           memberId: req.session.userId,
           memberCompanyName: member.companyName,
           status: "대기",
-          categoryLarge: parsedRow.productInfo?.categoryLarge || null,
-          categoryMedium: parsedRow.productInfo?.categoryMedium || null,
-          categorySmall: parsedRow.productInfo?.categorySmall || null,
+          categoryLarge: parsedRow.currentProduct.categoryLarge || null,
+          categoryMedium: parsedRow.currentProduct.categoryMedium || null,
+          categorySmall: parsedRow.currentProduct.categorySmall || null,
           productCode: parsedRow.productCode,
           productName: parsedRow.productName,
-          supplyPrice: parsedRow.productInfo?.topPrice || null,
+          supplyPrice: supplyPrice,
           ordererName: parsedRow.ordererName,
           ordererPhone: parsedRow.ordererPhone,
           ordererAddress: parsedRow.ordererAddress || null,
