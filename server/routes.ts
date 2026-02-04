@@ -7034,7 +7034,7 @@ export async function registerRoutes(
     }
   });
 
-  // 주문조정 실행 API - 공평 배분 알고리즘 적용
+  // 주문조정 실행 API - 공평 배분 알고리즘 적용 (비율 기반 + 끝번호 우선 취소)
   app.post('/api/admin/order-adjustment-execute', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7059,111 +7059,180 @@ export async function registerRoutes(
 
       const availableStock = material.currentStock;
       
-      // DB에서 해당 원재료를 사용하는 모든 대기 주문의 전체 필요량 계산
-      // 상품-재료 매핑 조회 (productMaterialMappings 테이블 사용)
+      // 선택된 상품 코드 목록
+      const selectedProductCodes = products.map((p: any) => p.productCode);
+      
+      // 상품-재료 매핑 조회
       const allMaterialMappings = await db.select()
         .from(productMaterialMappings)
         .where(eq(productMaterialMappings.materialCode, materialCode));
       
-      // 해당 원재료를 사용하는 상품 코드 목록
-      const productCodesUsingMaterial = allMaterialMappings.map(pm => pm.productCode);
-      
-      // 해당 상품들의 대기 주문 조회
-      const allPendingOrders = await db.select()
+      // 선택된 상품들의 대기 주문 조회 (순번 포함)
+      const targetOrders = await db.select()
         .from(pendingOrders)
         .where(
           and(
             eq(pendingOrders.status, "대기"),
-            inArray(pendingOrders.productCode, productCodesUsingMaterial)
+            inArray(pendingOrders.productCode, selectedProductCodes)
           )
-        );
+        )
+        .orderBy(pendingOrders.sequence);
       
-      // 전체 필요량 계산 (모든 대기 주문 기준)
-      let fullTotalRequired = 0;
-      const productRequirements: { [productCode: string]: { orderCount: number; materialQuantity: number } } = {};
-      
-      for (const order of allPendingOrders) {
-        const productCode = order.productCode;
-        if (!productCode) continue;
-        
-        const mapping = allMaterialMappings.find(pm => 
-          pm.productCode === productCode
-        );
-        const materialQuantity = mapping?.quantity || 1;
-        
-        if (!productRequirements[productCode]) {
-          productRequirements[productCode] = { orderCount: 0, materialQuantity };
-        }
-        productRequirements[productCode].orderCount++;
-        fullTotalRequired += materialQuantity;
-      }
-      
-      // 전체 기준으로 부족 여부 확인
-      const deficit = fullTotalRequired - availableStock;
-      
-      if (deficit <= 0) {
+      if (targetOrders.length === 0) {
         return res.json({ 
-          message: "재고가 충분합니다. 조정이 필요하지 않습니다.",
+          message: "조정 대상 주문이 없습니다.",
           adjusted: false 
         });
       }
 
-      // 선택된 상품의 필요량 계산
-      let selectedTotalRequired = 0;
-      for (const p of products) {
-        selectedTotalRequired += p.orderCount * p.materialQuantity;
+      // 각 주문에 원재료 소모량 정보 추가
+      interface OrderWithMaterial {
+        id: string;
+        memberId: string | null;
+        productCode: string | null;
+        productName: string | null;
+        sequence: number | null;
+        materialQuantity: number;
+        keepOrder: boolean;
       }
       
-      // 부족량만큼 선택된 상품에서 취소
-      // 취소해야 할 원재료 수량 = deficit
-      let remainingDeficit = deficit;
+      const ordersWithMaterial: OrderWithMaterial[] = targetOrders.map(order => {
+        const mapping = allMaterialMappings.find(pm => pm.productCode === order.productCode);
+        return {
+          id: order.id,
+          memberId: order.memberId,
+          productCode: order.productCode,
+          productName: order.productName,
+          sequence: order.sequence,
+          materialQuantity: mapping?.quantity || 1,
+          keepOrder: true
+        };
+      });
+
+      // 1. 총 필요 원재료량 계산
+      const totalRequired = ordersWithMaterial.reduce((sum, o) => sum + o.materialQuantity, 0);
       
-      const adjustedProducts: {
-        productCode: string;
-        originalCount: number;
-        adjustedCount: number;
-        cancelCount: number;
-        orderIds: string[];
-      }[] = [];
-      
-      // 상품별로 취소 수량 계산 (원재료 사용량이 많은 상품부터)
-      const sortedProducts = [...products].sort((a, b) => b.materialQuantity - a.materialQuantity);
-      
-      for (const p of sortedProducts) {
-        let cancelCount = 0;
-        
-        while (remainingDeficit > 0 && cancelCount < p.orderCount) {
-          cancelCount++;
-          remainingDeficit -= p.materialQuantity;
-        }
-        
-        adjustedProducts.push({
-          productCode: p.productCode,
-          originalCount: p.orderCount,
-          adjustedCount: p.orderCount - cancelCount,
-          cancelCount: cancelCount,
-          orderIds: p.orderIds
+      // 재고가 충분한 경우
+      if (totalRequired <= availableStock) {
+        return res.json({ 
+          message: "선택된 상품의 재고가 충분합니다. 조정이 필요하지 않습니다.",
+          adjusted: false 
         });
       }
 
-      // 주문 상태 업데이트 (취소할 주문들)
-      const cancelledOrderIds: string[] = [];
+      // 2. 충족 비율 계산 (가용 재고 / 총 필요량)
+      const ratio = availableStock / totalRequired;
+      console.log(`공평 배분 - 비율: ${ratio.toFixed(4)} (재고: ${availableStock} / 필요: ${totalRequired})`);
+
+      // 3. 회원+상품별로 그룹화하여 비율 적용
+      interface MemberProductGroup {
+        memberId: string;
+        productCode: string;
+        materialQuantity: number;
+        orders: OrderWithMaterial[];
+        originalCount: number;
+        keepCount: number;
+        cancelCount: number;
+      }
       
-      for (const ap of adjustedProducts) {
-        if (ap.cancelCount > 0) {
-          // cancelCount 개수만큼 주문을 '주문조정' 상태로 변경
-          const orderIdsToCancel = ap.orderIds.slice(0, ap.cancelCount);
-          
-          for (const orderId of orderIdsToCancel) {
-            await db.update(pendingOrders)
-              .set({ 
-                status: "주문조정",
-                updatedAt: new Date()
-              })
-              .where(eq(pendingOrders.id, orderId));
-            cancelledOrderIds.push(orderId);
+      const groupMap = new Map<string, MemberProductGroup>();
+      
+      for (const order of ordersWithMaterial) {
+        const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+        
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            memberId: order.memberId || 'unknown',
+            productCode: order.productCode || 'unknown',
+            materialQuantity: order.materialQuantity,
+            orders: [],
+            originalCount: 0,
+            keepCount: 0,
+            cancelCount: 0
+          });
+        }
+        
+        const group = groupMap.get(key)!;
+        group.orders.push(order);
+        group.originalCount++;
+      }
+
+      // 4. 각 그룹별로 유지 건수 계산 (내림 적용)
+      for (const group of groupMap.values()) {
+        group.keepCount = Math.floor(group.originalCount * ratio);
+        group.cancelCount = group.originalCount - group.keepCount;
+        
+        // 주문을 순번 오름차순으로 정렬 (낮은 번호 = 빠른 주문 = 유지 우선)
+        group.orders.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+        
+        // 유지할 주문과 취소할 주문 결정
+        group.orders.forEach((order, idx) => {
+          order.keepOrder = idx < group.keepCount;
+        });
+      }
+
+      // 5. 조정 후 총 소모량 검증
+      let totalConsumed = 0;
+      for (const group of groupMap.values()) {
+        totalConsumed += group.keepCount * group.materialQuantity;
+      }
+      
+      console.log(`공평 배분 - 1차 조정 후 소모량: ${totalConsumed} (재고: ${availableStock})`);
+
+      // 6. 재고 초과 시, 순번 끝번호부터 추가 취소
+      if (totalConsumed > availableStock) {
+        // 모든 "유지" 주문을 순번 내림차순으로 정렬 (큰 번호 = 늦은 주문)
+        const allKeptOrders: OrderWithMaterial[] = [];
+        for (const group of groupMap.values()) {
+          for (const order of group.orders) {
+            if (order.keepOrder) {
+              allKeptOrders.push(order);
+            }
           }
         }
+        
+        allKeptOrders.sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+        
+        // 끝번호부터 추가 취소
+        for (const order of allKeptOrders) {
+          if (totalConsumed <= availableStock) break;
+          
+          order.keepOrder = false;
+          totalConsumed -= order.materialQuantity;
+          
+          // 해당 그룹의 카운트도 업데이트
+          const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+          const group = groupMap.get(key);
+          if (group) {
+            group.keepCount--;
+            group.cancelCount++;
+          }
+        }
+        
+        console.log(`공평 배분 - 미세조정 후 소모량: ${totalConsumed} (재고: ${availableStock})`);
+      }
+
+      // 7. 취소 대상 주문들을 '주문조정' 상태로 변경 (끝번호부터)
+      const cancelledOrderIds: string[] = [];
+      
+      // 취소할 주문들 수집 (순번 내림차순 - 끝번호부터)
+      const ordersToCancel: OrderWithMaterial[] = [];
+      for (const order of ordersWithMaterial) {
+        if (!order.keepOrder) {
+          ordersToCancel.push(order);
+        }
+      }
+      ordersToCancel.sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+      
+      // 상태 업데이트
+      for (const order of ordersToCancel) {
+        await db.update(pendingOrders)
+          .set({ 
+            status: "주문조정",
+            updatedAt: new Date()
+          })
+          .where(eq(pendingOrders.id, order.id));
+        cancelledOrderIds.push(order.id);
       }
 
       // SSE 알림
@@ -7173,19 +7242,27 @@ export async function registerRoutes(
         cancelledCount: cancelledOrderIds.length
       });
 
-      const usedStock = fullTotalRequired - deficit + remainingDeficit;
+      // 조정 결과 요약 (그룹별)
+      const adjustedGroups = Array.from(groupMap.values()).map(g => ({
+        memberId: g.memberId,
+        productCode: g.productCode,
+        originalCount: g.originalCount,
+        keepCount: g.keepCount,
+        cancelCount: g.cancelCount,
+        materialQuantity: g.materialQuantity
+      }));
 
       res.json({
         adjusted: true,
-        message: `${cancelledOrderIds.length}건의 주문이 조정되었습니다.`,
-        adjustedProducts,
+        message: `${cancelledOrderIds.length}건의 주문이 공평 배분 방식으로 조정되었습니다.`,
         cancelledOrderIds,
+        adjustedGroups,
         summary: {
           availableStock,
-          fullTotalRequired,
-          deficit,
-          remainingDeficit,
-          usedStock
+          totalRequired,
+          ratio: ratio.toFixed(4),
+          totalConsumedAfter: totalConsumed,
+          totalCancelled: cancelledOrderIds.length
         }
       });
     } catch (error: any) {
