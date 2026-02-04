@@ -229,6 +229,46 @@ export default function OrdersPendingPage() {
     ? productSummaries
     : productSummaries.slice((summaryCurrentPage - 1) * summaryPageSize, summaryCurrentPage * summaryPageSize);
 
+  const handleDownloadOrdersExcel = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({ title: "다운로드할 데이터가 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const excelData = filteredOrders.map((order, index) => ({
+      "순번": index + 1,
+      "상호명(업체명)": order.memberCompanyName || "",
+      "대분류": order.categoryLarge || "",
+      "중분류": order.categoryMedium || "",
+      "소분류": order.categorySmall || "",
+      "상품코드": order.productCode || "",
+      "상품명": order.productName || "",
+      "공급가": order.supplyPrice || 0,
+      "주문자명": order.ordererName || "",
+      "주문자 전화번호": order.ordererPhone || "",
+      "수령자명": order.recipientName || "",
+      "수령자휴대폰번호": order.recipientMobile || "",
+      "수령자 전화번호": order.recipientPhone || "",
+      "수령자 주소": order.recipientAddress || "",
+      "배송메시지": order.deliveryMessage || "",
+      "주문번호": order.orderNumber || "",
+      "자체주문번호": order.customOrderNumber || "",
+      "운송장번호": order.trackingNumber || "",
+      "택배사": order.courierCompany || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "주문대기목록");
+    
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const fileName = `주문대기_목록_${dateStr}.xlsx`;
+    
+    XLSX.writeFile(workbook, fileName);
+    toast({ title: "엑셀 다운로드 완료", description: `${fileName} 파일이 다운로드되었습니다.` });
+  }, [filteredOrders, toast]);
+
   const handleDownloadSummaryExcel = useCallback(() => {
     if (productSummaries.length === 0) {
       toast({ title: "다운로드할 데이터가 없습니다.", variant: "destructive" });
@@ -300,7 +340,13 @@ export default function OrdersPendingPage() {
 
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" data-testid="button-download-orders">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleDownloadOrdersExcel}
+                disabled={filteredOrders.length === 0}
+                data-testid="button-download-orders"
+              >
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>
