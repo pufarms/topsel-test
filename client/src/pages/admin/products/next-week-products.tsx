@@ -34,6 +34,11 @@ function formatDate(date: Date) {
   return `${y}.${m}.${d}(${days[date.getDay()]})`;
 }
 
+function roundUpToTen(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  return Math.ceil(value / 10) * 10;
+}
+
 const MIN_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 40, categoryLarge: 70, categoryMedium: 70, categorySmall: 70, weight: 60,
   productCode: 90, productName: 120, startPrice: 100, drivingPrice: 100, topPrice: 100, supplyStatus: 80,
@@ -259,7 +264,7 @@ export default function NextWeekProductsPage() {
     
     const headerRow = ["대분류", "중분류", "소분류", "중량(수량)", "상품코드", "상품명", "Start회원 공급가", "Driving회원 공급가", "Top회원 공급가", "공급상태"];
     
-    const dataRows = filteredProducts.map(p => [p.categoryLarge, p.categoryMedium, p.categorySmall, p.weight, p.productCode, p.productName, p.startPrice, p.drivingPrice, p.topPrice, p.supplyStatus === "supply" ? "공급" : "공급예정"]);
+    const dataRows = filteredProducts.map(p => [p.categoryLarge, p.categoryMedium, p.categorySmall, p.weight, p.productCode, p.productName, roundUpToTen(p.startPrice), roundUpToTen(p.drivingPrice), roundUpToTen(p.topPrice), p.supplyStatus === "supply" ? "공급" : "공급예정"]);
 
     const data = [
       ["차주 예상공급가"],
@@ -442,9 +447,9 @@ export default function NextWeekProductsPage() {
                               </div>
                             ) :
                             col === "productName" ? product.productName :
-                            col === "startPrice" ? product.startPrice?.toLocaleString() :
-                            col === "drivingPrice" ? product.drivingPrice?.toLocaleString() :
-                            col === "topPrice" ? product.topPrice?.toLocaleString() :
+                            col === "startPrice" ? roundUpToTen(product.startPrice)?.toLocaleString() :
+                            col === "drivingPrice" ? roundUpToTen(product.drivingPrice)?.toLocaleString() :
+                            col === "topPrice" ? roundUpToTen(product.topPrice)?.toLocaleString() :
                             col === "supplyStatus" ? (
                               <Badge variant={product.supplyStatus === "supply" ? "default" : "secondary"} className={product.supplyStatus === "supply" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
                                 {product.supplyStatus === "supply" ? "공급" : "공급예정"}

@@ -612,17 +612,17 @@ export default function ProductRegistrationPage() {
       updated.sourceProductTotal = sourceProductTotal;
       updated.totalCost = totalCost;
       
-      // 공급가 재계산 (10원 단위 올림)
+      // 공급가 재계산 (1원 단위)
       if (updated.startMarginRate != null) {
-        updated.startPrice = Math.ceil(totalCost * (1 + updated.startMarginRate / 100) / 10) * 10;
+        updated.startPrice = Math.round(totalCost * (1 + updated.startMarginRate / 100));
         updated.startMargin = updated.startPrice - totalCost;
       }
       if (updated.drivingMarginRate != null) {
-        updated.drivingPrice = Math.ceil(totalCost * (1 + updated.drivingMarginRate / 100) / 10) * 10;
+        updated.drivingPrice = Math.round(totalCost * (1 + updated.drivingMarginRate / 100));
         updated.drivingMargin = updated.drivingPrice - totalCost;
       }
       if (updated.topMarginRate != null) {
-        updated.topPrice = Math.ceil(totalCost * (1 + updated.topMarginRate / 100) / 10) * 10;
+        updated.topPrice = Math.round(totalCost * (1 + updated.topMarginRate / 100));
         updated.topMargin = updated.topPrice - totalCost;
       }
       
@@ -631,7 +631,7 @@ export default function ProductRegistrationPage() {
 
     toast({ 
       title: "공급가 재계산 완료", 
-      description: `${targetIds.length}개 상품의 공급가가 10원 단위로 재계산되었습니다` 
+      description: `${targetIds.length}개 상품의 공급가가 재계산되었습니다` 
     });
   };
 
@@ -682,15 +682,15 @@ export default function ProductRegistrationPage() {
         merged.totalCost = totalCost;
         
         if (merged.startMarginRate != null) {
-          merged.startPrice = Math.ceil(totalCost * (1 + merged.startMarginRate / 100) / 10) * 10;
+          merged.startPrice = Math.round(totalCost * (1 + merged.startMarginRate / 100));
           merged.startMargin = merged.startPrice - totalCost;
         }
         if (merged.drivingMarginRate != null) {
-          merged.drivingPrice = Math.ceil(totalCost * (1 + merged.drivingMarginRate / 100) / 10) * 10;
+          merged.drivingPrice = Math.round(totalCost * (1 + merged.drivingMarginRate / 100));
           merged.drivingMargin = merged.drivingPrice - totalCost;
         }
         if (merged.topMarginRate != null) {
-          merged.topPrice = Math.ceil(totalCost * (1 + merged.topMarginRate / 100) / 10) * 10;
+          merged.topPrice = Math.round(totalCost * (1 + merged.topMarginRate / 100));
           merged.topMargin = merged.topPrice - totalCost;
         }
         
@@ -848,15 +848,15 @@ export default function ProductRegistrationPage() {
     p.totalCost = totalCost;
     
     if (p.startMarginRate != null) {
-      p.startPrice = Math.ceil(totalCost * (1 + p.startMarginRate / 100) / 10) * 10;
+      p.startPrice = Math.round(totalCost * (1 + p.startMarginRate / 100));
       p.startMargin = p.startPrice - totalCost;
     }
     if (p.drivingMarginRate != null) {
-      p.drivingPrice = Math.ceil(totalCost * (1 + p.drivingMarginRate / 100) / 10) * 10;
+      p.drivingPrice = Math.round(totalCost * (1 + p.drivingMarginRate / 100));
       p.drivingMargin = p.drivingPrice - totalCost;
     }
     if (p.topMarginRate != null) {
-      p.topPrice = Math.ceil(totalCost * (1 + p.topMarginRate / 100) / 10) * 10;
+      p.topPrice = Math.round(totalCost * (1 + p.topMarginRate / 100));
       p.topMargin = p.topPrice - totalCost;
     }
     
