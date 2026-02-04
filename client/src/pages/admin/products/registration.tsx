@@ -576,6 +576,65 @@ export default function ProductRegistrationPage() {
     setBulkTopMargin("");
   };
 
+  // 공급가 재계산 (10원 단위 올림 적용)
+  const handleRecalculatePrices = () => {
+    const targetIds = selectedIds.length > 0 ? selectedIds : products.map(p => p.id);
+    if (targetIds.length === 0) {
+      toast({ variant: "destructive", title: "오류", description: "재계산할 상품이 없습니다" });
+      return;
+    }
+
+    setProducts(prev => prev.map(p => {
+      if (!targetIds.includes(p.id)) return p;
+
+      const updated = { ...p };
+      
+      // 총원가 계산
+      const sourcePrice = updated.sourcePrice || 0;
+      const lossRate = updated.lossRate || 0;
+      const sourceWeight = updated.sourceWeight || 0;
+      const weight = parseFloat(String(updated.weight)) || 0;
+      
+      const priceAfterLoss = sourcePrice * (1 + lossRate / 100);
+      const unitPrice = sourceWeight > 0 ? Math.round(priceAfterLoss / sourceWeight) : 0;
+      const sourceProductTotal = Math.round(unitPrice * weight);
+      
+      const boxCost = updated.boxCost || 0;
+      const materialCost = updated.materialCost || 0;
+      const outerBoxCost = updated.outerBoxCost || 0;
+      const wrappingCost = updated.wrappingCost || 0;
+      const laborCost = updated.laborCost || 0;
+      const shippingCost = updated.shippingCost || 0;
+      
+      const totalCost = sourceProductTotal + boxCost + materialCost + outerBoxCost + wrappingCost + laborCost + shippingCost;
+      
+      updated.unitPrice = unitPrice;
+      updated.sourceProductTotal = sourceProductTotal;
+      updated.totalCost = totalCost;
+      
+      // 공급가 재계산 (10원 단위 올림)
+      if (updated.startMarginRate != null) {
+        updated.startPrice = Math.ceil(totalCost * (1 + updated.startMarginRate / 100) / 10) * 10;
+        updated.startMargin = updated.startPrice - totalCost;
+      }
+      if (updated.drivingMarginRate != null) {
+        updated.drivingPrice = Math.ceil(totalCost * (1 + updated.drivingMarginRate / 100) / 10) * 10;
+        updated.drivingMargin = updated.drivingPrice - totalCost;
+      }
+      if (updated.topMarginRate != null) {
+        updated.topPrice = Math.ceil(totalCost * (1 + updated.topMarginRate / 100) / 10) * 10;
+        updated.topMargin = updated.topPrice - totalCost;
+      }
+      
+      return updated;
+    }));
+
+    toast({ 
+      title: "공급가 재계산 완료", 
+      description: `${targetIds.length}개 상품의 공급가가 10원 단위로 재계산되었습니다` 
+    });
+  };
+
   const handleBulkApply = () => {
     if (selectedIds.length === 0) {
       toast({ variant: "destructive", title: "오류", description: "상품을 선택해주세요" });
@@ -1344,6 +1403,10 @@ export default function ProductRegistrationPage() {
             <Button size="sm" onClick={handleBulkApply} disabled={bulkUpdateMutation.isPending} className="h-7 text-xs" data-testid="button-bulk-apply">
               {bulkUpdateMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
               선택한 상품에 일괄 적용
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleRecalculatePrices} className="h-7 text-xs" data-testid="button-recalculate-prices">
+              <Calculator className="h-3 w-3 mr-1" />
+              공급가 재계산
             </Button>
             <Button size="sm" variant="secondary" onClick={handleDownloadList} className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-download-list">
               <Download className="h-3 w-3 mr-1" />
