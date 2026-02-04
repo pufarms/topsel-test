@@ -19,6 +19,7 @@ import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterSt
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 export default function OrdersPendingPage() {
   const { toast } = useToast();
@@ -227,6 +228,40 @@ export default function OrdersPendingPage() {
   const displayedSummaries = summaryPageSize === "all"
     ? productSummaries
     : productSummaries.slice((summaryCurrentPage - 1) * summaryPageSize, summaryCurrentPage * summaryPageSize);
+
+  const handleDownloadSummaryExcel = useCallback(() => {
+    if (productSummaries.length === 0) {
+      toast({ title: "다운로드할 데이터가 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const excelData = productSummaries.map((product, index) => {
+      const row: Record<string, string | number> = {
+        "순번": index + 1,
+        "상품코드": product.productCode,
+        "상품명": product.productName,
+        "주문합계": product.totalQuantity,
+      };
+      
+      uniqueCompanies.forEach(company => {
+        const companyData = product.companyQuantities.get(company.id);
+        row[company.name] = companyData ? companyData.quantity : 0;
+      });
+      
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "상품별합계");
+    
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const fileName = `주문대기_상품별합계_${dateStr}.xlsx`;
+    
+    XLSX.writeFile(workbook, fileName);
+    toast({ title: "엑셀 다운로드 완료", description: `${fileName} 파일이 다운로드되었습니다.` });
+  }, [productSummaries, uniqueCompanies, toast]);
 
   return (
     <div className="space-y-6">
@@ -458,9 +493,21 @@ export default function OrdersPendingPage() {
           />
 
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-sm text-muted-foreground">
-              {displayedSummaries.length} / {productSummaries.length}개 상품
-            </span>
+            <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleDownloadSummaryExcel}
+                disabled={productSummaries.length === 0}
+                data-testid="button-download-summary-excel"
+              >
+                <FileDown className="h-4 w-4 mr-1" />
+                엑셀 다운로드
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {displayedSummaries.length} / {productSummaries.length}개 상품
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm">표시 개수:</span>
               <select 
