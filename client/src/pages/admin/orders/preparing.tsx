@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from "lucide-react";
+import { FileDown, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,23 +54,10 @@ export default function OrdersPreparingPage() {
   const [showRestoreSelectedDialog, setShowRestoreSelectedDialog] = useState(false);
   const [showRestoreAllDialog, setShowRestoreAllDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte">("default");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
-  });
-
-  const deleteSelectedMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await apiRequest("DELETE", "/api/admin/pending-orders", { ids });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
-      setSelectedOrders([]);
-      toast({ title: "선택한 주문이 삭제되었습니다." });
-    },
-    onError: () => {
-      toast({ title: "삭제 실패", description: "주문 삭제 중 오류가 발생했습니다.", variant: "destructive" });
-    },
   });
 
   const restoreToWaitingMutation = useMutation({
@@ -210,26 +197,21 @@ export default function OrdersPreparingPage() {
             <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" disabled={isDownloading} data-testid="button-download-orders">
-                    {isDownloading ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <FileDown className="h-4 w-4 mr-1" />
-                    )}
-                    엑셀 다운로드
+                  <Button size="sm" variant="outline" data-testid="button-select-format">
+                    다운양식선택: {downloadFormat === "lotte" ? "롯데 양식" : "기본 양식"}
                     <ChevronDown className="h-4 w-4 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem 
-                    onClick={() => handleDownload("default")}
-                    data-testid="menu-download-default"
+                    onClick={() => setDownloadFormat("default")}
+                    data-testid="menu-format-default"
                   >
                     기본 양식
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => handleDownload("lotte")}
-                    data-testid="menu-download-lotte"
+                    onClick={() => setDownloadFormat("lotte")}
+                    data-testid="menu-format-lotte"
                   >
                     롯데 양식
                   </DropdownMenuItem>
@@ -237,17 +219,17 @@ export default function OrdersPreparingPage() {
               </DropdownMenu>
               <Button
                 size="sm"
-                variant="destructive"
-                disabled={selectedOrders.length === 0 || deleteSelectedMutation.isPending}
-                onClick={() => {
-                  if (confirm(`선택한 ${selectedOrders.length}건의 주문을 삭제하시겠습니까?`)) {
-                    deleteSelectedMutation.mutate(selectedOrders);
-                  }
-                }}
-                data-testid="button-delete-selected"
+                variant="default"
+                disabled={isDownloading}
+                onClick={() => handleDownload(downloadFormat)}
+                data-testid="button-download-orders"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
-                선택 삭제 ({selectedOrders.length})
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-1" />
+                )}
+                다운로드
               </Button>
               <Button
                 size="sm"
