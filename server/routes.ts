@@ -6326,6 +6326,7 @@ export async function registerRoutes(
 
       // 재고 복구 로직: 상품준비중/배송준비중/배송중에서 대기/취소/주문조정으로 변경되는 경우
       // 중요: 실제로 상태가 변경될 때만 재고 조정 (멱등성 보장)
+      // 중요: 원자적(atomic) SQL 연산 사용으로 race condition 방지
       const stockDeductedStatuses = ["상품준비중", "배송준비중", "배송중"];
       const stockNotDeductedStatuses = ["대기", "취소", "주문조정"];
       const currentStatus = currentOrder.status || "";
@@ -6334,21 +6335,18 @@ export async function registerRoutes(
           status !== currentStatus &&  // 실제 상태 변경인 경우만
           stockDeductedStatuses.includes(currentStatus) &&
           stockNotDeductedStatuses.includes(status)) {
-        // 재고 복구
+        // 재고 복구 - 원자적 SQL 연산 사용 (race condition 방지)
         const productCode = currentOrder.productCode || "";
         if (productCode) {
           const mappings = await storage.getProductMaterialMappings(productCode);
           for (const mapping of mappings) {
-            const material = await storage.getMaterialByCode(mapping.materialCode);
-            if (material) {
-              const newStock = material.currentStock + mapping.quantity;
-              await db.update(materials)
-                .set({ 
-                  currentStock: newStock,
-                  updatedAt: new Date()
-                })
-                .where(eq(materials.materialCode, mapping.materialCode));
-            }
+            // 원자적 증가: currentStock = currentStock + quantity
+            await db.update(materials)
+              .set({ 
+                currentStock: sql`${materials.currentStock} + ${mapping.quantity}`,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, mapping.materialCode));
           }
           console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 복구 완료: ${productCode}`);
         }
@@ -6359,21 +6357,18 @@ export async function registerRoutes(
           status !== currentStatus &&  // 실제 상태 변경인 경우만
           stockNotDeductedStatuses.includes(currentStatus) &&
           status === "상품준비중") {
-        // 재고 차감
+        // 재고 차감 - 원자적 SQL 연산 사용 (race condition 방지)
         const productCode = currentOrder.productCode || "";
         if (productCode) {
           const mappings = await storage.getProductMaterialMappings(productCode);
           for (const mapping of mappings) {
-            const material = await storage.getMaterialByCode(mapping.materialCode);
-            if (material) {
-              const newStock = Math.max(0, material.currentStock - mapping.quantity);
-              await db.update(materials)
-                .set({ 
-                  currentStock: newStock,
-                  updatedAt: new Date()
-                })
-                .where(eq(materials.materialCode, mapping.materialCode));
-            }
+            // 원자적 감소: currentStock = GREATEST(0, currentStock - quantity)
+            await db.update(materials)
+              .set({ 
+                currentStock: sql`GREATEST(0, ${materials.currentStock} - ${mapping.quantity})`,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, mapping.materialCode));
           }
           console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 차감 완료: ${productCode}`);
         }
@@ -6459,19 +6454,16 @@ export async function registerRoutes(
           }
         }
 
+        // 원자적 SQL 연산으로 재고 복구 (race condition 방지)
         for (const [materialCode, restoreAmount] of Object.entries(materialRestorations)) {
-          const material = await storage.getMaterialByCode(materialCode);
-          if (material) {
-            const newStock = material.currentStock + restoreAmount;
-            await db.update(materials)
-              .set({ 
-                currentStock: newStock,
-                updatedAt: new Date()
-              })
-              .where(eq(materials.materialCode, materialCode));
-          }
+          await db.update(materials)
+            .set({ 
+              currentStock: sql`${materials.currentStock} + ${restoreAmount}`,
+              updatedAt: new Date()
+            })
+            .where(eq(materials.materialCode, materialCode));
         }
-        console.log(`재고 복구 완료: ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
+        console.log(`재고 복구 완료 (원자적 연산): ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
       }
 
       const deleted = await db.delete(pendingOrders)
@@ -6540,19 +6532,16 @@ export async function registerRoutes(
           }
         }
 
+        // 원자적 SQL 연산으로 재고 복구 (race condition 방지)
         for (const [materialCode, restoreAmount] of Object.entries(materialRestorations)) {
-          const material = await storage.getMaterialByCode(materialCode);
-          if (material) {
-            const newStock = material.currentStock + restoreAmount;
-            await db.update(materials)
-              .set({ 
-                currentStock: newStock,
-                updatedAt: new Date()
-              })
-              .where(eq(materials.materialCode, materialCode));
-          }
+          await db.update(materials)
+            .set({ 
+              currentStock: sql`${materials.currentStock} + ${restoreAmount}`,
+              updatedAt: new Date()
+            })
+            .where(eq(materials.materialCode, materialCode));
         }
-        console.log(`전체 삭제 - 재고 복구 완료: ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
+        console.log(`전체 삭제 - 재고 복구 완료 (원자적 연산): ${Object.keys(materialRestorations).length}개 원재료, ${ordersForStockRestore.length}건 주문`);
       }
 
       const deleted = await db.delete(pendingOrders).returning();
@@ -6608,18 +6597,15 @@ export async function registerRoutes(
         if (productCode) {
           const mappings = await storage.getProductMaterialMappings(productCode);
           for (const mapping of mappings) {
-            const material = await storage.getMaterialByCode(mapping.materialCode);
-            if (material) {
-              const newStock = material.currentStock + mapping.quantity;
-              await db.update(materials)
-                .set({ 
-                  currentStock: newStock,
-                  updatedAt: new Date()
-                })
-                .where(eq(materials.materialCode, mapping.materialCode));
-            }
+            // 원자적 SQL 연산 사용 (race condition 방지)
+            await db.update(materials)
+              .set({ 
+                currentStock: sql`${materials.currentStock} + ${mapping.quantity}`,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, mapping.materialCode));
           }
-          console.log(`단일 주문 삭제 - 재고 복구 완료: ${productCode}`);
+          console.log(`단일 주문 삭제 - 재고 복구 완료 (원자적 연산): ${productCode}`);
         }
       }
 
@@ -7436,18 +7422,14 @@ export async function registerRoutes(
         }
       }
 
-      // 3. 원재료 재고 차감 실행
+      // 3. 원재료 재고 차감 실행 - 원자적 SQL 연산 사용 (race condition 방지)
       for (const [materialCode, deductionAmount] of Object.entries(materialDeductions)) {
-        const material = await storage.getMaterialByCode(materialCode);
-        if (material) {
-          const newStock = Math.max(0, material.currentStock - deductionAmount);
-          await db.update(materials)
-            .set({ 
-              currentStock: newStock,
-              updatedAt: new Date()
-            })
-            .where(eq(materials.materialCode, materialCode));
-        }
+        await db.update(materials)
+          .set({ 
+            currentStock: sql`GREATEST(0, ${materials.currentStock} - ${deductionAmount})`,
+            updatedAt: new Date()
+          })
+          .where(eq(materials.materialCode, materialCode));
       }
 
       console.log(`재고 차감 완료: ${Object.keys(materialDeductions).length}개 원재료, 총 ${ordersToTransfer.length}건 주문`);
