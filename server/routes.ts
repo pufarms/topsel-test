@@ -6795,9 +6795,11 @@ export async function registerRoutes(
         const mapping = productMaterialMap[productCode];
         if (!mapping || mapping.materials.length === 0) continue;
 
-        // 첫 번째 원재료만 사용 (주요 원재료)
-        // TODO: 여러 원재료가 있는 경우 로직 확장 가능
-        const primaryMaterial = mapping.materials[0];
+        // 원물(raw) 또는 반재료(semi)만 사용 - 부재료(auxiliary)는 제외
+        // 상품은 원물 단독 또는 반재료+부재료로 구성됨
+        const primaryMaterial = mapping.materials.find(m => 
+          m.materialType === 'raw' || m.materialType === 'semi'
+        );
         if (!primaryMaterial) continue;
 
         const materialKey = `${primaryMaterial.materialCode}_${primaryMaterial.materialName}`;
