@@ -13,7 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -35,6 +45,8 @@ export default function OrdersPreparingPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showRestoreSelectedDialog, setShowRestoreSelectedDialog] = useState(false);
+  const [showRestoreAllDialog, setShowRestoreAllDialog] = useState(false);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -51,6 +63,28 @@ export default function OrdersPreparingPage() {
     },
     onError: () => {
       toast({ title: "삭제 실패", description: "주문 삭제 중 오류가 발생했습니다.", variant: "destructive" });
+    },
+  });
+
+  const restoreToWaitingMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.all(
+        ids.map(id => 
+          apiRequest("PATCH", `/api/admin/pending-orders/${id}`, { status: "대기" })
+        )
+      );
+      return results;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ 
+        title: "주문대기 복구 완료", 
+        description: `${variables.length}건의 주문이 주문대기 상태로 복구되었습니다. 재고도 복구되었습니다.` 
+      });
+    },
+    onError: () => {
+      toast({ title: "복구 실패", description: "주문 복구 중 오류가 발생했습니다.", variant: "destructive" });
     },
   });
 
@@ -96,6 +130,17 @@ export default function OrdersPreparingPage() {
     }
   };
 
+  const handleRestoreSelected = () => {
+    setShowRestoreSelectedDialog(false);
+    restoreToWaitingMutation.mutate(selectedOrders);
+  };
+
+  const handleRestoreAll = () => {
+    setShowRestoreAllDialog(false);
+    const allIds = filteredOrders.map(o => o.id);
+    restoreToWaitingMutation.mutate(allIds);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -133,6 +178,30 @@ export default function OrdersPreparingPage() {
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 선택 삭제 ({selectedOrders.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={selectedOrders.length === 0 || restoreToWaitingMutation.isPending}
+                onClick={() => setShowRestoreSelectedDialog(true)}
+                data-testid="button-restore-selected"
+              >
+                {restoreToWaitingMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                )}
+                선택 복구 ({selectedOrders.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={filteredOrders.length === 0 || restoreToWaitingMutation.isPending}
+                onClick={() => setShowRestoreAllDialog(true)}
+                data-testid="button-restore-all"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                필터 전체 복구 ({filteredOrders.length})
               </Button>
               <span className="text-sm text-muted-foreground">
                 {displayedOrders.length} / {filteredOrders.length}건
@@ -267,6 +336,54 @@ export default function OrdersPreparingPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={showRestoreSelectedDialog} onOpenChange={setShowRestoreSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택 주문 복구</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedOrders.length}건의 주문을 주문대기 상태로 복구하시겠습니까?
+              <br /><br />
+              <strong>복구 시 발생하는 변경사항:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>주문 상태가 "상품준비중" → "대기"로 변경됩니다.</li>
+                <li>해당 주문의 원재료 재고가 자동으로 복구됩니다.</li>
+                <li>복구된 주문은 다시 주문조정 단계를 거쳐야 합니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-restore-selected-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestoreSelected} data-testid="button-restore-selected-confirm">
+              복구 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRestoreAllDialog} onOpenChange={setShowRestoreAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>전체 주문 복구</AlertDialogTitle>
+            <AlertDialogDescription>
+              현재 목록의 {filteredOrders.length}건의 주문을 모두 주문대기 상태로 복구하시겠습니까?
+              <br /><br />
+              <strong>복구 시 발생하는 변경사항:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>모든 주문 상태가 "상품준비중" → "대기"로 변경됩니다.</li>
+                <li>모든 주문의 원재료 재고가 자동으로 복구됩니다.</li>
+                <li>복구된 주문은 다시 주문조정 단계를 거쳐야 합니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-restore-all-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestoreAll} data-testid="button-restore-all-confirm">
+              전체 복구 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
