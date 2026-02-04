@@ -258,20 +258,20 @@ export default function OrdersAdminCancelPage() {
           )}
 
           <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
-            <Table className="w-full table-fixed">
+            <Table className="min-w-[1400px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
-                  <TableHead className="w-[140px]">재료명(원물,반재료)</TableHead>
-                  <TableHead className="w-[100px]">상품코드</TableHead>
-                  <TableHead className="w-[240px]">상품명</TableHead>
-                  <TableHead className="w-[70px] text-center">주문조정<br/>선택</TableHead>
-                  <TableHead className="w-[60px] text-center">주문<br/>합계</TableHead>
-                  <TableHead className="w-[60px] text-center">원재료</TableHead>
-                  <TableHead className="w-[70px] text-center">해당<br/>원재료<br/>합계</TableHead>
-                  <TableHead className="w-[90px] text-center">원재료 재고<br/>(원물,반재료)</TableHead>
-                  <TableHead className="w-[80px] text-center">재고합산<br/>(잔여재고)</TableHead>
-                  <TableHead className="w-[100px] text-center">대체 원재료</TableHead>
-                  <TableHead className="w-[70px] text-center">대체<br/>원재료<br/>재고</TableHead>
+                  <TableHead className="min-w-[160px] whitespace-nowrap">재료명(원물,반재료)</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">상품코드</TableHead>
+                  <TableHead className="min-w-[280px] whitespace-nowrap">상품명</TableHead>
+                  <TableHead className="min-w-[80px] text-center whitespace-nowrap">주문조정<br/>선택</TableHead>
+                  <TableHead className="min-w-[70px] text-center whitespace-nowrap">주문<br/>합계</TableHead>
+                  <TableHead className="min-w-[70px] text-center whitespace-nowrap">원재료</TableHead>
+                  <TableHead className="min-w-[90px] text-center whitespace-nowrap">해당<br/>원재료 합계</TableHead>
+                  <TableHead className="min-w-[120px] text-center whitespace-nowrap">원재료 재고<br/>(원물,반재료)</TableHead>
+                  <TableHead className="min-w-[100px] text-center whitespace-nowrap">재고합산<br/>(잔여재고)</TableHead>
+                  <TableHead className="min-w-[120px] text-center whitespace-nowrap">대체 원재료</TableHead>
+                  <TableHead className="min-w-[90px] text-center whitespace-nowrap">대체<br/>원재료 재고</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,7 +297,7 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="font-medium align-middle border-r bg-muted/30 text-sm"
+                            className="font-medium align-middle border-r bg-muted/30 text-sm min-w-[160px]"
                           >
                             {group.materialName}
                             <div className="text-xs text-muted-foreground mt-1">
@@ -305,8 +305,8 @@ export default function OrdersAdminCancelPage() {
                             </div>
                           </TableCell>
                         )}
-                        <TableCell className="font-mono text-xs">{product.productCode}</TableCell>
-                        <TableCell className="text-sm truncate" title={product.productName}>{product.productName}</TableCell>
+                        <TableCell className="font-mono text-xs min-w-[120px]">{product.productCode}</TableCell>
+                        <TableCell className="text-sm min-w-[280px]">{product.productName}</TableCell>
                         <TableCell className="text-center">
                           <Checkbox
                             checked={isProductSelected(group.materialCode, product.productCode)}
