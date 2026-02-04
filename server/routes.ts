@@ -2553,6 +2553,9 @@ export async function registerRoutes(
     let created = 0;
     let updated = 0;
     
+    // 10원 단위 올림 함수
+    const roundUpToTen = (value: number) => Math.ceil(value / 10) * 10;
+    
     for (const pr of validProducts) {
       const existing = await storage.getNextWeekProductByCode(pr.productCode);
       
@@ -2563,9 +2566,9 @@ export async function registerRoutes(
         categoryMedium: pr.categoryMedium,
         categorySmall: pr.categorySmall,
         weight: pr.weight,
-        startPrice: pr.startPrice!,
-        drivingPrice: pr.drivingPrice!,
-        topPrice: pr.topPrice!,
+        startPrice: roundUpToTen(pr.startPrice!),
+        drivingPrice: roundUpToTen(pr.drivingPrice!),
+        topPrice: roundUpToTen(pr.topPrice!),
         supplyStatus: "supply" as const,
       };
       
@@ -2683,6 +2686,9 @@ export async function registerRoutes(
     let created = 0;
     let updated = 0;
     
+    // 10원 단위 올림 함수 (이미 예상공급가에서 올림되었지만 안전하게 한번 더 적용)
+    const roundUpToTen = (value: number) => Math.ceil(value / 10) * 10;
+    
     for (const product of validProducts) {
       const existing = await storage.getCurrentProductByCode(product.productCode);
       const productData = {
@@ -2692,9 +2698,9 @@ export async function registerRoutes(
         categoryMedium: product.categoryMedium,
         categorySmall: product.categorySmall,
         weight: product.weight,
-        startPrice: product.startPrice,
-        drivingPrice: product.drivingPrice,
-        topPrice: product.topPrice,
+        startPrice: roundUpToTen(product.startPrice),
+        drivingPrice: roundUpToTen(product.drivingPrice),
+        topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
         appliedAt: new Date(),
       };
@@ -2771,6 +2777,9 @@ export async function registerRoutes(
     let created = 0;
     let updated = 0;
     
+    // 10원 단위 올림 함수 (이미 예상공급가에서 올림되었지만 안전하게 한번 더 적용)
+    const roundUpToTen = (value: number) => Math.ceil(value / 10) * 10;
+    
     for (const product of validProducts) {
       const existing = await storage.getCurrentProductByCode(product.productCode);
       const productData = {
@@ -2780,9 +2789,9 @@ export async function registerRoutes(
         categoryMedium: product.categoryMedium,
         categorySmall: product.categorySmall,
         weight: product.weight,
-        startPrice: product.startPrice,
-        drivingPrice: product.drivingPrice,
-        topPrice: product.topPrice,
+        startPrice: roundUpToTen(product.startPrice),
+        drivingPrice: roundUpToTen(product.drivingPrice),
+        topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
         appliedAt: new Date(),
       };
