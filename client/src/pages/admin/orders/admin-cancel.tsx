@@ -561,6 +561,37 @@ export default function OrdersAdminCancelPage() {
     toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
 
+  const handleDownloadOrdersExcel = () => {
+    if (filteredOrders.length === 0) {
+      toast({ title: "다운로드 실패", description: "다운로드할 주문이 없습니다.", variant: "destructive" });
+      return;
+    }
+
+    const rows = filteredOrders.map((order, index) => ({
+      "순번": index + 1,
+      "상호명": order.memberCompanyName || "",
+      "대분류": order.categoryLarge || "",
+      "중분류": order.categoryMedium || "",
+      "소분류": order.categorySmall || "",
+      "상품코드": order.productCode || "",
+      "상품명": order.productName || "",
+      "공급가": order.supplyPrice || 0,
+      "수취인명": order.recipientName || "",
+      "수취인 휴대폰": order.recipientMobile || "",
+      "수취인 전화": order.recipientPhone || "",
+      "수취인 주소": order.recipientAddress || "",
+      "배송메시지": order.deliveryMessage || "",
+      "자체주문번호": order.customOrderNumber || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "주문조정 내역");
+    XLSX.writeFile(wb, `주문조정_직권취소_내역_${new Date().toISOString().split("T")[0]}.xlsx`);
+    
+    toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
+  };
+
   const deficitGroups = adjustmentData.filter(g => g.isDeficit);
 
   return (
@@ -937,7 +968,7 @@ export default function OrdersAdminCancelPage() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" data-testid="button-download-orders">
+              <Button size="sm" variant="outline" onClick={handleDownloadOrdersExcel} data-testid="button-download-orders">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>
