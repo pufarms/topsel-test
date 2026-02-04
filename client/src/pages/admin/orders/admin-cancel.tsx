@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -13,12 +14,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, AlertTriangle } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { FileDown, Loader2, AlertTriangle, Search, Check, X } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PendingOrder } from "@shared/schema";
+import type { PendingOrder, Material } from "@shared/schema";
 import * as XLSX from "xlsx";
 
 interface MaterialProduct {
@@ -43,6 +57,15 @@ interface MaterialGroup {
   products: MaterialProduct[];
 }
 
+interface AlternateSelection {
+  materialCode: string;
+  alternateMaterialCode: string;
+  alternateMaterialName: string;
+  alternateMaterialStock: number;
+  alternateQuantity: number;
+  useAlternate: boolean;
+}
+
 export default function OrdersAdminCancelPage() {
   const { toast } = useToast();
   useSSE();
@@ -57,6 +80,8 @@ export default function OrdersAdminCancelPage() {
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<{materialCode: string; productCode: string}[]>([]);
+  const [alternateSelections, setAlternateSelections] = useState<Map<string, AlternateSelection>>(new Map());
+  const [openPopovers, setOpenPopovers] = useState<Map<string, boolean>>(new Map());
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders"],
@@ -65,6 +90,14 @@ export default function OrdersAdminCancelPage() {
   const { data: adjustmentData = [], isLoading: isLoadingAdjustment } = useQuery<MaterialGroup[]>({
     queryKey: ["/api/admin/order-adjustment-stock"],
   });
+
+  const { data: allMaterials = [] } = useQuery<Material[]>({
+    queryKey: ["/api/materials"],
+  });
+
+  const rawSemiMaterials = useMemo(() => {
+    return allMaterials.filter(m => m.materialType === "raw" || m.materialType === "semi");
+  }, [allMaterials]);
 
   const adminCancelledOrders = allOrders.filter(o => o.status === "주문조정");
 
@@ -89,6 +122,7 @@ export default function OrdersAdminCancelPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       setSelectedProducts([]);
       toast({ 
         title: "주문조정 완료", 
@@ -98,6 +132,31 @@ export default function OrdersAdminCancelPage() {
     onError: (error: any) => {
       toast({ 
         title: "주문조정 실패", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const executeAlternateShipmentMutation = useMutation({
+    mutationFn: async (data: { 
+      materialCode: string; 
+      alternateMaterialCode: string;
+      alternateQuantity: number;
+    }) => {
+      return await apiRequest("POST", "/api/admin/alternate-shipment-execute", data);
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      toast({ 
+        title: "대체발송 완료", 
+        description: result.message 
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "대체발송 실패", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -134,6 +193,69 @@ export default function OrdersAdminCancelPage() {
     return selectedProducts.some(p => p.materialCode === materialCode && p.productCode === productCode);
   };
 
+  const handleAlternateCheck = (materialCode: string, checked: boolean) => {
+    const newSelections = new Map(alternateSelections);
+    const existing = newSelections.get(materialCode);
+    if (existing) {
+      newSelections.set(materialCode, { ...existing, useAlternate: checked });
+    } else {
+      newSelections.set(materialCode, {
+        materialCode,
+        alternateMaterialCode: "",
+        alternateMaterialName: "",
+        alternateMaterialStock: 0,
+        alternateQuantity: 0,
+        useAlternate: checked,
+      });
+    }
+    setAlternateSelections(newSelections);
+  };
+
+  const handleSelectAlternateMaterial = (materialCode: string, material: Material) => {
+    const newSelections = new Map(alternateSelections);
+    const existing = newSelections.get(materialCode);
+    newSelections.set(materialCode, {
+      materialCode,
+      alternateMaterialCode: material.materialCode,
+      alternateMaterialName: material.materialName,
+      alternateMaterialStock: material.currentStock,
+      alternateQuantity: existing?.alternateQuantity || 0,
+      useAlternate: existing?.useAlternate || true,
+    });
+    setAlternateSelections(newSelections);
+    
+    const newPopovers = new Map(openPopovers);
+    newPopovers.set(materialCode, false);
+    setOpenPopovers(newPopovers);
+  };
+
+  const handleClearAlternateMaterial = (materialCode: string) => {
+    const newSelections = new Map(alternateSelections);
+    newSelections.delete(materialCode);
+    setAlternateSelections(newSelections);
+  };
+
+  const handleAlternateQuantityChange = (materialCode: string, quantity: number) => {
+    const newSelections = new Map(alternateSelections);
+    const existing = newSelections.get(materialCode);
+    if (existing) {
+      newSelections.set(materialCode, { ...existing, alternateQuantity: quantity });
+      setAlternateSelections(newSelections);
+    }
+  };
+
+  const getAdjustedRemainingStock = (group: MaterialGroup): number => {
+    const selection = alternateSelections.get(group.materialCode);
+    if (selection && selection.useAlternate && selection.alternateQuantity > 0) {
+      return group.remainingStock + selection.alternateQuantity;
+    }
+    return group.remainingStock;
+  };
+
+  const isStillDeficit = (group: MaterialGroup): boolean => {
+    return getAdjustedRemainingStock(group) < 0;
+  };
+
   const handleExecuteAdjustment = async () => {
     if (selectedProducts.length === 0) return;
     
@@ -145,7 +267,7 @@ export default function OrdersAdminCancelPage() {
 
     for (const materialCode of materialCodes) {
       const group = adjustmentData.find(g => g.materialCode === materialCode);
-      if (group && group.isDeficit) {
+      if (group && isStillDeficit(group)) {
         const selectedProductCodes = selectedProducts
           .filter(p => p.materialCode === materialCode)
           .map(p => p.productCode);
@@ -162,6 +284,37 @@ export default function OrdersAdminCancelPage() {
         }
       }
     }
+  };
+
+  const handleExecuteAlternateShipment = async (materialCode: string) => {
+    const selection = alternateSelections.get(materialCode);
+    if (!selection || !selection.alternateMaterialCode || selection.alternateQuantity <= 0) {
+      toast({
+        title: "입력 오류",
+        description: "대체 원재료와 수량을 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selection.alternateQuantity > selection.alternateMaterialStock) {
+      toast({
+        title: "재고 부족",
+        description: "대체 수량이 대체 원재료 재고보다 많습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`${selection.alternateMaterialName}에서 ${selection.alternateQuantity}만큼 대체발송 하시겠습니까?\n\n해당 원재료의 재고가 차감됩니다.`)) {
+      return;
+    }
+
+    await executeAlternateShipmentMutation.mutateAsync({
+      materialCode,
+      alternateMaterialCode: selection.alternateMaterialCode,
+      alternateQuantity: selection.alternateQuantity,
+    });
   };
 
   const handleDownloadAdjustmentExcel = () => {
@@ -185,6 +338,7 @@ export default function OrdersAdminCancelPage() {
       });
     } else {
       for (const group of adjustmentData) {
+        const selection = alternateSelections.get(group.materialCode);
         for (let i = 0; i < group.products.length; i++) {
           const product = group.products[i];
           rows.push({
@@ -196,11 +350,11 @@ export default function OrdersAdminCancelPage() {
             "원재료": product.requiredMaterial,
             "해당 원재료 합계": i === 0 ? group.totalRequired : "",
             "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
-            "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
-            "대체발송": "",
-            "대체 원재료": i === 0 ? (group.alternateMaterialName || "") : "",
-            "대체 원재료 재고": i === 0 ? (group.alternateMaterialStock || "") : "",
-            "대체 수량": "",
+            "재고합산(잔여재고)": i === 0 ? getAdjustedRemainingStock(group) : "",
+            "대체발송": i === 0 ? (selection?.useAlternate ? "O" : "") : "",
+            "대체 원재료": i === 0 ? (selection?.alternateMaterialName || "") : "",
+            "대체 원재료 재고": i === 0 ? (selection?.alternateMaterialStock || "") : "",
+            "대체 수량": i === 0 ? (selection?.alternateQuantity || "") : "",
           });
         }
       }
@@ -256,13 +410,13 @@ export default function OrdersAdminCancelPage() {
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               <span className="text-sm text-destructive font-medium">
-                재고 부족 원재료: {deficitGroups.length}개 그룹 - 재고합산이 '-'인 상품을 선택하여 주문조정 가능
+                재고 부족 원재료: {deficitGroups.length}개 그룹 - 대체발송 또는 주문조정 가능
               </span>
             </div>
           )}
 
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
-            <Table className="min-w-[1400px]">
+          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+            <Table className="min-w-[1600px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead className="min-w-[160px] whitespace-nowrap">재료명(원물,반재료)</TableHead>
@@ -275,30 +429,35 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="min-w-[120px] text-center whitespace-nowrap">원재료 재고<br/>(원물,반재료)</TableHead>
                   <TableHead className="min-w-[100px] text-center whitespace-nowrap">재고합산<br/>(잔여재고)</TableHead>
                   <TableHead className="min-w-[80px] text-center whitespace-nowrap">대체발송</TableHead>
-                  <TableHead className="min-w-[120px] text-center whitespace-nowrap">대체 원재료</TableHead>
+                  <TableHead className="min-w-[200px] text-center whitespace-nowrap">대체 원재료</TableHead>
                   <TableHead className="min-w-[90px] text-center whitespace-nowrap">대체<br/>원재료 재고</TableHead>
-                  <TableHead className="min-w-[80px] text-center whitespace-nowrap">대체 수량</TableHead>
+                  <TableHead className="min-w-[100px] text-center whitespace-nowrap">대체 수량</TableHead>
+                  <TableHead className="min-w-[100px] text-center whitespace-nowrap">대체발송<br/>실행</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8">
+                    <TableCell colSpan={14} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : adjustmentData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  adjustmentData.map((group) => (
-                    group.products.map((product, productIndex) => (
+                  adjustmentData.map((group) => {
+                    const selection = alternateSelections.get(group.materialCode);
+                    const adjustedRemaining = getAdjustedRemainingStock(group);
+                    const stillDeficit = isStillDeficit(group);
+                    
+                    return group.products.map((product, productIndex) => (
                       <TableRow 
                         key={`${group.materialCode}-${product.productCode}`}
-                        className={group.isDeficit ? "bg-destructive/5" : ""}
+                        className={stillDeficit ? "bg-destructive/5" : group.isDeficit ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}
                       >
                         {productIndex === 0 && (
                           <TableCell 
@@ -317,7 +476,7 @@ export default function OrdersAdminCancelPage() {
                           <Checkbox
                             checked={isProductSelected(group.materialCode, product.productCode)}
                             onCheckedChange={(checked) => handleSelectProduct(group.materialCode, product.productCode, !!checked)}
-                            disabled={!group.isDeficit}
+                            disabled={!stillDeficit}
                             data-testid={`checkbox-product-${product.productCode}`}
                           />
                         </TableCell>
@@ -343,10 +502,15 @@ export default function OrdersAdminCancelPage() {
                           <TableCell 
                             rowSpan={group.products.length} 
                             className={`text-center font-bold align-middle border-l ${
-                              group.isDeficit ? "text-destructive" : "text-green-600"
+                              stillDeficit ? "text-destructive" : adjustedRemaining >= 0 ? "text-green-600" : "text-orange-500"
                             }`}
                           >
-                            {group.remainingStock}
+                            {adjustedRemaining}
+                            {selection && selection.alternateQuantity > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                (대체: +{selection.alternateQuantity})
+                              </div>
+                            )}
                           </TableCell>
                         )}
                         {productIndex === 0 && (
@@ -355,6 +519,8 @@ export default function OrdersAdminCancelPage() {
                             className="text-center align-middle border-l"
                           >
                             <Checkbox
+                              checked={selection?.useAlternate || false}
+                              onCheckedChange={(checked) => handleAlternateCheck(group.materialCode, !!checked)}
                               disabled={!group.isDeficit}
                               data-testid={`checkbox-alternate-${group.materialCode}`}
                             />
@@ -363,9 +529,81 @@ export default function OrdersAdminCancelPage() {
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
-                            className="text-center align-middle border-l text-sm"
+                            className="text-center align-middle border-l"
                           >
-                            {group.alternateMaterialName || "-"}
+                            {group.isDeficit && selection?.useAlternate ? (
+                              <div className="flex items-center gap-1">
+                                <Popover 
+                                  open={openPopovers.get(group.materialCode) || false} 
+                                  onOpenChange={(open) => {
+                                    const newPopovers = new Map(openPopovers);
+                                    newPopovers.set(group.materialCode, open);
+                                    setOpenPopovers(newPopovers);
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="w-full justify-start text-left font-normal"
+                                      data-testid={`button-select-alternate-${group.materialCode}`}
+                                    >
+                                      {selection?.alternateMaterialName || (
+                                        <span className="text-muted-foreground flex items-center gap-1">
+                                          <Search className="h-3 w-3" />
+                                          원재료 검색
+                                        </span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[300px] p-0" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="원재료명 또는 코드 검색..." />
+                                      <CommandList>
+                                        <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                                        <CommandGroup heading="원물/반재료">
+                                          {rawSemiMaterials
+                                            .filter(m => m.materialCode !== group.materialCode && m.currentStock > 0)
+                                            .map((material) => (
+                                              <CommandItem
+                                                key={material.id}
+                                                value={`${material.materialName} ${material.materialCode}`}
+                                                onSelect={() => handleSelectAlternateMaterial(group.materialCode, material)}
+                                              >
+                                                <Check
+                                                  className={`mr-2 h-4 w-4 ${
+                                                    selection?.alternateMaterialCode === material.materialCode
+                                                      ? "opacity-100"
+                                                      : "opacity-0"
+                                                  }`}
+                                                />
+                                                <div className="flex flex-col">
+                                                  <span className="text-sm">{material.materialName}</span>
+                                                  <span className="text-xs text-muted-foreground">
+                                                    {material.materialCode} | 재고: {material.currentStock}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                {selection?.alternateMaterialCode && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={() => handleClearAlternateMaterial(group.materialCode)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                         )}
                         {productIndex === 0 && (
@@ -373,7 +611,11 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            {group.alternateMaterialStock ?? "-"}
+                            {selection?.alternateMaterialCode ? (
+                              <span className="font-medium">{selection.alternateMaterialStock}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                         )}
                         {productIndex === 0 && (
@@ -381,12 +623,48 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            -
+                            {selection?.alternateMaterialCode ? (
+                              <Input
+                                type="number"
+                                min={0}
+                                max={selection.alternateMaterialStock}
+                                value={selection.alternateQuantity || ""}
+                                onChange={(e) => handleAlternateQuantityChange(group.materialCode, Number(e.target.value) || 0)}
+                                className="w-20 text-center mx-auto"
+                                data-testid={`input-alternate-quantity-${group.materialCode}`}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        )}
+                        {productIndex === 0 && (
+                          <TableCell 
+                            rowSpan={group.products.length} 
+                            className="text-center align-middle border-l"
+                          >
+                            {selection?.alternateMaterialCode && selection.alternateQuantity > 0 ? (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleExecuteAlternateShipment(group.materialCode)}
+                                disabled={executeAlternateShipmentMutation.isPending}
+                                data-testid={`button-execute-alternate-${group.materialCode}`}
+                              >
+                                {executeAlternateShipmentMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "실행"
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                         )}
                       </TableRow>
-                    ))
-                  ))
+                    ));
+                  })
                 )}
               </TableBody>
             </Table>

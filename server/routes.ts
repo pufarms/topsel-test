@@ -7003,5 +7003,89 @@ export async function registerRoutes(
     }
   });
 
+  // 대체발송 실행 API - 대체 원재료 재고 차감
+  app.post('/api/admin/alternate-shipment-execute', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { materialCode, alternateMaterialCode, alternateQuantity } = req.body;
+      
+      if (!materialCode || !alternateMaterialCode || !alternateQuantity || alternateQuantity <= 0) {
+        return res.status(400).json({ message: "잘못된 요청입니다" });
+      }
+
+      // 원재료 조회
+      const originalMaterial = await storage.getMaterialByCode(materialCode);
+      if (!originalMaterial) {
+        return res.status(404).json({ message: "원재료를 찾을 수 없습니다" });
+      }
+
+      // 대체 원재료 조회
+      const alternateMaterial = await storage.getMaterialByCode(alternateMaterialCode);
+      if (!alternateMaterial) {
+        return res.status(404).json({ message: "대체 원재료를 찾을 수 없습니다" });
+      }
+
+      // 대체 원재료 재고 확인
+      if (alternateMaterial.currentStock < alternateQuantity) {
+        return res.status(400).json({ 
+          message: `대체 원재료 재고가 부족합니다. 현재 재고: ${alternateMaterial.currentStock}` 
+        });
+      }
+
+      // 대체 원재료 재고 차감
+      const newStock = alternateMaterial.currentStock - alternateQuantity;
+      await db.update(materials)
+        .set({ 
+          currentStock: newStock,
+          updatedAt: new Date()
+        })
+        .where(eq(materials.materialCode, alternateMaterialCode));
+
+      // 원래 원재료에 대체 수량 추가 (가상 재고 증가)
+      const newOriginalStock = originalMaterial.currentStock + alternateQuantity;
+      await db.update(materials)
+        .set({ 
+          currentStock: newOriginalStock,
+          updatedAt: new Date()
+        })
+        .where(eq(materials.materialCode, materialCode));
+
+      // SSE 알림
+      sseManager.sendToAdmins("alternate-shipment", {
+        type: "alternate-shipment",
+        originalMaterialCode: materialCode,
+        alternateMaterialCode,
+        quantity: alternateQuantity
+      });
+
+      res.json({
+        success: true,
+        message: `${alternateMaterial.materialName}에서 ${alternateQuantity}만큼 대체발송 처리되었습니다.`,
+        originalMaterial: {
+          code: materialCode,
+          name: originalMaterial.materialName,
+          previousStock: originalMaterial.currentStock,
+          newStock: newOriginalStock
+        },
+        alternateMaterial: {
+          code: alternateMaterialCode,
+          name: alternateMaterial.materialName,
+          previousStock: alternateMaterial.currentStock,
+          newStock: newStock
+        }
+      });
+    } catch (error: any) {
+      console.error("Alternate shipment execute error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }
