@@ -6897,7 +6897,7 @@ export async function registerRoutes(
       
       // DB에서 해당 원재료를 사용하는 모든 대기 주문의 전체 필요량 계산
       // 상품 매핑 및 현재 상품 정보 조회
-      const allProductMappings = await storage.getProductMappings();
+      const allProductMappings = await storage.getAllProductMappings();
       const allCurrentProducts = await storage.getAllCurrentProducts();
       
       // 해당 원재료를 사용하는 상품 코드 목록
