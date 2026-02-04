@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, AlertTriangle, CheckCircle } from "lucide-react";
+import { FileDown, Loader2, AlertTriangle } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -54,13 +54,13 @@ export default function OrdersAdminCancelPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [selectedMaterialCodes, setSelectedMaterialCodes] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<{materialCode: string; productCode: string}[]>([]);
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders"],
   });
 
-  const { data: adjustmentData = [], isLoading: isLoadingAdjustment, refetch: refetchAdjustment } = useQuery<MaterialGroup[]>({
+  const { data: adjustmentData = [], isLoading: isLoadingAdjustment } = useQuery<MaterialGroup[]>({
     queryKey: ["/api/admin/order-adjustment-stock"],
   });
 
@@ -87,7 +87,7 @@ export default function OrdersAdminCancelPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
-      setSelectedMaterialCodes([]);
+      setSelectedProducts([]);
       toast({ 
         title: "주문조정 완료", 
         description: result.message 
@@ -118,53 +118,81 @@ export default function OrdersAdminCancelPage() {
     }
   };
 
-  const handleSelectMaterial = (materialCode: string, checked: boolean) => {
+  const handleSelectProduct = (materialCode: string, productCode: string, checked: boolean) => {
     if (checked) {
-      setSelectedMaterialCodes([...selectedMaterialCodes, materialCode]);
+      setSelectedProducts([...selectedProducts, { materialCode, productCode }]);
     } else {
-      setSelectedMaterialCodes(selectedMaterialCodes.filter(c => c !== materialCode));
+      setSelectedProducts(selectedProducts.filter(
+        p => !(p.materialCode === materialCode && p.productCode === productCode)
+      ));
     }
   };
 
+  const isProductSelected = (materialCode: string, productCode: string) => {
+    return selectedProducts.some(p => p.materialCode === materialCode && p.productCode === productCode);
+  };
+
   const handleExecuteAdjustment = async () => {
-    if (selectedMaterialCodes.length === 0) return;
+    if (selectedProducts.length === 0) return;
     
-    if (!confirm(`선택한 ${selectedMaterialCodes.length}개 원재료 그룹의 주문을 조정하시겠습니까?\n\n공평 배분 알고리즘이 적용되어 재고 부족분만큼 주문이 자동 취소됩니다.`)) {
+    const materialCodes = [...new Set(selectedProducts.map(p => p.materialCode))];
+    
+    if (!confirm(`선택한 ${selectedProducts.length}개 상품의 주문을 조정하시겠습니까?\n\n공평 배분 알고리즘이 적용되어 순번이 높은 주문부터 취소됩니다.`)) {
       return;
     }
 
-    for (const materialCode of selectedMaterialCodes) {
+    for (const materialCode of materialCodes) {
       const group = adjustmentData.find(g => g.materialCode === materialCode);
       if (group && group.isDeficit) {
-        await executeAdjustmentMutation.mutateAsync({
-          materialCode: group.materialCode,
-          products: group.products
-        });
+        const selectedProductCodes = selectedProducts
+          .filter(p => p.materialCode === materialCode)
+          .map(p => p.productCode);
+        
+        const productsToAdjust = group.products.filter(p => 
+          selectedProductCodes.includes(p.productCode)
+        );
+        
+        if (productsToAdjust.length > 0) {
+          await executeAdjustmentMutation.mutateAsync({
+            materialCode: group.materialCode,
+            products: productsToAdjust
+          });
+        }
       }
     }
   };
 
   const handleDownloadAdjustmentExcel = () => {
-    if (adjustmentData.length === 0) {
-      toast({ title: "데이터 없음", description: "다운로드할 데이터가 없습니다.", variant: "destructive" });
-      return;
-    }
-
     const rows: any[] = [];
     
-    for (const group of adjustmentData) {
-      for (let i = 0; i < group.products.length; i++) {
-        const product = group.products[i];
-        rows.push({
-          "재료명(원물,반재료)": i === 0 ? group.materialName : "",
-          "상품코드": product.productCode,
-          "상품명": product.productName,
-          "주문합계": product.orderCount,
-          "원재료": product.requiredMaterial,
-          "해당 원재료 합계": i === 0 ? group.totalRequired : "",
-          "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
-          "재고합산(잔여재고)": i === 0 ? group.remainingStock : "",
-        });
+    if (adjustmentData.length === 0) {
+      rows.push({
+        "재료명(원물,반재료)": "",
+        "상품코드": "",
+        "상품명": "",
+        "주문조정선택": "",
+        "주문합계": "",
+        "원재료": "",
+        "해당 원재료 합계": "",
+        "원재료 재고(원물,반재료)": "",
+        "재고합산(잔여재고)": "",
+      });
+    } else {
+      for (const group of adjustmentData) {
+        for (let i = 0; i < group.products.length; i++) {
+          const product = group.products[i];
+          rows.push({
+            "재료명(원물,반재료)": i === 0 ? group.materialName : "",
+            "상품코드": product.productCode,
+            "상품명": product.productName,
+            "주문조정선택": "",
+            "주문합계": product.orderCount,
+            "원재료": product.requiredMaterial,
+            "해당 원재료 합계": i === 0 ? group.totalRequired : "",
+            "원재료 재고(원물,반재료)": i === 0 ? group.currentStock : "",
+            "재고합산(잔여재고)": i === 0 ? (group.isDeficit ? group.remainingStock : group.remainingStock) : "",
+          });
+        }
       }
     }
 
@@ -202,7 +230,7 @@ export default function OrdersAdminCancelPage() {
             <Button 
               size="sm" 
               variant="default" 
-              disabled={selectedMaterialCodes.length === 0 || executeAdjustmentMutation.isPending}
+              disabled={selectedProducts.length === 0 || executeAdjustmentMutation.isPending}
               onClick={handleExecuteAdjustment}
               data-testid="button-execute-adjustment"
             >
@@ -218,56 +246,46 @@ export default function OrdersAdminCancelPage() {
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
               <AlertTriangle className="h-5 w-5 text-destructive" />
               <span className="text-sm text-destructive font-medium">
-                재고 부족 원재료: {deficitGroups.length}개 그룹 (체크하여 주문조정 실행 가능)
+                재고 부족 원재료: {deficitGroups.length}개 그룹 - 재고합산이 '-'인 상품을 선택하여 주문조정 가능
               </span>
             </div>
           )}
 
-          {isLoadingAdjustment ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : adjustmentData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              주문대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
-              <Table className="min-w-[1200px]">
-                <TableHeader className="sticky top-0 z-10 bg-background">
+          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
+            <Table className="min-w-[1200px]">
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
+                  <TableHead className="w-[180px]">재료명(원물,반재료)</TableHead>
+                  <TableHead className="w-[140px]">상품코드</TableHead>
+                  <TableHead className="min-w-[200px]">상품명</TableHead>
+                  <TableHead className="w-[100px] text-center">주문조정선택</TableHead>
+                  <TableHead className="w-[80px] text-right">주문합계</TableHead>
+                  <TableHead className="w-[80px] text-right">원재료</TableHead>
+                  <TableHead className="w-[100px] text-right">해당 원재료 합계</TableHead>
+                  <TableHead className="w-[130px] text-right">원재료 재고(원물,반재료)</TableHead>
+                  <TableHead className="w-[100px] text-right">재고합산(잔여재고)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingAdjustment ? (
                   <TableRow>
-                    <TableHead className="w-12 text-center">선택</TableHead>
-                    <TableHead className="w-[200px]">재료명(원물,반재료)</TableHead>
-                    <TableHead className="w-[140px]">상품코드</TableHead>
-                    <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[80px] text-right">주문합계</TableHead>
-                    <TableHead className="w-[80px] text-right">원재료</TableHead>
-                    <TableHead className="w-[100px] text-right">원재료 합계</TableHead>
-                    <TableHead className="w-[100px] text-right">원재료 재고</TableHead>
-                    <TableHead className="w-[100px] text-right">잔여재고</TableHead>
-                    <TableHead className="w-[80px] text-center">상태</TableHead>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adjustmentData.map((group) => (
+                ) : adjustmentData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      주문대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  adjustmentData.map((group) => (
                     group.products.map((product, productIndex) => (
                       <TableRow 
                         key={`${group.materialCode}-${product.productCode}`}
                         className={group.isDeficit ? "bg-destructive/5" : ""}
                       >
-                        {productIndex === 0 && (
-                          <TableCell 
-                            rowSpan={group.products.length} 
-                            className="text-center align-middle border-r"
-                          >
-                            <Checkbox
-                              checked={selectedMaterialCodes.includes(group.materialCode)}
-                              onCheckedChange={(checked) => handleSelectMaterial(group.materialCode, !!checked)}
-                              disabled={!group.isDeficit}
-                              data-testid={`checkbox-material-${group.materialCode}`}
-                            />
-                          </TableCell>
-                        )}
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
@@ -281,6 +299,14 @@ export default function OrdersAdminCancelPage() {
                         )}
                         <TableCell className="font-mono text-sm">{product.productCode}</TableCell>
                         <TableCell>{product.productName}</TableCell>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={isProductSelected(group.materialCode, product.productCode)}
+                            onCheckedChange={(checked) => handleSelectProduct(group.materialCode, product.productCode, !!checked)}
+                            disabled={!group.isDeficit}
+                            data-testid={`checkbox-product-${product.productCode}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-right font-medium">{product.orderCount}</TableCell>
                         <TableCell className="text-right">{product.requiredMaterial}</TableCell>
                         {productIndex === 0 && (
@@ -306,34 +332,16 @@ export default function OrdersAdminCancelPage() {
                               group.isDeficit ? "text-destructive" : "text-green-600"
                             }`}
                           >
-                            {group.remainingStock}
-                          </TableCell>
-                        )}
-                        {productIndex === 0 && (
-                          <TableCell 
-                            rowSpan={group.products.length} 
-                            className="text-center align-middle border-l"
-                          >
-                            {group.isDeficit ? (
-                              <Badge variant="destructive" className="gap-1">
-                                <AlertTriangle className="h-3 w-3" />
-                                부족
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
-                                <CheckCircle className="h-3 w-3" />
-                                충분
-                              </Badge>
-                            )}
+                            {group.isDeficit ? group.remainingStock : group.remainingStock}
                           </TableCell>
                         )}
                       </TableRow>
                     ))
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -364,44 +372,48 @@ export default function OrdersAdminCancelPage() {
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              직권취소 내역이 없습니다.
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
-              <Table className="min-w-[1600px]">
-                <TableHeader className="sticky top-0 z-10 bg-background">
+          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
+            <Table className="min-w-[1600px]">
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="w-[100px]">순번</TableHead>
+                  <TableHead className="w-[120px]">상호명</TableHead>
+                  <TableHead className="w-[120px]">대분류</TableHead>
+                  <TableHead className="w-[120px]">중분류</TableHead>
+                  <TableHead className="w-[120px]">소분류</TableHead>
+                  <TableHead className="w-[140px]">상품코드</TableHead>
+                  <TableHead className="min-w-[200px]">상품명</TableHead>
+                  <TableHead className="w-[100px]">수량</TableHead>
+                  <TableHead className="w-[120px]">공급가</TableHead>
+                  <TableHead className="w-[100px]">주문자</TableHead>
+                  <TableHead className="w-[100px]">수령자</TableHead>
+                  <TableHead className="w-[150px]">수령자 연락처</TableHead>
+                  <TableHead className="min-w-[250px]">배송지</TableHead>
+                  <TableHead className="w-[100px]">상태</TableHead>
+                  <TableHead className="w-[150px]">조정일시</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead className="w-[100px]">순번</TableHead>
-                    <TableHead className="w-[120px]">상호명</TableHead>
-                    <TableHead className="w-[120px]">대분류</TableHead>
-                    <TableHead className="w-[120px]">중분류</TableHead>
-                    <TableHead className="w-[120px]">소분류</TableHead>
-                    <TableHead className="w-[140px]">상품코드</TableHead>
-                    <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[100px]">수량</TableHead>
-                    <TableHead className="w-[120px]">공급가</TableHead>
-                    <TableHead className="w-[100px]">주문자</TableHead>
-                    <TableHead className="w-[100px]">수령자</TableHead>
-                    <TableHead className="w-[150px]">수령자 연락처</TableHead>
-                    <TableHead className="min-w-[250px]">배송지</TableHead>
-                    <TableHead className="w-[100px]">상태</TableHead>
-                    <TableHead className="w-[150px]">조정일시</TableHead>
+                    <TableCell colSpan={16} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.map((order, index) => (
+                ) : filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                      직권취소 내역이 없습니다.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order, index) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <Checkbox
@@ -433,11 +445,11 @@ export default function OrdersAdminCancelPage() {
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

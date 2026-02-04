@@ -6835,6 +6835,7 @@ export async function registerRoutes(
       }
 
       // 5. 결과를 배열로 변환하여 반환
+      // 주문을 순번(sequenceNumber) 내림차순으로 정렬하여 저장
       const result = Object.values(materialGroups).map(group => ({
         materialCode: group.materialCode,
         materialName: group.materialName,
@@ -6843,14 +6844,22 @@ export async function registerRoutes(
         currentStock: group.currentStock,
         remainingStock: group.remainingStock,
         isDeficit: group.remainingStock < 0,
-        products: group.products.map(p => ({
-          productCode: p.productCode,
-          productName: p.productName,
-          orderCount: p.orderCount,
-          materialQuantity: p.materialQuantity,
-          requiredMaterial: p.requiredMaterial,
-          orderIds: p.orders.map(o => o.id)
-        }))
+        products: group.products.map(p => {
+          // 순번 내림차순 정렬 (높은 순번이 먼저 취소됨)
+          const sortedOrders = [...p.orders].sort((a, b) => {
+            const seqA = a.sequenceNumber || 0;
+            const seqB = b.sequenceNumber || 0;
+            return seqB - seqA; // 내림차순
+          });
+          return {
+            productCode: p.productCode,
+            productName: p.productName,
+            orderCount: p.orderCount,
+            materialQuantity: p.materialQuantity,
+            requiredMaterial: p.requiredMaterial,
+            orderIds: sortedOrders.map(o => o.id)
+          };
+        })
       }));
 
       res.json(result);
