@@ -19,7 +19,7 @@ import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterSt
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 
 export default function OrdersPendingPage() {
   const { toast } = useToast();
@@ -252,6 +252,23 @@ export default function OrdersPendingPage() {
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    const yellowBoldStyle = {
+      fill: { fgColor: { rgb: "FFFF00" } },
+      font: { bold: true },
+      alignment: { horizontal: "center" as const },
+    };
+    
+    const orderTotalColIndex = 3;
+    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+    
+    for (let row = 0; row <= range.e.r; row++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: orderTotalColIndex });
+      if (worksheet[cellAddress]) {
+        worksheet[cellAddress].s = yellowBoldStyle;
+      }
+    }
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "상품별합계");
     
