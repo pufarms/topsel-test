@@ -6345,7 +6345,7 @@ export async function registerRoutes(
             order.deliveryMessage || "",
             order.productName || "",
             order.quantity || 0,
-            order.orderNumber || "",
+            order.customOrderNumber || "",
             order.trackingNumber || "",
             order.courierCompany || ""
           ]);
@@ -6359,16 +6359,16 @@ export async function registerRoutes(
         for (const order of orders) {
           wsData.push([
             order.sequenceNumber || "",
-            order.memberName || "",
-            order.orderNumber || "",
+            order.memberCompanyName || "",
+            order.customOrderNumber || "",
             order.ordererName || "",
             order.recipientName || "",
-            order.recipientPhone || "",
+            order.recipientMobile || "",
             order.recipientAddress || "",
             order.productCode || "",
             order.productName || "",
             order.quantity || 0,
-            order.unitPrice || 0,
+            order.supplyPrice || 0,
             order.deliveryMessage || "",
             order.trackingNumber || "",
             order.courierCompany || "",
