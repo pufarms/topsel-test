@@ -6460,9 +6460,9 @@ export async function registerRoutes(
       let wsData: any[][];
 
       if (format === "lotte") {
-        // 롯데 양식: 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품명, 수량, 주문번호, 운송장번호, 택배사
+        // 롯데 양식: 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품코드, 상품명, 수량, 주문번호, 운송장번호, 택배사
         wsData = [
-          ["주문자명", "주문자 전화번호", "주문자 주소", "수령자명", "수령자휴대폰번호", "수령자 전화번호", "수령자 주소", "배송메시지", "상품명", "수량", "주문번호", "운송장번호", "택배사"]
+          ["주문자명", "주문자 전화번호", "주문자 주소", "수령자명", "수령자휴대폰번호", "수령자 전화번호", "수령자 주소", "배송메시지", "상품코드", "상품명", "수량", "주문번호", "운송장번호", "택배사"]
         ];
         
         for (const order of orders) {
@@ -6475,6 +6475,7 @@ export async function registerRoutes(
             order.recipientPhone || "",
             order.recipientAddress || "",
             order.deliveryMessage || "",
+            order.productCode || "",
             order.productName || "",
             1,
             order.customOrderNumber || "",
