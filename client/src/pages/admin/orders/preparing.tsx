@@ -431,21 +431,19 @@ export default function OrdersPreparingPage() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="w-[100px]">순번</TableHead>
-                    <TableHead className="w-[120px]">상호명</TableHead>
-                    <TableHead className="w-[120px]">대분류</TableHead>
-                    <TableHead className="w-[120px]">중분류</TableHead>
-                    <TableHead className="w-[120px]">소분류</TableHead>
-                    <TableHead className="w-[140px]">상품코드</TableHead>
+                    <TableHead className="w-[100px]">주문자명</TableHead>
+                    <TableHead className="w-[140px]">주문자 전화번호</TableHead>
+                    <TableHead className="min-w-[200px]">주문자 주소</TableHead>
+                    <TableHead className="w-[100px]">수령자명</TableHead>
+                    <TableHead className="w-[140px]">수령자휴대폰번호</TableHead>
+                    <TableHead className="w-[140px]">수령자 전화번호</TableHead>
+                    <TableHead className="min-w-[250px]">수령자 주소</TableHead>
+                    <TableHead className="min-w-[150px]">배송메시지</TableHead>
                     <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[100px]">수량</TableHead>
-                    <TableHead className="w-[120px]">공급가</TableHead>
-                    <TableHead className="w-[100px]">주문자</TableHead>
-                    <TableHead className="w-[100px]">수령자</TableHead>
-                    <TableHead className="w-[150px]">수령자 연락처</TableHead>
-                    <TableHead className="min-w-[250px]">배송지</TableHead>
-                    <TableHead className="w-[100px]">상태</TableHead>
-                    <TableHead className="w-[150px]">등록일시</TableHead>
+                    <TableHead className="w-[80px]">수량</TableHead>
+                    <TableHead className="w-[140px]">주문번호</TableHead>
+                    <TableHead className="w-[140px]">운송장번호</TableHead>
+                    <TableHead className="w-[100px]">택배사</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -457,29 +455,25 @@ export default function OrdersPreparingPage() {
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{order.sequenceNumber || index + 1}</TableCell>
-                      <TableCell>{order.memberCompanyName || "-"}</TableCell>
-                      <TableCell>{order.categoryLarge || "-"}</TableCell>
-                      <TableCell>{order.categoryMedium || "-"}</TableCell>
-                      <TableCell>{order.categorySmall || "-"}</TableCell>
-                      <TableCell className="font-mono">{order.productCode || "-"}</TableCell>
-                      <TableCell>{order.productName || "-"}</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell className="text-right">
-                        {order.supplyPrice ? order.supplyPrice.toLocaleString() + "원" : "-"}
+                      <TableCell data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
+                      <TableCell data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={order.ordererAddress || ""} data-testid={`text-orderer-address-${order.id}`}>
+                        {order.ordererAddress || "-"}
                       </TableCell>
-                      <TableCell>{order.ordererName || "-"}</TableCell>
-                      <TableCell>{order.recipientName || "-"}</TableCell>
-                      <TableCell>{order.recipientMobile || order.recipientPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""}>
+                      <TableCell data-testid={`text-recipient-name-${order.id}`}>{order.recipientName || "-"}</TableCell>
+                      <TableCell data-testid={`text-recipient-mobile-${order.id}`}>{order.recipientMobile || "-"}</TableCell>
+                      <TableCell data-testid={`text-recipient-phone-${order.id}`}>{order.recipientPhone || "-"}</TableCell>
+                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""} data-testid={`text-recipient-address-${order.id}`}>
                         {order.recipientAddress || "-"}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">준비중</Badge>
+                      <TableCell data-testid={`text-delivery-message-${order.id}`}>{order.deliveryMessage || "-"}</TableCell>
+                      <TableCell data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
+                      <TableCell data-testid={`text-quantity-${order.id}`}>1</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.orderNumber || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-tracking-number-${order.id}`}>
+                        {order.trackingNumber || "-"}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleString("ko-KR") : "-"}
-                      </TableCell>
+                      <TableCell data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
