@@ -5997,8 +5997,22 @@ export async function registerRoutes(
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
       }
 
-      // 중복 파일 감지 (파일 내용 해시 기반)
-      const contentHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      // 중복 파일 감지 (실제 데이터 내용 기반 해시)
+      // 파일 바이트가 아닌 실제 엑셀 셀 데이터를 기반으로 해시 계산
+      // 파일명, 저장시간 등 메타데이터 변경에 영향받지 않음
+      const dataForHash = rows.map(row => {
+        // 주문 식별에 중요한 필드들만 추출하여 정규화
+        return {
+          상품코드: String(row['상품코드'] || '').trim(),
+          고객주문번호: String(row['고객주문번호'] || '').trim(),
+          주문자명: String(row['주문자명'] || '').trim(),
+          주문자휴대폰: String(row['주문자휴대폰'] || '').trim(),
+          수취인명: String(row['수취인명'] || '').trim(),
+          수취인휴대폰: String(row['수취인휴대폰'] || '').trim(),
+          수취인주소: String(row['수취인주소'] || '').trim(),
+        };
+      });
+      const contentHash = crypto.createHash('sha256').update(JSON.stringify(dataForHash)).digest('hex');
       const fileName = req.file.originalname || 'unknown.xlsx';
       
       if (!confirmDuplicate) {
