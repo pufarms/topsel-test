@@ -231,6 +231,7 @@ export default function OrdersAdminCancelPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       setSelectedOrders([]);
       toast({ 
         title: "주문복구 완료", 

@@ -71,6 +71,8 @@ export default function OrdersPreparingPage() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       setSelectedOrders([]);
       toast({ 
         title: "주문대기 복구 완료", 
