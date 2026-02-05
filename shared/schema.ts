@@ -1335,3 +1335,19 @@ export const addressLearningData = pgTable('address_learning_data', {
 
 export type AddressLearningData = typeof addressLearningData.$inferSelect;
 export type NewAddressLearningData = typeof addressLearningData.$inferInsert;
+
+// 주문 업로드 히스토리 (중복 파일 감지용)
+export const orderUploadHistory = pgTable("order_upload_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  fileName: text("file_name").notNull(),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(), // SHA-256 해시
+  rowCount: integer("row_count").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdIdx: index("idx_upload_member_id").on(table.memberId),
+  contentHashIdx: index("idx_upload_content_hash").on(table.contentHash),
+}));
+
+export type OrderUploadHistory = typeof orderUploadHistory.$inferSelect;
+export type NewOrderUploadHistory = typeof orderUploadHistory.$inferInsert;

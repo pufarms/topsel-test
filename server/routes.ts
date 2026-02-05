@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -5978,6 +5978,8 @@ export async function registerRoutes(
 
     // confirmPartial 파라미터: 오류건 제외하고 정상건만 등록할지 여부
     const confirmPartial = req.body.confirmPartial === 'true' || req.body.confirmPartial === true;
+    // confirmDuplicate 파라미터: 중복 파일임을 확인하고 진행할지 여부
+    const confirmDuplicate = req.body.confirmDuplicate === 'true' || req.body.confirmDuplicate === true;
 
     try {
       const XLSX = await import("xlsx");
@@ -5993,6 +5995,39 @@ export async function registerRoutes(
       const member = await storage.getMember(req.session.userId);
       if (!member) {
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      // 중복 파일 감지 (파일 내용 해시 기반)
+      const contentHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const fileName = req.file.originalname || 'unknown.xlsx';
+      
+      if (!confirmDuplicate) {
+        // 중복 확인: 동일한 해시가 이미 존재하는지 검사
+        const existingUpload = await db
+          .select()
+          .from(orderUploadHistory)
+          .where(eq(orderUploadHistory.contentHash, contentHash))
+          .limit(1);
+        
+        if (existingUpload.length > 0) {
+          const previous = existingUpload[0];
+          const previousDate = new Date(previous.uploadedAt).toLocaleString('ko-KR', { 
+            year: 'numeric', month: '2-digit', day: '2-digit', 
+            hour: '2-digit', minute: '2-digit' 
+          });
+          
+          return res.json({
+            status: 'duplicate_detected',
+            message: '동일한 내용의 파일이 이미 업로드된 기록이 있습니다.',
+            previousUpload: {
+              fileName: previous.fileName,
+              uploadedAt: previousDate,
+              rowCount: previous.rowCount
+            },
+            currentFileName: fileName,
+            rowCount: rows.length
+          });
+        }
       }
 
       // 정상건과 오류건을 분리
@@ -6018,6 +6053,24 @@ export async function registerRoutes(
         rowNum: number;
         originalData: Record<string, any>;
         errorReason: string;
+      }> = [];
+
+      // 1단계: 기본 검증 (필수 필드, 상품 존재 여부) - 주소검증 제외
+      const pendingValidationRows: Array<{
+        rowNum: number;
+        row: Record<string, any>;
+        productCode: string;
+        productName: string;
+        customOrderNumber: string;
+        ordererName: string;
+        ordererPhone: string;
+        ordererAddress: string;
+        recipientName: string;
+        recipientMobile: string;
+        recipientPhone: string;
+        recipientAddress: string;
+        deliveryMessage: string;
+        currentProduct: any;
       }> = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -6078,30 +6131,10 @@ export async function registerRoutes(
           continue;
         }
 
-        // 주소 검증 (JUSO_API_KEY가 설정된 경우에만)
-        let addressValidationResult: { status: AddressStatus; standardAddress?: string; fullAddress?: string; warningMessage?: string; errorMessage?: string } | null = null;
-        if (process.env.JUSO_API_KEY && recipientAddress) {
-          try {
-            addressValidationResult = await validateSingleAddress(recipientAddress);
-            
-            // 주소 검증 실패 시 오류 처리
-            if (addressValidationResult.status === 'invalid') {
-              errorRows.push({
-                rowNum,
-                originalData: row,
-                errorReason: `주소 오류: ${addressValidationResult.errorMessage || '건물을 찾을 수 없습니다'}`
-              });
-              continue;
-            }
-          } catch (addrError: any) {
-            console.error(`주소 검증 오류 (${rowNum}번 줄):`, addrError.message);
-            // 주소 검증 API 오류는 경고만 하고 진행 (검증 비활성화 상태와 동일하게 처리)
-          }
-        }
-
-        // Store valid row for insertion (주소 검증 결과 포함)
-        validRows.push({
+        // 기본 검증 통과 - 주소검증 대기열에 추가
+        pendingValidationRows.push({
           rowNum,
+          row,
           productCode,
           productName,
           customOrderNumber,
@@ -6114,9 +6147,83 @@ export async function registerRoutes(
           recipientAddress,
           deliveryMessage,
           currentProduct,
-          validatedAddress: addressValidationResult?.fullAddress || addressValidationResult?.standardAddress,
-          addressWarning: addressValidationResult?.warningMessage,
         });
+      }
+
+      // 2단계: 주소 검증 - 병렬 처리 (5건씩 동시 처리)
+      const PARALLEL_BATCH_SIZE = 5;
+      
+      if (process.env.JUSO_API_KEY && pendingValidationRows.length > 0) {
+        console.log(`주소검증 시작: ${pendingValidationRows.length}건을 ${PARALLEL_BATCH_SIZE}건씩 병렬 처리`);
+        
+        for (let batchStart = 0; batchStart < pendingValidationRows.length; batchStart += PARALLEL_BATCH_SIZE) {
+          const batch = pendingValidationRows.slice(batchStart, batchStart + PARALLEL_BATCH_SIZE);
+          
+          // 배치 내 주소검증 병렬 실행
+          const validationPromises = batch.map(async (pendingRow) => {
+            try {
+              const result = await validateSingleAddress(pendingRow.recipientAddress);
+              return { pendingRow, result, error: null };
+            } catch (error: any) {
+              console.error(`주소 검증 오류 (${pendingRow.rowNum}번 줄):`, error.message);
+              return { pendingRow, result: null, error };
+            }
+          });
+          
+          const batchResults = await Promise.all(validationPromises);
+          
+          // 배치 결과 처리
+          for (const { pendingRow, result, error } of batchResults) {
+            if (result && result.status === 'invalid') {
+              // 주소 검증 실패
+              errorRows.push({
+                rowNum: pendingRow.rowNum,
+                originalData: pendingRow.row,
+                errorReason: `주소 오류: ${result.errorMessage || '건물을 찾을 수 없습니다'}`
+              });
+            } else {
+              // 검증 성공 또는 API 오류 (경고만 하고 진행)
+              validRows.push({
+                rowNum: pendingRow.rowNum,
+                productCode: pendingRow.productCode,
+                productName: pendingRow.productName,
+                customOrderNumber: pendingRow.customOrderNumber,
+                ordererName: pendingRow.ordererName,
+                ordererPhone: pendingRow.ordererPhone,
+                ordererAddress: pendingRow.ordererAddress,
+                recipientName: pendingRow.recipientName,
+                recipientMobile: pendingRow.recipientMobile,
+                recipientPhone: pendingRow.recipientPhone,
+                recipientAddress: pendingRow.recipientAddress,
+                deliveryMessage: pendingRow.deliveryMessage,
+                currentProduct: pendingRow.currentProduct,
+                validatedAddress: result?.fullAddress || result?.standardAddress,
+                addressWarning: result?.warningMessage,
+              });
+            }
+          }
+        }
+        
+        console.log(`주소검증 완료: 정상 ${validRows.length}건, 오류 ${errorRows.length}건`);
+      } else {
+        // 주소검증 비활성화 상태 - 모든 기본검증 통과 행을 그대로 추가
+        for (const pendingRow of pendingValidationRows) {
+          validRows.push({
+            rowNum: pendingRow.rowNum,
+            productCode: pendingRow.productCode,
+            productName: pendingRow.productName,
+            customOrderNumber: pendingRow.customOrderNumber,
+            ordererName: pendingRow.ordererName,
+            ordererPhone: pendingRow.ordererPhone,
+            ordererAddress: pendingRow.ordererAddress,
+            recipientName: pendingRow.recipientName,
+            recipientMobile: pendingRow.recipientMobile,
+            recipientPhone: pendingRow.recipientPhone,
+            recipientAddress: pendingRow.recipientAddress,
+            deliveryMessage: pendingRow.deliveryMessage,
+            currentProduct: pendingRow.currentProduct,
+          });
+        }
       }
 
       // 오류건 엑셀 데이터 생성 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
@@ -6194,6 +6301,16 @@ export async function registerRoutes(
         });
 
         successCount++;
+      }
+
+      // 업로드 히스토리 저장 (중복 감지용)
+      if (successCount > 0) {
+        await db.insert(orderUploadHistory).values({
+          memberId: member.id,
+          fileName,
+          contentHash,
+          rowCount: rows.length,
+        });
       }
 
       // SSE: 관리자에게 일괄 주문 등록 알림

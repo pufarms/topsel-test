@@ -243,7 +243,7 @@ export default function Dashboard() {
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{ 
-    status: 'idle' | 'validation_failed' | 'partial_success' | 'success';
+    status: 'idle' | 'duplicate_detected' | 'validation_failed' | 'partial_success' | 'success';
     total: number; 
     validCount: number;
     errorCount: number;
@@ -251,6 +251,8 @@ export default function Dashboard() {
     failed: number; 
     errors?: string[];
     errorExcelData?: Record<string, any>[];
+    previousUpload?: { fileName: string; uploadedAt: string; rowCount: number };
+    currentFileName?: string;
   } | null>(null);
 
   // 오류건 엑셀 다운로드 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
@@ -300,11 +302,14 @@ export default function Dashboard() {
 
   // Excel upload mutation for bulk order registration
   const uploadExcelMutation = useMutation({
-    mutationFn: async ({ file, confirmPartial }: { file: File; confirmPartial?: boolean }) => {
+    mutationFn: async ({ file, confirmPartial, confirmDuplicate }: { file: File; confirmPartial?: boolean; confirmDuplicate?: boolean }) => {
       const formData = new FormData();
       formData.append("file", file);
       if (confirmPartial) {
         formData.append("confirmPartial", "true");
+      }
+      if (confirmDuplicate) {
+        formData.append("confirmDuplicate", "true");
       }
       const res = await fetch("/api/member/pending-orders/excel-upload", {
         method: "POST",
@@ -318,7 +323,21 @@ export default function Dashboard() {
       return data;
     },
     onSuccess: (data) => {
-      if (data.status === 'validation_failed') {
+      if (data.status === 'duplicate_detected') {
+        // 중복 파일 감지 - 사용자 확인 필요
+        setUploadProgress({ 
+          status: 'duplicate_detected',
+          total: data.rowCount || 0,
+          validCount: 0,
+          errorCount: 0,
+          success: 0, 
+          failed: 0, 
+          errors: [],
+          errorExcelData: [],
+          previousUpload: data.previousUpload,
+          currentFileName: data.currentFileName
+        });
+      } else if (data.status === 'validation_failed') {
         // 검증 오류 - 사용자 결정 필요
         setUploadProgress({ 
           status: 'validation_failed',
@@ -361,14 +380,22 @@ export default function Dashboard() {
   const handleExcelUpload = () => {
     if (excelFile) {
       setUploadProgress(null);
-      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false });
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: false });
+    }
+  };
+
+  // 중복 확인 후 계속 진행
+  const handleConfirmDuplicate = () => {
+    if (excelFile) {
+      setUploadProgress(null);
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: true });
     }
   };
 
   // 정상건만 등록 (오류건 다운로드)
   const handlePartialUpload = () => {
     if (excelFile) {
-      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: true });
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: true, confirmDuplicate: true });
     }
   };
 
@@ -1177,7 +1204,38 @@ export default function Dashboard() {
                                   )}
                                 </div>
 
-                                {uploadProgress && (
+                                {uploadProgress && uploadProgress.status === 'duplicate_detected' && (
+                                  <div className="rounded-lg p-4 bg-orange-50 border border-orange-300 dark:bg-orange-950/30 dark:border-orange-700">
+                                    <div className="flex items-start gap-2 mb-3">
+                                      <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                                      <div>
+                                        <h4 className="font-medium text-orange-800 dark:text-orange-300">중복 파일 감지</h4>
+                                        <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
+                                          동일한 내용의 파일이 이미 업로드된 기록이 있습니다.
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="bg-white/50 dark:bg-black/20 rounded p-3 text-sm space-y-2">
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">이전 업로드 파일:</span>
+                                        <span className="font-medium">{uploadProgress.previousUpload?.fileName}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">업로드 일시:</span>
+                                        <span>{uploadProgress.previousUpload?.uploadedAt}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">주문 건수:</span>
+                                        <span>{uploadProgress.previousUpload?.rowCount}건</span>
+                                      </div>
+                                    </div>
+                                    <p className="text-sm text-orange-700 dark:text-orange-400 mt-3">
+                                      그래도 계속 업로드하시겠습니까?
+                                    </p>
+                                  </div>
+                                )}
+
+                                {uploadProgress && uploadProgress.status !== 'duplicate_detected' && (
                                   <div className={`rounded-lg p-4 ${uploadProgress.status === 'validation_failed' ? 'bg-amber-50 border border-amber-300 dark:bg-amber-950/30 dark:border-amber-700' : 'bg-muted/50'}`}>
                                     <h4 className="font-medium mb-2">
                                       {uploadProgress.status === 'validation_failed' ? '검증 결과' : '업로드 결과'}
@@ -1225,8 +1283,19 @@ export default function Dashboard() {
                                   <Button variant="outline" onClick={handleCloseUploadDialog} data-testid="button-cancel-order">
                                     취소
                                   </Button>
-                                  {/* 검증 실패 상태이고 정상건이 있을 때: 정상건만 등록 버튼 표시 */}
-                                  {uploadProgress?.status === 'validation_failed' && uploadProgress.validCount > 0 ? (
+                                  {/* 중복 감지 상태: 계속 진행 버튼 표시 */}
+                                  {uploadProgress?.status === 'duplicate_detected' ? (
+                                    <Button 
+                                      onClick={handleConfirmDuplicate} 
+                                      disabled={uploadExcelMutation.isPending} 
+                                      data-testid="button-confirm-duplicate"
+                                      variant="destructive"
+                                    >
+                                      {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                      그래도 계속 진행
+                                    </Button>
+                                  ) : uploadProgress?.status === 'validation_failed' && uploadProgress.validCount > 0 ? (
+                                    /* 검증 실패 상태이고 정상건이 있을 때: 정상건만 등록 버튼 표시 */
                                     <Button 
                                       onClick={handlePartialUpload} 
                                       disabled={uploadExcelMutation.isPending} 
