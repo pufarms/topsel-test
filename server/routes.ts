@@ -5,6 +5,7 @@ import session from "express-session";
 import cookieParser from "cookie-parser";
 import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
+import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
 import crypto from "crypto";
 import { z } from "zod";
@@ -6178,11 +6179,11 @@ export async function registerRoutes(
           productName: parsedRow.productName,
           supplyPrice: supplyPrice,
           ordererName: parsedRow.ordererName,
-          ordererPhone: parsedRow.ordererPhone,
+          ordererPhone: normalizePhoneNumber(parsedRow.ordererPhone),
           ordererAddress: parsedRow.ordererAddress || null,
           recipientName: parsedRow.recipientName,
-          recipientMobile: parsedRow.recipientMobile,
-          recipientPhone: parsedRow.recipientPhone || null,
+          recipientMobile: normalizePhoneNumber(parsedRow.recipientMobile),
+          recipientPhone: normalizePhoneNumber(parsedRow.recipientPhone) || null,
           recipientAddress: parsedRow.validatedAddress || parsedRow.recipientAddress,
           deliveryMessage: parsedRow.addressWarning 
             ? `${parsedRow.deliveryMessage || ''} [주소확인필요: ${parsedRow.addressWarning}]`.trim()
@@ -6379,6 +6380,33 @@ export async function registerRoutes(
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // 전화번호 컬럼을 텍스트 형식으로 설정 (앞자리 0 보존)
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        if (format === "lotte") {
+          // 롯데 양식: B(주문자 전화번호), E(수령자휴대폰번호), F(수령자 전화번호)
+          const phoneColumns = [1, 4, 5]; // B=1, E=4, F=5
+          for (const C of phoneColumns) {
+            const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+            if (ws[cellRef]) {
+              ws[cellRef].t = 's'; // 텍스트 타입으로 설정
+              ws[cellRef].z = '@'; // 텍스트 형식
+            }
+          }
+        } else {
+          // 기본 양식: F(수령자 전화번호)
+          const phoneColumns = [5]; // F=5
+          for (const C of phoneColumns) {
+            const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+            if (ws[cellRef]) {
+              ws[cellRef].t = 's'; // 텍스트 타입으로 설정
+              ws[cellRef].z = '@'; // 텍스트 형식
+            }
+          }
+        }
+      }
+      
       XLSX.utils.book_append_sheet(wb, ws, "상품준비중");
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
