@@ -55,6 +55,7 @@ export default function OrdersPreparingPage() {
   const [showRestoreAllDialog, setShowRestoreAllDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte" | "postoffice">("default");
+  const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -98,7 +99,12 @@ export default function OrdersPreparingPage() {
     productCode: order.productCode || undefined,
   }), []);
 
-  const filteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
+  const categoryFilteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
+  
+  // 업로드 양식 필터 적용
+  const filteredOrders = uploadFormatFilter === "all" 
+    ? categoryFilteredOrders 
+    : categoryFilteredOrders.filter(o => (o.uploadFormat || "default") === uploadFormatFilter);
   
   const totalPages = tablePageSize === "all" ? 1 : Math.ceil(filteredOrders.length / tablePageSize);
   const displayedOrders = tablePageSize === "all" 
@@ -195,6 +201,38 @@ export default function OrdersPreparingPage() {
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
           />
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium">업로드 양식:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" data-testid="button-upload-format-filter">
+                  {uploadFormatFilter === "all" ? "전체" : uploadFormatFilter === "postoffice" ? "우체국" : "기본"}
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("all"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-all"
+                >
+                  전체
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("default"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-default"
+                >
+                  기본 양식
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("postoffice"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-postoffice"
+                >
+                  우체국 양식
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">

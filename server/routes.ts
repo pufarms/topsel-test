@@ -6366,6 +6366,7 @@ export async function registerRoutes(
           customOrderNumber: parsedRow.customOrderNumber,
           orderDetailNumber: parsedRow.orderDetailNumber || null,
           volumeUnit: parsedRow.volumeUnit || null,
+          uploadFormat: isPostOfficeFormat ? "postoffice" : "default",
           trackingNumber: null,
           courierCompany: null,
         });

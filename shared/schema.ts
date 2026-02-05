@@ -1226,6 +1226,7 @@ export const pendingOrders = pgTable("pending_orders", {
   customOrderNumber: text("custom_order_number").notNull(),
   orderDetailNumber: text("order_detail_number"),
   volumeUnit: text("volume_unit"),
+  uploadFormat: text("upload_format").default("default"),
   
   trackingNumber: text("tracking_number"),
   courierCompany: text("courier_company"),
