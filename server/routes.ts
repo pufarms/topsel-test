@@ -6469,8 +6469,13 @@ export async function registerRoutes(
           stockNotDeductedStatuses.includes(status)) {
         // 재고 복구 - 원자적 SQL 연산 사용 (race condition 방지)
         const productCode = currentOrder.productCode || "";
+        console.log(`[재고 복구 시도] 상태: ${currentOrder.status} → ${status}, 상품코드: ${productCode}`);
         if (productCode) {
           const mappings = await storage.getProductMaterialMappings(productCode);
+          console.log(`[재고 복구] 상품코드 ${productCode}의 원재료 매핑 수: ${mappings.length}`);
+          if (mappings.length === 0) {
+            console.log(`[재고 복구 경고] 상품코드 ${productCode}에 대한 원재료 매핑이 없습니다!`);
+          }
           for (const mapping of mappings) {
             // 원자적 증가: currentStock = currentStock + quantity
             await db.update(materials)
@@ -6479,6 +6484,7 @@ export async function registerRoutes(
                 updatedAt: new Date()
               })
               .where(eq(materials.materialCode, mapping.materialCode));
+            console.log(`[재고 복구] 원재료 ${mapping.materialCode}에 ${mapping.quantity} 복구`);
           }
           console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 복구 완료: ${productCode}`);
         }
@@ -6491,8 +6497,13 @@ export async function registerRoutes(
           status === "상품준비중") {
         // 재고 차감 - 원자적 SQL 연산 사용 (race condition 방지)
         const productCode = currentOrder.productCode || "";
+        console.log(`[재고 차감 시도] 상태: ${currentOrder.status} → ${status}, 상품코드: ${productCode}`);
         if (productCode) {
           const mappings = await storage.getProductMaterialMappings(productCode);
+          console.log(`[재고 차감] 상품코드 ${productCode}의 원재료 매핑 수: ${mappings.length}`);
+          if (mappings.length === 0) {
+            console.log(`[재고 차감 경고] 상품코드 ${productCode}에 대한 원재료 매핑이 없습니다!`);
+          }
           for (const mapping of mappings) {
             // 원자적 감소: currentStock = GREATEST(0, currentStock - quantity)
             await db.update(materials)
@@ -6501,6 +6512,7 @@ export async function registerRoutes(
                 updatedAt: new Date()
               })
               .where(eq(materials.materialCode, mapping.materialCode));
+            console.log(`[재고 차감] 원재료 ${mapping.materialCode}에서 ${mapping.quantity} 차감`);
           }
           console.log(`상태 변경(${currentOrder.status} → ${status}) - 재고 차감 완료: ${productCode}`);
         }
