@@ -4595,6 +4595,7 @@ export async function registerRoutes(
     
     const history = await storage.getFilteredStockHistory(params);
     
+    const XLSX = await import("xlsx");
     const workbook = XLSX.utils.book_new();
     const data = history.map((h) => ({
       "번호": h.id,
@@ -6846,7 +6847,7 @@ export async function registerRoutes(
         .returning();
 
       // SSE: 해당 회원들에게 주문 삭제 알림
-      const memberIds = [...new Set(deleted.map(d => d.memberId).filter(Boolean))];
+      const memberIds = Array.from(new Set(deleted.map(d => d.memberId).filter(Boolean)));
       memberIds.forEach(memberId => {
         if (memberId) {
           sseManager.sendToMember(memberId, "orders-deleted", { 
@@ -6922,7 +6923,7 @@ export async function registerRoutes(
       const deleted = await db.delete(pendingOrders).returning();
 
       // SSE: 해당 회원들에게 주문 삭제 알림
-      const memberIds = [...new Set(deleted.map(d => d.memberId).filter(Boolean))];
+      const memberIds = Array.from(new Set(deleted.map(d => d.memberId).filter(Boolean)));
       memberIds.forEach(memberId => {
         if (memberId) {
           sseManager.sendToMember(memberId, "orders-deleted", { 
@@ -7387,8 +7388,8 @@ export async function registerRoutes(
         products: group.products.map(p => {
           // 순번 내림차순 정렬 (높은 순번이 먼저 취소됨)
           const sortedOrders = [...p.orders].sort((a, b) => {
-            const seqA = a.sequenceNumber || 0;
-            const seqB = b.sequenceNumber || 0;
+            const seqA = typeof a.sequenceNumber === 'string' ? parseInt(a.sequenceNumber.replace(/\D/g, ''), 10) || 0 : (a.sequenceNumber || 0);
+            const seqB = typeof b.sequenceNumber === 'string' ? parseInt(b.sequenceNumber.replace(/\D/g, ''), 10) || 0 : (b.sequenceNumber || 0);
             return seqB - seqA; // 내림차순
           });
           return {
@@ -7894,7 +7895,7 @@ export async function registerRoutes(
       });
 
       // 회원들에게도 알림
-      const memberIds = [...new Set(ordersToTransfer.map(o => o.memberId).filter(Boolean))];
+      const memberIds = Array.from(new Set(ordersToTransfer.map(o => o.memberId).filter(Boolean)));
       for (const memberId of memberIds) {
         if (memberId) {
           sseManager.sendToMember(memberId, "order-status-changed", {

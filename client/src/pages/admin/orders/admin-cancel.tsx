@@ -367,7 +367,7 @@ export default function OrdersAdminCancelPage() {
   const handleExecuteAdjustment = async () => {
     if (selectedProducts.length === 0) return;
     
-    const materialCodes = [...new Set(selectedProducts.map(p => p.materialCode))];
+    const materialCodes = Array.from(new Set(selectedProducts.map(p => p.materialCode)));
     
     const alternateShipments: { materialCode: string; alternateMaterialCode: string; alternateQuantity: number; alternateMaterialName: string }[] = [];
     for (const materialCode of materialCodes) {
