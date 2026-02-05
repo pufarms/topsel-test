@@ -5980,6 +5980,9 @@ export async function registerRoutes(
     const confirmPartial = req.body.confirmPartial === 'true' || req.body.confirmPartial === true;
     // confirmDuplicate 파라미터: 중복 파일임을 확인하고 진행할지 여부
     const confirmDuplicate = req.body.confirmDuplicate === 'true' || req.body.confirmDuplicate === true;
+    // format 파라미터: 업로드 양식 (default, postoffice)
+    const uploadFormat = req.body.format || 'default';
+    const isPostOfficeFormat = uploadFormat === 'postoffice';
 
     try {
       const XLSX = await import("xlsx");
@@ -6052,12 +6055,16 @@ export async function registerRoutes(
         customOrderNumber: string;
         ordererName: string;
         ordererPhone: string;
+        ordererZipCode: string;
         ordererAddress: string;
         recipientName: string;
         recipientMobile: string;
         recipientPhone: string;
+        recipientZipCode: string;
         recipientAddress: string;
         deliveryMessage: string;
+        orderDetailNumber: string;
+        volumeUnit: string;
         currentProduct: any;
         validatedAddress?: string;
         addressWarning?: string;
@@ -6078,12 +6085,16 @@ export async function registerRoutes(
         customOrderNumber: string;
         ordererName: string;
         ordererPhone: string;
+        ordererZipCode: string;
         ordererAddress: string;
         recipientName: string;
         recipientMobile: string;
         recipientPhone: string;
+        recipientZipCode: string;
         recipientAddress: string;
         deliveryMessage: string;
+        orderDetailNumber: string;
+        volumeUnit: string;
         currentProduct: any;
       }> = [];
 
@@ -6092,18 +6103,47 @@ export async function registerRoutes(
         const rowNum = i + 2; // Excel rows start at 1, and header is row 1
         const missingFields: string[] = [];
 
-        // Map Excel columns to order data (주문등록양식 columns)
-        const productCode = String(row['상품코드'] || row['productCode'] || '').trim();
-        const productName = String(row['상품명'] || row['productName'] || '').trim();
-        const customOrderNumber = String(row['자체주문번호'] || row['customOrderNumber'] || '').trim();
-        const ordererName = String(row['주문자명'] || row['ordererName'] || '').trim();
-        const ordererPhone = String(row['주문자전화번호'] || row['주문자 전화번호'] || row['ordererPhone'] || '').trim();
-        const ordererAddress = String(row['주문자주소'] || row['주문자 주소'] || row['ordererAddress'] || '').trim();
-        const recipientName = String(row['수령자명'] || row['recipientName'] || '').trim();
-        const recipientMobile = String(row['수령자휴대폰번호'] || row['수령자 휴대폰번호'] || row['recipientMobile'] || '').trim();
-        const recipientPhone = String(row['수령자전화번호'] || row['수령자 전화번호'] || row['recipientPhone'] || '').trim();
-        const recipientAddress = String(row['수령자주소'] || row['수령자 주소'] || row['recipientAddress'] || '').trim();
-        const deliveryMessage = String(row['배송메시지'] || row['deliveryMessage'] || '').trim();
+        // Map Excel columns to order data (양식에 따라 다른 컬럼 매핑)
+        let productCode: string, productName: string, customOrderNumber: string;
+        let ordererName: string, ordererPhone: string, ordererAddress: string, ordererZipCode: string;
+        let recipientName: string, recipientMobile: string, recipientPhone: string, recipientAddress: string, recipientZipCode: string;
+        let deliveryMessage: string, orderDetailNumber: string, volumeUnit: string;
+
+        if (isPostOfficeFormat) {
+          // 우체국 양식: 부피단위, 주문자명, 주문자 전화번호, 주문자 우편번호, 주문자 주소, 상품명, 수취인명, 수취인 전화번호, 수취인 우편번호, 수취인 주소, 배송메세지, 주문번호, 주문상세번호, 상품코드, 수량
+          volumeUnit = String(row['부피단위'] || '').trim();
+          ordererName = String(row['주문자명'] || '').trim();
+          ordererPhone = String(row['주문자 전화번호'] || row['주문자전화번호'] || '').trim();
+          ordererZipCode = String(row['주문자 우편번호'] || row['주문자우편번호'] || '').trim();
+          ordererAddress = String(row['주문자 주소'] || row['주문자주소'] || '').trim();
+          productName = String(row['상품명'] || '').trim();
+          recipientName = String(row['수취인명'] || '').trim();
+          recipientMobile = String(row['수취인 전화번호'] || row['수취인전화번호'] || '').trim();
+          recipientZipCode = String(row['수취인 우편번호'] || row['수취인우편번호'] || '').trim();
+          recipientAddress = String(row['수취인 주소'] || row['수취인주소'] || '').trim();
+          deliveryMessage = String(row['배송메세지'] || row['배송메시지'] || '').trim();
+          customOrderNumber = String(row['주문번호'] || '').trim();
+          orderDetailNumber = String(row['주문상세번호'] || '').trim();
+          productCode = String(row['상품코드'] || '').trim();
+          recipientPhone = ''; // 우체국 양식에는 별도의 수령자 전화번호가 없음
+        } else {
+          // 기본 양식 (주문등록양식 columns)
+          productCode = String(row['상품코드'] || row['productCode'] || '').trim();
+          productName = String(row['상품명'] || row['productName'] || '').trim();
+          customOrderNumber = String(row['자체주문번호'] || row['customOrderNumber'] || '').trim();
+          ordererName = String(row['주문자명'] || row['ordererName'] || '').trim();
+          ordererPhone = String(row['주문자전화번호'] || row['주문자 전화번호'] || row['ordererPhone'] || '').trim();
+          ordererAddress = String(row['주문자주소'] || row['주문자 주소'] || row['ordererAddress'] || '').trim();
+          recipientName = String(row['수령자명'] || row['recipientName'] || '').trim();
+          recipientMobile = String(row['수령자휴대폰번호'] || row['수령자 휴대폰번호'] || row['recipientMobile'] || '').trim();
+          recipientPhone = String(row['수령자전화번호'] || row['수령자 전화번호'] || row['recipientPhone'] || '').trim();
+          recipientAddress = String(row['수령자주소'] || row['수령자 주소'] || row['recipientAddress'] || '').trim();
+          deliveryMessage = String(row['배송메시지'] || row['deliveryMessage'] || '').trim();
+          ordererZipCode = '';
+          recipientZipCode = '';
+          orderDetailNumber = '';
+          volumeUnit = '';
+        }
 
         // Check each required field individually
         if (!productCode) missingFields.push('상품코드');
@@ -6154,12 +6194,16 @@ export async function registerRoutes(
           customOrderNumber,
           ordererName,
           ordererPhone,
+          ordererZipCode,
           ordererAddress,
           recipientName,
           recipientMobile,
           recipientPhone,
+          recipientZipCode,
           recipientAddress,
           deliveryMessage,
+          orderDetailNumber,
+          volumeUnit,
           currentProduct,
         });
       }
@@ -6204,12 +6248,16 @@ export async function registerRoutes(
                 customOrderNumber: pendingRow.customOrderNumber,
                 ordererName: pendingRow.ordererName,
                 ordererPhone: pendingRow.ordererPhone,
+                ordererZipCode: pendingRow.ordererZipCode,
                 ordererAddress: pendingRow.ordererAddress,
                 recipientName: pendingRow.recipientName,
                 recipientMobile: pendingRow.recipientMobile,
                 recipientPhone: pendingRow.recipientPhone,
+                recipientZipCode: pendingRow.recipientZipCode,
                 recipientAddress: pendingRow.recipientAddress,
                 deliveryMessage: pendingRow.deliveryMessage,
+                orderDetailNumber: pendingRow.orderDetailNumber,
+                volumeUnit: pendingRow.volumeUnit,
                 currentProduct: pendingRow.currentProduct,
                 validatedAddress: result?.fullAddress || result?.standardAddress,
                 addressWarning: result?.warningMessage,
@@ -6229,12 +6277,16 @@ export async function registerRoutes(
             customOrderNumber: pendingRow.customOrderNumber,
             ordererName: pendingRow.ordererName,
             ordererPhone: pendingRow.ordererPhone,
+            ordererZipCode: pendingRow.ordererZipCode,
             ordererAddress: pendingRow.ordererAddress,
             recipientName: pendingRow.recipientName,
             recipientMobile: pendingRow.recipientMobile,
             recipientPhone: pendingRow.recipientPhone,
+            recipientZipCode: pendingRow.recipientZipCode,
             recipientAddress: pendingRow.recipientAddress,
             deliveryMessage: pendingRow.deliveryMessage,
+            orderDetailNumber: pendingRow.orderDetailNumber,
+            volumeUnit: pendingRow.volumeUnit,
             currentProduct: pendingRow.currentProduct,
           });
         }
@@ -6301,15 +6353,19 @@ export async function registerRoutes(
           supplyPrice: supplyPrice,
           ordererName: parsedRow.ordererName,
           ordererPhone: normalizePhoneNumber(parsedRow.ordererPhone),
+          ordererZipCode: parsedRow.ordererZipCode || null,
           ordererAddress: parsedRow.ordererAddress || null,
           recipientName: parsedRow.recipientName,
           recipientMobile: normalizePhoneNumber(parsedRow.recipientMobile),
           recipientPhone: normalizePhoneNumber(parsedRow.recipientPhone) || null,
+          recipientZipCode: parsedRow.recipientZipCode || null,
           recipientAddress: parsedRow.validatedAddress || parsedRow.recipientAddress,
           deliveryMessage: parsedRow.addressWarning 
             ? `${parsedRow.deliveryMessage || ''} [주소확인필요: ${parsedRow.addressWarning}]`.trim()
             : (parsedRow.deliveryMessage || null),
           customOrderNumber: parsedRow.customOrderNumber,
+          orderDetailNumber: parsedRow.orderDetailNumber || null,
+          volumeUnit: parsedRow.volumeUnit || null,
           trackingNumber: null,
           courierCompany: null,
         });
@@ -6459,7 +6515,32 @@ export async function registerRoutes(
       const XLSX = await import("xlsx");
       let wsData: any[][];
 
-      if (format === "lotte") {
+      if (format === "postoffice") {
+        // 우체국 양식: 부피단위, 주문자명, 주문자 전화번호, 주문자 우편번호, 주문자 주소, 상품명, 수취인명, 수취인 전화번호, 수취인 우편번호, 수취인 주소, 배송메세지, 주문번호, 주문상세번호, 상품코드, 수량
+        wsData = [
+          ["부피단위", "주문자명", "주문자 전화번호", "주문자 우편번호", "주문자 주소", "상품명", "수취인명", "수취인 전화번호", "수취인 우편번호", "수취인 주소", "배송메세지", "주문번호", "주문상세번호", "상품코드", "수량"]
+        ];
+        
+        for (const order of orders) {
+          wsData.push([
+            order.volumeUnit || "",
+            order.ordererName || "",
+            order.ordererPhone || "",
+            order.ordererZipCode || "",
+            order.ordererAddress || "",
+            order.productName || "",
+            order.recipientName || "",
+            order.recipientMobile || "",
+            order.recipientZipCode || "",
+            order.recipientAddress || "",
+            order.deliveryMessage || "",
+            order.customOrderNumber || "",
+            order.orderDetailNumber || "",
+            order.productCode || "",
+            1
+          ]);
+        }
+      } else if (format === "lotte") {
         // 롯데 양식: 주문자명, 주문자 전화번호, 주문자 주소, 수령자명, 수령자휴대폰번호, 수령자 전화번호, 수령자 주소, 배송메시지, 상품코드, 상품명, 수량, 주문번호, 운송장번호, 택배사
         wsData = [
           ["주문자명", "주문자 전화번호", "주문자 주소", "수령자명", "수령자휴대폰번호", "수령자 전화번호", "수령자 주소", "배송메시지", "상품코드", "상품명", "수량", "주문번호", "운송장번호", "택배사"]
@@ -6516,7 +6597,17 @@ export async function registerRoutes(
       // 전화번호 컬럼을 텍스트 형식으로 설정 (앞자리 0 보존)
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
       for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-        if (format === "lotte") {
+        if (format === "postoffice") {
+          // 우체국 양식: C(주문자 전화번호), H(수취인 전화번호), D(주문자 우편번호), I(수취인 우편번호)
+          const phoneAndZipColumns = [2, 3, 7, 8]; // C=2, D=3, H=7, I=8
+          for (const C of phoneAndZipColumns) {
+            const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+            if (ws[cellRef]) {
+              ws[cellRef].t = 's';
+              ws[cellRef].z = '@';
+            }
+          }
+        } else if (format === "lotte") {
           // 롯데 양식: B(주문자 전화번호), E(수령자휴대폰번호), F(수령자 전화번호)
           const phoneColumns = [1, 4, 5]; // B=1, E=4, F=5
           for (const C of phoneColumns) {
@@ -6540,15 +6631,22 @@ export async function registerRoutes(
       }
       
       XLSX.utils.book_append_sheet(wb, ws, "상품준비중");
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-
-      const formatName = format === "lotte" ? "lotte" : "default";
-      const koreanFormatName = format === "lotte" ? "롯데" : "기본";
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const asciiFilename = `preparing_orders_${formatName}_${dateStr}.xlsx`;
-      const koreanFilename = `상품준비중_${koreanFormatName}_${dateStr}.xlsx`;
       
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      // 우체국 양식은 .xls, 나머지는 .xlsx
+      const bookType = format === "postoffice" ? "biff8" : "xlsx";
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: bookType as any });
+
+      const formatName = format === "postoffice" ? "postoffice" : format === "lotte" ? "lotte" : "default";
+      const koreanFormatName = format === "postoffice" ? "우체국" : format === "lotte" ? "롯데" : "기본";
+      const fileExt = format === "postoffice" ? "xls" : "xlsx";
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const asciiFilename = `preparing_orders_${formatName}_${dateStr}.${fileExt}`;
+      const koreanFilename = `상품준비중_${koreanFormatName}_${dateStr}.${fileExt}`;
+      
+      const contentType = format === "postoffice" 
+        ? "application/vnd.ms-excel" 
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Disposition", `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(koreanFilename)}`);
       res.send(buffer);
     } catch (error: any) {

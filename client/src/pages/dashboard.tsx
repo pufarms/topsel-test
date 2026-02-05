@@ -242,6 +242,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [uploadFormat, setUploadFormat] = useState<"default" | "postoffice">("default");
   const [uploadProgress, setUploadProgress] = useState<{ 
     status: 'idle' | 'duplicate_detected' | 'validation_failed' | 'partial_success' | 'success';
     total: number; 
@@ -302,7 +303,7 @@ export default function Dashboard() {
 
   // Excel upload mutation for bulk order registration
   const uploadExcelMutation = useMutation({
-    mutationFn: async ({ file, confirmPartial, confirmDuplicate }: { file: File; confirmPartial?: boolean; confirmDuplicate?: boolean }) => {
+    mutationFn: async ({ file, confirmPartial, confirmDuplicate, format }: { file: File; confirmPartial?: boolean; confirmDuplicate?: boolean; format?: string }) => {
       const formData = new FormData();
       formData.append("file", file);
       if (confirmPartial) {
@@ -310,6 +311,9 @@ export default function Dashboard() {
       }
       if (confirmDuplicate) {
         formData.append("confirmDuplicate", "true");
+      }
+      if (format) {
+        formData.append("format", format);
       }
       const res = await fetch("/api/member/pending-orders/excel-upload", {
         method: "POST",
@@ -380,7 +384,7 @@ export default function Dashboard() {
   const handleExcelUpload = () => {
     if (excelFile) {
       setUploadProgress(null);
-      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: false });
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: false, format: uploadFormat });
     }
   };
 
@@ -388,14 +392,14 @@ export default function Dashboard() {
   const handleConfirmDuplicate = () => {
     if (excelFile) {
       setUploadProgress(null);
-      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: true });
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: false, confirmDuplicate: true, format: uploadFormat });
     }
   };
 
   // 정상건만 등록 (오류건 다운로드)
   const handlePartialUpload = () => {
     if (excelFile) {
-      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: true, confirmDuplicate: true });
+      uploadExcelMutation.mutate({ file: excelFile, confirmPartial: true, confirmDuplicate: true, format: uploadFormat });
     }
   };
 
@@ -403,6 +407,7 @@ export default function Dashboard() {
     setOrderDialogOpen(false);
     setExcelFile(null);
     setUploadProgress(null);
+    setUploadFormat("default");
   };
   
   // 카테고리 데이터 쿼리 (상품관리/카테고리관리 연동)
@@ -1187,10 +1192,23 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="space-y-2">
+                                  <Label>업로드 양식 선택</Label>
+                                  <select
+                                    className="w-full h-10 px-3 border rounded-md bg-background"
+                                    value={uploadFormat}
+                                    onChange={(e) => setUploadFormat(e.target.value as "default" | "postoffice")}
+                                    data-testid="select-upload-format"
+                                  >
+                                    <option value="default">기본 양식 (.xlsx)</option>
+                                    <option value="postoffice">우체국 양식 (.xls)</option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-2">
                                   <Label>엑셀 파일 선택</Label>
                                   <Input
                                     type="file"
-                                    accept=".xlsx,.xls"
+                                    accept={uploadFormat === "postoffice" ? ".xls" : ".xlsx,.xls"}
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) setExcelFile(file);

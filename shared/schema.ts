@@ -1213,15 +1213,19 @@ export const pendingOrders = pgTable("pending_orders", {
   
   ordererName: text("orderer_name").notNull(),
   ordererPhone: text("orderer_phone").notNull(),
+  ordererZipCode: text("orderer_zip_code"),
   ordererAddress: text("orderer_address"),
   
   recipientName: text("recipient_name").notNull(),
   recipientMobile: text("recipient_mobile").notNull(),
   recipientPhone: text("recipient_phone"),
+  recipientZipCode: text("recipient_zip_code"),
   recipientAddress: text("recipient_address").notNull(),
   
   deliveryMessage: text("delivery_message"),
   customOrderNumber: text("custom_order_number").notNull(),
+  orderDetailNumber: text("order_detail_number"),
+  volumeUnit: text("volume_unit"),
   
   trackingNumber: text("tracking_number"),
   courierCompany: text("courier_company"),

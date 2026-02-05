@@ -54,7 +54,7 @@ export default function OrdersPreparingPage() {
   const [showRestoreSelectedDialog, setShowRestoreSelectedDialog] = useState(false);
   const [showRestoreAllDialog, setShowRestoreAllDialog] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte">("default");
+  const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte" | "postoffice">("default");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -110,7 +110,7 @@ export default function OrdersPreparingPage() {
     setSelectedOrders([]);
   };
 
-  const handleDownload = async (format: "default" | "lotte") => {
+  const handleDownload = async (format: "default" | "lotte" | "postoffice") => {
     const orderIds = selectedOrders.length > 0 ? selectedOrders : filteredOrders.map(o => o.id);
     
     if (orderIds.length === 0) {
@@ -135,8 +135,9 @@ export default function OrdersPreparingPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const formatName = format === "lotte" ? "롯데" : "기본";
-      a.download = `상품준비중_${formatName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const formatName = format === "postoffice" ? "우체국" : format === "lotte" ? "롯데" : "기본";
+      const fileExt = format === "postoffice" ? "xls" : "xlsx";
+      a.download = `상품준비중_${formatName}_${new Date().toISOString().slice(0, 10)}.${fileExt}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -200,7 +201,7 @@ export default function OrdersPreparingPage() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="outline" data-testid="button-select-format">
-                    다운양식선택: {downloadFormat === "lotte" ? "롯데 양식" : "기본 양식"}
+                    다운양식선택: {downloadFormat === "postoffice" ? "우체국 양식" : downloadFormat === "lotte" ? "롯데 양식" : "기본 양식"}
                     <ChevronDown className="h-4 w-4 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -209,13 +210,19 @@ export default function OrdersPreparingPage() {
                     onClick={() => setDownloadFormat("default")}
                     data-testid="menu-format-default"
                   >
-                    기본 양식
+                    기본 양식 (.xlsx)
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setDownloadFormat("lotte")}
                     data-testid="menu-format-lotte"
                   >
-                    롯데 양식
+                    롯데 양식 (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setDownloadFormat("postoffice")}
+                    data-testid="menu-format-postoffice"
+                  >
+                    우체국 양식 (.xls)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
