@@ -13,7 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileDown, Loader2, Trash2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -38,6 +44,7 @@ export default function OrdersPendingPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
+  const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
 
   // 상품별 합계 테이블용 상태 (기존 상태와 독립적)
   const [summaryFilters, setSummaryFilters] = useState<AdminCategoryFilterState>({
@@ -111,7 +118,12 @@ export default function OrdersPendingPage() {
     productCode: order.productCode || undefined,
   }), []);
 
-  const filteredOrders = useAdminCategoryFilter(pendingOrders, filters, getFields);
+  const categoryFilteredOrders = useAdminCategoryFilter(pendingOrders, filters, getFields);
+  
+  // 업로드 양식 필터 적용
+  const filteredOrders = uploadFormatFilter === "all" 
+    ? categoryFilteredOrders 
+    : categoryFilteredOrders.filter(o => (o.uploadFormat || "default") === uploadFormatFilter);
   
   // 페이지네이션 계산
   const totalPages = tablePageSize === "all" 
@@ -340,6 +352,38 @@ export default function OrdersPendingPage() {
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
           />
+
+          <div className="flex items-center gap-2 flex-wrap bg-orange-50 dark:bg-orange-900/30 p-2 rounded-md border border-orange-200 dark:border-orange-800">
+            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">업로드양식 선택:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="default" className="bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-upload-format-filter">
+                  {uploadFormatFilter === "all" ? "전체" : uploadFormatFilter === "postoffice" ? "우체국" : "기본"}
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("all"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-all"
+                >
+                  전체
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("default"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-default"
+                >
+                  기본 양식
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setUploadFormatFilter("postoffice"); setCurrentPage(1); }}
+                  data-testid="menu-upload-filter-postoffice"
+                >
+                  우체국 양식
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">

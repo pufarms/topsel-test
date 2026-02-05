@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { FileDown, Loader2, AlertTriangle, Search, Check, X, Send } from "lucide-react";
+import { FileDown, Loader2, AlertTriangle, Search, Check, X, Send, ChevronDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -95,6 +101,7 @@ export default function OrdersAdminCancelPage() {
   const [deficitMaterials, setDeficitMaterials] = useState<MaterialGroup[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
   const [applyingMaterials, setApplyingMaterials] = useState<Set<string>>(new Set());
+  const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -126,7 +133,12 @@ export default function OrdersAdminCancelPage() {
     productCode: order.productCode || undefined,
   }), []);
 
-  const filteredOrders = useAdminCategoryFilter(adminCancelledOrders, filters, getFields);
+  const categoryFilteredOrders = useAdminCategoryFilter(adminCancelledOrders, filters, getFields);
+  
+  // 업로드 양식 필터 적용
+  const filteredOrders = uploadFormatFilter === "all" 
+    ? categoryFilteredOrders 
+    : categoryFilteredOrders.filter(o => (o.uploadFormat || "default") === uploadFormatFilter);
 
   const executeAdjustmentMutation = useMutation({
     mutationFn: async (data: { materialCode: string; products: MaterialProduct[] }) => {
@@ -966,6 +978,38 @@ export default function OrdersAdminCancelPage() {
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
           />
+
+          <div className="flex items-center gap-2 flex-wrap bg-orange-50 dark:bg-orange-900/30 p-2 rounded-md border border-orange-200 dark:border-orange-800">
+            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">업로드양식 선택:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="default" className="bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-upload-format-filter">
+                  {uploadFormatFilter === "all" ? "전체" : uploadFormatFilter === "postoffice" ? "우체국" : "기본"}
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem 
+                  onClick={() => setUploadFormatFilter("all")}
+                  data-testid="menu-upload-filter-all"
+                >
+                  전체
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setUploadFormatFilter("default")}
+                  data-testid="menu-upload-filter-default"
+                >
+                  기본 양식
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setUploadFormatFilter("postoffice")}
+                  data-testid="menu-upload-filter-postoffice"
+                >
+                  우체국 양식
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
