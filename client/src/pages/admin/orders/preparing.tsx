@@ -202,11 +202,11 @@ export default function OrdersPreparingPage() {
             searchPlaceholder="검색어를 입력하세요"
           />
 
-          <div className="flex items-center gap-2 flex-wrap bg-blue-50 dark:bg-blue-900/30 p-2 rounded-md border border-blue-200 dark:border-blue-800">
-            <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">업로드양식 선택:</span>
+          <div className="flex items-center gap-2 flex-wrap bg-orange-50 dark:bg-orange-900/30 p-2 rounded-md border border-orange-200 dark:border-orange-800">
+            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">업로드양식 선택:</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700 text-white" data-testid="button-upload-format-filter">
+                <Button size="sm" variant="default" className="bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-upload-format-filter">
                   {uploadFormatFilter === "all" ? "전체" : uploadFormatFilter === "postoffice" ? "우체국" : "기본"}
                   <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
