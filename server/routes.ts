@@ -6657,6 +6657,169 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Upload waybill file (운송장 파일 업로드)
+  const waybillUpload = multer({ storage: multer.memoryStorage() });
+  app.post('/api/admin/orders/upload-waybill', waybillUpload.single('file'), async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const file = req.file;
+      const courier = req.body.courier as "lotte" | "postoffice";
+
+      if (!file) {
+        return res.status(400).json({ message: "파일을 업로드해주세요" });
+      }
+
+      if (!courier || !["lotte", "postoffice"].includes(courier)) {
+        return res.status(400).json({ message: "택배사를 선택해주세요" });
+      }
+
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+
+      if (rows.length < 2) {
+        return res.status(400).json({ message: "파일에 데이터가 없습니다" });
+      }
+
+      // 택배사별 컬럼 인덱스 설정
+      // 롯데: 주문번호(인덱스 9), 운송장번호(인덱스 6)
+      // 우체국: 주문번호(인덱스 20), 등기번호(인덱스 1)
+      const orderNumberIndex = courier === "lotte" ? 9 : 20;
+      const trackingNumberIndex = courier === "lotte" ? 6 : 1;
+      const courierCompanyName = courier === "lotte" ? "롯데택배" : "우체국택배";
+
+      // 파일에서 주문번호-운송장번호 쌍 추출 (헤더 제외)
+      const waybillPairs: Array<{ orderNumber: string; trackingNumber: string; rowIndex: number }> = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const orderNumber = String(row[orderNumberIndex] || "").trim();
+        const trackingNumber = String(row[trackingNumberIndex] || "").trim();
+        
+        if (orderNumber) {
+          waybillPairs.push({ orderNumber, trackingNumber, rowIndex: i });
+        }
+      }
+
+      if (waybillPairs.length === 0) {
+        return res.status(400).json({ message: "파일에서 주문번호를 찾을 수 없습니다" });
+      }
+
+      // 상품준비중 상태의 주문 조회 (sequenceNumber 기준 정렬)
+      const preparingOrders = await db
+        .select()
+        .from(pendingOrders)
+        .where(eq(pendingOrders.status, "상품준비중"))
+        .orderBy(asc(pendingOrders.sequenceNumber));
+
+      // 주문번호별 그룹화 (순서 유지)
+      const ordersByOrderNumber: Map<string, typeof preparingOrders> = new Map();
+      for (const order of preparingOrders) {
+        const orderNumber = order.customOrderNumber || order.orderNumber || "";
+        if (!ordersByOrderNumber.has(orderNumber)) {
+          ordersByOrderNumber.set(orderNumber, []);
+        }
+        ordersByOrderNumber.get(orderNumber)!.push(order);
+      }
+
+      // 파일의 주문번호별 운송장 그룹화 (순서 유지)
+      const waybillsByOrderNumber: Map<string, typeof waybillPairs> = new Map();
+      for (const pair of waybillPairs) {
+        if (!waybillsByOrderNumber.has(pair.orderNumber)) {
+          waybillsByOrderNumber.set(pair.orderNumber, []);
+        }
+        waybillsByOrderNumber.get(pair.orderNumber)!.push(pair);
+      }
+
+      // 결과 집계
+      const details: Array<{ orderNumber: string; trackingNumber: string; status: "success" | "failed" | "skipped"; reason?: string }> = [];
+      let successCount = 0;
+      let failedCount = 0;
+      let skippedCount = 0;
+
+      // 매핑 및 업데이트 처리
+      for (const [orderNumber, waybills] of Array.from(waybillsByOrderNumber.entries())) {
+        const dbOrders = ordersByOrderNumber.get(orderNumber) || [];
+        
+        for (let i = 0; i < waybills.length; i++) {
+          const waybill = waybills[i];
+          
+          if (!waybill.trackingNumber) {
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: "",
+              status: "skipped",
+              reason: "운송장번호 없음"
+            });
+            skippedCount++;
+            continue;
+          }
+
+          if (i >= dbOrders.length) {
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: waybill.trackingNumber,
+              status: "failed",
+              reason: "테이블에서 주문 찾을 수 없음"
+            });
+            failedCount++;
+            continue;
+          }
+
+          // 순서대로 매핑
+          const targetOrder = dbOrders[i];
+          
+          try {
+            await db.update(pendingOrders)
+              .set({
+                trackingNumber: waybill.trackingNumber,
+                courierCompany: courierCompanyName,
+                updatedAt: new Date()
+              })
+              .where(eq(pendingOrders.id, targetOrder.id));
+
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: waybill.trackingNumber,
+              status: "success"
+            });
+            successCount++;
+          } catch (err) {
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: waybill.trackingNumber,
+              status: "failed",
+              reason: "DB 업데이트 실패"
+            });
+            failedCount++;
+          }
+        }
+      }
+
+      // SSE 이벤트 발송
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+      res.json({
+        success: successCount,
+        failed: failedCount,
+        skipped: skippedCount,
+        details
+      });
+
+    } catch (error: any) {
+      console.error("Waybill upload error:", error);
+      res.status(500).json({ message: error.message || "운송장 파일 처리 중 오류가 발생했습니다" });
+    }
+  });
+
   // Admin: Update pending order (tracking number, courier, status)
   app.patch('/api/admin/pending-orders/:id', async (req, res) => {
     if (!req.session.userId) {

@@ -23,7 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileDown, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileDown, FileUp, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +67,19 @@ export default function OrdersPreparingPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte" | "postoffice">("default");
   const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
+  
+  // 운송장 업로드 관련 상태
+  const [showWaybillUploadDialog, setShowWaybillUploadDialog] = useState(false);
+  const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice">("lotte");
+  const [waybillFile, setWaybillFile] = useState<File | null>(null);
+  const [isUploadingWaybill, setIsUploadingWaybill] = useState(false);
+  const [showWaybillResultDialog, setShowWaybillResultDialog] = useState(false);
+  const [waybillUploadResult, setWaybillUploadResult] = useState<{
+    success: number;
+    failed: number;
+    skipped: number;
+    details: Array<{ orderNumber: string; trackingNumber: string; status: "success" | "failed" | "skipped"; reason?: string }>;
+  } | null>(null);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -184,6 +208,54 @@ export default function OrdersPreparingPage() {
     restoreToWaitingMutation.mutate(allIds);
   };
 
+  // 운송장 업로드 처리
+  const handleWaybillUpload = async () => {
+    if (!waybillFile) {
+      toast({ title: "파일을 선택해주세요", variant: "destructive" });
+      return;
+    }
+
+    setIsUploadingWaybill(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", waybillFile);
+      formData.append("courier", waybillCourier);
+
+      const response = await fetch("/api/admin/orders/upload-waybill", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "업로드 실패");
+      }
+
+      const result = await response.json();
+      setWaybillUploadResult(result);
+      setShowWaybillUploadDialog(false);
+      setShowWaybillResultDialog(true);
+      setWaybillFile(null);
+      
+      // 데이터 새로고침
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      
+    } catch (error: any) {
+      toast({ 
+        title: "운송장 업로드 실패", 
+        description: error.message || "파일 처리 중 오류가 발생했습니다.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploadingWaybill(false);
+    }
+  };
+
+  const handleOpenWaybillDialog = () => {
+    setWaybillFile(null);
+    setShowWaybillUploadDialog(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -277,6 +349,16 @@ export default function OrdersPreparingPage() {
                   <FileDown className="h-4 w-4 mr-1" />
                 )}
                 다운로드
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenWaybillDialog}
+                className="bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                data-testid="button-upload-waybill"
+              >
+                <FileUp className="h-4 w-4 mr-1" />
+                운송장 업로드
               </Button>
               <Button
                 size="sm"
@@ -483,6 +565,172 @@ export default function OrdersPreparingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 운송장 업로드 다이얼로그 */}
+      <Dialog open={showWaybillUploadDialog} onOpenChange={setShowWaybillUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>운송장 파일 업로드</DialogTitle>
+            <DialogDescription>
+              택배사를 선택하고 운송장 파일을 업로드하세요.
+              주문번호와 운송장번호가 자동으로 매핑됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>택배사 선택</Label>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300" data-testid="badge-selected-courier">
+                  {waybillCourier === "lotte" ? "롯데택배" : "우체국택배"} 선택됨
+                </Badge>
+              </div>
+              <RadioGroup
+                value={waybillCourier}
+                onValueChange={(value) => setWaybillCourier(value as "lotte" | "postoffice")}
+                className="flex gap-4"
+              >
+                <div 
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md cursor-pointer border transition-colors ${waybillCourier === "lotte" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}`}
+                  onClick={() => setWaybillCourier("lotte")}
+                  data-testid="option-courier-lotte"
+                >
+                  <RadioGroupItem value="lotte" id="courier-lotte" data-testid="radio-courier-lotte" />
+                  <Label htmlFor="courier-lotte" className="font-normal cursor-pointer">롯데택배</Label>
+                </div>
+                <div 
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md cursor-pointer border transition-colors ${waybillCourier === "postoffice" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}`}
+                  onClick={() => setWaybillCourier("postoffice")}
+                  data-testid="option-courier-postoffice"
+                >
+                  <RadioGroupItem value="postoffice" id="courier-postoffice" data-testid="radio-courier-postoffice" />
+                  <Label htmlFor="courier-postoffice" className="font-normal cursor-pointer">우체국택배</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label>파일 선택</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setWaybillFile(e.target.files?.[0] || null)}
+                  className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  data-testid="input-waybill-file"
+                />
+              </div>
+              {waybillFile && (
+                <p className="text-sm text-muted-foreground">
+                  선택된 파일: {waybillFile.name}
+                </p>
+              )}
+            </div>
+            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 border border-amber-200">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">주의사항</p>
+                  <ul className="list-disc list-inside mt-1 text-xs space-y-1">
+                    <li>롯데택배: 주문번호(10번째), 운송장번호(7번째) 컬럼 사용</li>
+                    <li>우체국택배: 주문번호(21번째), 등기번호(2번째) 컬럼 사용</li>
+                    <li>동일 주문번호가 여러 건인 경우 순서대로 매핑됩니다.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowWaybillUploadDialog(false)}
+              data-testid="button-waybill-cancel"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleWaybillUpload}
+              disabled={!waybillFile || isUploadingWaybill}
+              data-testid="button-waybill-upload-confirm"
+            >
+              {isUploadingWaybill ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  처리중...
+                </>
+              ) : (
+                <>
+                  <FileUp className="h-4 w-4 mr-1" />
+                  업로드
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 운송장 업로드 결과 다이얼로그 */}
+      <Dialog open={showWaybillResultDialog} onOpenChange={setShowWaybillResultDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>운송장 업로드 결과</DialogTitle>
+            <DialogDescription>
+              운송장 파일 처리가 완료되었습니다.
+            </DialogDescription>
+          </DialogHeader>
+          {waybillUploadResult && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-lg bg-green-50 p-3 text-center border border-green-200">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-green-700">{waybillUploadResult.success}</p>
+                  <p className="text-xs text-green-600">성공</p>
+                </div>
+                <div className="rounded-lg bg-red-50 p-3 text-center border border-red-200">
+                  <XCircle className="h-6 w-6 text-red-600 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-red-700">{waybillUploadResult.failed}</p>
+                  <p className="text-xs text-red-600">실패</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3 text-center border border-gray-200">
+                  <AlertTriangle className="h-6 w-6 text-gray-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-gray-700">{waybillUploadResult.skipped}</p>
+                  <p className="text-xs text-gray-600">스킵</p>
+                </div>
+              </div>
+              
+              {waybillUploadResult.details.length > 0 && (
+                <div className="space-y-2">
+                  <Label>상세 내역</Label>
+                  <ScrollArea className="h-[200px] rounded-md border p-2">
+                    <div className="space-y-1">
+                      {waybillUploadResult.details.map((item, index) => (
+                        <div key={index} className={`flex items-center justify-between text-sm px-2 py-1 rounded ${
+                          item.status === "success" ? "bg-green-50" :
+                          item.status === "failed" ? "bg-red-50" : "bg-gray-50"
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {item.status === "success" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                            {item.status === "failed" && <XCircle className="h-3 w-3 text-red-600" />}
+                            {item.status === "skipped" && <AlertTriangle className="h-3 w-3 text-gray-500" />}
+                            <span className="font-mono text-xs">{item.orderNumber || "-"}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono">{item.trackingNumber || "-"}</span>
+                            {item.reason && <span className="text-red-600">({item.reason})</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowWaybillResultDialog(false)} data-testid="button-waybill-result-close">
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
