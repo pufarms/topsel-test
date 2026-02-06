@@ -28,6 +28,7 @@ import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersReadyToShipPage() {
@@ -46,6 +47,8 @@ export default function OrdersReadyToShipPage() {
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { dateRange, setDateRange } = useDateRange("today");
+
   const [showTransferAllDialog, setShowTransferAllDialog] = useState(false);
   const [showTransferFilteredDialog, setShowTransferFilteredDialog] = useState(false);
   const [showTransferSelectedDialog, setShowTransferSelectedDialog] = useState(false);
@@ -53,7 +56,15 @@ export default function OrdersReadyToShipPage() {
   const [showCancelDeadlineDialog, setShowCancelDeadlineDialog] = useState(false);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: deliveryStatus } = useQuery<{ waybillDelivered: boolean; cancelDeadlineClosed: boolean }>({
@@ -233,6 +244,7 @@ export default function OrdersReadyToShipPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

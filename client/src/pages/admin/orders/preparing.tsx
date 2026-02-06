@@ -46,10 +46,13 @@ import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterSt
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 export default function OrdersPreparingPage() {
   const { toast } = useToast();
   useSSE();
+
+  const { dateRange, setDateRange } = useDateRange("today");
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
@@ -91,7 +94,15 @@ export default function OrdersPreparingPage() {
   } | null>(null);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const restoreToWaitingMutation = useMutation({
@@ -403,6 +414,7 @@ export default function OrdersPreparingPage() {
           <CardTitle>상품준비중 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

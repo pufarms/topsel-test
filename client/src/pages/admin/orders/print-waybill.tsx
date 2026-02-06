@@ -16,6 +16,7 @@ import {
 import { FileDown, Printer, Loader2 } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import type { PendingOrder } from "@shared/schema";
 
 export default function OrdersPrintWaybillPage() {
@@ -30,9 +31,18 @@ export default function OrdersPrintWaybillPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const { dateRange, setDateRange } = useDateRange("today");
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/orders"],
+    queryKey: ["/api/admin/orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const printableOrders = allOrders.filter(o => 
@@ -81,6 +91,7 @@ export default function OrdersPrintWaybillPage() {
           <CardTitle>운송장 출력 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

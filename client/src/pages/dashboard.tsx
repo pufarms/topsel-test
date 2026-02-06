@@ -59,6 +59,7 @@ import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { MemberPageBanner } from "@/components/member/MemberPageBanner";
 import { MemberOrderFilter } from "@/components/member/MemberOrderFilter";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { type Order, type Member, type PendingOrder, type Category } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import MemberOrderAdjust from "@/pages/member/order-adjust";
@@ -190,6 +191,8 @@ export default function Dashboard() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   
+  const { dateRange, setDateRange } = useDateRange("today");
+  
   const urlParams = new URLSearchParams(window.location.search);
   const isPreviewMode = urlParams.get("preview") === "true";
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
@@ -218,8 +221,18 @@ export default function Dashboard() {
   });
   
   const { data: pendingOrders = [], isLoading: pendingOrdersLoading, refetch: refetchPendingOrders } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/member/pending-orders"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryKey: ["/api/member/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/member/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) return null;
+        throw new Error("Failed to fetch");
+      }
+      return res.json();
+    },
     enabled: !!user && (isMember || isPreviewMode),
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
@@ -235,7 +248,15 @@ export default function Dashboard() {
     memberCancelled: number;
     shipping: number;
   }>({
-    queryKey: ["/api/order-stats"],
+    queryKey: ["/api/order-stats", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/order-stats?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     enabled: !!user && (isMember || isPreviewMode),
   });
 
@@ -805,6 +826,7 @@ export default function Dashboard() {
         <main className="lg:ml-64 min-w-0 p-4 md:p-6">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
+              <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">

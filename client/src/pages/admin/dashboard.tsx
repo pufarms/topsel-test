@@ -26,6 +26,7 @@ import {
   Percent
 } from "lucide-react";
 import type { User, Order, Member } from "@shared/schema";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { 
   Table, 
   TableBody, 
@@ -115,8 +116,8 @@ function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
 }
 
 export default function AdminDashboard() {
-  // SSE 실시간 업데이트 연결 (관리자)
   useSSE();
+  const { dateRange, setDateRange } = useDateRange("today");
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -127,10 +128,17 @@ export default function AdminDashboard() {
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
-  // Order stats from API (real-time counts from pending_orders table)
   const { data: orderStats } = useQuery<{
     total: number;
     pending: number;
@@ -140,7 +148,15 @@ export default function AdminDashboard() {
     memberCancelled: number;
     shipping: number;
   }>({
-    queryKey: ["/api/order-stats"],
+    queryKey: ["/api/order-stats", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/order-stats?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const today = new Date();
@@ -186,6 +202,8 @@ export default function AdminDashboard() {
           <span>{formattedDate}</span>
         </div>
       </div>
+
+      <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
 
       <Card>
         <CardHeader className="pb-3">

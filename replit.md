@@ -138,6 +138,7 @@ Preferred communication style: Simple, everyday language.
 - **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses during Excel order uploads, utilizing regex, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI) with a learning mechanism. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
 - **AI Address Learning Management**: Admin interface to register error address patterns, enabling AI to analyze, learn, and apply these patterns during order validation. This includes bulk Excel upload for learning and manual registration, inferring `correctionType` and assigning confidence scores.
 - **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events for both administrators and members.
+- **Date Range Filtering (KST)**: All order-related pages (admin 8 pages + dashboard, member dashboard + 2 order tabs) include a `DateRangeFilter` component with preset buttons (Today/Yesterday/This Week/This Month/Custom). Date filtering uses KST timezone (UTC+9) with server-side SQL filtering via `buildDateCondition()` and `parseDateRangeKST()`. Default is "today". Query keys use flat array format: `["/api/...", startDate, endDate]`. Database indexes exist on `pending_orders.created_at` and `orders.created_at`.
 
 ## External Dependencies
 

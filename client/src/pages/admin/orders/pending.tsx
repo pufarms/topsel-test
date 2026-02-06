@@ -26,12 +26,15 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
 import XLSX from "xlsx-js-style";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 export default function OrdersPendingPage() {
   const { toast } = useToast();
   
   // SSE 실시간 업데이트 연결
   useSSE();
+
+  const { dateRange, setDateRange } = useDateRange("today");
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
@@ -59,7 +62,15 @@ export default function OrdersPendingPage() {
   const [summaryCurrentPage, setSummaryCurrentPage] = useState(1);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   // 주문대기 페이지는 "대기" 상태만 표시
@@ -342,6 +353,8 @@ export default function OrdersPendingPage() {
       </div>
 
       <OrderStatsBanner />
+
+      <DateRangeFilter onChange={setDateRange} />
 
       <Card className="overflow-hidden">
         <CardHeader>

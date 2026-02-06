@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lt } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -900,8 +900,22 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Admin access required" });
     }
 
-    const orders = await storage.getAllOrders();
-    return res.json(orders);
+    try {
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      
+      if (startDate || endDate) {
+        const dateCondition = buildDateCondition(orders, startDate, endDate);
+        const filteredOrders = await db.select().from(orders)
+          .where(dateCondition!)
+          .orderBy(desc(orders.createdAt));
+        return res.json(filteredOrders);
+      }
+      
+      const allOrders = await storage.getAllOrders();
+      return res.json(allOrders);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
   });
 
   app.patch("/api/admin/users/:id/tier", async (req, res) => {
@@ -5730,6 +5744,32 @@ export async function registerRoutes(
     return `ORD-${dateStr}-${randomStr}`;
   }
 
+  function parseDateRangeKST(startDateStr?: string, endDateStr?: string) {
+    const KST_OFFSET = 9 * 60 * 60 * 1000;
+    const now = new Date();
+    const kstNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + KST_OFFSET);
+    
+    const defaultDate = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, "0")}-${String(kstNow.getDate()).padStart(2, "0")}`;
+    
+    const startStr = (startDateStr && typeof startDateStr === "string" && startDateStr.trim()) ? startDateStr.trim() : defaultDate;
+    const endStr = (endDateStr && typeof endDateStr === "string" && endDateStr.trim()) ? endDateStr.trim() : defaultDate;
+    
+    const startUTC = new Date(`${startStr}T00:00:00+09:00`);
+    const endDate = new Date(`${endStr}T00:00:00+09:00`);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    return { startUTC, endUTC: endDate };
+  }
+
+  function buildDateCondition(table: any, startDate?: string, endDate?: string) {
+    if (!startDate && !endDate) {
+      const { startUTC, endUTC } = parseDateRangeKST();
+      return and(gte(table.createdAt, startUTC), lt(table.createdAt, endUTC));
+    }
+    const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+    return and(gte(table.createdAt, startUTC), lt(table.createdAt, endUTC));
+  }
+
   // Get order stats for dashboard - role-based filtering
   // Admin: sees aggregated counts from all members
   // Member: sees only their own order counts
@@ -5742,7 +5782,6 @@ export async function registerRoutes(
       const isMember = req.session.userType === "member";
       let isAdmin = false;
       
-      // Check admin role if user type is "user" (not member)
       if (req.session.userType === "user") {
         const user = await storage.getUser(req.session.userId);
         if (user && (user.role === "SUPER_ADMIN" || user.role === "ADMIN")) {
@@ -5754,40 +5793,40 @@ export async function registerRoutes(
         return res.status(403).json({ message: "접근 권한이 없습니다" });
       }
 
-      const baseCondition = isAdmin ? sql`1=1` : eq(pendingOrders.memberId, req.session.userId);
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const dateCondition = buildDateCondition(pendingOrders, startDate, endDate);
 
-      // Total count (전체주문)
+      const baseCondition = isAdmin 
+        ? dateCondition
+        : and(eq(pendingOrders.memberId, req.session.userId), dateCondition);
+
       const totalResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
-        .where(baseCondition);
+        .where(baseCondition!);
       
-      // Pending (주문대기) count
       const pendingResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "대기")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "대기")));
+          ? and(eq(pendingOrders.status, "대기"), dateCondition)
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "대기"), dateCondition));
       
-      // Adjustment (주문조정) count
       const adjustmentResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "주문조정")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "주문조정")));
+          ? and(eq(pendingOrders.status, "주문조정"), dateCondition)
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "주문조정"), dateCondition));
       
-      // Preparing (상품준비중) count
       const preparingResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "상품준비중")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "상품준비중")));
+          ? and(eq(pendingOrders.status, "상품준비중"), dateCondition)
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "상품준비중"), dateCondition));
       
-      // Ready to ship (배송준비중) count - members only see this after waybill delivery
       let readyToShipCount = 0;
       if (isAdmin) {
         const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
           .from(pendingOrders)
-          .where(eq(pendingOrders.status, "배송준비중"));
+          .where(and(eq(pendingOrders.status, "배송준비중"), dateCondition));
         readyToShipCount = readyToShipResult[0]?.count || 0;
       } else {
         const waybillSetting = await db.select().from(siteSettings)
@@ -5796,24 +5835,22 @@ export async function registerRoutes(
         if (waybillDelivered) {
           const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
             .from(pendingOrders)
-            .where(and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송준비중")));
+            .where(and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송준비중"), dateCondition));
           readyToShipCount = readyToShipResult[0]?.count || 0;
         }
       }
       
-      // Member cancelled (회원취소) count
       const memberCancelledResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "회원취소")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "회원취소")));
+          ? and(eq(pendingOrders.status, "회원취소"), dateCondition)
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "회원취소"), dateCondition));
       
-      // Shipping (배송중) count
       const shippingResult = await db.select({ count: sql<number>`count(*)::int` })
         .from(pendingOrders)
         .where(isAdmin 
-          ? eq(pendingOrders.status, "배송중")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송중")));
+          ? and(eq(pendingOrders.status, "배송중"), dateCondition)
+          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송중"), dateCondition));
 
       res.json({
         total: totalResult[0]?.count || 0,               // 전체주문
@@ -5838,15 +5875,19 @@ export async function registerRoutes(
     }
 
     try {
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const dateCondition = buildDateCondition(pendingOrders, startDate, endDate);
+      
       const waybillSetting = await db.select().from(siteSettings)
         .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
       const waybillDelivered = waybillSetting.length > 0 && waybillSetting[0].settingValue === "true";
 
       const condition = waybillDelivered
-        ? eq(pendingOrders.memberId, req.session.userId)
+        ? and(eq(pendingOrders.memberId, req.session.userId), dateCondition)
         : and(
             eq(pendingOrders.memberId, req.session.userId),
-            ne(pendingOrders.status, "배송준비중")
+            ne(pendingOrders.status, "배송준비중"),
+            dateCondition
           );
 
       const orders = await db.select()
@@ -6487,19 +6528,22 @@ export async function registerRoutes(
     }
 
     try {
-      const { status, memberId } = req.query;
+      const { status, memberId, startDate, endDate } = req.query as Record<string, string | undefined>;
+      const dateCondition = buildDateCondition(pendingOrders, startDate, endDate);
       
-      let query = db.select().from(pendingOrders);
+      const conditions: any[] = [dateCondition];
       
       if (status && typeof status === 'string') {
-        query = query.where(eq(pendingOrders.status, status)) as any;
+        conditions.push(eq(pendingOrders.status, status));
       }
       
       if (memberId && typeof memberId === 'string') {
-        query = query.where(eq(pendingOrders.memberId, memberId)) as any;
+        conditions.push(eq(pendingOrders.memberId, memberId));
       }
       
-      const orders = await query.orderBy(asc(pendingOrders.sequenceNumber));
+      const orders = await db.select().from(pendingOrders)
+        .where(and(...conditions))
+        .orderBy(asc(pendingOrders.sequenceNumber));
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

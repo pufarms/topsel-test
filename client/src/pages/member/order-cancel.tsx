@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { FileDown, XCircle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, BanIcon } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PendingOrder } from "@shared/schema";
@@ -25,6 +26,7 @@ export default function MemberOrderCancel() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { dateRange, setDateRange } = useDateRange("today");
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,7 +34,15 @@ export default function MemberOrderCancel() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/member/pending-orders"],
+    queryKey: ["/api/member/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/member/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: cancelDeadlineStatus } = useQuery<{ cancelDeadlineClosed: boolean }>({
@@ -239,6 +249,7 @@ export default function MemberOrderCancel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
           <MemberOrderFilter
             onFilterChange={handleFilterChange}
             showSearchField={true}

@@ -48,6 +48,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder, Material } from "@shared/schema";
 import * as XLSX from "xlsx";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 interface MaterialProduct {
   productCode: string;
@@ -85,6 +86,8 @@ export default function OrdersAdminCancelPage() {
   const { toast } = useToast();
   useSSE();
 
+  const { dateRange, setDateRange } = useDateRange("today");
+
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
     categoryLarge: "",
@@ -105,7 +108,15 @@ export default function OrdersAdminCancelPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "deficit">("all");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: adjustmentData = [], isLoading: isLoadingAdjustment } = useQuery<MaterialGroup[]>({
@@ -1010,6 +1021,7 @@ export default function OrdersAdminCancelPage() {
           <CardTitle>주문조정(직권취소) 내역</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

@@ -17,9 +17,12 @@ import { FileDown, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import type { PendingOrder } from "@shared/schema";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 export default function OrdersCancelledPage() {
   useSSE();
+
+  const { dateRange, setDateRange } = useDateRange("today");
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
@@ -34,7 +37,15 @@ export default function OrdersCancelledPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/admin/pending-orders"],
+    queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/admin/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const cancelledOrders = allPendingOrders.filter(o => o.status === "회원취소" || o.status === "취소");
@@ -90,6 +101,7 @@ export default function OrdersCancelledPage() {
           <CardTitle>회원취소 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

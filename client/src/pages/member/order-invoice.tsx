@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { FileDown, FileText, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
+import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
 import * as XLSX from "xlsx";
@@ -23,6 +24,7 @@ export default function MemberOrderInvoice() {
   useSSE();
   const { toast } = useToast();
 
+  const { dateRange, setDateRange } = useDateRange("today");
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,7 +32,15 @@ export default function MemberOrderInvoice() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
-    queryKey: ["/api/member/pending-orders"],
+    queryKey: ["/api/member/pending-orders", dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.set("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.set("endDate", dateRange.endDate);
+      const res = await fetch(`/api/member/pending-orders?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const readyToShipOrders = allOrders.filter(o => o.status === "배송준비중");
@@ -207,6 +217,7 @@ export default function MemberOrderInvoice() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
           <MemberOrderFilter
             onFilterChange={handleFilterChange}
             showSearchField={true}
