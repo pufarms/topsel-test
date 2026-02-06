@@ -160,7 +160,7 @@ export default function MemberOrderInvoice() {
     setIsDownloading(true);
     try {
       const data = orders.map(order => ({
-        "부피단위": "",
+        "부피단위": order.volumeUnit || "",
         "주문자명": order.ordererName || "",
         "주문자 전화번호": order.ordererPhone || "",
         "주문자 우편번호": order.ordererZipCode || "",
