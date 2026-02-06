@@ -153,6 +153,9 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/member/cancel-deadline-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ready-to-ship-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
     });
 
     eventSource.onerror = (error) => {

@@ -1192,7 +1192,7 @@ export type BrandtalkHistory = typeof brandtalkHistory.$inferSelect;
 // 3. 배송준비중 (회원취소건 접수 단계)
 // 4. 배송중
 // 예외: 주문조정, 취소
-export const pendingOrderStatuses = ["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소"] as const;
+export const pendingOrderStatuses = ["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소", "회원취소"] as const;
 export type PendingOrderStatus = typeof pendingOrderStatuses[number];
 
 // 주문대기 테이블

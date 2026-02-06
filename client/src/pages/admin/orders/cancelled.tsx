@@ -37,7 +37,7 @@ export default function OrdersCancelledPage() {
     queryKey: ["/api/admin/pending-orders"],
   });
 
-  const cancelledOrders = allPendingOrders.filter(o => o.status === "취소");
+  const cancelledOrders = allPendingOrders.filter(o => o.status === "회원취소" || o.status === "취소");
 
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,

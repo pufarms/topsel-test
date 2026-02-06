@@ -224,7 +224,7 @@ export default function OrdersReadyToShipPage() {
                 ) : (
                   <BanIcon className="h-4 w-4 mr-1" />
                 )}
-                {cancelDeadlineClosed ? "회원취소 마감됨" : "회원취소마감"}
+                {cancelDeadlineClosed ? "취소마감중" : "회원취소마감"}
               </Button>
               {waybillDelivered && (
                 <Badge variant={cancelDeadlineClosed ? "default" : "secondary"}>

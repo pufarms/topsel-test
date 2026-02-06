@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, XCircle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { FileDown, XCircle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, BanIcon } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PendingOrder } from "@shared/schema";
 import * as XLSX from "xlsx";
 
@@ -32,6 +33,12 @@ export default function MemberOrderCancel() {
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/member/pending-orders"],
   });
+
+  const { data: cancelDeadlineStatus } = useQuery<{ cancelDeadlineClosed: boolean }>({
+    queryKey: ["/api/member/cancel-deadline-status"],
+  });
+
+  const cancelDeadlineClosed = cancelDeadlineStatus?.cancelDeadlineClosed ?? false;
 
   const cancelledOrders = allOrders.filter(o => o.status === "회원취소" || o.status === "취소");
 
@@ -144,9 +151,34 @@ export default function MemberOrderCancel() {
     }
   }, [getDownloadOrders, toast]);
 
+  const cancelMutation = useMutation({
+    mutationFn: async (orderNumbers: string[]) => {
+      const res = await apiRequest("POST", "/api/member/cancel-orders", { orderNumbers });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: `${data.cancelledCount}건의 주문이 즉시 취소 처리되었습니다.`,
+        description: data.errors && data.errors.length > 0
+          ? `오류: ${data.errors.join(", ")}`
+          : "재고가 복구되었습니다.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "취소 처리 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleCancelRegister = useCallback(() => {
+    if (cancelDeadlineClosed) {
+      toast({ title: "취소마감 상태입니다.", description: "더 이상 취소 등록이 불가합니다.", variant: "destructive" });
+      return;
+    }
     fileInputRef.current?.click();
-  }, []);
+  }, [cancelDeadlineClosed, toast]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,7 +195,7 @@ export default function MemberOrderCancel() {
         return;
       }
 
-      const requiredCols = ["수령자명", "주문번호"];
+      const requiredCols = ["주문번호"];
       const headers = Object.keys(rows[0]);
       const missing = requiredCols.filter(col => !headers.includes(col));
       if (missing.length > 0) {
@@ -171,16 +203,22 @@ export default function MemberOrderCancel() {
         return;
       }
 
-      toast({
-        title: `${rows.length}건의 취소 요청이 접수되었습니다.`,
-        description: "관리자 확인 후 처리됩니다.",
-      });
+      const orderNumbers = rows
+        .map(row => String(row["주문번호"] || "").trim())
+        .filter(Boolean);
+
+      if (orderNumbers.length === 0) {
+        toast({ title: "유효한 주문번호가 없습니다.", variant: "destructive" });
+        return;
+      }
+
+      cancelMutation.mutate(orderNumbers);
     } catch {
       toast({ title: "파일을 읽을 수 없습니다.", variant: "destructive" });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [toast]);
+  }, [toast, cancelMutation]);
 
   return (
     <div className="space-y-4">
@@ -236,12 +274,19 @@ export default function MemberOrderCancel() {
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
-                variant="default"
+                variant={cancelDeadlineClosed ? "outline" : "default"}
                 onClick={handleCancelRegister}
+                disabled={cancelDeadlineClosed || cancelMutation.isPending}
                 data-testid="button-cancel-register"
               >
-                <Upload className="h-4 w-4 mr-1" />
-                취소건 등록
+                {cancelMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : cancelDeadlineClosed ? (
+                  <BanIcon className="h-4 w-4 mr-1" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-1" />
+                )}
+                {cancelDeadlineClosed ? "취소마감" : "취소건 등록"}
               </Button>
               <Button
                 size="sm"

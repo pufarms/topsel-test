@@ -7192,6 +7192,120 @@ export async function registerRoutes(
     }
   });
 
+  // Member: Get cancel deadline status
+  app.get('/api/member/cancel-deadline-status', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const cancelSetting = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
+
+      res.json({
+        cancelDeadlineClosed: cancelSetting.length > 0 && cancelSetting[0].settingValue === "true",
+      });
+    } catch (error: any) {
+      console.error("Get cancel deadline status error:", error);
+      res.status(500).json({ message: error.message || "상태 조회 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Member: Cancel orders (즉시 회원취소 처리 + 재고 복구)
+  app.post('/api/member/cancel-orders', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const cancelSetting = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
+      if (cancelSetting.length > 0 && cancelSetting[0].settingValue === "true") {
+        return res.status(400).json({ message: "취소마감 상태입니다. 더 이상 취소 등록이 불가합니다." });
+      }
+
+      const { orderNumbers } = req.body;
+      if (!orderNumbers || !Array.isArray(orderNumbers) || orderNumbers.length === 0) {
+        return res.status(400).json({ message: "취소할 주문번호가 없습니다." });
+      }
+
+      const memberId = req.session.userId;
+      const member = await storage.getMember(memberId);
+      if (!member) {
+        return res.status(403).json({ message: "회원 정보를 찾을 수 없습니다." });
+      }
+
+      let cancelledCount = 0;
+      const errors: string[] = [];
+
+      for (const orderNum of orderNumbers) {
+        const orderNumStr = String(orderNum).trim();
+        if (!orderNumStr) continue;
+
+        const [order] = await db.select().from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.memberId, memberId),
+            or(
+              eq(pendingOrders.customOrderNumber, orderNumStr),
+              eq(pendingOrders.orderNumber, orderNumStr)
+            )
+          )).limit(1);
+
+        if (!order) {
+          errors.push(`주문번호 ${orderNumStr}: 주문을 찾을 수 없습니다.`);
+          continue;
+        }
+
+        if (order.status !== "배송준비중") {
+          errors.push(`주문번호 ${orderNumStr}: 배송준비중 상태가 아닙니다 (현재: ${order.status}).`);
+          continue;
+        }
+
+        // 재고 복구 (배송준비중 → 회원취소)
+        const productCode = order.productCode || "";
+        if (productCode) {
+          const mappings = await storage.getProductMaterialMappings(productCode);
+          for (const mapping of mappings) {
+            await db.update(materials)
+              .set({
+                currentStock: sql`${materials.currentStock} + ${mapping.quantity}`,
+                updatedAt: new Date()
+              })
+              .where(eq(materials.materialCode, mapping.materialCode));
+            console.log(`[회원취소 재고 복구] 원재료 ${mapping.materialCode}에 ${mapping.quantity} 복구`);
+          }
+        }
+
+        // 상태를 회원취소로 변경
+        await db.update(pendingOrders)
+          .set({
+            status: "회원취소",
+            updatedAt: new Date()
+          })
+          .where(eq(pendingOrders.id, order.id));
+
+        cancelledCount++;
+      }
+
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+      sseManager.broadcast("order-status-changed", { type: "order-status-changed" });
+
+      const message = cancelledCount > 0
+        ? `${cancelledCount}건의 주문이 즉시 취소 처리되었습니다.`
+        : "취소 처리된 주문이 없습니다.";
+
+      res.json({
+        success: true,
+        cancelledCount,
+        errors,
+        message: errors.length > 0 ? `${message} (오류: ${errors.length}건)` : message,
+      });
+    } catch (error: any) {
+      console.error("Member cancel orders error:", error);
+      res.status(500).json({ message: error.message || "취소 처리 중 오류가 발생했습니다" });
+    }
+  });
+
   // Admin: Transfer orders from 배송준비중 to 배송중 (exclude cancelled)
   app.post('/api/admin/orders/to-shipping', async (req, res) => {
     if (!req.session.userId) {
@@ -7397,7 +7511,7 @@ export async function registerRoutes(
       // 중요: 실제로 상태가 변경될 때만 재고 조정 (멱등성 보장)
       // 중요: 원자적(atomic) SQL 연산 사용으로 race condition 방지
       const stockDeductedStatuses = ["상품준비중", "배송준비중", "배송중"];
-      const stockNotDeductedStatuses = ["대기", "취소", "주문조정"];
+      const stockNotDeductedStatuses = ["대기", "취소", "주문조정", "회원취소"];
       const currentStatus = currentOrder.status || "";
       
       if (status !== undefined && 
