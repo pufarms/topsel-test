@@ -305,7 +305,9 @@ export default function OrdersPreparingPage() {
           categoryLarge: filters.categoryLarge || undefined,
           categoryMedium: filters.categoryMedium || undefined,
           categorySmall: filters.categorySmall || undefined,
+          searchFilter: filters.searchFilter !== "선택 없음" ? filters.searchFilter : undefined,
           search: filters.searchTerm || undefined,
+          uploadFormat: uploadFormatFilter !== "all" ? uploadFormatFilter : undefined,
         },
       });
       const data = await res.json();

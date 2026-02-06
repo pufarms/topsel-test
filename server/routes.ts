@@ -6969,15 +6969,45 @@ export async function registerRoutes(
         if (filters?.categorySmall) {
           conditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
         }
-        if (filters?.search) {
+        if (filters?.search && filters.search.trim()) {
           const searchTerm = `%${filters.search}%`;
-          conditions.push(
-            or(
-              like(pendingOrders.productName, searchTerm),
-              like(pendingOrders.recipientName, searchTerm),
-              like(pendingOrders.customOrderNumber, searchTerm)
-            )
-          );
+          if (filters.searchFilter) {
+            switch (filters.searchFilter) {
+              case "주문자명":
+                conditions.push(like(pendingOrders.ordererName, searchTerm));
+                break;
+              case "수령자명":
+                conditions.push(like(pendingOrders.recipientName, searchTerm));
+                break;
+              case "상품명":
+                conditions.push(like(pendingOrders.productName, searchTerm));
+                break;
+              case "상품코드":
+                conditions.push(like(pendingOrders.productCode, searchTerm));
+                break;
+              default:
+                conditions.push(
+                  or(
+                    like(pendingOrders.productName, searchTerm),
+                    like(pendingOrders.recipientName, searchTerm),
+                    like(pendingOrders.ordererName, searchTerm),
+                    like(pendingOrders.productCode, searchTerm)
+                  )
+                );
+            }
+          } else {
+            conditions.push(
+              or(
+                like(pendingOrders.productName, searchTerm),
+                like(pendingOrders.recipientName, searchTerm),
+                like(pendingOrders.ordererName, searchTerm),
+                like(pendingOrders.productCode, searchTerm)
+              )
+            );
+          }
+        }
+        if (filters?.uploadFormat) {
+          conditions.push(eq(pendingOrders.uploadFormat, filters.uploadFormat));
         }
 
         const result = await db.update(pendingOrders)
