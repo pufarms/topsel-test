@@ -34,7 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, FileUp, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { FileDown, FileUp, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Eraser } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +69,10 @@ export default function OrdersPreparingPage() {
   const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
   
   // 운송장 업로드 관련 상태
+  const [showResetSelectedDialog, setShowResetSelectedDialog] = useState(false);
+  const [showResetFilteredDialog, setShowResetFilteredDialog] = useState(false);
+  const [isResettingWaybill, setIsResettingWaybill] = useState(false);
+  
   const [showWaybillUploadDialog, setShowWaybillUploadDialog] = useState(false);
   const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice">("lotte");
   const [waybillFile, setWaybillFile] = useState<File | null>(null);
@@ -206,6 +210,57 @@ export default function OrdersPreparingPage() {
     setShowRestoreAllDialog(false);
     const allIds = filteredOrders.map(o => o.id);
     restoreToWaitingMutation.mutate(allIds);
+  };
+
+  const selectedWithTracking = selectedOrders.filter(id => {
+    const order = preparingOrders.find(o => o.id === id);
+    return order?.trackingNumber;
+  });
+
+  const filteredWithTracking = filteredOrders.filter(o => o.trackingNumber);
+
+  const handleResetSelectedWaybill = async () => {
+    setShowResetSelectedDialog(false);
+    setIsResettingWaybill(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/orders/reset-waybill", {
+        mode: "selected",
+        orderIds: selectedWithTracking.length > 0 ? selectedWithTracking : selectedOrders,
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "운송장 초기화 완료", description: data.message });
+    } catch (error) {
+      toast({ title: "초기화 실패", description: "운송장 초기화 중 오류가 발생했습니다.", variant: "destructive" });
+    } finally {
+      setIsResettingWaybill(false);
+    }
+  };
+
+  const handleResetFilteredWaybill = async () => {
+    setShowResetFilteredDialog(false);
+    setIsResettingWaybill(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/orders/reset-waybill", {
+        mode: "filtered",
+        filters: {
+          memberId: filters.memberId || undefined,
+          categoryLarge: filters.categoryLarge || undefined,
+          categoryMedium: filters.categoryMedium || undefined,
+          categorySmall: filters.categorySmall || undefined,
+          search: filters.searchTerm || undefined,
+        },
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "운송장 초기화 완료", description: data.message });
+    } catch (error) {
+      toast({ title: "초기화 실패", description: "운송장 초기화 중 오류가 발생했습니다.", variant: "destructive" });
+    } finally {
+      setIsResettingWaybill(false);
+    }
   };
 
   // 운송장 업로드 처리
@@ -360,6 +415,43 @@ export default function OrdersPreparingPage() {
                 <FileUp className="h-4 w-4 mr-1" />
                 운송장 업로드
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isResettingWaybill}
+                    className="bg-orange-50 border-orange-300 text-orange-700"
+                    data-testid="button-reset-waybill-dropdown"
+                  >
+                    {isResettingWaybill ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Eraser className="h-4 w-4 mr-1" />
+                    )}
+                    운송장 초기화
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    disabled={selectedOrders.length === 0}
+                    onClick={() => setShowResetSelectedDialog(true)}
+                    data-testid="button-reset-waybill-selected"
+                  >
+                    <Eraser className="h-4 w-4 mr-2" />
+                    선택 초기화 ({selectedWithTracking.length > 0 ? selectedWithTracking.length : selectedOrders.length}건)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={filteredWithTracking.length === 0}
+                    onClick={() => setShowResetFilteredDialog(true)}
+                    data-testid="button-reset-waybill-filtered"
+                  >
+                    <Eraser className="h-4 w-4 mr-2" />
+                    필터 전체 초기화 ({filteredWithTracking.length}건)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 variant="outline"
@@ -559,6 +651,56 @@ export default function OrdersPreparingPage() {
             <AlertDialogCancel data-testid="button-restore-all-cancel">취소</AlertDialogCancel>
             <AlertDialogAction onClick={handleRestoreAll} data-testid="button-restore-all-confirm">
               전체 복구 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 운송장 선택 초기화 확인 */}
+      <AlertDialog open={showResetSelectedDialog} onOpenChange={setShowResetSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택 운송장 초기화</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 주문 중 운송장이 등록된 {selectedWithTracking.length > 0 ? selectedWithTracking.length : selectedOrders.length}건의 운송장번호와 택배사 정보를 초기화하시겠습니까?
+              <br /><br />
+              <strong>초기화 후:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>운송장번호와 택배사 정보가 삭제됩니다.</li>
+                <li>주문 상태는 "상품준비중"으로 유지됩니다.</li>
+                <li>새 운송장 파일을 다시 업로드할 수 있습니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-reset-selected-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetSelectedWaybill} data-testid="button-reset-selected-confirm">
+              초기화 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 운송장 필터 전체 초기화 확인 */}
+      <AlertDialog open={showResetFilteredDialog} onOpenChange={setShowResetFilteredDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>필터 전체 운송장 초기화</AlertDialogTitle>
+            <AlertDialogDescription>
+              현재 검색 조건에 해당하는 {filteredWithTracking.length}건의 운송장번호와 택배사 정보를 모두 초기화하시겠습니까?
+              <br /><br />
+              <strong>초기화 후:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>해당 주문의 운송장번호와 택배사 정보가 삭제됩니다.</li>
+                <li>주문 상태는 "상품준비중"으로 유지됩니다.</li>
+                <li>새 운송장 파일을 다시 업로드할 수 있습니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-reset-filtered-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetFilteredWaybill} data-testid="button-reset-filtered-confirm">
+              전체 초기화 실행
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

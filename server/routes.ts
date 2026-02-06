@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, desc, asc, sql, and, inArray } from "drizzle-orm";
+import { eq, desc, asc, sql, and, or, inArray, like, isNotNull } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -6817,6 +6817,100 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Waybill upload error:", error);
       res.status(500).json({ message: error.message || "운송장 파일 처리 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Admin: Reset waybill (운송장 초기화)
+  app.post('/api/admin/orders/reset-waybill', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { mode, orderIds, filters } = req.body;
+
+      if (mode === "selected") {
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({ message: "초기화할 주문을 선택해주세요" });
+        }
+
+        const result = await db.update(pendingOrders)
+          .set({
+            trackingNumber: null,
+            courierCompany: null,
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              inArray(pendingOrders.id, orderIds),
+              eq(pendingOrders.status, "상품준비중")
+            )
+          )
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          resetCount: result.length,
+          message: `${result.length}건의 운송장이 초기화되었습니다.`
+        });
+
+      } else if (mode === "filtered") {
+        const conditions: any[] = [eq(pendingOrders.status, "상품준비중")];
+
+        if (filters?.memberId) {
+          conditions.push(eq(pendingOrders.memberId, filters.memberId));
+        }
+        if (filters?.categoryLarge) {
+          conditions.push(eq(pendingOrders.categoryLarge, filters.categoryLarge));
+        }
+        if (filters?.categoryMedium) {
+          conditions.push(eq(pendingOrders.categoryMedium, filters.categoryMedium));
+        }
+        if (filters?.categorySmall) {
+          conditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
+        }
+        if (filters?.search) {
+          const searchTerm = `%${filters.search}%`;
+          conditions.push(
+            or(
+              like(pendingOrders.productName, searchTerm),
+              like(pendingOrders.recipientName, searchTerm),
+              like(pendingOrders.customOrderNumber, searchTerm)
+            )
+          );
+        }
+
+        conditions.push(isNotNull(pendingOrders.trackingNumber));
+
+        const result = await db.update(pendingOrders)
+          .set({
+            trackingNumber: null,
+            courierCompany: null,
+            updatedAt: new Date()
+          })
+          .where(and(...conditions))
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          resetCount: result.length,
+          message: `${result.length}건의 운송장이 초기화되었습니다.`
+        });
+
+      } else {
+        return res.status(400).json({ message: "올바른 초기화 모드를 선택해주세요 (selected 또는 filtered)" });
+      }
+    } catch (error: any) {
+      console.error("Waybill reset error:", error);
+      res.status(500).json({ message: error.message || "운송장 초기화 중 오류가 발생했습니다" });
     }
   });
 
