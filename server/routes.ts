@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, desc, asc, sql, and, or, inArray, like, isNotNull } from "drizzle-orm";
+import { eq, desc, asc, sql, and, or, inArray, like, ilike, isNotNull } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -6974,34 +6974,34 @@ export async function registerRoutes(
           if (filters.searchFilter) {
             switch (filters.searchFilter) {
               case "주문자명":
-                conditions.push(like(pendingOrders.ordererName, searchTerm));
+                conditions.push(ilike(pendingOrders.ordererName, searchTerm));
                 break;
               case "수령자명":
-                conditions.push(like(pendingOrders.recipientName, searchTerm));
+                conditions.push(ilike(pendingOrders.recipientName, searchTerm));
                 break;
               case "상품명":
-                conditions.push(like(pendingOrders.productName, searchTerm));
+                conditions.push(ilike(pendingOrders.productName, searchTerm));
                 break;
               case "상품코드":
-                conditions.push(like(pendingOrders.productCode, searchTerm));
+                conditions.push(ilike(pendingOrders.productCode, searchTerm));
                 break;
               default:
                 conditions.push(
                   or(
-                    like(pendingOrders.productName, searchTerm),
-                    like(pendingOrders.recipientName, searchTerm),
-                    like(pendingOrders.ordererName, searchTerm),
-                    like(pendingOrders.productCode, searchTerm)
+                    ilike(pendingOrders.productName, searchTerm),
+                    ilike(pendingOrders.recipientName, searchTerm),
+                    ilike(pendingOrders.ordererName, searchTerm),
+                    ilike(pendingOrders.productCode, searchTerm)
                   )
                 );
             }
           } else {
             conditions.push(
               or(
-                like(pendingOrders.productName, searchTerm),
-                like(pendingOrders.recipientName, searchTerm),
-                like(pendingOrders.ordererName, searchTerm),
-                like(pendingOrders.productCode, searchTerm)
+                ilike(pendingOrders.productName, searchTerm),
+                ilike(pendingOrders.recipientName, searchTerm),
+                ilike(pendingOrders.ordererName, searchTerm),
+                ilike(pendingOrders.productCode, searchTerm)
               )
             );
           }
