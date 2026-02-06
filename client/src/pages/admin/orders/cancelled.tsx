@@ -129,33 +129,32 @@ export default function OrdersCancelledPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg max-h-[400px] overflow-x-scroll">
-              <div className="overflow-y-auto max-h-[383px] min-w-[1600px]">
-                <Table className="w-full">
+            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                <Table className="w-max">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
-                    <TableHead className="w-12">
+                    <TableHead className="whitespace-nowrap px-3">
                       <Checkbox
                         checked={selectedOrders.length === displayedOrders.length && displayedOrders.length > 0}
                         onCheckedChange={handleSelectAll}
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="w-[100px]">주문자명</TableHead>
-                    <TableHead className="w-[140px]">주문자 전화번호</TableHead>
-                    <TableHead className="min-w-[200px]">주문자 주소</TableHead>
-                    <TableHead className="w-[100px]">수령자명</TableHead>
-                    <TableHead className="w-[140px]">수령자휴대폰번호</TableHead>
-                    <TableHead className="w-[140px]">수령자 전화번호</TableHead>
-                    <TableHead className="min-w-[250px]">수령자 주소</TableHead>
-                    <TableHead className="min-w-[150px]">배송메시지</TableHead>
-                    <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[80px]">수량</TableHead>
-                    <TableHead className="w-[140px]">주문번호</TableHead>
-                    <TableHead className="w-[140px]">운송장번호</TableHead>
-                    <TableHead className="w-[100px]">택배사</TableHead>
-                    <TableHead className="w-[100px]">상태</TableHead>
-                    <TableHead className="w-[150px]">취소일시</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">주문자명</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">주문자 전화번호</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">주문자 주소</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">수령자명</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">수령자 휴대폰번호</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">수령자 전화번호</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">수령자 주소</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">배송메시지</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">상품명</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">수량</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">주문번호</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">운송장번호</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">택배사</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">상태</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">취소일시</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -167,46 +166,45 @@ export default function OrdersCancelledPage() {
                     </TableRow>
                   ) : displayedOrders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell>
+                      <TableCell className="px-3">
                         <Checkbox
                           checked={selectedOrders.includes(order.id)}
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                         />
                       </TableCell>
-                      <TableCell data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
-                      <TableCell data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={order.ordererAddress || ""} data-testid={`text-orderer-address-${order.id}`}>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 max-w-[300px] truncate" title={order.ordererAddress || ""} data-testid={`text-orderer-address-${order.id}`}>
                         {order.ordererAddress || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-recipient-name-${order.id}`}>{order.recipientName || "-"}</TableCell>
-                      <TableCell data-testid={`text-recipient-mobile-${order.id}`}>{order.recipientMobile || "-"}</TableCell>
-                      <TableCell data-testid={`text-recipient-phone-${order.id}`}>{order.recipientPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""} data-testid={`text-recipient-address-${order.id}`}>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-recipient-name-${order.id}`}>{order.recipientName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-recipient-mobile-${order.id}`}>{order.recipientMobile || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-recipient-phone-${order.id}`}>{order.recipientPhone || "-"}</TableCell>
+                      <TableCell className="px-3 max-w-[400px] truncate" title={order.recipientAddress || ""} data-testid={`text-recipient-address-${order.id}`}>
                         {order.recipientAddress || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-delivery-message-${order.id}`}>
+                      <TableCell className="px-3 max-w-[200px] truncate" data-testid={`text-delivery-message-${order.id}`}>
                         {order.deliveryMessage
                           ? order.deliveryMessage.replace(/\s*\[주소확인필요:[^\]]*\]/g, "").trim() || "-"
                           : "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
-                      <TableCell data-testid={`text-quantity-${order.id}`}>1</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.customOrderNumber || "-"}</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-tracking-number-${order.id}`}>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 text-center" data-testid={`text-quantity-${order.id}`}>1</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.customOrderNumber || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 font-mono text-sm" data-testid={`text-tracking-number-${order.id}`}>
                         {order.trackingNumber || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="destructive">회원취소</Badge>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3">
+                        <Badge variant="destructive">{order.status === "회원취소" ? "회원취소" : "취소"}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="whitespace-nowrap px-3 text-sm text-muted-foreground">
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </div>
           )}
 
