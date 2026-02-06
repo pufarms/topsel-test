@@ -291,8 +291,9 @@ export default function MemberOrderInvoice() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-              <Table className="w-max min-w-full">
+            <div className="border rounded-lg max-h-[600px] overflow-x-scroll">
+              <div className="overflow-y-auto max-h-[583px] min-w-[1600px]">
+              <Table className="w-full">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-12">
@@ -364,6 +365,7 @@ export default function MemberOrderInvoice() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
           )}
 
