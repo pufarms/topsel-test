@@ -6914,6 +6914,148 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Transfer orders from 상품준비중 to 배송준비중 (only with tracking number)
+  app.post('/api/admin/orders/to-ready-to-ship', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { mode, orderIds, filters } = req.body;
+
+      if (mode === "all") {
+        // Transfer ALL orders with tracking numbers in 상품준비중
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송준비중",
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(pendingOrders.status, "상품준비중"),
+              isNotNull(pendingOrders.trackingNumber)
+            )
+          )
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          message: `${result.length}건의 주문이 배송준비중으로 전송되었습니다.`
+        });
+
+      } else if (mode === "filtered") {
+        // Transfer filtered orders with tracking numbers
+        const conditions: any[] = [
+          eq(pendingOrders.status, "상품준비중"),
+          isNotNull(pendingOrders.trackingNumber)
+        ];
+
+        if (filters?.memberId) {
+          conditions.push(eq(pendingOrders.memberId, filters.memberId));
+        }
+        if (filters?.categoryLarge) {
+          conditions.push(eq(pendingOrders.categoryLarge, filters.categoryLarge));
+        }
+        if (filters?.categoryMedium) {
+          conditions.push(eq(pendingOrders.categoryMedium, filters.categoryMedium));
+        }
+        if (filters?.categorySmall) {
+          conditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
+        }
+        if (filters?.search) {
+          const searchTerm = `%${filters.search}%`;
+          conditions.push(
+            or(
+              like(pendingOrders.productName, searchTerm),
+              like(pendingOrders.recipientName, searchTerm),
+              like(pendingOrders.customOrderNumber, searchTerm)
+            )
+          );
+        }
+
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송준비중",
+            updatedAt: new Date()
+          })
+          .where(and(...conditions))
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          message: `${result.length}건의 주문이 배송준비중으로 전송되었습니다.`
+        });
+
+      } else if (mode === "selected") {
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({ message: "전송할 주문을 선택해주세요" });
+        }
+
+        // Only transfer selected orders that have tracking numbers (partial transfer allowed)
+        const ordersToCheck = await db.select()
+          .from(pendingOrders)
+          .where(
+            and(
+              inArray(pendingOrders.id, orderIds),
+              eq(pendingOrders.status, "상품준비중")
+            )
+          );
+
+        const withTracking = ordersToCheck.filter(o => o.trackingNumber);
+        const withoutTracking = ordersToCheck.filter(o => !o.trackingNumber);
+
+        if (withTracking.length === 0) {
+          return res.status(400).json({
+            message: "선택한 주문 중 운송장번호가 등록된 주문이 없습니다. 운송장번호가 등록된 주문만 전송 가능합니다."
+          });
+        }
+
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송준비중",
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              inArray(pendingOrders.id, withTracking.map(o => o.id)),
+              eq(pendingOrders.status, "상품준비중"),
+              isNotNull(pendingOrders.trackingNumber)
+            )
+          )
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        const skippedMsg = withoutTracking.length > 0 
+          ? ` (운송장 미등록 ${withoutTracking.length}건 제외)` 
+          : "";
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          skippedCount: withoutTracking.length,
+          message: `${result.length}건의 주문이 배송준비중으로 전송되었습니다.${skippedMsg}`
+        });
+
+      } else {
+        return res.status(400).json({ message: "올바른 전송 모드를 선택해주세요 (all, filtered, selected)" });
+      }
+    } catch (error: any) {
+      console.error("Transfer to ready-to-ship error:", error);
+      res.status(500).json({ message: error.message || "배송준비중 전송 중 오류가 발생했습니다" });
+    }
+  });
+
   // Admin: Update pending order (tracking number, courier, status)
   app.patch('/api/admin/pending-orders/:id', async (req, res) => {
     if (!req.session.userId) {

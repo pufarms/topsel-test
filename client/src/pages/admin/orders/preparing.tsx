@@ -34,7 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, FileUp, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Eraser } from "lucide-react";
+import { FileDown, FileUp, Loader2, ChevronLeft, ChevronRight, RotateCcw, ChevronDown, CheckCircle2, XCircle, AlertTriangle, Eraser, Send } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +72,11 @@ export default function OrdersPreparingPage() {
   const [showResetSelectedDialog, setShowResetSelectedDialog] = useState(false);
   const [showResetFilteredDialog, setShowResetFilteredDialog] = useState(false);
   const [isResettingWaybill, setIsResettingWaybill] = useState(false);
+  
+  const [showTransferAllDialog, setShowTransferAllDialog] = useState(false);
+  const [showTransferFilteredDialog, setShowTransferFilteredDialog] = useState(false);
+  const [showTransferSelectedDialog, setShowTransferSelectedDialog] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   
   const [showWaybillUploadDialog, setShowWaybillUploadDialog] = useState(false);
   const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice">("lotte");
@@ -260,6 +265,78 @@ export default function OrdersPreparingPage() {
       toast({ title: "초기화 실패", description: "운송장 초기화 중 오류가 발생했습니다.", variant: "destructive" });
     } finally {
       setIsResettingWaybill(false);
+    }
+  };
+
+  const allWithTracking = preparingOrders.filter(o => o.trackingNumber);
+  const filteredWithTrackingForTransfer = filteredOrders.filter(o => o.trackingNumber);
+  const selectedWithTrackingForTransfer = selectedOrders.filter(id => {
+    const order = preparingOrders.find(o => o.id === id);
+    return order?.trackingNumber;
+  });
+
+  const handleTransferAll = async () => {
+    setShowTransferAllDialog(false);
+    setIsTransferring(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/orders/to-ready-to-ship", {
+        mode: "all",
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "전송 완료", description: data.message });
+    } catch (error: any) {
+      const errMsg = error?.message || "배송준비중 전송 중 오류가 발생했습니다.";
+      toast({ title: "전송 실패", description: errMsg, variant: "destructive" });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleTransferFiltered = async () => {
+    setShowTransferFilteredDialog(false);
+    setIsTransferring(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/orders/to-ready-to-ship", {
+        mode: "filtered",
+        filters: {
+          memberId: filters.memberId || undefined,
+          categoryLarge: filters.categoryLarge || undefined,
+          categoryMedium: filters.categoryMedium || undefined,
+          categorySmall: filters.categorySmall || undefined,
+          search: filters.searchTerm || undefined,
+        },
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "전송 완료", description: data.message });
+    } catch (error: any) {
+      const errMsg = error?.message || "배송준비중 전송 중 오류가 발생했습니다.";
+      toast({ title: "전송 실패", description: errMsg, variant: "destructive" });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleTransferSelected = async () => {
+    setShowTransferSelectedDialog(false);
+    setIsTransferring(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/orders/to-ready-to-ship", {
+        mode: "selected",
+        orderIds: selectedOrders,
+      });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      setSelectedOrders([]);
+      toast({ title: "전송 완료", description: data.message });
+    } catch (error: any) {
+      const errMsg = error?.message || "배송준비중 전송 중 오류가 발생했습니다.";
+      toast({ title: "전송 실패", description: errMsg, variant: "destructive" });
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -496,9 +573,6 @@ export default function OrdersPreparingPage() {
                 <option value="100">100개씩</option>
                 <option value="all">전체</option>
               </select>
-              <Button size="sm" variant="default" disabled={selectedOrders.length === 0}>
-                배송준비완료 처리
-              </Button>
             </div>
           </div>
 
@@ -605,8 +679,143 @@ export default function OrdersPreparingPage() {
               </Button>
             </div>
           )}
+
+          <div className="border-t pt-4 mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-medium text-muted-foreground">
+                운송장 등록 주문건 배송준비중으로 전송
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={allWithTracking.length === 0 || isTransferring}
+                  onClick={() => setShowTransferAllDialog(true)}
+                  data-testid="button-transfer-all"
+                >
+                  {isTransferring ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-1" />
+                  )}
+                  전체 일괄전송 ({allWithTracking.length}건)
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={filteredWithTrackingForTransfer.length === 0 || isTransferring}
+                  onClick={() => setShowTransferFilteredDialog(true)}
+                  data-testid="button-transfer-filtered"
+                >
+                  {isTransferring ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-1" />
+                  )}
+                  검색건 일괄전송 ({filteredWithTrackingForTransfer.length}건)
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={selectedWithTrackingForTransfer.length === 0 || isTransferring}
+                  onClick={() => setShowTransferSelectedDialog(true)}
+                  data-testid="button-transfer-selected"
+                >
+                  {isTransferring ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-1" />
+                  )}
+                  선택 전송 ({selectedWithTrackingForTransfer.length}건)
+                </Button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* 전체 일괄전송 확인 */}
+      <AlertDialog open={showTransferAllDialog} onOpenChange={setShowTransferAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>전체 일괄전송</AlertDialogTitle>
+            <AlertDialogDescription>
+              운송장이 등록된 전체 {allWithTracking.length}건의 주문을 배송준비중으로 전송하시겠습니까?
+              <br /><br />
+              <strong>전송 조건:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>운송장번호가 등록된 주문만 전송됩니다.</li>
+                <li>전송 후 주문 상태가 "상품준비중" → "배송준비중"으로 변경됩니다.</li>
+                <li>배송준비중 페이지에서 확인할 수 있습니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-transfer-all-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleTransferAll} data-testid="button-transfer-all-confirm">
+              전체 전송 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 검색건 일괄전송 확인 */}
+      <AlertDialog open={showTransferFilteredDialog} onOpenChange={setShowTransferFilteredDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>검색건 일괄전송</AlertDialogTitle>
+            <AlertDialogDescription>
+              현재 검색 조건에 해당하는 운송장 등록 {filteredWithTrackingForTransfer.length}건의 주문을 배송준비중으로 전송하시겠습니까?
+              <br /><br />
+              <strong>전송 조건:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>현재 검색/필터 조건에 해당하는 주문 중 운송장번호가 등록된 주문만 전송됩니다.</li>
+                <li>전송 후 주문 상태가 "상품준비중" → "배송준비중"으로 변경됩니다.</li>
+                <li>배송준비중 페이지에서 확인할 수 있습니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-transfer-filtered-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleTransferFiltered} data-testid="button-transfer-filtered-confirm">
+              검색건 전송 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 선택 전송 확인 */}
+      <AlertDialog open={showTransferSelectedDialog} onOpenChange={setShowTransferSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택 전송</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 주문 중 운송장이 등록된 {selectedWithTrackingForTransfer.length}건의 주문을 배송준비중으로 전송하시겠습니까?
+              {selectedOrders.length > selectedWithTrackingForTransfer.length && (
+                <>
+                  <br /><br />
+                  <strong className="text-orange-600">
+                    선택한 {selectedOrders.length}건 중 운송장이 없는 {selectedOrders.length - selectedWithTrackingForTransfer.length}건은 전송되지 않습니다.
+                  </strong>
+                </>
+              )}
+              <br /><br />
+              <strong>전송 조건:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>운송장번호가 등록된 주문만 전송됩니다.</li>
+                <li>전송 후 주문 상태가 "상품준비중" → "배송준비중"으로 변경됩니다.</li>
+                <li>배송준비중 페이지에서 확인할 수 있습니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-transfer-selected-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleTransferSelected} data-testid="button-transfer-selected-confirm">
+              선택 전송 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showRestoreSelectedDialog} onOpenChange={setShowRestoreSelectedDialog}>
         <AlertDialogContent>
