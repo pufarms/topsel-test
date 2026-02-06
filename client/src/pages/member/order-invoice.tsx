@@ -4,6 +4,7 @@ import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -12,19 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { FileDown, FileText, ChevronLeft, ChevronRight, ChevronDown, Loader2 } from "lucide-react";
+import { FileDown, FileText, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
+import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
 import * as XLSX from "xlsx";
 
 export default function MemberOrderInvoice() {
   useSSE();
+  const { toast } = useToast();
 
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
@@ -62,6 +59,16 @@ export default function MemberOrderInvoice() {
     });
   }, [readyToShipOrders, filters]);
 
+  const defaultOrders = useMemo(() =>
+    filteredOrders.filter(o => (o.uploadFormat || "default") === "default"),
+    [filteredOrders]
+  );
+
+  const postofficeOrders = useMemo(() =>
+    filteredOrders.filter(o => o.uploadFormat === "postoffice"),
+    [filteredOrders]
+  );
+
   const totalPages = pageSize === "all" ? 1 : Math.ceil(filteredOrders.length / pageSize);
   const displayedOrders = pageSize === "all"
     ? filteredOrders
@@ -93,16 +100,22 @@ export default function MemberOrderInvoice() {
     setSelectedOrders([]);
   };
 
-  const getDownloadOrders = useCallback(() => {
+  const getOrdersForDownload = useCallback((format: "default" | "postoffice") => {
+    const formatOrders = format === "postoffice" ? postofficeOrders : defaultOrders;
     if (selectedOrders.length > 0) {
-      return filteredOrders.filter(o => selectedOrders.includes(o.id));
+      return formatOrders.filter(o => selectedOrders.includes(o.id));
     }
-    return filteredOrders;
-  }, [selectedOrders, filteredOrders]);
+    return formatOrders;
+  }, [selectedOrders, defaultOrders, postofficeOrders]);
 
   const handleDownloadBasic = useCallback(() => {
-    const orders = getDownloadOrders();
-    if (orders.length === 0) return;
+    const orders = getOrdersForDownload("default");
+    if (orders.length === 0) {
+      if (selectedOrders.length > 0) {
+        toast({ title: "선택한 주문 중 기본 양식 주문이 없습니다.", variant: "destructive" });
+      }
+      return;
+    }
 
     setIsDownloading(true);
     try {
@@ -133,11 +146,16 @@ export default function MemberOrderInvoice() {
     } finally {
       setIsDownloading(false);
     }
-  }, [getDownloadOrders]);
+  }, [getOrdersForDownload, selectedOrders, toast]);
 
   const handleDownloadPostOffice = useCallback(() => {
-    const orders = getDownloadOrders();
-    if (orders.length === 0) return;
+    const orders = getOrdersForDownload("postoffice");
+    if (orders.length === 0) {
+      if (selectedOrders.length > 0) {
+        toast({ title: "선택한 주문 중 우체국 양식 주문이 없습니다.", variant: "destructive" });
+      }
+      return;
+    }
 
     setIsDownloading(true);
     try {
@@ -170,7 +188,14 @@ export default function MemberOrderInvoice() {
     } finally {
       setIsDownloading(false);
     }
-  }, [getDownloadOrders]);
+  }, [getOrdersForDownload, selectedOrders, toast]);
+
+  const getFormatBadge = (format: string | null | undefined) => {
+    if (format === "postoffice") {
+      return <Badge variant="outline" className="text-xs whitespace-nowrap">우체국</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs whitespace-nowrap">기본</Badge>;
+  };
 
   return (
     <div className="space-y-4">
@@ -213,31 +238,41 @@ export default function MemberOrderInvoice() {
                 총 {filteredOrders.length}건
                 {selectedOrders.length > 0 && ` (${selectedOrders.length}건 선택)`}
               </span>
+              <span className="text-muted-foreground">
+                | 기본 {defaultOrders.length}건 / 우체국 {postofficeOrders.length}건
+              </span>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" disabled={filteredOrders.length === 0 || isDownloading} data-testid="button-invoice-download">
-                  {isDownloading ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <FileDown className="h-4 w-4 mr-1" />
-                  )}
-                  송장파일 다운로드
-                  <ChevronDown className="h-3 w-3 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleDownloadBasic} data-testid="menu-download-basic">
-                  <FileDown className="h-4 w-4 mr-2" />
-                  기본 운송장파일
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownloadPostOffice} data-testid="menu-download-postoffice">
-                  <FileDown className="h-4 w-4 mr-2" />
-                  우체국 전용 운송장파일
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={defaultOrders.length === 0 || isDownloading}
+                onClick={handleDownloadBasic}
+                data-testid="button-download-basic"
+              >
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-1" />
+                )}
+                기본 운송장 ({defaultOrders.length}건)
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={postofficeOrders.length === 0 || isDownloading}
+                onClick={handleDownloadPostOffice}
+                data-testid="button-download-postoffice"
+              >
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-1" />
+                )}
+                우체국 운송장 ({postofficeOrders.length}건)
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -256,6 +291,7 @@ export default function MemberOrderInvoice() {
                         data-testid="checkbox-invoice-all"
                       />
                     </TableHead>
+                    <TableHead className="w-[70px]">양식</TableHead>
                     <TableHead className="w-[100px]">주문자명</TableHead>
                     <TableHead className="w-[140px]">주문자 전화번호</TableHead>
                     <TableHead className="min-w-[200px]">주문자 주소</TableHead>
@@ -274,7 +310,7 @@ export default function MemberOrderInvoice() {
                 <TableBody>
                   {displayedOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                         배송준비중 주문 내역이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -286,6 +322,9 @@ export default function MemberOrderInvoice() {
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                           data-testid={`checkbox-invoice-${order.id}`}
                         />
+                      </TableCell>
+                      <TableCell data-testid={`text-format-${order.id}`}>
+                        {getFormatBadge(order.uploadFormat)}
                       </TableCell>
                       <TableCell data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
                       <TableCell data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
