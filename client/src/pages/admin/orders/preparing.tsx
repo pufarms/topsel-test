@@ -473,7 +473,7 @@ export default function OrdersPreparingPage() {
                       </TableCell>
                       <TableCell data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
                       <TableCell data-testid={`text-quantity-${order.id}`}>1</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.orderNumber || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.customOrderNumber || "-"}</TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-tracking-number-${order.id}`}>
                         {order.trackingNumber || "-"}
                       </TableCell>
