@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>탑셀 주문관리시스템 - 전체 구조 및 기능 정리</title>
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Pretendard', sans-serif; background: #f8f9fa; color: #222; line-height: 1.7; padding: 40px 20px; }
+  .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,0.07); padding: 48px 40px; }
+  h1 { font-size: 28px; font-weight: 800; color: #111827; border-bottom: 3px solid #5D7AF2; padding-bottom: 12px; margin-bottom: 32px; }
+  h2 { font-size: 22px; font-weight: 700; color: #5D7AF2; margin-top: 40px; margin-bottom: 16px; padding-left: 12px; border-left: 4px solid #5D7AF2; }
+  h3 { font-size: 18px; font-weight: 600; color: #374151; margin-top: 24px; margin-bottom: 10px; }
+  h4 { font-size: 15px; font-weight: 600; color: #4B5563; margin-top: 16px; margin-bottom: 6px; }
+  p { margin-bottom: 10px; font-size: 15px; }
+  ul { margin-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; font-size: 14.5px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+  .badge-blue { background: #EEF2FF; color: #5D7AF2; }
+  .badge-green { background: #ECFDF5; color: #059669; }
+  .badge-red { background: #FEF2F2; color: #DC2626; }
+  .badge-orange { background: #FFF7ED; color: #EA580C; }
+  .badge-gray { background: #F3F4F6; color: #6B7280; }
+  .badge-purple { background: #F5F3FF; color: #7C3AED; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+  th { background: #F9FAFB; font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 2px solid #E5E7EB; }
+  td { padding: 8px 12px; border-bottom: 1px solid #F3F4F6; }
+  tr:hover td { background: #FAFBFF; }
+  .flow-box { background: #F0F4FF; border: 1px solid #D1DAFE; border-radius: 8px; padding: 16px 20px; margin: 12px 0; }
+  .flow-arrow { color: #5D7AF2; font-weight: 700; margin: 0 6px; }
+  .section-divider { border: none; border-top: 1px dashed #E5E7EB; margin: 32px 0; }
+  .note { background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; font-size: 14px; }
+  .print-btn { position: fixed; bottom: 30px; right: 30px; background: #5D7AF2; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(93,122,242,0.3); }
+  .print-btn:hover { background: #4A6AE0; }
+  @media print { .print-btn { display: none; } body { padding: 0; background: #fff; } .container { box-shadow: none; padding: 20px; } }
+  .timestamp { text-align: right; color: #9CA3AF; font-size: 13px; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>탑셀 주문관리시스템 - 전체 구조 및 기능 정리</h1>
+<p class="timestamp">작성일: 2026년 2월 6일</p>
+
+<!-- ============================================ -->
+<h2>1. 시스템 개요</h2>
+<p>한국어 기반의 주문관리시스템으로, <strong>판매회원(셀러)</strong>과 <strong>관리자(어드민)</strong>를 위한 별도 대시보드를 제공합니다. 회원의 주문 접수부터 배송 완료까지의 전 과정을 체계적으로 관리하며, 상품/재고/정산/통계 등 운영에 필요한 종합 기능을 갖추고 있습니다.</p>
+
+<h3>기술 스택</h3>
+<table>
+  <tr><th>구분</th><th>기술</th></tr>
+  <tr><td>프론트엔드</td><td>React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, Wouter(라우팅), TanStack Query</td></tr>
+  <tr><td>백엔드</td><td>Express 5, Node.js, TypeScript</td></tr>
+  <tr><td>데이터베이스</td><td>PostgreSQL + Drizzle ORM</td></tr>
+  <tr><td>인증</td><td>세션 기반 (express-session) + SHA256 해싱</td></tr>
+  <tr><td>실시간 통신</td><td>SSE (Server-Sent Events)</td></tr>
+  <tr><td>이미지 저장</td><td>Cloudflare R2 (S3 호환)</td></tr>
+  <tr><td>이메일</td><td>Resend API</td></tr>
+  <tr><td>주소 검증</td><td>행정안전부 주소 API + Anthropic Claude AI</td></tr>
+</table>
+
+<!-- ============================================ -->
+<h2>2. 사용자 역할 및 권한</h2>
+<table>
+  <tr><th>역할</th><th>설명</th><th>접근 영역</th></tr>
+  <tr><td><span class="badge badge-red">SUPER_ADMIN</span></td><td>최고 관리자</td><td>관리자 대시보드 전체 + 관리자 계정 관리</td></tr>
+  <tr><td><span class="badge badge-orange">ADMIN</span></td><td>일반 관리자</td><td>관리자 대시보드 (관리자 계정 관리 제외)</td></tr>
+  <tr><td><span class="badge badge-blue">member (seller)</span></td><td>판매 회원</td><td>회원 대시보드 (마이페이지)</td></tr>
+</table>
+
+<h3>회원 등급 체계</h3>
+<table>
+  <tr><th>등급</th><th>설명</th></tr>
+  <tr><td><span class="badge badge-gray">PENDING</span> 승인대기</td><td>가입 직후, 관리자 승인 대기 상태</td></tr>
+  <tr><td><span class="badge badge-green">ASSOCIATE</span> 준회원</td><td>승인 완료된 기본 회원</td></tr>
+  <tr><td><span class="badge badge-blue">START</span> 스타트</td><td>스타트 등급 공급가 적용</td></tr>
+  <tr><td><span class="badge badge-purple">DRIVING</span> 드라이빙</td><td>드라이빙 등급 공급가 적용</td></tr>
+  <tr><td><span class="badge badge-orange">TOP</span> 탑셀러</td><td>최상위 등급, 최저 공급가 적용</td></tr>
+</table>
+
+<!-- ============================================ -->
+<h2>3. 주문 상태 워크플로우 (핵심)</h2>
+
+<h3>3-1. 정상 흐름 (4단계)</h3>
+<div class="flow-box">
+  <span class="badge badge-blue">1. 대기</span>
+  <span class="flow-arrow">→</span>
+  <span class="badge badge-orange">2. 상품준비중</span>
+  <span class="flow-arrow">→</span>
+  <span class="badge badge-purple">3. 배송준비중</span>
+  <span class="flow-arrow">→</span>
+  <span class="badge badge-green">4. 배송중</span>
+</div>
+
+<table>
+  <tr><th>단계</th><th>상태</th><th>관리 페이지</th><th>역할</th></tr>
+  <tr><td>1단계</td><td><strong>대기</strong> (주문조정 단계)</td><td>pending.tsx</td><td>회원 주문 접수 후 대기, 조건 충족 시 상품준비중으로 전환</td></tr>
+  <tr><td>2단계</td><td><strong>상품준비중</strong> (운송장 출력)</td><td>preparing.tsx</td><td>운송장 입력/출력 후 배송준비중으로 전환 (자동/수동)</td></tr>
+  <tr><td>3단계</td><td><strong>배송준비중</strong> (회원취소 접수)</td><td>ready-to-ship.tsx</td><td>회원 취소 접수 → 취소마감 → 배송중 전송</td></tr>
+  <tr><td>4단계</td><td><strong>배송중</strong></td><td>shipping.tsx</td><td>배송 진행 중</td></tr>
+</table>
+
+<h3>3-2. 예외 상태</h3>
+<table>
+  <tr><th>상태</th><th>관리 페이지</th><th>설명</th></tr>
+  <tr><td><span class="badge badge-red">주문조정</span></td><td>admin-cancel.tsx</td><td>관리자 직권취소 - 재고 부족 등으로 조정 필요한 주문</td></tr>
+  <tr><td><span class="badge badge-red">취소</span></td><td>cancelled.tsx</td><td>취소 완료된 주문 목록</td></tr>
+  <tr><td><span class="badge badge-red">회원취소</span></td><td>cancelled.tsx</td><td>회원이 직접 취소한 주문 (즉시 처리, 재고 자동 복원)</td></tr>
+</table>
+
+<h3>3-3. 배송준비중 단계 상세 (핵심 워크플로우)</h3>
+<div class="note">
+  <strong>중요!</strong> 배송준비중 단계에서의 가시성 제어 및 버튼 워크플로우
+</div>
+
+<h4>가시성 제어</h4>
+<ul>
+  <li>상품준비중 → 배송준비중으로 전환된 주문은 <strong>관리자 화면에서만</strong> 보임</li>
+  <li>관리자가 <strong>"운송장 전달"</strong> 버튼을 클릭하면 회원 화면에서도 보이기 시작</li>
+  <li><code>waybill_delivered</code> 설정으로 제어 (site_settings 테이블)</li>
+</ul>
+
+<h4>버튼 워크플로우</h4>
+<table>
+  <tr><th>버튼</th><th>작동 조건</th><th>완료 후 상태</th></tr>
+  <tr><td><strong>운송장 전달</strong></td><td>독립 작동 (항상 활성)</td><td>버튼 텍스트 → "운송장전달 완료", 회원에게 주문 노출</td></tr>
+  <tr><td><strong>회원취소마감</strong></td><td>독립 작동 (운송장 전달과 별개)</td><td>회원 취소 접수 마감, 배송중 전송 가능</td></tr>
+  <tr><td><strong>배송중 전송</strong></td><td>취소마감 완료 필요</td><td>배송준비중 → 배송중으로 전환, 설정 초기화</td></tr>
+</table>
+
+<h4>회원 취소 처리</h4>
+<ul>
+  <li>회원이 취소 요청 시 <strong>즉시 처리</strong> (관리자 승인 불필요)</li>
+  <li>취소 시 <strong>재고 자동 복원</strong></li>
+  <li>취소마감 후에는 회원 취소 불가</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>4. 관리자 대시보드 (Admin)</h2>
+<p>경로: <code>/admin/*</code> | 접근 권한: SUPER_ADMIN, ADMIN</p>
+
+<h3>4-1. 대시보드 (/admin)</h3>
+<p>전체 주문 현황, 통계 요약, 실시간 알림 등을 한눈에 파악</p>
+
+<h3>4-2. 회원관리</h3>
+<table>
+  <tr><th>메뉴</th><th>경로</th><th>기능</th></tr>
+  <tr><td>관리자 관리</td><td>/admin/admins</td><td>관리자 계정 추가/수정/삭제 (SUPER_ADMIN 전용)</td></tr>
+  <tr><td>협력업체 관리</td><td>/admin/partners</td><td>협력업체 등록 및 관리</td></tr>
+  <tr><td>회원관리</td><td>/admin/users</td><td>회원 목록, 등급 변경, 승인/거절, 상세정보</td></tr>
+  <tr><td>약관 동의 기록</td><td>/admin/term-agreements</td><td>약관 동의 이력 관리 (SHA-256 무결성 검증)</td></tr>
+</table>
+
+<h3>4-3. 주문관리 (8개 페이지)</h3>
+<table>
+  <tr><th>메뉴</th><th>경로</th><th>기능</th></tr>
+  <tr><td>주문 대기</td><td>/admin/orders/pending</td><td>"대기" 상태 주문 목록, 상품별 합계, 상품준비중 전환</td></tr>
+  <tr><td>주문조정(직권취소)</td><td>/admin/orders/admin-cancel</td><td>"주문조정" 상태 주문, 관리자 직권 취소 처리</td></tr>
+  <tr><td>상품준비중</td><td>/admin/orders/preparing</td><td>운송장 입력, 엑셀 업로드, 배송준비중 전환</td></tr>
+  <tr><td>운송장 출력</td><td>/admin/orders/print-waybill</td><td>운송장 출력 및 인쇄 기능</td></tr>
+  <tr><td>배송준비중</td><td>/admin/orders/ready-to-ship</td><td>운송장 전달, 취소마감, 배송중 전송 처리</td></tr>
+  <tr><td>취소건 관리</td><td>/admin/orders/cancelled</td><td>취소/회원취소 주문 목록 및 관리</td></tr>
+  <tr><td>배송중</td><td>/admin/orders/shipping</td><td>배송 진행 중인 주문 추적</td></tr>
+  <tr><td>배송완료</td><td>/admin/orders/completed</td><td>배송 완료된 주문 이력</td></tr>
+</table>
+<div class="note">
+  <strong>공통 필터:</strong> 모든 주문 페이지는 <code>AdminCategoryFilter</code> 컴포넌트를 사용하여 상호명(회원), 대분류/중분류/소분류, 키워드 검색 가능
+</div>
+
+<h3>4-4. 상품관리</h3>
+<table>
+  <tr><th>메뉴</th><th>경로</th><th>기능</th></tr>
+  <tr><td>카테고리 관리</td><td>/admin/products/categories</td><td>대분류/중분류/소분류 계단식 카테고리 관리</td></tr>
+  <tr><td>상품등록 (공급가 계산)</td><td>/admin/products/registration</td><td>상품 등록, 1원 단위 정밀 공급가 계산</td></tr>
+  <tr><td>차주 예상공급가 상품</td><td>/admin/products/next-week</td><td>다음 주 예상 공급가 (10원 올림 적용)</td></tr>
+  <tr><td>현재 공급가 상품</td><td>/admin/products/current</td><td>현재 운영 중인 공급가 (모든 주문/정산의 기준)</td></tr>
+  <tr><td>공급 중지 상품</td><td>/admin/products/suspended</td><td>공급 중지된 상품 관리</td></tr>
+</table>
+<div class="note">
+  <strong>가격 체계 흐름:</strong> 상품등록(1원 단위) → 차주 예상공급가(10원 올림) → 현재 공급가(실제 운영 기준)
+</div>
+
+<h3>4-5. 재고관리</h3>
+<table>
+  <tr><th>메뉴</th><th>경로</th><th>기능</th></tr>
+  <tr><td>재료타입 관리</td><td>/admin/inventory/material-types</td><td>원재료 타입 분류 관리</td></tr>
+  <tr><td>원재료 관리</td><td>/admin/inventory/materials</td><td>원재료 등록/수정/삭제</td></tr>
+  <tr><td>상품 매핑</td><td>/admin/inventory/mapping</td><td>상품과 원재료 간 매핑 관계 설정</td></tr>
+  <tr><td>공급상품 재고 관리</td><td>/admin/inventory/stock</td><td>상품별 현재 재고 수량 관리</td></tr>
+  <tr><td>재고 이력</td><td>/admin/inventory/history</td><td>재고 변동 이력 추적</td></tr>
+</table>
+
+<h3>4-6. 기타 관리 기능</h3>
+<table>
+  <tr><th>메뉴</th><th>경로</th><th>기능</th></tr>
+  <tr><td>정산관리</td><td>/admin/settlements</td><td>정산 내역 관리 (준비 중)</td></tr>
+  <tr><td>통계관리</td><td>/admin/stats</td><td>통계 데이터 확인 (준비 중)</td></tr>
+  <tr><td>쿠폰관리</td><td>/admin/coupons</td><td>쿠폰 관리 (준비 중)</td></tr>
+  <tr><td>알림톡(고정)</td><td>/admin/kakao-notifications/alimtalk</td><td>카카오 알림톡 발송 관리</td></tr>
+  <tr><td>친구톡 관리</td><td>/admin/kakao-notifications/brandtalk</td><td>카카오 친구톡 발송 관리</td></tr>
+  <tr><td>페이지관리</td><td>/admin/pages</td><td>CMS 페이지 생성/편집/관리 (비주얼 에디터)</td></tr>
+  <tr><td>사이트 설정</td><td>/admin/settings/site</td><td>사이트 기본 설정 관리</td></tr>
+  <tr><td>양식 관리</td><td>/admin/settings/form-templates</td><td>주문 업로드 양식 템플릿 관리</td></tr>
+  <tr><td>이미지 갤러리</td><td>/admin/settings/gallery</td><td>이미지 업로드/관리 (Cloudflare R2)</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>5. 회원 대시보드 (Member)</h2>
+<p>경로: <code>/dashboard</code>, <code>/mypage</code> | 접근 권한: member</p>
+
+<h3>5-1. 회원 대시보드 (/dashboard)</h3>
+<p>회원 전용 메인 화면으로, 사이드바 탭 방식으로 모든 기능에 접근</p>
+
+<table>
+  <tr><th>탭</th><th>기능</th></tr>
+  <tr><td>대시보드</td><td>주문 현황 요약, 통계, 빠른 접근 메뉴</td></tr>
+  <tr><td>회원정보</td><td>프로필 조회/수정, 비밀번호 변경</td></tr>
+  <tr><td>주문등록</td><td>엑셀 파일 업로드로 대량 주문 등록</td></tr>
+  <tr><td>주문조정</td><td>주문조정 상태 주문 확인 (order-adjust.tsx)</td></tr>
+  <tr><td>운송장조회</td><td>배송준비중 주문의 운송장 정보 조회 (order-invoice.tsx)</td></tr>
+  <tr><td>취소신청</td><td>배송준비중 주문 취소 신청 - 즉시 처리 (order-cancel.tsx)</td></tr>
+  <tr><td>주문내역</td><td>전체 주문 이력 조회 (order-list.tsx)</td></tr>
+  <tr><td>주소관리 도구</td><td>배송 주소 검증/정규화 도구</td></tr>
+  <tr><td>예치금</td><td>예치금 잔액 확인</td></tr>
+  <tr><td>구매통계</td><td>구매 관련 통계</td></tr>
+  <tr><td>정산통계</td><td>정산 관련 통계</td></tr>
+</table>
+
+<div class="note">
+  <strong>공통 필터:</strong> 회원 주문 관련 탭은 <code>MemberOrderFilter</code> 컴포넌트를 사용하여 대분류/중분류/소분류, 날짜 범위, 검색어로 필터링 가능
+</div>
+
+<h3>5-2. 마이페이지 (/mypage)</h3>
+<p>회원 프로필 정보 조회 및 수정 (대표자명, 연락처, 이메일, 비밀번호 등)</p>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>6. 공개 페이지 (Public)</h2>
+<table>
+  <tr><th>경로</th><th>기능</th></tr>
+  <tr><td>/</td><td>메인 홈페이지 (CMS 동적 페이지)</td></tr>
+  <tr><td>/login</td><td>로그인 페이지</td></tr>
+  <tr><td>/register</td><td>회원가입 페이지</td></tr>
+  <tr><td>/about</td><td>소개 페이지</td></tr>
+  <tr><td>/:path*</td><td>CMS 동적 페이지 (관리자가 생성한 페이지)</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>7. 데이터베이스 테이블 구조</h2>
+
+<h3>7-1. 핵심 테이블</h3>
+<table>
+  <tr><th>테이블</th><th>역할</th></tr>
+  <tr><td><strong>users</strong></td><td>사용자 계정 (관리자/회원 공통)</td></tr>
+  <tr><td><strong>members</strong></td><td>회원 상세 정보 (상호명, 사업자번호, 등급 등)</td></tr>
+  <tr><td><strong>pending_orders</strong></td><td>진행 중인 주문 (대기~배송중)</td></tr>
+  <tr><td><strong>orders</strong></td><td>완료된 주문 아카이브</td></tr>
+  <tr><td><strong>site_settings</strong></td><td>사이트 설정 (waybill_delivered, cancel_deadline_closed 등)</td></tr>
+</table>
+
+<h3>7-2. 상품 관련 테이블</h3>
+<table>
+  <tr><th>테이블</th><th>역할</th></tr>
+  <tr><td><strong>categories</strong></td><td>카테고리 (대분류/중분류/소분류)</td></tr>
+  <tr><td><strong>products</strong></td><td>기본 상품 정보</td></tr>
+  <tr><td><strong>product_registrations</strong></td><td>상품등록 (1원 단위 공급가 계산)</td></tr>
+  <tr><td><strong>next_week_products</strong></td><td>차주 예상공급가 (10원 올림)</td></tr>
+  <tr><td><strong>current_products</strong></td><td>현재 공급가 (실제 운영 기준)</td></tr>
+</table>
+
+<h3>7-3. 재고 관련 테이블</h3>
+<table>
+  <tr><th>테이블</th><th>역할</th></tr>
+  <tr><td><strong>materials</strong></td><td>원재료</td></tr>
+  <tr><td><strong>material_types</strong></td><td>재료 타입</td></tr>
+  <tr><td><strong>product_mappings</strong></td><td>상품-원재료 매핑</td></tr>
+  <tr><td><strong>product_stocks</strong></td><td>상품 재고 수량</td></tr>
+  <tr><td><strong>stock_history</strong></td><td>재고 변동 이력</td></tr>
+</table>
+
+<h3>7-4. CMS/설정 관련 테이블</h3>
+<table>
+  <tr><th>테이블</th><th>역할</th></tr>
+  <tr><td><strong>pages</strong></td><td>CMS 동적 페이지</td></tr>
+  <tr><td><strong>header_menus</strong></td><td>헤더 메뉴 (드래그앤드롭 정렬)</td></tr>
+  <tr><td><strong>images</strong></td><td>이미지 갤러리</td></tr>
+  <tr><td><strong>announcements</strong></td><td>공지사항</td></tr>
+  <tr><td><strong>form_templates</strong></td><td>양식 템플릿</td></tr>
+  <tr><td><strong>term_agreements / term_versions</strong></td><td>약관 동의 기록 및 버전</td></tr>
+</table>
+
+<h3>7-5. 기타 테이블</h3>
+<table>
+  <tr><th>테이블</th><th>역할</th></tr>
+  <tr><td><strong>partners / partner_products</strong></td><td>협력업체 및 상품</td></tr>
+  <tr><td><strong>address_learning_data</strong></td><td>AI 주소 학습 데이터</td></tr>
+  <tr><td><strong>alimtalk_templates / alimtalk_history</strong></td><td>카카오 알림톡</td></tr>
+  <tr><td><strong>brandtalk_templates / brandtalk_history</strong></td><td>카카오 친구톡</td></tr>
+  <tr><td><strong>member_logs</strong></td><td>회원 활동 로그</td></tr>
+  <tr><td><strong>deleted_members / deleted_member_orders</strong></td><td>삭제된 회원/주문 아카이브</td></tr>
+</table>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>8. 핵심 비즈니스 규칙</h2>
+
+<h3>8-1. 상품가격 체계</h3>
+<ul>
+  <li><strong>현재공급가(current_products)</strong>가 모든 기준 - 주문, 정산, 통계의 기준</li>
+  <li>상품등록 → 1원 단위 정밀 계산</li>
+  <li>전송 시 10원 올림 적용: <code>Math.ceil(price/10)*10</code></li>
+  <li>회원 등급별 공급가: start / driving / top 등급에 따라 다른 가격 적용</li>
+</ul>
+
+<h3>8-2. 주문 규칙</h3>
+<ul>
+  <li>주문 시 반드시 <strong>현재공급가 테이블</strong>에서 상품 존재 여부 확인</li>
+  <li>공급중지 상품은 주문 불가</li>
+  <li>동일 주문은 4단계 중 하나에만 존재 (중복 불가)</li>
+  <li>모든 주문은 대기 → 상품준비중 → 배송준비중 → 배송중 순서로 진행</li>
+</ul>
+
+<h3>8-3. 주소 검증 시스템</h3>
+<ul>
+  <li>엑셀 주문 업로드 시 다단계 주소 검증 파이프라인 적용</li>
+  <li>정규식, 패턴 유사도, 규칙 기반 검증 (Juso.go.kr API)</li>
+  <li>AI 정규화 (Anthropic Claude AI) + 학습 메커니즘</li>
+  <li>주소 상태: <span class="badge badge-green">VALID</span> <span class="badge badge-orange">WARNING</span> <span class="badge badge-red">INVALID</span></li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>9. 실시간 통신 (SSE)</h2>
+<p>서버에서 클라이언트로 실시간 이벤트를 전송하여 주문 상태 변경을 즉시 반영합니다.</p>
+<ul>
+  <li>SSE는 <strong>알림 전용</strong> - 실제 데이터는 보안된 API를 통해 가져옴</li>
+  <li>관리자/회원 각각 별도 SSE 채널</li>
+  <li>주문 생성, 수정, 삭제, 상태 변경 시 이벤트 발송</li>
+  <li>클라이언트에서 이벤트 수신 시 해당 쿼리 자동 갱신 (TanStack Query 무효화)</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>10. 디자인 및 UI 원칙</h2>
+<ul>
+  <li><strong>반응형 웹 디자인</strong>: 모바일/태블릿/데스크톱 대응</li>
+  <li><strong>Pretendard 한글 폰트</strong> 적용</li>
+  <li><strong>테이블</strong>: 가로+세로 스크롤, 헤더 고정, 표시 개수 선택 (10/30/100/전체)</li>
+  <li><strong>다크/라이트 모드</strong> 지원</li>
+  <li><strong>카테고리 연동</strong>: 모든 필터에서 카테고리 관리와 연동된 계단식 필터링</li>
+</ul>
+
+<hr class="section-divider">
+
+<!-- ============================================ -->
+<h2>11. 전체 페이지 경로 맵</h2>
+
+<h3>공개 페이지</h3>
+<table>
+  <tr><th>경로</th><th>페이지</th></tr>
+  <tr><td>/</td><td>메인 홈 (동적 CMS)</td></tr>
+  <tr><td>/login</td><td>로그인</td></tr>
+  <tr><td>/register</td><td>회원가입</td></tr>
+  <tr><td>/logout</td><td>로그아웃</td></tr>
+  <tr><td>/about</td><td>소개</td></tr>
+  <tr><td>/dashboard</td><td>회원 대시보드</td></tr>
+  <tr><td>/mypage</td><td>마이페이지</td></tr>
+</table>
+
+<h3>관리자 페이지 (총 30+개)</h3>
+<table>
+  <tr><th>카테고리</th><th>경로</th><th>페이지</th></tr>
+  <tr><td rowspan="1">메인</td><td>/admin</td><td>관리자 대시보드</td></tr>
+  <tr><td rowspan="4">회원관리</td><td>/admin/admins</td><td>관리자 관리</td></tr>
+  <tr><td>/admin/partners</td><td>협력업체 관리</td></tr>
+  <tr><td>/admin/users</td><td>회원관리</td></tr>
+  <tr><td>/admin/term-agreements</td><td>약관 동의 기록</td></tr>
+  <tr><td rowspan="8">주문관리</td><td>/admin/orders/pending</td><td>주문 대기</td></tr>
+  <tr><td>/admin/orders/admin-cancel</td><td>주문조정(직권취소)</td></tr>
+  <tr><td>/admin/orders/preparing</td><td>상품준비중</td></tr>
+  <tr><td>/admin/orders/print-waybill</td><td>운송장 출력</td></tr>
+  <tr><td>/admin/orders/ready-to-ship</td><td>배송준비중</td></tr>
+  <tr><td>/admin/orders/cancelled</td><td>취소건 관리</td></tr>
+  <tr><td>/admin/orders/shipping</td><td>배송중</td></tr>
+  <tr><td>/admin/orders/completed</td><td>배송완료</td></tr>
+  <tr><td rowspan="5">상품관리</td><td>/admin/products/categories</td><td>카테고리 관리</td></tr>
+  <tr><td>/admin/products/registration</td><td>상품등록 (공급가 계산)</td></tr>
+  <tr><td>/admin/products/next-week</td><td>차주 예상공급가</td></tr>
+  <tr><td>/admin/products/current</td><td>현재 공급가</td></tr>
+  <tr><td>/admin/products/suspended</td><td>공급 중지</td></tr>
+  <tr><td rowspan="5">재고관리</td><td>/admin/inventory/material-types</td><td>재료타입 관리</td></tr>
+  <tr><td>/admin/inventory/materials</td><td>원재료 관리</td></tr>
+  <tr><td>/admin/inventory/mapping</td><td>상품 매핑</td></tr>
+  <tr><td>/admin/inventory/stock</td><td>재고 관리</td></tr>
+  <tr><td>/admin/inventory/history</td><td>재고 이력</td></tr>
+  <tr><td rowspan="2">알림</td><td>/admin/kakao-notifications/alimtalk</td><td>알림톡</td></tr>
+  <tr><td>/admin/kakao-notifications/brandtalk</td><td>친구톡</td></tr>
+  <tr><td rowspan="1">페이지</td><td>/admin/pages</td><td>페이지관리 (CMS)</td></tr>
+  <tr><td rowspan="3">설정</td><td>/admin/settings/site</td><td>사이트 설정</td></tr>
+  <tr><td>/admin/settings/form-templates</td><td>양식 관리</td></tr>
+  <tr><td>/admin/settings/gallery</td><td>이미지 갤러리</td></tr>
+</table>
+
+</div>
+
+<button class="print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+</body>
+</html>
