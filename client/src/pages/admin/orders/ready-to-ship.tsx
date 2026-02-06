@@ -215,7 +215,7 @@ export default function OrdersReadyToShipPage() {
               <Button
                 size="sm"
                 variant={cancelDeadlineClosed ? "outline" : "destructive"}
-                disabled={!waybillDelivered || cancelDeadlineMutation.isPending}
+                disabled={cancelDeadlineClosed || cancelDeadlineMutation.isPending}
                 onClick={() => setShowCancelDeadlineDialog(true)}
                 data-testid="button-close-cancel-deadline"
               >
@@ -226,11 +226,9 @@ export default function OrdersReadyToShipPage() {
                 )}
                 {cancelDeadlineClosed ? "취소마감중" : "회원취소마감"}
               </Button>
-              {waybillDelivered && (
-                <Badge variant={cancelDeadlineClosed ? "default" : "secondary"}>
-                  {cancelDeadlineClosed ? "전송 가능" : "취소 접수중"}
-                </Badge>
-              )}
+              <Badge variant={cancelDeadlineClosed ? "default" : "secondary"}>
+                {cancelDeadlineClosed ? "전송 가능" : "취소 접수중"}
+              </Badge>
             </div>
           </CardTitle>
         </CardHeader>
