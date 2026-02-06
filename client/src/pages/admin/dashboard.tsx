@@ -203,8 +203,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
-
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -290,9 +288,12 @@ export default function AdminDashboard() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-base">주문/배송 현황</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              <CardTitle className="text-base">주문/배송 현황</CardTitle>
+            </div>
+            <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
           </div>
         </CardHeader>
         <CardContent>

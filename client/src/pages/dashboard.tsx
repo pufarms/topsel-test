@@ -826,12 +826,14 @@ export default function Dashboard() {
         <main className="lg:ml-64 min-w-0 p-4 md:p-6">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
-              <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-base">주문현황</CardTitle>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">주문현황</CardTitle>
+                    </div>
+                    <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
