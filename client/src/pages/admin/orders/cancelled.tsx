@@ -140,6 +140,7 @@ export default function OrdersCancelledPage() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
+                    <TableHead className="whitespace-nowrap px-3">상태</TableHead>
                     <TableHead className="whitespace-nowrap px-3">주문자명</TableHead>
                     <TableHead className="whitespace-nowrap px-3">주문자 전화번호</TableHead>
                     <TableHead className="whitespace-nowrap px-3">주문자 주소</TableHead>
@@ -153,7 +154,6 @@ export default function OrdersCancelledPage() {
                     <TableHead className="whitespace-nowrap px-3">주문번호</TableHead>
                     <TableHead className="whitespace-nowrap px-3">운송장번호</TableHead>
                     <TableHead className="whitespace-nowrap px-3">택배사</TableHead>
-                    <TableHead className="whitespace-nowrap px-3">상태</TableHead>
                     <TableHead className="whitespace-nowrap px-3">취소일시</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -171,6 +171,9 @@ export default function OrdersCancelledPage() {
                           checked={selectedOrders.includes(order.id)}
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                         />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-3">
+                        <Badge variant="destructive">{order.status === "회원취소" ? "회원취소" : "취소"}</Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap px-3" data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
                       <TableCell className="whitespace-nowrap px-3" data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
@@ -195,9 +198,6 @@ export default function OrdersCancelledPage() {
                         {order.trackingNumber || "-"}
                       </TableCell>
                       <TableCell className="whitespace-nowrap px-3" data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
-                      <TableCell className="whitespace-nowrap px-3">
-                        <Badge variant="destructive">{order.status === "회원취소" ? "회원취소" : "취소"}</Badge>
-                      </TableCell>
                       <TableCell className="whitespace-nowrap px-3 text-sm text-muted-foreground">
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
                       </TableCell>
