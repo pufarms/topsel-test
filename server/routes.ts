@@ -6691,10 +6691,10 @@ export async function registerRoutes(
       }
 
       // 택배사별 컬럼 인덱스 설정
-      // 롯데: 주문번호(인덱스 9), 운송장번호(인덱스 6)
+      // 롯데: 주문번호(인덱스 11), 운송장번호(인덱스 12)
       // 우체국: 주문번호(인덱스 20), 등기번호(인덱스 1)
-      const orderNumberIndex = courier === "lotte" ? 9 : 20;
-      const trackingNumberIndex = courier === "lotte" ? 6 : 1;
+      const orderNumberIndex = courier === "lotte" ? 11 : 20;
+      const trackingNumberIndex = courier === "lotte" ? 12 : 1;
       const courierCompanyName = courier === "lotte" ? "롯데택배" : "우체국";
 
       // 파일에서 주문번호-운송장번호 쌍 추출 (헤더 제외)
