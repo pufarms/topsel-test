@@ -728,7 +728,7 @@ export default function Dashboard() {
           { label: "주문조정건 확인", tab: "order-adjust" },
           { label: "송장파일 다운로드", tab: "order-invoice" },
           { label: "취소건 등록", tab: "order-cancel" },
-          { label: "주문건 조회", tab: "order-list" },
+          { label: "배송중 조회", tab: "order-list" },
         ]}
       />
       <SidebarItem
@@ -911,7 +911,7 @@ export default function Dashboard() {
                     </Button>
                     <Button size="sm" variant="outline" className="gap-1.5">
                       <Search className="h-4 w-4" />
-                      주문건 조회
+                      배송중 조회
                     </Button>
                   </div>
                 </CardContent>
@@ -1495,7 +1495,7 @@ export default function Dashboard() {
                 <MemberOrderCancel />
               )}
 
-              {/* 주문건 조회 탭 */}
+              {/* 배송중 조회 탭 */}
               {activeTab === "order-list" && (
                 <MemberOrderList />
               )}
