@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import type { PendingOrder } from "@shared/schema";
@@ -30,12 +30,13 @@ export default function OrdersCancelledPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
   });
 
-  // 취소 페이지는 "취소" 상태만 표시
   const cancelledOrders = allPendingOrders.filter(o => o.status === "취소");
 
   const getFields = useCallback((order: PendingOrder) => ({
@@ -51,9 +52,18 @@ export default function OrdersCancelledPage() {
 
   const filteredOrders = useAdminCategoryFilter(cancelledOrders, filters, getFields);
 
+  const totalPages = tablePageSize === "all" ? 1 : Math.ceil(filteredOrders.length / tablePageSize);
+  const displayedOrders = tablePageSize === "all"
+    ? filteredOrders
+    : filteredOrders.slice((currentPage - 1) * tablePageSize, currentPage * tablePageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedOrders(filteredOrders.map(o => o.id));
+      setSelectedOrders(displayedOrders.map(o => o.id));
     } else {
       setSelectedOrders([]);
     }
@@ -77,7 +87,7 @@ export default function OrdersCancelledPage() {
 
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>회원 취소 목록</CardTitle>
+          <CardTitle>회원취소 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
           <AdminCategoryFilter
@@ -85,20 +95,32 @@ export default function OrdersCancelledPage() {
             searchPlaceholder="검색어를 입력하세요"
           />
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" data-testid="button-download-orders">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>
               <span className="text-sm text-muted-foreground">
-                총 {filteredOrders.length}건
+                {displayedOrders.length} / {filteredOrders.length}건
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="default" disabled={selectedOrders.length === 0}>
-                주문 복구
-              </Button>
+              <span className="text-sm">표시 개수:</span>
+              <select
+                className="h-8 px-2 border rounded text-sm"
+                value={tablePageSize === "all" ? "all" : tablePageSize.toString()}
+                onChange={(e) => {
+                  setTablePageSize(e.target.value === "all" ? "all" : parseInt(e.target.value));
+                  setCurrentPage(1);
+                }}
+                data-testid="select-page-size"
+              >
+                <option value="10">10개씩</option>
+                <option value="30">30개씩</option>
+                <option value="100">100개씩</option>
+                <option value="all">전체</option>
+              </select>
             </div>
           </div>
 
@@ -106,40 +128,44 @@ export default function OrdersCancelledPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              취소 내역이 없습니다.
-            </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
-              <Table className="min-w-[1600px]">
-                <TableHeader>
+            <div className="border rounded-lg max-h-[400px] overflow-x-scroll">
+              <div className="overflow-y-auto max-h-[383px] min-w-[1600px]">
+                <Table className="w-full">
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                        checked={selectedOrders.length === displayedOrders.length && displayedOrders.length > 0}
                         onCheckedChange={handleSelectAll}
+                        data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="w-[100px]">순번</TableHead>
-                    <TableHead className="w-[120px]">상호명</TableHead>
-                    <TableHead className="w-[120px]">대분류</TableHead>
-                    <TableHead className="w-[120px]">중분류</TableHead>
-                    <TableHead className="w-[120px]">소분류</TableHead>
-                    <TableHead className="w-[140px]">상품코드</TableHead>
+                    <TableHead className="w-[100px]">주문자명</TableHead>
+                    <TableHead className="w-[140px]">주문자 전화번호</TableHead>
+                    <TableHead className="min-w-[200px]">주문자 주소</TableHead>
+                    <TableHead className="w-[100px]">수령자명</TableHead>
+                    <TableHead className="w-[140px]">수령자휴대폰번호</TableHead>
+                    <TableHead className="w-[140px]">수령자 전화번호</TableHead>
+                    <TableHead className="min-w-[250px]">수령자 주소</TableHead>
+                    <TableHead className="min-w-[150px]">배송메시지</TableHead>
                     <TableHead className="min-w-[200px]">상품명</TableHead>
-                    <TableHead className="w-[100px]">수량</TableHead>
-                    <TableHead className="w-[120px]">공급가</TableHead>
-                    <TableHead className="w-[100px]">주문자</TableHead>
-                    <TableHead className="w-[100px]">수령자</TableHead>
-                    <TableHead className="w-[150px]">수령자 연락처</TableHead>
-                    <TableHead className="min-w-[250px]">배송지</TableHead>
+                    <TableHead className="w-[80px]">수량</TableHead>
+                    <TableHead className="w-[140px]">주문번호</TableHead>
+                    <TableHead className="w-[140px]">운송장번호</TableHead>
+                    <TableHead className="w-[100px]">택배사</TableHead>
                     <TableHead className="w-[100px]">상태</TableHead>
                     <TableHead className="w-[150px]">취소일시</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order, index) => (
+                  {displayedOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                        취소 내역이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : displayedOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <Checkbox
@@ -147,23 +173,29 @@ export default function OrdersCancelledPage() {
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{order.sequenceNumber || index + 1}</TableCell>
-                      <TableCell>{order.memberCompanyName || "-"}</TableCell>
-                      <TableCell>{order.categoryLarge || "-"}</TableCell>
-                      <TableCell>{order.categoryMedium || "-"}</TableCell>
-                      <TableCell>{order.categorySmall || "-"}</TableCell>
-                      <TableCell className="font-mono">{order.productCode || "-"}</TableCell>
-                      <TableCell>{order.productName || "-"}</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell className="text-right">
-                        {order.supplyPrice ? order.supplyPrice.toLocaleString() + "원" : "-"}
+                      <TableCell data-testid={`text-orderer-name-${order.id}`}>{order.ordererName || "-"}</TableCell>
+                      <TableCell data-testid={`text-orderer-phone-${order.id}`}>{order.ordererPhone || "-"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={order.ordererAddress || ""} data-testid={`text-orderer-address-${order.id}`}>
+                        {order.ordererAddress || "-"}
                       </TableCell>
-                      <TableCell>{order.ordererName || "-"}</TableCell>
-                      <TableCell>{order.recipientName || "-"}</TableCell>
-                      <TableCell>{order.recipientMobile || order.recipientPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""}>
+                      <TableCell data-testid={`text-recipient-name-${order.id}`}>{order.recipientName || "-"}</TableCell>
+                      <TableCell data-testid={`text-recipient-mobile-${order.id}`}>{order.recipientMobile || "-"}</TableCell>
+                      <TableCell data-testid={`text-recipient-phone-${order.id}`}>{order.recipientPhone || "-"}</TableCell>
+                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""} data-testid={`text-recipient-address-${order.id}`}>
                         {order.recipientAddress || "-"}
                       </TableCell>
+                      <TableCell data-testid={`text-delivery-message-${order.id}`}>
+                        {order.deliveryMessage
+                          ? order.deliveryMessage.replace(/\s*\[주소확인필요:[^\]]*\]/g, "").trim() || "-"
+                          : "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
+                      <TableCell data-testid={`text-quantity-${order.id}`}>1</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.customOrderNumber || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-tracking-number-${order.id}`}>
+                        {order.trackingNumber || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="destructive">회원취소</Badge>
                       </TableCell>
@@ -174,6 +206,35 @@ export default function OrdersCancelledPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
+            </div>
+          )}
+
+          {tablePageSize !== "all" && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                이전
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                {currentPage} / {totalPages} 페이지
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+                data-testid="button-next-page"
+              >
+                다음
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </CardContent>

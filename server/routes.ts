@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -7083,6 +7083,282 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Transfer to ready-to-ship error:", error);
       res.status(500).json({ message: error.message || "배송준비중 전송 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Admin: Get ready-to-ship status (waybill delivered, cancel deadline)
+  app.get('/api/admin/ready-to-ship-status', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const waybillSetting = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
+      const cancelSetting = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
+
+      res.json({
+        waybillDelivered: waybillSetting.length > 0 && waybillSetting[0].settingValue === "true",
+        cancelDeadlineClosed: cancelSetting.length > 0 && cancelSetting[0].settingValue === "true",
+      });
+    } catch (error: any) {
+      console.error("Get ready-to-ship status error:", error);
+      res.status(500).json({ message: error.message || "상태 조회 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Admin: Deliver waybill to members
+  app.post('/api/admin/ready-to-ship/deliver-waybill', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const existing = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
+
+      if (existing.length > 0) {
+        await db.update(siteSettings)
+          .set({ settingValue: "true", updatedAt: new Date() })
+          .where(eq(siteSettings.settingKey, "waybill_delivered"));
+      } else {
+        await db.insert(siteSettings).values({
+          settingKey: "waybill_delivered",
+          settingValue: "true",
+          settingType: "boolean",
+          category: "order",
+          description: "운송장 전달 상태",
+        });
+      }
+
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+      res.json({
+        success: true,
+        message: "운송장이 회원들에게 전달되었습니다. 회원들이 운송장 파일을 다운로드할 수 있습니다.",
+      });
+    } catch (error: any) {
+      console.error("Deliver waybill error:", error);
+      res.status(500).json({ message: error.message || "운송장 전달 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Admin: Close cancel deadline
+  app.post('/api/admin/ready-to-ship/close-cancel-deadline', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const existing = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
+
+      if (existing.length > 0) {
+        await db.update(siteSettings)
+          .set({ settingValue: "true", updatedAt: new Date() })
+          .where(eq(siteSettings.settingKey, "cancel_deadline_closed"));
+      } else {
+        await db.insert(siteSettings).values({
+          settingKey: "cancel_deadline_closed",
+          settingValue: "true",
+          settingType: "boolean",
+          category: "order",
+          description: "회원취소 마감 상태",
+        });
+      }
+
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+      res.json({
+        success: true,
+        message: "회원취소가 마감되었습니다. 더 이상 회원이 취소를 접수할 수 없습니다.",
+      });
+    } catch (error: any) {
+      console.error("Close cancel deadline error:", error);
+      res.status(500).json({ message: error.message || "회원취소 마감 중 오류가 발생했습니다" });
+    }
+  });
+
+  // Admin: Transfer orders from 배송준비중 to 배송중 (exclude cancelled)
+  app.post('/api/admin/orders/to-shipping', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { mode, orderIds, filters } = req.body;
+
+      if (mode === "all") {
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송중",
+            updatedAt: new Date()
+          })
+          .where(
+            eq(pendingOrders.status, "배송준비중")
+          )
+          .returning({ id: pendingOrders.id });
+
+        // Reset waybill/cancel status for next batch (upsert to handle missing keys)
+        const waybillExists = await db.select().from(siteSettings)
+          .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
+        if (waybillExists.length > 0) {
+          await db.update(siteSettings)
+            .set({ settingValue: "false", updatedAt: new Date() })
+            .where(eq(siteSettings.settingKey, "waybill_delivered"));
+        } else {
+          await db.insert(siteSettings).values({
+            settingKey: "waybill_delivered",
+            settingValue: "false",
+            settingType: "boolean",
+            category: "order",
+            description: "운송장 전달 상태",
+          });
+        }
+        const cancelExists = await db.select().from(siteSettings)
+          .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
+        if (cancelExists.length > 0) {
+          await db.update(siteSettings)
+            .set({ settingValue: "false", updatedAt: new Date() })
+            .where(eq(siteSettings.settingKey, "cancel_deadline_closed"));
+        } else {
+          await db.insert(siteSettings).values({
+            settingKey: "cancel_deadline_closed",
+            settingValue: "false",
+            settingType: "boolean",
+            category: "order",
+            description: "회원취소 마감 상태",
+          });
+        }
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
+        });
+
+      } else if (mode === "filtered") {
+        const conditions: any[] = [
+          eq(pendingOrders.status, "배송준비중")
+        ];
+
+        if (filters?.memberId) {
+          conditions.push(eq(pendingOrders.memberId, filters.memberId));
+        }
+        if (filters?.categoryLarge) {
+          conditions.push(eq(pendingOrders.categoryLarge, filters.categoryLarge));
+        }
+        if (filters?.categoryMedium) {
+          conditions.push(eq(pendingOrders.categoryMedium, filters.categoryMedium));
+        }
+        if (filters?.categorySmall) {
+          conditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
+        }
+        if (filters?.search && filters.search.trim()) {
+          const searchTerm = `%${filters.search}%`;
+          if (filters.searchFilter) {
+            switch (filters.searchFilter) {
+              case "주문자명":
+                conditions.push(ilike(pendingOrders.ordererName, searchTerm));
+                break;
+              case "수령자명":
+                conditions.push(ilike(pendingOrders.recipientName, searchTerm));
+                break;
+              case "상품명":
+                conditions.push(ilike(pendingOrders.productName, searchTerm));
+                break;
+              case "상품코드":
+                conditions.push(ilike(pendingOrders.productCode, searchTerm));
+                break;
+              default:
+                conditions.push(
+                  or(
+                    ilike(pendingOrders.productName, searchTerm),
+                    ilike(pendingOrders.recipientName, searchTerm),
+                    ilike(pendingOrders.ordererName, searchTerm),
+                    ilike(pendingOrders.productCode, searchTerm)
+                  )
+                );
+            }
+          } else {
+            conditions.push(
+              or(
+                ilike(pendingOrders.productName, searchTerm),
+                ilike(pendingOrders.recipientName, searchTerm),
+                ilike(pendingOrders.ordererName, searchTerm),
+                ilike(pendingOrders.productCode, searchTerm)
+              )
+            );
+          }
+        }
+
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송중",
+            updatedAt: new Date()
+          })
+          .where(and(...conditions))
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
+        });
+
+      } else if (mode === "selected") {
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({ message: "전송할 주문을 선택해주세요" });
+        }
+
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "배송중",
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              inArray(pendingOrders.id, orderIds),
+              eq(pendingOrders.status, "배송준비중")
+            )
+          )
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          transferredCount: result.length,
+          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
+        });
+
+      } else {
+        return res.status(400).json({ message: "올바른 전송 모드를 선택해주세요 (all, filtered, selected)" });
+      }
+    } catch (error: any) {
+      console.error("Transfer to shipping error:", error);
+      res.status(500).json({ message: error.message || "배송중 전송 중 오류가 발생했습니다" });
     }
   });
 
