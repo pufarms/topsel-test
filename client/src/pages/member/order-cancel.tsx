@@ -33,12 +33,12 @@ export default function MemberOrderCancel() {
     queryKey: ["/api/member/pending-orders"],
   });
 
-  const readyToShipOrders = allOrders.filter(o => o.status === "배송준비중");
+  const cancelledOrders = allOrders.filter(o => o.status === "회원취소" || o.status === "취소");
 
   const filteredOrders = useMemo(() => {
-    if (!filters) return readyToShipOrders;
+    if (!filters) return cancelledOrders;
 
-    return readyToShipOrders.filter(order => {
+    return cancelledOrders.filter(order => {
       if (filters.categoryLarge && order.categoryLarge !== filters.categoryLarge) return false;
       if (filters.categoryMedium && order.categoryMedium !== filters.categoryMedium) return false;
       if (filters.categorySmall && order.categorySmall !== filters.categorySmall) return false;
@@ -57,7 +57,7 @@ export default function MemberOrderCancel() {
 
       return true;
     });
-  }, [readyToShipOrders, filters]);
+  }, [cancelledOrders, filters]);
 
   const totalPages = pageSize === "all" ? 1 : Math.ceil(filteredOrders.length / pageSize);
   const displayedOrders = pageSize === "all"
@@ -304,7 +304,7 @@ export default function MemberOrderCancel() {
                   {displayedOrders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
-                        배송준비중 주문 내역이 없습니다.
+                        취소 등록된 주문이 없습니다.
                       </TableCell>
                     </TableRow>
                   ) : displayedOrders.map((order) => (
