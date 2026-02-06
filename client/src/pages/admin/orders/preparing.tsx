@@ -466,7 +466,11 @@ export default function OrdersPreparingPage() {
                       <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""} data-testid={`text-recipient-address-${order.id}`}>
                         {order.recipientAddress || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-delivery-message-${order.id}`}>{order.deliveryMessage || "-"}</TableCell>
+                      <TableCell data-testid={`text-delivery-message-${order.id}`}>
+                        {order.deliveryMessage 
+                          ? order.deliveryMessage.replace(/\s*\[주소확인필요:[^\]]*\]/g, "").trim() || "-"
+                          : "-"}
+                      </TableCell>
                       <TableCell data-testid={`text-product-name-${order.id}`}>{order.productName || "-"}</TableCell>
                       <TableCell data-testid={`text-quantity-${order.id}`}>1</TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-order-number-${order.id}`}>{order.orderNumber || "-"}</TableCell>
