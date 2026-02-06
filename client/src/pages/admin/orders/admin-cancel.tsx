@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { FileDown, Loader2, AlertTriangle, Search, Check, X, Send, ChevronDown } from "lucide-react";
+import { FileDown, Loader2, AlertTriangle, Search, Check, X, Send, ChevronDown, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -102,6 +102,7 @@ export default function OrdersAdminCancelPage() {
   const [isTransferring, setIsTransferring] = useState(false);
   const [applyingMaterials, setApplyingMaterials] = useState<Set<string>>(new Set());
   const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "deficit">("all");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders"],
@@ -607,6 +608,13 @@ export default function OrdersAdminCancelPage() {
 
   const deficitGroups = adjustmentData.filter(g => g.isDeficit);
 
+  const filteredAdjustmentData = useMemo(() => {
+    if (stockFilter === "deficit") {
+      return adjustmentData.filter(g => g.remainingStock < 0);
+    }
+    return adjustmentData;
+  }, [adjustmentData, stockFilter]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -616,30 +624,56 @@ export default function OrdersAdminCancelPage() {
       <OrderStatsBanner />
 
       <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle>원재료 기반 주문조정 재고표</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={handleDownloadAdjustmentExcel}
-              data-testid="button-download-adjustment"
-            >
-              <FileDown className="h-4 w-4 mr-1" />
-              엑셀 다운로드
-            </Button>
-            <Button 
-              size="sm" 
-              variant="default" 
-              disabled={selectedProducts.length === 0 || executeAdjustmentMutation.isPending}
-              onClick={handleExecuteAdjustment}
-              data-testid="button-execute-adjustment"
-            >
-              {executeAdjustmentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : null}
-              주문조정 실행
-            </Button>
+        <CardHeader className="flex flex-col gap-3">
+          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardTitle>원재료 기반 주문조정 재고표</CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 border rounded-md p-0.5" data-testid="stock-filter-group">
+                <Button
+                  size="sm"
+                  variant={stockFilter === "all" ? "default" : "ghost"}
+                  onClick={() => setStockFilter("all")}
+                  data-testid="button-stock-filter-all"
+                >
+                  전체
+                </Button>
+                <Button
+                  size="sm"
+                  variant={stockFilter === "deficit" ? "destructive" : "ghost"}
+                  onClick={() => setStockFilter("deficit")}
+                  data-testid="button-stock-filter-deficit"
+                >
+                  <Filter className="h-3.5 w-3.5 mr-1" />
+                  재고부족
+                  {deficitGroups.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {deficitGroups.length}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleDownloadAdjustmentExcel}
+                data-testid="button-download-adjustment"
+              >
+                <FileDown className="h-4 w-4 mr-1" />
+                엑셀 다운로드
+              </Button>
+              <Button 
+                size="sm" 
+                variant="default" 
+                disabled={selectedProducts.length === 0 || executeAdjustmentMutation.isPending}
+                onClick={handleExecuteAdjustment}
+                data-testid="button-execute-adjustment"
+              >
+                {executeAdjustmentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : null}
+                주문조정 실행
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
@@ -678,14 +712,16 @@ export default function OrdersAdminCancelPage() {
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
-                ) : adjustmentData.length === 0 ? (
+                ) : filteredAdjustmentData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
-                      대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다.
+                      {stockFilter === "deficit" 
+                        ? "재고 부족인 원재료가 없습니다." 
+                        : "대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  adjustmentData.map((group) => {
+                  filteredAdjustmentData.map((group) => {
                     const selection = alternateSelections.get(group.materialCode);
                     const adjustedRemaining = getAdjustedRemainingStock(group);
                     const stillDeficit = isStillDeficit(group);
