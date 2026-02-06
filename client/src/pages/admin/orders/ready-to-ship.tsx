@@ -210,7 +210,7 @@ export default function OrdersReadyToShipPage() {
                 ) : (
                   <Bell className="h-4 w-4 mr-1" />
                 )}
-                {waybillDelivered ? "운송장 전달됨" : "운송장 전달"}
+                {waybillDelivered ? "운송장전달 완료" : "운송장 전달"}
               </Button>
               <Button
                 size="sm"

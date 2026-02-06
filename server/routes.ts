@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, desc, asc, sql, and, or, inArray, like, ilike, isNotNull } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
@@ -5782,12 +5782,24 @@ export async function registerRoutes(
           ? eq(pendingOrders.status, "상품준비중")
           : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "상품준비중")));
       
-      // Ready to ship (배송준비중) count
-      const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
-        .from(pendingOrders)
-        .where(isAdmin 
-          ? eq(pendingOrders.status, "배송준비중")
-          : and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송준비중")));
+      // Ready to ship (배송준비중) count - members only see this after waybill delivery
+      let readyToShipCount = 0;
+      if (isAdmin) {
+        const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
+          .from(pendingOrders)
+          .where(eq(pendingOrders.status, "배송준비중"));
+        readyToShipCount = readyToShipResult[0]?.count || 0;
+      } else {
+        const waybillSetting = await db.select().from(siteSettings)
+          .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
+        const waybillDelivered = waybillSetting.length > 0 && waybillSetting[0].settingValue === "true";
+        if (waybillDelivered) {
+          const readyToShipResult = await db.select({ count: sql<number>`count(*)::int` })
+            .from(pendingOrders)
+            .where(and(eq(pendingOrders.memberId, req.session.userId), eq(pendingOrders.status, "배송준비중")));
+          readyToShipCount = readyToShipResult[0]?.count || 0;
+        }
+      }
       
       // Member cancelled (회원취소) count
       const memberCancelledResult = await db.select({ count: sql<number>`count(*)::int` })
@@ -5808,7 +5820,7 @@ export async function registerRoutes(
         pending: pendingResult[0]?.count || 0,           // 주문대기
         adjustment: adjustmentResult[0]?.count || 0,     // 주문조정
         preparing: preparingResult[0]?.count || 0,       // 상품준비중
-        readyToShip: readyToShipResult[0]?.count || 0,   // 배송준비중
+        readyToShip: readyToShipCount,   // 배송준비중
         memberCancelled: memberCancelledResult[0]?.count || 0, // 회원취소
         shipping: shippingResult[0]?.count || 0,         // 배송중
         isAdmin
@@ -5826,9 +5838,20 @@ export async function registerRoutes(
     }
 
     try {
+      const waybillSetting = await db.select().from(siteSettings)
+        .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
+      const waybillDelivered = waybillSetting.length > 0 && waybillSetting[0].settingValue === "true";
+
+      const condition = waybillDelivered
+        ? eq(pendingOrders.memberId, req.session.userId)
+        : and(
+            eq(pendingOrders.memberId, req.session.userId),
+            ne(pendingOrders.status, "배송준비중")
+          );
+
       const orders = await db.select()
         .from(pendingOrders)
-        .where(eq(pendingOrders.memberId, req.session.userId))
+        .where(condition!)
         .orderBy(asc(pendingOrders.sequenceNumber));
 
       res.json(orders);
