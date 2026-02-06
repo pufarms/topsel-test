@@ -683,7 +683,7 @@ export default function OrdersPreparingPage() {
           )}
 
           <div className="border-t pt-4 mt-4">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <span className="text-base font-bold text-orange-500 whitespace-nowrap">
                 운송장 등록 주문건 배송준비중으로 전송
               </span>
