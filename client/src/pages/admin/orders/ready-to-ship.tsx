@@ -130,10 +130,6 @@ export default function OrdersReadyToShipPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : displayedOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              배송준비중 내역이 없습니다.
-            </div>
           ) : (
             <div className="border rounded-lg max-h-[400px] overflow-x-scroll">
               <div className="overflow-y-auto max-h-[383px] min-w-[1600px]">
@@ -163,7 +159,13 @@ export default function OrdersReadyToShipPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedOrders.map((order) => (
+                  {displayedOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                        배송준비중 내역이 없습니다.
+                      </TableCell>
+                    </TableRow>
+                  ) : displayedOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <Checkbox
