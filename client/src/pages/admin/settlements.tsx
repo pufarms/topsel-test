@@ -65,7 +65,7 @@ interface DepositRecord {
   balanceAfter: number;
   description: string | null;
   relatedOrderId: number | null;
-  processedBy: string | null;
+  adminId: string | null;
   createdAt: string;
   memberCompanyName: string | null;
 }
@@ -78,7 +78,7 @@ interface PointerRecord {
   balanceAfter: number;
   description: string | null;
   relatedOrderId: number | null;
-  processedBy: string | null;
+  adminId: string | null;
   createdAt: string;
   memberCompanyName: string | null;
 }

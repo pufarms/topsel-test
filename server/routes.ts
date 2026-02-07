@@ -9339,7 +9339,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9364,7 +9364,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9384,7 +9384,7 @@ export async function registerRoutes(
           amount,
           balanceAfter: newDeposit,
           description: description || `관리자 예치금 충전`,
-          processedBy: req.session.userId,
+          adminId: req.session.userId,
         });
         return { error: false, newDeposit } as const;
       });
@@ -9403,7 +9403,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9427,7 +9427,7 @@ export async function registerRoutes(
           amount,
           balanceAfter: newDeposit,
           description: description || `관리자 예치금 환급`,
-          processedBy: req.session.userId,
+          adminId: req.session.userId,
         });
         return { error: false, newDeposit } as const;
       });
@@ -9446,7 +9446,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9466,7 +9466,7 @@ export async function registerRoutes(
           amount,
           balanceAfter: newPoint,
           description: description || `관리자 포인터 지급`,
-          processedBy: req.session.userId,
+          adminId: req.session.userId,
         });
         return { error: false, newPoint } as const;
       });
@@ -9485,7 +9485,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9548,7 +9548,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9577,7 +9577,7 @@ export async function registerRoutes(
           balanceAfter: depositHistory.balanceAfter,
           description: depositHistory.description,
           relatedOrderId: depositHistory.relatedOrderId,
-          processedBy: depositHistory.processedBy,
+          adminId: depositHistory.adminId,
           createdAt: depositHistory.createdAt,
           memberCompanyName: members.companyName,
         })
@@ -9608,7 +9608,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
@@ -9637,7 +9637,7 @@ export async function registerRoutes(
           balanceAfter: pointerHistory.balanceAfter,
           description: pointerHistory.description,
           relatedOrderId: pointerHistory.relatedOrderId,
-          processedBy: pointerHistory.processedBy,
+          adminId: pointerHistory.adminId,
           createdAt: pointerHistory.createdAt,
           memberCompanyName: members.companyName,
         })
@@ -9668,7 +9668,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
