@@ -127,6 +127,7 @@ import {
   pageCategories, 
   pageAccessLevels, 
   pageAccessLevelLabels,
+  adminOnlyCategories,
   imageCategories,
   type Page, 
   type PageCategory, 
@@ -1005,7 +1006,11 @@ export default function PagesManagement() {
               <Label>카테고리</Label>
               <Select 
                 value={formData.category} 
-                onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
+                onValueChange={(v) => {
+                  const cat = v as PageCategory;
+                  const isAdminOnly = adminOnlyCategories.includes(cat);
+                  setFormData({ ...formData, category: cat, accessLevel: isAdminOnly ? "ADMIN" : formData.accessLevel });
+                }}
               >
                 <SelectTrigger data-testid="select-page-category">
                   <SelectValue />
@@ -1019,19 +1024,31 @@ export default function PagesManagement() {
             </div>
             <div>
               <Label>접근권한</Label>
-              <Select 
-                value={formData.accessLevel} 
-                onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
-              >
-                <SelectTrigger data-testid="select-page-access">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageAccessLevels.map((level) => (
-                    <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {adminOnlyCategories.includes(formData.category) ? (
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value="관리자(부관리자) 이상" 
+                    disabled 
+                    className="bg-muted"
+                    data-testid="select-page-access-locked"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">고정</span>
+                </div>
+              ) : (
+                <Select 
+                  value={formData.accessLevel} 
+                  onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
+                >
+                  <SelectTrigger data-testid="select-page-access">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageAccessLevels.map((level) => (
+                      <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label>상태</Label>
@@ -1174,7 +1191,11 @@ export default function PagesManagement() {
                     <Label>카테고리</Label>
                     <Select 
                       value={formData.category} 
-                      onValueChange={(v) => setFormData({ ...formData, category: v as PageCategory })}
+                      onValueChange={(v) => {
+                        const cat = v as PageCategory;
+                        const isAdminOnly = adminOnlyCategories.includes(cat);
+                        setFormData({ ...formData, category: cat, accessLevel: isAdminOnly ? "ADMIN" : formData.accessLevel });
+                      }}
                     >
                       <SelectTrigger data-testid="select-edit-page-category">
                         <SelectValue />
@@ -1188,19 +1209,31 @@ export default function PagesManagement() {
                   </div>
                   <div>
                     <Label>접근권한</Label>
-                    <Select 
-                      value={formData.accessLevel} 
-                      onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
-                    >
-                      <SelectTrigger data-testid="select-edit-page-access">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {pageAccessLevels.map((level) => (
-                          <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {adminOnlyCategories.includes(formData.category) ? (
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          value="관리자(부관리자) 이상" 
+                          disabled 
+                          className="bg-muted"
+                          data-testid="select-edit-page-access-locked"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">고정</span>
+                      </div>
+                    ) : (
+                      <Select 
+                        value={formData.accessLevel} 
+                        onValueChange={(v) => setFormData({ ...formData, accessLevel: v as PageAccessLevel })}
+                      >
+                        <SelectTrigger data-testid="select-edit-page-access">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pageAccessLevels.map((level) => (
+                            <SelectItem key={level} value={level}>{pageAccessLevelLabels[level]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div>
                     <Label>상태</Label>

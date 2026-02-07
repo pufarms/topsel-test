@@ -1661,8 +1661,8 @@ export class DatabaseStorage implements IStorage {
       { name: "배송완료", path: "/orders/completed", description: "배송 완료된 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 7, icon: "CheckCircle", isSystem: "false" },
 
       // 5. 통계관리페이지
-      { name: "상품별 통계관리", path: "/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "START", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },
-      { name: "정산 관리", path: "/stats/settlement", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "START", status: "draft", sortOrder: 2, icon: "DollarSign", isSystem: "false" },
+      { name: "상품별 통계관리", path: "/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },
+      { name: "정산 관리", path: "/stats/settlement", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "DollarSign", isSystem: "false" },
 
       // 6. 가이드페이지
       { name: "회원가입과 등급", path: "/guide/membership", description: "회원가입, 자격, 등급, 혜택 안내", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "BookOpen", isSystem: "false" },

@@ -5053,6 +5053,10 @@ export async function registerRoutes(
     
     try {
       const validatedData = insertPageSchema.parse(req.body);
+      const { adminOnlyCategories } = await import("@shared/schema");
+      if (adminOnlyCategories.includes(validatedData.category)) {
+        validatedData.accessLevel = "ADMIN";
+      }
       const page = await storage.createPage(validatedData);
       res.json(page);
     } catch (error) {
@@ -5076,6 +5080,11 @@ export async function registerRoutes(
     
     try {
       const validatedData = insertPageSchema.partial().parse(req.body);
+      const { adminOnlyCategories } = await import("@shared/schema");
+      const category = validatedData.category || (await storage.getPage(req.params.id))?.category;
+      if (category && adminOnlyCategories.includes(category)) {
+        validatedData.accessLevel = "ADMIN";
+      }
       const page = await storage.updatePage(req.params.id, validatedData);
       if (!page) {
         return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
