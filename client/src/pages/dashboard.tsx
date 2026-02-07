@@ -501,7 +501,7 @@ export default function Dashboard() {
     availableBalance: number;
   }>({
     queryKey: ["/api/member/my-balance"],
-    enabled: isMember,
+    enabled: !!isMember,
   });
 
   // 주문등록 양식 템플릿 조회
@@ -512,7 +512,7 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("양식을 찾을 수 없습니다");
       return res.json();
     },
-    enabled: isMember || isPreviewMode,
+    enabled: !!(isMember || isPreviewMode),
     staleTime: 1000 * 60 * 30,
     retry: false,
   });
