@@ -1224,7 +1224,9 @@ export default function Dashboard() {
                                     data-testid="select-upload-format"
                                   >
                                     <option value="default">기본 양식 (.xlsx)</option>
-                                    <option value="postoffice">우체국 양식 (.xls)</option>
+                                    {memberData?.postOfficeEnabled && (
+                                      <option value="postoffice">우체국 양식 (.xls)</option>
+                                    )}
                                   </select>
                                 </div>
 

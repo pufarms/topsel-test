@@ -31,6 +31,12 @@ export default function MemberOrderInvoice() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const { data: memberProfile } = useQuery<{ postOfficeEnabled?: boolean }>({
+    queryKey: ["/api/member/profile"],
+  });
+
+  const postOfficeEnabled = memberProfile?.postOfficeEnabled ?? false;
+
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/member/pending-orders", dateRange.startDate, dateRange.endDate],
     queryFn: async () => {
@@ -250,7 +256,7 @@ export default function MemberOrderInvoice() {
                 {selectedOrders.length > 0 && ` (${selectedOrders.length}건 선택)`}
               </span>
               <span className="text-muted-foreground">
-                | 기본 {defaultOrders.length}건 / 우체국 {postofficeOrders.length}건
+                | 기본 {defaultOrders.length}건{postOfficeEnabled && ` / 우체국 ${postofficeOrders.length}건`}
               </span>
             </div>
 
@@ -269,20 +275,22 @@ export default function MemberOrderInvoice() {
                 )}
                 기본 운송장 ({defaultOrders.length}건)
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={postofficeOrders.length === 0 || isDownloading}
-                onClick={handleDownloadPostOffice}
-                data-testid="button-download-postoffice"
-              >
-                {isDownloading ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4 mr-1" />
-                )}
-                우체국 운송장 ({postofficeOrders.length}건)
-              </Button>
+              {postOfficeEnabled && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={postofficeOrders.length === 0 || isDownloading}
+                  onClick={handleDownloadPostOffice}
+                  data-testid="button-download-postoffice"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4 mr-1" />
+                  )}
+                  우체국 운송장 ({postofficeOrders.length}건)
+                </Button>
+              )}
             </div>
           </div>
 

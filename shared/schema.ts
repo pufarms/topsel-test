@@ -277,6 +277,7 @@ export const members = pgTable("members", {
   mailFilePath: text("mail_file_path"),
   profileImageUrl: text("profile_image_url"),
   signatureData: text("signature_data"),
+  postOfficeEnabled: boolean("post_office_enabled").notNull().default(false),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   lastLoginAt: timestamp("last_login_at"),
@@ -319,6 +320,7 @@ export const bulkUpdateMemberSchema = z.object({
   depositAdjust: z.number().optional(),
   pointAdjust: z.number().optional(),
   memoAdd: z.string().optional(),
+  postOfficeEnabled: z.boolean().optional(),
 });
 
 export type InsertMember = z.infer<typeof insertMemberSchema>;

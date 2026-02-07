@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2, UserPlus } from "lucide-react";
+import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2, UserPlus, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -81,10 +81,12 @@ export default function MembersPage() {
   const [companySelectMode, setCompanySelectMode] = useState<"direct" | string>("all");
   const [usernameSelectMode, setUsernameSelectMode] = useState<"direct" | string>("all");
   const [filterGrade, setFilterGrade] = useState<string>("all");
+  const [filterPostOffice, setFilterPostOffice] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("newest");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   
   const [bulkGrade, setBulkGrade] = useState<string>("none");
+  const [bulkPostOffice, setBulkPostOffice] = useState<string>("none");
   const [bulkDepositAdjust, setBulkDepositAdjust] = useState("");
   const [bulkPointAdjust, setBulkPointAdjust] = useState("");
   const [bulkMemoAdd, setBulkMemoAdd] = useState("");
@@ -193,6 +195,8 @@ export default function MembersPage() {
   const filteredMembers = members
     .filter(m => {
       if (filterGrade !== "all" && m.grade !== filterGrade) return false;
+      if (filterPostOffice === "true" && !m.postOfficeEnabled) return false;
+      if (filterPostOffice === "false" && m.postOfficeEnabled) return false;
       if (companySelectMode === "direct") {
         if (searchCompany && !m.companyName.toLowerCase().includes(searchCompany.toLowerCase())) return false;
       } else if (companySelectMode !== "all") {
@@ -233,6 +237,8 @@ export default function MembersPage() {
     }
     const updateData: any = { memberIds: selectedMembers };
     if (bulkGrade && bulkGrade !== "none") updateData.grade = bulkGrade;
+    if (bulkPostOffice === "true") updateData.postOfficeEnabled = true;
+    if (bulkPostOffice === "false") updateData.postOfficeEnabled = false;
     if (bulkDepositAdjust) updateData.depositAdjust = parseInt(bulkDepositAdjust);
     if (bulkPointAdjust) updateData.pointAdjust = parseInt(bulkPointAdjust);
     if (bulkMemoAdd) updateData.memoAdd = bulkMemoAdd;
@@ -245,6 +251,7 @@ export default function MembersPage() {
     setCompanySelectMode("all");
     setUsernameSelectMode("all");
     setFilterGrade("all");
+    setFilterPostOffice("all");
     setSortBy("newest");
   };
 
@@ -268,6 +275,7 @@ export default function MembersPage() {
       "담당자3연락처": m.manager3Phone || "",
       "예치금": m.deposit,
       "포인트": m.point,
+      "우체국양식": m.postOfficeEnabled ? "사용" : "미사용",
       "상태": m.status,
       "가입일": formatDate(m.createdAt),
     }));
@@ -289,6 +297,9 @@ export default function MembersPage() {
     { key: "email", label: "이메일", render: (m) => m.email || "-" },
     { key: "deposit", label: "예치금", className: "text-right", render: (m) => `${formatNumber(m.deposit)}원` },
     { key: "point", label: "포인트", className: "text-right", render: (m) => `${formatNumber(m.point)}P` },
+    { key: "postOfficeEnabled", label: "우체국", render: (m) => (
+      <Badge variant={m.postOfficeEnabled ? "default" : "secondary"}>{m.postOfficeEnabled ? "사용" : "미사용"}</Badge>
+    )},
     { key: "status", label: "상태", render: (m) => (
       <Badge variant={m.status === "활성" ? "default" : "secondary"}>{m.status}</Badge>
     )},
@@ -447,6 +458,18 @@ export default function MembersPage() {
             </SelectContent>
           </Select>
         </FilterField>
+        <FilterField label="우체국양식">
+          <Select value={filterPostOffice} onValueChange={setFilterPostOffice}>
+            <SelectTrigger className="h-9" data-testid="select-filter-postoffice">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+              <SelectItem value="true">사용</SelectItem>
+              <SelectItem value="false">미사용</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
         <FilterField label="정렬">
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="h-9" data-testid="select-sort">
@@ -483,6 +506,18 @@ export default function MembersPage() {
               <SelectItem value="START">Start회원</SelectItem>
               <SelectItem value="DRIVING">Driving회원</SelectItem>
               <SelectItem value="TOP">Top회원</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField label="우체국양식">
+          <Select value={bulkPostOffice} onValueChange={setBulkPostOffice}>
+            <SelectTrigger className="h-9" data-testid="select-bulk-postoffice">
+              <SelectValue placeholder="변경 안함" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">변경 안함</SelectItem>
+              <SelectItem value="true">사용</SelectItem>
+              <SelectItem value="false">미사용</SelectItem>
             </SelectContent>
           </Select>
         </FilterField>
@@ -549,6 +584,7 @@ export default function MembersPage() {
               <MobileCardField label="이메일" value={member.email || "-"} />
               <MobileCardField label="예치금" value={`${formatNumber(member.deposit)}원`} />
               <MobileCardField label="포인트" value={`${formatNumber(member.point)}P`} />
+              <MobileCardField label="우체국양식" value={member.postOfficeEnabled ? "사용" : "미사용"} />
               <MobileCardField label="가입일" value={formatDate(member.createdAt)} />
             </div>
           </MobileCard>

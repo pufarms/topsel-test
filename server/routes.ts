@@ -1720,6 +1720,10 @@ export async function registerRoutes(
         changes.push(`상태: ${targetMember.status} → ${data.status}`);
       }
       if (data.memo !== undefined) updateData.memo = data.memo;
+      if (typeof (req.body as any).postOfficeEnabled === 'boolean' && (req.body as any).postOfficeEnabled !== targetMember.postOfficeEnabled) {
+        updateData.postOfficeEnabled = (req.body as any).postOfficeEnabled;
+        changes.push(`우체국 양식: ${(req.body as any).postOfficeEnabled ? '사용' : '미사용'}`);
+      }
       if (data.password && data.password.length >= 6) {
         updateData.password = data.password;
         changes.push("비밀번호 변경");
@@ -1778,6 +1782,7 @@ export async function registerRoutes(
         depositAdjust: data.depositAdjust,
         pointAdjust: data.pointAdjust,
         memoAdd: data.memoAdd,
+        postOfficeEnabled: data.postOfficeEnabled,
       });
 
       const changes: string[] = [];
@@ -1785,6 +1790,7 @@ export async function registerRoutes(
       if (data.depositAdjust) changes.push(`예치금 조정: ${data.depositAdjust > 0 ? '+' : ''}${data.depositAdjust.toLocaleString()}원`);
       if (data.pointAdjust) changes.push(`포인트 조정: ${data.pointAdjust > 0 ? '+' : ''}${data.pointAdjust.toLocaleString()}`);
       if (data.memoAdd) changes.push(`메모 추가`);
+      if (typeof data.postOfficeEnabled === 'boolean') changes.push(`우체국 양식: ${data.postOfficeEnabled ? '사용' : '미사용'}`);
 
       for (const memberId of data.memberIds) {
         await storage.createMemberLog({
@@ -6048,6 +6054,13 @@ export async function registerRoutes(
     // format 파라미터: 업로드 양식 (default, postoffice)
     const uploadFormat = req.body.format || 'default';
     const isPostOfficeFormat = uploadFormat === 'postoffice';
+
+    if (isPostOfficeFormat) {
+      const memberForCheck = await storage.getMember(req.session.userId);
+      if (!memberForCheck || !memberForCheck.postOfficeEnabled) {
+        return res.status(403).json({ message: "우체국 양식 사용 권한이 없습니다. 관리자에게 문의하세요." });
+      }
+    }
 
     try {
       const XLSX = await import("xlsx");

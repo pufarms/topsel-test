@@ -71,6 +71,7 @@ export default function MemberDetailPage() {
     status: string;
     memo: string;
     password: string;
+    postOfficeEnabled: boolean;
   }>({
     grade: "",
     representative: "",
@@ -88,6 +89,7 @@ export default function MemberDetailPage() {
     status: "",
     memo: "",
     password: "",
+    postOfficeEnabled: false,
   });
 
   const { data: member, isLoading } = useQuery<MemberDetail>({
@@ -169,6 +171,7 @@ export default function MemberDetailPage() {
     if (formData.manager3Phone !== (member.manager3Phone || "")) updateData.manager3Phone = formData.manager3Phone;
     if (formData.email !== (member.email || "")) updateData.email = formData.email;
     if (formData.status && formData.status !== member.status) updateData.status = formData.status;
+    if (formData.postOfficeEnabled !== (member.postOfficeEnabled ?? false)) updateData.postOfficeEnabled = formData.postOfficeEnabled;
     if (formData.memo !== (member.memo || "")) updateData.memo = formData.memo;
     if (formData.password && formData.password.length >= 6) updateData.password = formData.password;
     
@@ -390,6 +393,21 @@ export default function MemberDetailPage() {
                       {memberStatuses.map(s => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">우체국양식 사용</Label>
+                  <Select 
+                    value={formData.postOfficeEnabled !== undefined ? String(formData.postOfficeEnabled) : String(member.postOfficeEnabled ?? false)} 
+                    onValueChange={(v) => setFormData({...formData, postOfficeEnabled: v === "true"})}
+                  >
+                    <SelectTrigger data-testid="select-post-office">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">사용</SelectItem>
+                      <SelectItem value="false">미사용</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

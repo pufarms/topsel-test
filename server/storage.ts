@@ -616,6 +616,7 @@ export class DatabaseStorage implements IStorage {
     memo: string;
     approvedAt: Date;
     approvedBy: string;
+    postOfficeEnabled: boolean;
   }>): Promise<Member | undefined> {
     const updateData: any = { ...data, updatedAt: new Date() };
     if (data.password) {
@@ -630,6 +631,7 @@ export class DatabaseStorage implements IStorage {
     depositAdjust?: number;
     pointAdjust?: number;
     memoAdd?: string;
+    postOfficeEnabled?: boolean;
   }): Promise<Member[]> {
     const updatedMembers: Member[] = [];
     for (const memberId of memberIds) {
@@ -641,6 +643,7 @@ export class DatabaseStorage implements IStorage {
       if (data.depositAdjust) updateData.deposit = member.deposit + data.depositAdjust;
       if (data.pointAdjust) updateData.point = member.point + data.pointAdjust;
       if (data.memoAdd) updateData.memo = member.memo ? `${member.memo}\n${data.memoAdd}` : data.memoAdd;
+      if (typeof data.postOfficeEnabled === 'boolean') updateData.postOfficeEnabled = data.postOfficeEnabled;
       
       const [updated] = await db.update(members).set(updateData).where(eq(members.id, memberId)).returning();
       if (updated) updatedMembers.push(updated);
