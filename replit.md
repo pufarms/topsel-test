@@ -56,7 +56,16 @@ Preferred communication style: Simple, everyday language.
 4. **주문 검증 기준**: 회원 주문 업로드 시 반드시 **현재공급가 테이블**에서 상품 존재 여부 확인
    - `getCurrentProductByCode()` 사용 (NOT getProductRegistrationByCode)
    - 공급중지 상품(supplyStatus === 'suspended')도 주문 불가
-5. **회원 등급별 공급가**: 주문 시 회원의 membershipTier에 따라 해당 공급가 적용 (start/driving/top)
+5. **회원 등급별 공급가**: 주문 시 회원의 grade에 따라 해당 공급가 적용 (start/driving/top)
+   - `getSupplyPriceByGrade()` 헬퍼 함수로 매핑: START→startPrice, DRIVING→drivingPrice, TOP→topPrice
+   - ASSOCIATE/PENDING은 START 가격 기본값 (실제로는 주문 불가)
+6. **주문 가능 등급 제한**: START, DRIVING, TOP만 주문 등록 가능
+   - PENDING(승인대기), ASSOCIATE(준회원)은 주문 등록 불가 (API 403 반환)
+   - 준회원(ASSOCIATE) 이상은 상품리스트에서 현재공급가/차주예상공급가 조회 및 다운로드 가능
+7. **가격 확정 워크플로우**: 
+   - 미확정 주문 (대기~배송준비중): 실시간으로 current_products에서 등급별 가격 표시
+   - 확정 주문 (배송중): "배송중 전환" 시점에 가격 확정 (priceConfirmed=true), 이후 가격 변동 없음
+   - 통계 API: 확정 주문은 저장된 가격, 미확정 주문은 실시간 계산 (하이브리드 방식)
 
 ### 필수 디자인 요구사항 (모든 페이지 적용)
 1. **반응형 웹 디자인 (필수!)**: 모든 페이지에 모바일/태블릿/데스크톱 반응형 레이아웃 적용

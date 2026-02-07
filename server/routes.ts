@@ -6171,13 +6171,21 @@ export async function registerRoutes(
     }
 
     try {
-      const data = pendingOrderFormSchema.parse(req.body);
-
-      // Get member info
+      // Get member info first for grade check
       const member = await storage.getMember(req.session.userId);
       if (!member) {
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
       }
+
+      // 주문 가능 등급 체크: START, DRIVING, TOP만 주문 가능 (body 파싱 전에 체크)
+      const orderableGrades = ['START', 'DRIVING', 'TOP'];
+      if (!orderableGrades.includes(member.grade)) {
+        return res.status(403).json({ 
+          message: "주문 등록은 스타트 등급 이상 회원만 가능합니다. 등급 승인 후 이용해주세요." 
+        });
+      }
+
+      const data = pendingOrderFormSchema.parse(req.body);
 
       // Look up product info by productCode - 현재공급상품에서 확인
       const productInfo = await storage.getProductRegistrationByCode(data.productCode);
@@ -6303,6 +6311,14 @@ export async function registerRoutes(
       const member = await storage.getMember(req.session.userId);
       if (!member) {
         return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      // 주문 가능 등급 체크: START, DRIVING, TOP만 주문 가능
+      const orderableGrades = ['START', 'DRIVING', 'TOP'];
+      if (!orderableGrades.includes(member.grade)) {
+        return res.status(403).json({ 
+          message: "주문 등록은 스타트 등급 이상 회원만 가능합니다. 등급 승인 후 이용해주세요." 
+        });
       }
 
       // 중복 파일 감지 (실제 데이터 내용 기반 해시)
@@ -6746,6 +6762,83 @@ export async function registerRoutes(
         categorySmall: product.categorySmall,
       });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 회원용 상품리스트 API: 현재공급가 조회 (ASSOCIATE 이상)
+  app.get('/api/member/product-list/current', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    try {
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      // PENDING 등급은 접근 불가, ASSOCIATE 이상만 가능
+      if (member.grade === 'PENDING') {
+        return res.status(403).json({ message: "승인대기 회원은 상품리스트를 조회할 수 없습니다." });
+      }
+
+      const products = await storage.getAllCurrentProducts();
+      const grade = member.grade;
+
+      // 회원 등급에 맞는 공급가만 반환
+      const result = products
+        .filter(p => p.supplyStatus === 'supply')
+        .map(p => ({
+          productCode: p.productCode,
+          productName: p.productName,
+          categoryLarge: p.categoryLarge,
+          categoryMedium: p.categoryMedium,
+          categorySmall: p.categorySmall,
+          weight: p.weight,
+          supplyPrice: getSupplyPriceByGrade(p, grade),
+          supplyStatus: p.supplyStatus,
+        }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("회원 현재공급가 조회 오류:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 회원용 상품리스트 API: 차주예상공급가 조회 (ASSOCIATE 이상)
+  app.get('/api/member/product-list/next-week', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    try {
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+
+      if (member.grade === 'PENDING') {
+        return res.status(403).json({ message: "승인대기 회원은 상품리스트를 조회할 수 없습니다." });
+      }
+
+      const products = await storage.getAllNextWeekProducts();
+      const grade = member.grade;
+
+      const result = products.map(p => ({
+        productCode: p.productCode,
+        productName: p.productName,
+        categoryLarge: p.categoryLarge,
+        categoryMedium: p.categoryMedium,
+        categorySmall: p.categorySmall,
+        weight: p.weight,
+        supplyPrice: getSupplyPriceByGrade(p, grade),
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("회원 차주예상공급가 조회 오류:", error);
       res.status(500).json({ error: error.message });
     }
   });

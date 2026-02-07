@@ -67,10 +67,12 @@ import MemberOrderAdjust from "@/pages/member/order-adjust";
 import MemberOrderInvoice from "@/pages/member/order-invoice";
 import MemberOrderCancel from "@/pages/member/order-cancel";
 import MemberOrderList from "@/pages/member/order-list";
+import MemberProductList from "@/pages/member/product-list";
 
 type SidebarTab = 
   | "dashboard" 
   | "member-info" 
+  | "product-list"
   | "order-new" 
   | "order-adjust" 
   | "order-invoice" 
@@ -184,6 +186,14 @@ function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
     </div>
   );
 }
+
+const memberGradeLabels: Record<string, string> = {
+  PENDING: "승인대기",
+  ASSOCIATE: "준회원",
+  START: "스타트",
+  DRIVING: "드라이빙",
+  TOP: "탑셀러",
+};
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -667,6 +677,9 @@ export default function Dashboard() {
     updatedAt: new Date(),
   } as Member : null);
 
+  // 주문 가능 등급 체크 (START, DRIVING, TOP만 주문 가능)
+  const canOrder = displayMemberData ? ['START', 'DRIVING', 'TOP'].includes(displayMemberData.grade) : false;
+
   const totalOrders = orderStats?.total || 0;
   const pendingOrdersCount = orderStats?.pending || 0;
   const adjustmentOrdersCount = orderStats?.adjustment || 0;
@@ -701,6 +714,13 @@ export default function Dashboard() {
         icon={<User className="h-4 w-4" />}
         label="회원정보"
         tab="member-info"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
+        icon={<Package className="h-4 w-4" />}
+        label="상품리스트"
+        tab="product-list"
         activeTab={activeTab}
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
       />
@@ -913,7 +933,12 @@ export default function Dashboard() {
                     <Button 
                       size="sm" 
                       className="gap-1.5"
+                      disabled={!canOrder}
                       onClick={() => {
+                        if (!canOrder) {
+                          toast({ title: "주문 불가", description: "스타트 등급 이상 회원만 주문 등록이 가능합니다.", variant: "destructive" });
+                          return;
+                        }
                         setActiveTab("order-new");
                         setOrderDialogOpen(true);
                       }}
@@ -1126,11 +1151,39 @@ export default function Dashboard() {
               </div>
               )}
 
+              {/* 상품리스트 탭 */}
+              {activeTab === "product-list" && (
+                <MemberProductList />
+              )}
+
               {/* 주문등록 탭 콘텐츠 */}
               {activeTab === "order-new" && (
                 <div className="space-y-6">
+                  {/* 주문 불가 등급 안내 */}
+                  {!canOrder && (
+                    <Card className="bg-amber-50 dark:bg-amber-950/30">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400 mb-2">주문 등록 불가</h3>
+                            <p className="text-sm text-muted-foreground">
+                              현재 회원 등급({memberGradeLabels[displayMemberData?.grade || ''] || displayMemberData?.grade})에서는 주문 등록이 불가합니다.
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              <strong>스타트(START) 등급 이상</strong>부터 주문 등록이 가능합니다. 등급 승인 관련 문의는 관리자에게 연락해주세요.
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-2">
+                              준회원 이상은 <button onClick={() => setActiveTab("product-list")} className="text-foreground underline font-medium" data-testid="link-product-list">상품리스트</button>에서 현재공급가와 차주예상공급가를 확인하실 수 있습니다.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* 주문 등록 안내 */}
-                  <Card className="border-l-4 border-l-emerald-500">
+                  <Card className="bg-emerald-50 dark:bg-emerald-950/30">
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between">
                         <div>
@@ -1170,7 +1223,7 @@ export default function Dashboard() {
                   <Card className="overflow-hidden">
                     <CardHeader className="pb-4">
                       <div className="flex items-center gap-2">
-                        <Package className="h-5 w-5 text-primary" />
+                        <Package className="h-5 w-5 text-foreground" />
                         <CardTitle className="text-base">주문 대기 리스트</CardTitle>
                       </div>
                     </CardHeader>
