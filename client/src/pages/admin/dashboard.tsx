@@ -1,7 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
+import { useAuth } from "@/lib/auth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, 
   Users, 
@@ -23,7 +35,8 @@ import {
   HelpCircle,
   FileText,
   Gift,
-  Percent
+  Percent,
+  Trash2
 } from "lucide-react";
 import type { User, Order, Member } from "@shared/schema";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
@@ -117,7 +130,36 @@ function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
 
 export default function AdminDashboard() {
   useSSE();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const { dateRange, setDateRange } = useDateRange("today");
+  const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
+  const [confirmText, setConfirmText] = useState("");
+
+  const isSuperOwner = user?.username === "kgong5026";
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/reset-test-data", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "테스트 데이터 초기화 완료",
+        description: data.message,
+      });
+      setResetStep(0);
+      setConfirmText("");
+      queryClient.invalidateQueries();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "초기화 실패",
+        description: error.message || "초기화 중 오류가 발생했습니다",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -206,9 +248,23 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-xl md:text-2xl font-bold">대시보드</h1>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
-          <span>{formattedDate}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isSuperOwner && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setResetStep(1)}
+              data-testid="button-open-reset-dialog"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              데이터 초기화
+            </Button>
+          )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <span>{formattedDate}</span>
+          </div>
         </div>
       </div>
 
@@ -461,6 +517,74 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={resetStep === 1} onOpenChange={(open) => { if (!open) { setResetStep(0); setConfirmText(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">1단계: 초기화 확인</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md bg-destructive/10 p-4 text-sm space-y-2">
+              <p className="font-semibold text-destructive">다음 데이터가 모두 삭제됩니다:</p>
+              <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                <li>모든 주문 데이터</li>
+                <li>모든 정산 이력</li>
+                <li>모든 예치금/포인터 변동 이력</li>
+                <li>모든 업로드 이력 (중복 파일 감지 포함)</li>
+                <li>모든 회원 잔액 (예치금 + 포인터) → 0원 리셋</li>
+              </ul>
+              <p className="text-xs text-muted-foreground mt-2">* 회원 정보, 상품, 카테고리, 사이트 설정은 유지됩니다.</p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setResetStep(0); setConfirmText(""); }} data-testid="button-reset-cancel-1">
+                취소
+              </Button>
+              <Button variant="destructive" onClick={() => setResetStep(2)} data-testid="button-reset-next">
+                다음 단계로
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetStep === 2} onOpenChange={(open) => { if (!open) { setResetStep(0); setConfirmText(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">2단계: 최종 확인</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              되돌릴 수 없습니다. 아래 입력란에 <span className="font-bold text-destructive">초기화</span>를 입력해주세요.
+            </p>
+            <Input
+              placeholder="초기화"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              data-testid="input-reset-confirm"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setResetStep(0); setConfirmText(""); }} data-testid="button-reset-cancel-2">
+                취소
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={confirmText !== "초기화" || resetMutation.isPending}
+                onClick={() => resetMutation.mutate()}
+                data-testid="button-reset-execute"
+              >
+                {resetMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    처리중...
+                  </>
+                ) : (
+                  "초기화 실행"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

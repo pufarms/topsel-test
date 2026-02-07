@@ -9831,5 +9831,60 @@ export async function registerRoutes(
     }
   });
 
+  // ===================== 테스트 데이터 초기화 API (최고관리자 전용) =====================
+
+  app.post('/api/admin/reset-test-data', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN')) {
+        return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+      }
+      if (user.username !== 'kgong5026') {
+        return res.status(403).json({ message: "이 기능은 최고관리자만 사용할 수 있습니다" });
+      }
+
+      const result = await db.transaction(async (tx) => {
+        const [ordersResult] = await tx.select({ count: sql<number>`count(*)` }).from(pendingOrders);
+        const [settlementsResult] = await tx.select({ count: sql<number>`count(*)` }).from(settlementHistory);
+        const [depositsResult] = await tx.select({ count: sql<number>`count(*)` }).from(depositHistory);
+        const [pointersResult] = await tx.select({ count: sql<number>`count(*)` }).from(pointerHistory);
+        const [uploadsResult] = await tx.select({ count: sql<number>`count(*)` }).from(orderUploadHistory);
+
+        await tx.delete(pendingOrders);
+        await tx.delete(settlementHistory);
+        await tx.delete(depositHistory);
+        await tx.delete(pointerHistory);
+        await tx.delete(orderUploadHistory);
+
+        await tx.update(members).set({
+          deposit: 0,
+          point: 0,
+          updatedAt: new Date(),
+        });
+
+        return {
+          orders: Number(ordersResult?.count || 0),
+          settlements: Number(settlementsResult?.count || 0),
+          deposits: Number(depositsResult?.count || 0),
+          pointers: Number(pointersResult?.count || 0),
+          uploads: Number(uploadsResult?.count || 0),
+        };
+      });
+
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+      sseManager.broadcast("order-status-changed", { type: "order-status-changed" });
+
+      res.json({
+        success: true,
+        deleted: result,
+        message: `초기화 완료: 주문 ${result.orders}건, 정산 ${result.settlements}건, 예치금이력 ${result.deposits}건, 포인터이력 ${result.pointers}건, 업로드이력 ${result.uploads}건 삭제. 회원 잔액 리셋 완료.`,
+      });
+    } catch (error: any) {
+      console.error("테스트 데이터 초기화 실패:", error);
+      res.status(500).json({ success: false, message: "초기화 실패 - 롤백 완료" });
+    }
+  });
+
   return httpServer;
 }
