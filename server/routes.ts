@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -5767,6 +5767,23 @@ export async function registerRoutes(
     return { startUTC, endUTC: endDate };
   }
 
+  function getSupplyPriceByGrade(currentProduct: any, memberGrade: string): number {
+    const gradeUpper = (memberGrade || '').toUpperCase();
+    switch (gradeUpper) {
+      case 'START':
+        return currentProduct.startPrice;
+      case 'DRIVING':
+        return currentProduct.drivingPrice;
+      case 'TOP':
+        return currentProduct.topPrice;
+      case 'ASSOCIATE':
+      case 'PENDING':
+        return currentProduct.startPrice;
+      default:
+        return currentProduct.startPrice;
+    }
+  }
+
   function buildDateCondition(table: any, startDate?: string, endDate?: string) {
     if (!startDate && !endDate) {
       const { startUTC, endUTC } = parseDateRangeKST();
@@ -5920,16 +5937,48 @@ export async function registerRoutes(
       const excludeStatuses = ['취소', '회원취소', '주문조정'];
       
       const calcSales = async (start: Date, end: Date) => {
-        const result = await db.select({
+        const confirmedResult = await db.select({
           total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
         })
         .from(pendingOrders)
         .where(and(
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, true),
           sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
         ));
-        return parseInt(result[0]?.total || '0', 10);
+        const confirmedTotal = parseInt(confirmedResult[0]?.total || '0', 10);
+
+        const unconfirmedRows = await db.select({
+          memberId: pendingOrders.memberId,
+          productCode: pendingOrders.productCode,
+        })
+        .from(pendingOrders)
+        .where(and(
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, false),
+          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+        ));
+
+        let unconfirmedTotal = 0;
+        if (unconfirmedRows.length > 0) {
+          const mIds = Array.from(new Set(unconfirmedRows.map(r => r.memberId)));
+          const pCodes = Array.from(new Set(unconfirmedRows.map(r => r.productCode)));
+          const mList = await db.select({ id: members.id, grade: members.grade }).from(members).where(inArray(members.id, mIds));
+          const mMap = new Map(mList.map(m => [m.id, m.grade]));
+          const pList = await db.select().from(currentProducts).where(inArray(currentProducts.productCode, pCodes));
+          const pMap = new Map(pList.map(p => [p.productCode, p]));
+          for (const row of unconfirmedRows) {
+            const grade = mMap.get(row.memberId) || 'START';
+            const product = pMap.get(row.productCode);
+            if (product) {
+              unconfirmedTotal += getSupplyPriceByGrade(product, grade);
+            }
+          }
+        }
+
+        return confirmedTotal + unconfirmedTotal;
       };
 
       const [todaySales, yesterdaySales, lastMonthSales, thisMonthSales] = await Promise.all([
@@ -5971,8 +6020,11 @@ export async function registerRoutes(
       // 정상 주문만 매입에 포함 (취소, 회원취소, 주문조정 제외)
       const excludeStatuses = ['취소', '회원취소', '주문조정'];
       
+      const memberData = await db.select({ grade: members.grade }).from(members).where(eq(members.id, memberId));
+      const memberGrade = memberData[0]?.grade || 'START';
+
       const calcPurchase = async (start: Date, end: Date) => {
-        const result = await db.select({
+        const confirmedResult = await db.select({
           total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
         })
         .from(pendingOrders)
@@ -5980,9 +6032,37 @@ export async function registerRoutes(
           eq(pendingOrders.memberId, memberId),
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, true),
           sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
         ));
-        return parseInt(result[0]?.total || '0', 10);
+        const confirmedTotal = parseInt(confirmedResult[0]?.total || '0', 10);
+
+        const unconfirmedRows = await db.select({
+          productCode: pendingOrders.productCode,
+        })
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.memberId, memberId),
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, false),
+          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+        ));
+
+        let unconfirmedTotal = 0;
+        if (unconfirmedRows.length > 0) {
+          const pCodes = Array.from(new Set(unconfirmedRows.map(r => r.productCode)));
+          const pList = await db.select().from(currentProducts).where(inArray(currentProducts.productCode, pCodes));
+          const pMap = new Map(pList.map(p => [p.productCode, p]));
+          for (const row of unconfirmedRows) {
+            const product = pMap.get(row.productCode);
+            if (product) {
+              unconfirmedTotal += getSupplyPriceByGrade(product, memberGrade);
+            }
+          }
+        }
+
+        return confirmedTotal + unconfirmedTotal;
       };
 
       const [lastMonthTotal, thisMonthTotal] = await Promise.all([
@@ -6022,12 +6102,33 @@ export async function registerRoutes(
             dateCondition
           );
 
-      const orders = await db.select()
+      const ordersList = await db.select()
         .from(pendingOrders)
         .where(condition!)
         .orderBy(asc(pendingOrders.sequenceNumber));
 
-      res.json(orders);
+      const unconfirmedOrders = ordersList.filter(o => !o.priceConfirmed);
+      if (unconfirmedOrders.length > 0) {
+        const memberData = await db.select({ id: members.id, grade: members.grade })
+          .from(members).where(eq(members.id, req.session.userId));
+        const memberGrade = memberData[0]?.grade || 'START';
+
+        const unconfirmedCodes = Array.from(new Set(unconfirmedOrders.map(o => o.productCode)));
+        const productsList = await db.select().from(currentProducts)
+          .where(inArray(currentProducts.productCode, unconfirmedCodes));
+        const productMap = new Map(productsList.map(p => [p.productCode, p]));
+
+        for (const order of ordersList) {
+          if (!order.priceConfirmed) {
+            const product = productMap.get(order.productCode);
+            if (product) {
+              (order as any).supplyPrice = getSupplyPriceByGrade(product, memberGrade);
+            }
+          }
+        }
+      }
+
+      res.json(ordersList);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -6534,14 +6635,7 @@ export async function registerRoutes(
         // Generate sequence number
         const sequenceNumber = await generateSequenceNumber(member.username);
 
-        // 회원 등급에 따른 공급가 결정 (start/driving/top)
-        const memberTier = member.membershipTier || 'top';
-        let supplyPrice = parsedRow.currentProduct.topPrice;
-        if (memberTier === 'start') {
-          supplyPrice = parsedRow.currentProduct.startPrice;
-        } else if (memberTier === 'driving') {
-          supplyPrice = parsedRow.currentProduct.drivingPrice;
-        }
+        const supplyPrice = getSupplyPriceByGrade(parsedRow.currentProduct, member.grade);
 
         await db.insert(pendingOrders).values({
           sequenceNumber,
@@ -6683,6 +6777,31 @@ export async function registerRoutes(
       const orders = await db.select().from(pendingOrders)
         .where(and(...conditions))
         .orderBy(asc(pendingOrders.sequenceNumber));
+
+      const unconfirmedOrders = orders.filter(o => !o.priceConfirmed);
+      if (unconfirmedOrders.length > 0) {
+        const unconfirmedMemberIds = Array.from(new Set(unconfirmedOrders.map(o => o.memberId)));
+        const unconfirmedProductCodes = Array.from(new Set(unconfirmedOrders.map(o => o.productCode)));
+
+        const membersList = await db.select({ id: members.id, grade: members.grade })
+          .from(members).where(inArray(members.id, unconfirmedMemberIds));
+        const memberGradeMap = new Map(membersList.map(m => [m.id, m.grade]));
+
+        const productsList = await db.select().from(currentProducts)
+          .where(inArray(currentProducts.productCode, unconfirmedProductCodes));
+        const productMap = new Map(productsList.map(p => [p.productCode, p]));
+
+        for (const order of orders) {
+          if (!order.priceConfirmed) {
+            const grade = memberGradeMap.get(order.memberId) || 'START';
+            const product = productMap.get(order.productCode);
+            if (product) {
+              (order as any).supplyPrice = getSupplyPriceByGrade(product, grade);
+            }
+          }
+        }
+      }
+
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -7525,18 +7644,114 @@ export async function registerRoutes(
     try {
       const { mode, orderIds, filters } = req.body;
 
+      let targetConditions: any[];
+
       if (mode === "all") {
-        const result = await db.update(pendingOrders)
+        targetConditions = [eq(pendingOrders.status, "배송준비중")];
+      } else if (mode === "filtered") {
+        targetConditions = [eq(pendingOrders.status, "배송준비중")];
+        if (filters?.memberId) {
+          targetConditions.push(eq(pendingOrders.memberId, filters.memberId));
+        }
+        if (filters?.categoryLarge) {
+          targetConditions.push(eq(pendingOrders.categoryLarge, filters.categoryLarge));
+        }
+        if (filters?.categoryMedium) {
+          targetConditions.push(eq(pendingOrders.categoryMedium, filters.categoryMedium));
+        }
+        if (filters?.categorySmall) {
+          targetConditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
+        }
+        if (filters?.search && filters.search.trim()) {
+          const searchTerm = `%${filters.search}%`;
+          if (filters.searchFilter) {
+            switch (filters.searchFilter) {
+              case "주문자명":
+                targetConditions.push(ilike(pendingOrders.ordererName, searchTerm));
+                break;
+              case "수령자명":
+                targetConditions.push(ilike(pendingOrders.recipientName, searchTerm));
+                break;
+              case "상품명":
+                targetConditions.push(ilike(pendingOrders.productName, searchTerm));
+                break;
+              case "상품코드":
+                targetConditions.push(ilike(pendingOrders.productCode, searchTerm));
+                break;
+              default:
+                targetConditions.push(
+                  or(
+                    ilike(pendingOrders.productName, searchTerm),
+                    ilike(pendingOrders.recipientName, searchTerm),
+                    ilike(pendingOrders.ordererName, searchTerm),
+                    ilike(pendingOrders.productCode, searchTerm)
+                  )
+                );
+            }
+          } else {
+            targetConditions.push(
+              or(
+                ilike(pendingOrders.productName, searchTerm),
+                ilike(pendingOrders.recipientName, searchTerm),
+                ilike(pendingOrders.ordererName, searchTerm),
+                ilike(pendingOrders.productCode, searchTerm)
+              )
+            );
+          }
+        }
+      } else if (mode === "selected") {
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({ message: "전송할 주문을 선택해주세요" });
+        }
+        targetConditions = [
+          inArray(pendingOrders.id, orderIds),
+          eq(pendingOrders.status, "배송준비중")
+        ];
+      } else {
+        return res.status(400).json({ message: "올바른 전송 모드를 선택해주세요 (all, filtered, selected)" });
+      }
+
+      const targetOrders = await db.select({
+        id: pendingOrders.id,
+        memberId: pendingOrders.memberId,
+        productCode: pendingOrders.productCode,
+      }).from(pendingOrders).where(and(...targetConditions));
+
+      if (targetOrders.length === 0) {
+        return res.json({ success: true, transferredCount: 0, message: "전송 대상 주문이 없습니다." });
+      }
+
+      const memberIds = Array.from(new Set(targetOrders.map(o => o.memberId)));
+      const productCodes = Array.from(new Set(targetOrders.map(o => o.productCode)));
+
+      const membersList = await db.select({ id: members.id, grade: members.grade })
+        .from(members)
+        .where(inArray(members.id, memberIds));
+      const memberGradeMap = new Map(membersList.map(m => [m.id, m.grade]));
+
+      const productsList = await db.select()
+        .from(currentProducts)
+        .where(inArray(currentProducts.productCode, productCodes));
+      const productPriceMap = new Map(productsList.map(p => [p.productCode, p]));
+
+      let transferredCount = 0;
+      for (const order of targetOrders) {
+        const memberGrade = memberGradeMap.get(order.memberId) || 'START';
+        const product = productPriceMap.get(order.productCode);
+        const confirmedPrice = product ? getSupplyPriceByGrade(product, memberGrade) : null;
+
+        await db.update(pendingOrders)
           .set({
             status: "배송중",
-            updatedAt: new Date()
+            supplyPrice: confirmedPrice ?? undefined,
+            priceConfirmed: true,
+            updatedAt: new Date(),
           })
-          .where(
-            eq(pendingOrders.status, "배송준비중")
-          )
-          .returning({ id: pendingOrders.id });
+          .where(eq(pendingOrders.id, order.id));
+        transferredCount++;
+      }
 
-        // Reset waybill/cancel status for next batch (upsert to handle missing keys)
+      if (mode === "all") {
         const waybillExists = await db.select().from(siteSettings)
           .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
         if (waybillExists.length > 0) {
@@ -7567,115 +7782,16 @@ export async function registerRoutes(
             description: "회원취소 마감 상태",
           });
         }
-
-        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
-
-        res.json({
-          success: true,
-          transferredCount: result.length,
-          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
-        });
-
-      } else if (mode === "filtered") {
-        const conditions: any[] = [
-          eq(pendingOrders.status, "배송준비중")
-        ];
-
-        if (filters?.memberId) {
-          conditions.push(eq(pendingOrders.memberId, filters.memberId));
-        }
-        if (filters?.categoryLarge) {
-          conditions.push(eq(pendingOrders.categoryLarge, filters.categoryLarge));
-        }
-        if (filters?.categoryMedium) {
-          conditions.push(eq(pendingOrders.categoryMedium, filters.categoryMedium));
-        }
-        if (filters?.categorySmall) {
-          conditions.push(eq(pendingOrders.categorySmall, filters.categorySmall));
-        }
-        if (filters?.search && filters.search.trim()) {
-          const searchTerm = `%${filters.search}%`;
-          if (filters.searchFilter) {
-            switch (filters.searchFilter) {
-              case "주문자명":
-                conditions.push(ilike(pendingOrders.ordererName, searchTerm));
-                break;
-              case "수령자명":
-                conditions.push(ilike(pendingOrders.recipientName, searchTerm));
-                break;
-              case "상품명":
-                conditions.push(ilike(pendingOrders.productName, searchTerm));
-                break;
-              case "상품코드":
-                conditions.push(ilike(pendingOrders.productCode, searchTerm));
-                break;
-              default:
-                conditions.push(
-                  or(
-                    ilike(pendingOrders.productName, searchTerm),
-                    ilike(pendingOrders.recipientName, searchTerm),
-                    ilike(pendingOrders.ordererName, searchTerm),
-                    ilike(pendingOrders.productCode, searchTerm)
-                  )
-                );
-            }
-          } else {
-            conditions.push(
-              or(
-                ilike(pendingOrders.productName, searchTerm),
-                ilike(pendingOrders.recipientName, searchTerm),
-                ilike(pendingOrders.ordererName, searchTerm),
-                ilike(pendingOrders.productCode, searchTerm)
-              )
-            );
-          }
-        }
-
-        const result = await db.update(pendingOrders)
-          .set({
-            status: "배송중",
-            updatedAt: new Date()
-          })
-          .where(and(...conditions))
-          .returning({ id: pendingOrders.id });
-
-        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
-
-        res.json({
-          success: true,
-          transferredCount: result.length,
-          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
-        });
-
-      } else if (mode === "selected") {
-        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
-          return res.status(400).json({ message: "전송할 주문을 선택해주세요" });
-        }
-
-        const result = await db.update(pendingOrders)
-          .set({
-            status: "배송중",
-            updatedAt: new Date()
-          })
-          .where(
-            and(
-              inArray(pendingOrders.id, orderIds),
-              eq(pendingOrders.status, "배송준비중")
-            )
-          )
-          .returning({ id: pendingOrders.id });
-
-        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
-
-        res.json({
-          success: true,
-          transferredCount: result.length,
-          message: `${result.length}건의 주문이 배송중으로 전송되었습니다.`
-        });
-
-      } else {
-        return res.status(400).json({ message: "올바른 전송 모드를 선택해주세요 (all, filtered, selected)" });
       }
+
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+      sseManager.broadcast("order-status-changed", { type: "order-status-changed" });
+
+      res.json({
+        success: true,
+        transferredCount,
+        message: `${transferredCount}건의 주문이 배송중으로 전송되었습니다.`
+      });
     } catch (error: any) {
       console.error("Transfer to shipping error:", error);
       res.status(500).json({ message: error.message || "배송중 전송 중 오류가 발생했습니다" });

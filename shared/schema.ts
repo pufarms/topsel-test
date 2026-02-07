@@ -1233,6 +1233,8 @@ export const pendingOrders = pgTable("pending_orders", {
   trackingNumber: text("tracking_number"),
   courierCompany: text("courier_company"),
   
+  priceConfirmed: boolean("price_confirmed").notNull().default(false),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
