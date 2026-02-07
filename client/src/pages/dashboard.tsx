@@ -1364,7 +1364,7 @@ export default function Dashboard() {
 
                       {/* 액션 버튼 및 페이지네이션 */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button size="sm" variant="outline" className="h-8" disabled={!canOrder} data-testid="button-download-orders">
                             <FileDown className="h-4 w-4 mr-1" />
                             다운로드
@@ -1373,7 +1373,6 @@ export default function Dashboard() {
                             size="sm" 
                             variant="outline" 
                             className="h-8" 
-                            disabled={!canOrder}
                             data-testid="button-download-form"
                             onClick={handleDownloadTemplate}
                           >
@@ -1592,6 +1591,11 @@ export default function Dashboard() {
                               </div>
                             </DialogContent>
                           </Dialog>
+                          {!canOrder && (
+                            <span className="text-xs font-semibold text-red-500" data-testid="text-order-restriction-warning">
+                              주문관리는 Start회원 이상 이용가능 합니다
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span>표시 개수:</span>

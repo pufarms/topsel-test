@@ -279,7 +279,7 @@ export default function MemberOrderInvoice({ canOrder = true }: MemberOrderInvoi
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
@@ -309,6 +309,11 @@ export default function MemberOrderInvoice({ canOrder = true }: MemberOrderInvoi
                   )}
                   우체국 운송장 ({postofficeOrders.length}건)
                 </Button>
+              )}
+              {!canOrder && (
+                <span className="text-xs font-semibold text-red-500" data-testid="text-invoice-restriction-warning">
+                  주문관리는 Start회원 이상 이용가능 합니다
+                </span>
               )}
             </div>
           </div>

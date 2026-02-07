@@ -75,10 +75,17 @@ export default function MemberOrderAdjust({ canOrder = true }: MemberOrderAdjust
               </select>
               <span className="text-muted-foreground">총 0건</span>
             </div>
-            <Button size="sm" variant="outline" disabled={!canOrder} data-testid="button-adjust-download">
-              <FileDown className="h-4 w-4 mr-1" />
-              엑셀 다운로드
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" disabled={!canOrder} data-testid="button-adjust-download">
+                <FileDown className="h-4 w-4 mr-1" />
+                엑셀 다운로드
+              </Button>
+              {!canOrder && (
+                <span className="text-xs font-semibold text-red-500" data-testid="text-adjust-restriction-warning">
+                  주문관리는 Start회원 이상 이용가능 합니다
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="border rounded-lg table-scroll-container">

@@ -133,6 +133,11 @@ export default function MemberOrderList({ canOrder = true }: MemberOrderListProp
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>
+              {!canOrder && (
+                <span className="text-xs font-semibold text-red-500" data-testid="text-shipping-restriction-warning">
+                  주문관리는 Start회원 이상 이용가능 합니다
+                </span>
+              )}
               <span className="text-sm text-muted-foreground">
                 {displayedOrders.length} / {filteredOrders.length}건
               </span>

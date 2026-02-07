@@ -323,7 +323,6 @@ export default function MemberOrderCancel({ canOrder = true }: MemberOrderCancel
                 size="sm"
                 variant="outline"
                 onClick={handleDownloadTemplate}
-                disabled={!canOrder}
                 data-testid="button-cancel-template"
               >
                 <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -343,6 +342,11 @@ export default function MemberOrderCancel({ canOrder = true }: MemberOrderCancel
                 )}
                 취소건 다운로드
               </Button>
+              {!canOrder && (
+                <span className="text-xs font-semibold text-red-500" data-testid="text-cancel-restriction-warning">
+                  주문관리는 Start회원 이상 이용가능 합니다
+                </span>
+              )}
             </div>
           </div>
 
