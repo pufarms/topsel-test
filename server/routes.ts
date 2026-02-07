@@ -7992,110 +7992,122 @@ export async function registerRoutes(
       let transferredCount = 0;
       const failedOrders: { memberId: string; companyName: string; shortage: number; count: number }[] = [];
 
-      // 회원별로 순차 정산 처리
+      // 회원별로 순차 정산 처리 (트랜잭션으로 데이터 일관성 보장)
       for (const [memberId, memberOrders] of ordersByMember) {
         const memberInfo = memberMap.get(memberId);
         if (!memberInfo) continue;
 
-        let currentDeposit = memberInfo.deposit;
-        let currentPoint = memberInfo.point;
-        let memberTransferred = 0;
-        let memberFailed = false;
+        try {
+          const result = await db.transaction(async (tx) => {
+            let currentDeposit = memberInfo.deposit;
+            let currentPoint = memberInfo.point;
+            let memberTransferred = 0;
 
-        for (const order of memberOrders) {
-          const product = productPriceMap.get(order.productCode);
-          const confirmedPrice = product ? getSupplyPriceByGrade(product, memberInfo.grade) : 0;
+            for (const order of memberOrders) {
+              const product = productPriceMap.get(order.productCode);
+              const confirmedPrice = product ? getSupplyPriceByGrade(product, memberInfo.grade) : 0;
 
-          // 잔액 확인
-          const totalAvailable = currentDeposit + currentPoint;
-          if (totalAvailable < confirmedPrice) {
-            // 잔액 부족 - 이 주문부터 실패
-            memberFailed = true;
+              const totalAvailable = currentDeposit + currentPoint;
+              if (totalAvailable < confirmedPrice) {
+                return {
+                  transferred: memberTransferred,
+                  failed: true,
+                  shortage: confirmedPrice - totalAvailable,
+                  remainingCount: memberOrders.length - memberTransferred,
+                };
+              }
+
+              let pointerDeduct = 0;
+              let depositDeduct = 0;
+
+              if (currentPoint >= confirmedPrice) {
+                pointerDeduct = confirmedPrice;
+              } else {
+                pointerDeduct = currentPoint;
+                depositDeduct = confirmedPrice - currentPoint;
+              }
+
+              currentPoint -= pointerDeduct;
+              currentDeposit -= depositDeduct;
+
+              await tx.update(pendingOrders)
+                .set({
+                  status: "배송중",
+                  supplyPrice: confirmedPrice ?? undefined,
+                  priceConfirmed: true,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pendingOrders.id, order.id));
+
+              await tx.insert(settlementHistory).values({
+                memberId,
+                orderId: order.id,
+                settlementType: "auto",
+                pointerAmount: pointerDeduct,
+                depositAmount: depositDeduct,
+                totalAmount: confirmedPrice,
+                pointerBalance: currentPoint,
+                depositBalance: currentDeposit,
+                description: `배송중 전환 자동 정산 (주문 ${order.id})`,
+              });
+
+              if (pointerDeduct > 0) {
+                await tx.insert(pointerHistory).values({
+                  memberId,
+                  type: "deduct",
+                  amount: pointerDeduct,
+                  balanceAfter: currentPoint,
+                  description: `주문 정산 (배송중 전환)`,
+                  relatedOrderId: order.id,
+                });
+              }
+
+              if (depositDeduct > 0) {
+                await tx.insert(depositHistory).values({
+                  memberId,
+                  type: "deduct",
+                  amount: depositDeduct,
+                  balanceAfter: currentDeposit,
+                  description: `주문 정산 (배송중 전환)`,
+                  relatedOrderId: order.id,
+                });
+              }
+
+              memberTransferred++;
+            }
+
+            if (memberTransferred > 0) {
+              await tx.update(members)
+                .set({
+                  deposit: currentDeposit,
+                  point: currentPoint,
+                  updatedAt: new Date(),
+                })
+                .where(eq(members.id, memberId));
+            }
+
+            return { transferred: memberTransferred, failed: false, shortage: 0, remainingCount: 0 };
+          });
+
+          transferredCount += result.transferred;
+
+          if (result.failed) {
             failedOrders.push({
               memberId,
               companyName: memberInfo.companyName,
-              shortage: confirmedPrice - totalAvailable,
-              count: memberOrders.length - memberTransferred,
+              shortage: result.shortage,
+              count: result.remainingCount,
             });
-            break;
           }
-
-          // 포인터 우선 차감 → 예치금 차감
-          let pointerDeduct = 0;
-          let depositDeduct = 0;
-
-          if (currentPoint >= confirmedPrice) {
-            pointerDeduct = confirmedPrice;
-          } else {
-            pointerDeduct = currentPoint;
-            depositDeduct = confirmedPrice - currentPoint;
-          }
-
-          currentPoint -= pointerDeduct;
-          currentDeposit -= depositDeduct;
-
-          // 주문 상태 업데이트 (배송중 + 가격 확정)
-          await db.update(pendingOrders)
-            .set({
-              status: "배송중",
-              supplyPrice: confirmedPrice ?? undefined,
-              priceConfirmed: true,
-              updatedAt: new Date(),
-            })
-            .where(eq(pendingOrders.id, order.id));
-
-          // 정산 이력 기록
-          await db.insert(settlementHistory).values({
+        } catch (txError: any) {
+          console.error(`회원 ${memberId} 정산 트랜잭션 실패:`, txError);
+          failedOrders.push({
             memberId,
-            orderId: order.id,
-            settlementType: "auto",
-            pointerAmount: pointerDeduct,
-            depositAmount: depositDeduct,
-            totalAmount: confirmedPrice,
-            pointerBalance: currentPoint,
-            depositBalance: currentDeposit,
-            description: `배송중 전환 자동 정산 (주문 ${order.id})`,
+            companyName: memberInfo.companyName,
+            shortage: 0,
+            count: memberOrders.length,
           });
-
-          // 포인터 차감 이력 기록
-          if (pointerDeduct > 0) {
-            await db.insert(pointerHistory).values({
-              memberId,
-              type: "deduct",
-              amount: pointerDeduct,
-              balanceAfter: currentPoint,
-              description: `주문 정산 (배송중 전환)`,
-              relatedOrderId: order.id,
-            });
-          }
-
-          // 예치금 차감 이력 기록
-          if (depositDeduct > 0) {
-            await db.insert(depositHistory).values({
-              memberId,
-              type: "deduct",
-              amount: depositDeduct,
-              balanceAfter: currentDeposit,
-              description: `주문 정산 (배송중 전환)`,
-              relatedOrderId: order.id,
-            });
-          }
-
-          memberTransferred++;
         }
-
-        // 회원 잔액 업데이트
-        if (memberTransferred > 0) {
-          await db.update(members)
-            .set({
-              deposit: currentDeposit,
-              point: currentPoint,
-              updatedAt: new Date(),
-            })
-            .where(eq(members.id, memberId));
-        }
-
-        transferredCount += memberTransferred;
       }
 
       if (mode === "all") {
@@ -9461,15 +9473,16 @@ export async function registerRoutes(
       if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
 
       const newDeposit = member[0].deposit + amount;
-      await db.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
-
-      await db.insert(depositHistory).values({
-        memberId,
-        type: "charge",
-        amount,
-        balanceAfter: newDeposit,
-        description: description || `관리자 예치금 충전`,
-        processedBy: req.session.userId,
+      await db.transaction(async (tx) => {
+        await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+        await tx.insert(depositHistory).values({
+          memberId,
+          type: "charge",
+          amount,
+          balanceAfter: newDeposit,
+          description: description || `관리자 예치금 충전`,
+          processedBy: req.session.userId,
+        });
       });
 
       res.json({ success: true, message: `${amount.toLocaleString()}원 충전 완료`, newDeposit });
@@ -9499,15 +9512,16 @@ export async function registerRoutes(
       }
 
       const newDeposit = member[0].deposit - amount;
-      await db.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
-
-      await db.insert(depositHistory).values({
-        memberId,
-        type: "refund",
-        amount,
-        balanceAfter: newDeposit,
-        description: description || `관리자 예치금 환급`,
-        processedBy: req.session.userId,
+      await db.transaction(async (tx) => {
+        await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+        await tx.insert(depositHistory).values({
+          memberId,
+          type: "refund",
+          amount,
+          balanceAfter: newDeposit,
+          description: description || `관리자 예치금 환급`,
+          processedBy: req.session.userId,
+        });
       });
 
       res.json({ success: true, message: `${amount.toLocaleString()}원 환급 완료`, newDeposit });
@@ -9533,15 +9547,16 @@ export async function registerRoutes(
       if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
 
       const newPoint = member[0].point + amount;
-      await db.update(members).set({ point: newPoint, updatedAt: new Date() }).where(eq(members.id, memberId));
-
-      await db.insert(pointerHistory).values({
-        memberId,
-        type: "grant",
-        amount,
-        balanceAfter: newPoint,
-        description: description || `관리자 포인터 지급`,
-        processedBy: req.session.userId,
+      await db.transaction(async (tx) => {
+        await tx.update(members).set({ point: newPoint, updatedAt: new Date() }).where(eq(members.id, memberId));
+        await tx.insert(pointerHistory).values({
+          memberId,
+          type: "grant",
+          amount,
+          balanceAfter: newPoint,
+          description: description || `관리자 포인터 지급`,
+          processedBy: req.session.userId,
+        });
       });
 
       res.json({ success: true, message: `${amount.toLocaleString()}P 지급 완료`, newPoint });

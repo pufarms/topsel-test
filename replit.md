@@ -104,82 +104,17 @@ Preferred communication style: Simple, everyday language.
 - 관리자: `/admin/settlements` (회원 잔액 현황, 정산/예치금/포인터 이력 탭, 충전/환급/지급 다이얼로그)
 - 회원: 대시보드 예치금충전 탭 (잔액 현황, 정산/예치금/포인터 이력 탭)
 
-### 필수 디자인 요구사항 (모든 페이지 적용)
-1. **반응형 웹 디자인 (필수!)**: 모든 페이지에 모바일/태블릿/데스크톱 반응형 레이아웃 적용
-   - 테이블: 데스크톱은 테이블, 모바일/태블릿은 카드 레이아웃
-   - 그리드: `grid-cols-1 sm:grid-cols-2` 등 반응형 그리드
-   - 텍스트: `text-xl md:text-2xl` 등 반응형 크기
-2. **Pretendard 한글 폰트 (필수!)**: 모든 페이지에 Pretendard 폰트 적용 유지
-3. **테이블 스크롤 (필수!)**: 주문/통계 관련 모든 테이블에 가로+세로 스크롤 적용
-   - **페이지 레벨**: 페이지는 가로 스크롤 금지 (`overflow-x-hidden`)
-   - **레이아웃**: admin-layout의 main에 `overflow-x-hidden`, 콘텐츠 div에 `min-w-0`
-   - **Card 컴포넌트**: 테이블을 포함하는 Card에 `overflow-hidden` 필수
-   - **CardContent**: `overflow-hidden` 추가
-   - **테이블 컨테이너**: `overflow-x-auto overflow-y-auto max-h-[600px]` 클래스 필수
-   - **테이블**: `w-max` 또는 `min-w-[1600px]` 등으로 자연스럽게 확장
-   - **테이블 헤더 고정**: `<TableHeader className="sticky top-0 z-10 bg-background">`
-   - **표시 개수 선택**: "10개씩, 30개씩, 100개씩, 전체" 옵션 제공
-   - **flex 컨테이너**: flex-1 요소에는 반드시 `min-w-0` 추가 (콘텐츠 오버플로우 허용)
-   - 예시 구조:
-     ```
-     <Card className="overflow-hidden">
-       <CardContent className="overflow-hidden">
-         <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-           <Table className="w-max">
-             <TableHeader className="sticky top-0 z-10 bg-background">...
-           </Table>
-         </div>
-       </CardContent>
-     </Card>
-     ```
-4. **카테고리 연동 (필수!)**: 모든 대분류/중분류/소분류 필터는 "상품관리/카테고리관리"와 연동
-   - 카테고리 데이터 소스: `/api/categories` 엔드포인트 (categories 테이블)
-   - 카테고리 레벨: `large` (대분류), `medium` (중분류), `small` (소분류)
-   - 계단식 필터링: 대분류 선택 → 해당 중분류만 표시 → 해당 소분류만 표시
-   - 상품관리와 연동: 상품의 카테고리는 반드시 카테고리관리에서 설정된 카테고리와 매칭되어야 함
-
-5. **공통 필터 컴포넌트 (필수!)**: 관리자와 회원은 각각 별도의 공통 필터 컴포넌트 사용
-   - **관리자 필터**: `AdminCategoryFilter` 컴포넌트 사용
-     - 위치: `client/src/components/admin/AdminCategoryFilter.tsx`
-     - 특징: 상호명(회원) 검색/선택, 대분류/중분류/소분류 계단식, 키워드 검색
-     - 회원 필터링: `members.id` (UUID) 사용
-     - 적용 대상: 관리자 주문관리 8개 페이지
-   - **회원 필터**: `MemberOrderFilter` 컴포넌트 사용
-     - 위치: `client/src/components/member/MemberOrderFilter.tsx`
-     - 특징: 대분류/중분류/소분류 계단식, 날짜 범위, 검색어 (선택적)
-     - 적용 대상: 회원 마이페이지 주문관리 5개 탭
-   - **새 리스트 테이블 추가 시**: 반드시 해당 영역의 공통 필터 컴포넌트 적용
-   - **중요**: 검색 필터는 페이지 전체가 아닌 해당 리스트 테이블에만 적용
-   - 한 페이지에 여러 리스트 테이블이 있으면 각 테이블마다 독립적인 필터 컴포넌트 적용
-
-### 페이지 접근권한 체계 (8단계 계층)
-- **접근권한 레벨**: `all` < `PENDING` < `ASSOCIATE` < `START` < `DRIVING` < `TOP` < `ADMIN` < `SUPER_ADMIN`
-- **페이지관리**에서 각 페이지의 접근권한을 8단계 중 하나로 설정
-- **계층 구조**: 상위 등급은 하위 등급 페이지에도 접근 가능 (예: ADMIN은 TOP 이하 모든 페이지 접근 가능)
-- **권한 라벨**:
-  - `all`: 전체 공개 (비로그인 포함)
-  - `PENDING`: 보류회원 이상
-  - `ASSOCIATE`: 준회원 이상
-  - `START`: Start회원 이상
-  - `DRIVING`: Driving회원 이상
-  - `TOP`: Top회원 이상
-  - `ADMIN`: 관리자(부관리자) 이상
-  - `SUPER_ADMIN`: 최고관리자 전용
-- **서버 체크**: `/api/pages/by-path` 엔드포인트에서 `pageAccessLevelRank` 기반으로 접근권한 검증
-- **관리자 역할**: SUPER_ADMIN(최고관리자)은 부관리자(ADMIN)의 메뉴 권한을 설정 가능 (12개 메뉴 권한 체크박스)
-- **헬퍼 함수**: `getUserAccessRank()`, `canAccessPage()` (shared/schema.ts)
-
 ## System Architecture
 
-### Frontend Architecture
+### Frontend
 - **Framework**: React 18 with TypeScript, Wouter for routing.
 - **State Management**: TanStack React Query for server state, React Context for authentication.
-- **UI/Styling**: shadcn/ui built on Radix UI, Lucide React for icons, Tailwind CSS with CSS variables for theming (light/dark mode), mobile-first responsive design.
+- **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS (theming, responsive design).
 - **Form Handling**: React Hook Form with Zod validation.
-- **Build Tool**: Vite with custom path aliases.
-- **Design System**: Topsel Design System (v2.0.0) governs global styles, color palette (e.g., `--primary: #5D7AF2`, `--navy: #111827`), section background alternation (White ↔ Navy), responsive breakpoints (xs: 375px, md: 768px, lg: 1024px), and typography classes (e.g., `.h1-hero`, `.body-text`).
+- **Build Tool**: Vite.
+- **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography.
 
-### Backend Architecture
+### Backend
 - **Framework**: Express 5 on Node.js with TypeScript.
 - **Session Management**: express-session with memorystore (development).
 - **API Design**: RESTful JSON API endpoints under `/api`.
@@ -188,42 +123,49 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect.
 - **Schema**: Shared `shared/schema.ts` with Zod schemas generated from Drizzle.
-- **Database Schema Highlights**: Key tables include `users`, `orders`, `products`, `product_registrations`, `categories`, `materials`, `product_mappings`, `members`, `images`, `siteSettings`, `headerMenus`, `pages`, and `term_agreements`.
+- **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, and `siteSettings`.
 
 ### Core Features
-- **User Portals**: Member Mypage and Admin-specific dashboards for product, inventory, and site management.
-- **Product & Inventory Management**: Comprehensive tools for product categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
-- **Admin Design System**: Standardized components and design rules for consistent UI.
-- **Filter Components**: Dedicated `AdminCategoryFilter` and `MemberOrderFilter` for distinct user roles, enabling advanced search and cascading category selection.
-- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import (`multer`, `xlsx`), including partial order uploads with error reporting.
-- **CMS & Configuration**: Site Settings Management, Header Menu Management (dynamic, drag-and-drop), and Page Management for dynamic content with visual editor and access control.
-- **Legal Compliance**: Term Agreement Record Keeping with content snapshots and SHA-256 hashes for integrity.
-- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses during Excel order uploads, utilizing regex, pattern similarity, rule-based validation, and AI normalization with a learning mechanism. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
-- **AI Address Learning Management**: Admin interface to register error address patterns, enabling AI to analyze, learn, and apply these patterns during order validation. This includes bulk Excel upload for learning and manual registration, inferring `correctionType` and assigning confidence scores.
-- **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events for both administrators and members.
-- **Date Range Filtering (KST)**: All order-related pages include a `DateRangeFilter` component with preset buttons. Date filtering uses KST timezone (UTC+9) with server-side SQL filtering. Default is "today".
+- **User Portals**: Member Mypage and Admin dashboards for product, inventory, and site management.
+- **Product & Inventory Management**: Tools for categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
+- **Admin Design System**: Standardized components and design rules.
+- **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter` for distinct user roles with cascading category selection.
+- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
+- **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management with dynamic content and access control.
+- **Legal Compliance**: Term Agreement Record Keeping with content snapshots and SHA-256 hashes.
+- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
+- **AI Address Learning Management**: Admin interface to register error address patterns for AI analysis and application during order validation, including bulk Excel upload and manual registration.
+- **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
+- **Date Range Filtering (KST)**: All order-related pages include a `DateRangeFilter` component with preset buttons. Date filtering uses KST timezone (UTC+9) with server-side SQL filtering.
+- **Design Requirements**: All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
+
+### Page Access Control
+- **Levels**: `all` < `PENDING` < `ASSOCIATE` < `START` < `DRIVING` < `TOP` < `ADMIN` < `SUPER_ADMIN`.
+- **Hierarchy**: Higher ranks can access lower-rank pages.
+- **Validation**: Server-side validation based on `pageAccessLevelRank`.
+- **Admin Roles**: SUPER_ADMIN can set menu permissions for ADMIN.
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary database.
+- **PostgreSQL**
 
 ### UI/UX Libraries
-- **Radix UI**: Accessible primitive components.
-- **Lucide React**: Icon library.
-- **embla-carousel-react**: Carousel component.
-- **vaul**: Drawer component.
-- **cmdk**: Command palette component.
-- **react-day-picker**: Calendar/date picker.
-- **recharts**: Charting library.
+- **Radix UI**
+- **Lucide React**
+- **embla-carousel-react**
+- **vaul**
+- **cmdk**
+- **react-day-picker**
+- **recharts**
 
 ### Session Storage
-- **memorystore**: In-memory session store for development.
+- **memorystore** (development)
 
 ### Image Storage
-- **Cloudflare R2**: S3-compatible object storage for images.
+- **Cloudflare R2**
 
 ### Other APIs
-- **Resend**: For email sending functionality.
-- **Juso.go.kr (행정안전부 주소 API)**: For delivery address verification.
-- **Anthropic Claude AI**: For detailed address normalization.
+- **Resend** (email)
+- **Juso.go.kr (행정안전부 주소 API)** (address verification)
+- **Anthropic Claude AI** (address normalization)
