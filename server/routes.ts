@@ -7693,6 +7693,13 @@ export async function registerRoutes(
         return res.status(403).json({ message: "회원 정보를 찾을 수 없습니다." });
       }
 
+      const orderableGrades = ['START', 'DRIVING', 'TOP'];
+      if (!orderableGrades.includes(member.grade)) {
+        return res.status(403).json({ 
+          message: "취소건 등록은 스타트 등급 이상 회원만 가능합니다." 
+        });
+      }
+
       let cancelledCount = 0;
       const errors: string[] = [];
 

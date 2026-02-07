@@ -9,10 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, ClipboardList } from "lucide-react";
+import { FileDown, ClipboardList, AlertCircle } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 
-export default function MemberOrderAdjust() {
+interface MemberOrderAdjustProps {
+  canOrder?: boolean;
+}
+
+export default function MemberOrderAdjust({ canOrder = true }: MemberOrderAdjustProps) {
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
 
@@ -22,6 +26,21 @@ export default function MemberOrderAdjust() {
 
   return (
     <div className="space-y-4">
+      {!canOrder && (
+        <Card className="bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400 mb-2">기능 제한</h3>
+                <p className="text-sm text-muted-foreground">
+                  스타트(START) 등급 이상 회원만 엑셀 다운로드가 가능합니다.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
@@ -56,7 +75,7 @@ export default function MemberOrderAdjust() {
               </select>
               <span className="text-muted-foreground">총 0건</span>
             </div>
-            <Button size="sm" variant="outline" data-testid="button-adjust-download">
+            <Button size="sm" variant="outline" disabled={!canOrder} data-testid="button-adjust-download">
               <FileDown className="h-4 w-4 mr-1" />
               엑셀 다운로드
             </Button>

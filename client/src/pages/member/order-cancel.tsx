@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileDown, XCircle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, BanIcon } from "lucide-react";
+import { FileDown, XCircle, Upload, FileSpreadsheet, ChevronLeft, ChevronRight, Loader2, BanIcon, AlertCircle } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PendingOrder } from "@shared/schema";
 import * as XLSX from "xlsx";
 
-export default function MemberOrderCancel() {
+interface MemberOrderCancelProps {
+  canOrder?: boolean;
+}
+
+export default function MemberOrderCancel({ canOrder = true }: MemberOrderCancelProps) {
   useSSE();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,6 +237,21 @@ export default function MemberOrderCancel() {
 
   return (
     <div className="space-y-4">
+      {!canOrder && (
+        <Card className="bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400 mb-2">기능 제한</h3>
+                <p className="text-sm text-muted-foreground">
+                  스타트(START) 등급 이상 회원만 취소건 등록 및 다운로드가 가능합니다.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -288,7 +307,7 @@ export default function MemberOrderCancel() {
                 size="sm"
                 variant={cancelDeadlineClosed ? "outline" : "default"}
                 onClick={handleCancelRegister}
-                disabled={cancelDeadlineClosed || cancelMutation.isPending}
+                disabled={!canOrder || cancelDeadlineClosed || cancelMutation.isPending}
                 data-testid="button-cancel-register"
               >
                 {cancelMutation.isPending ? (
@@ -304,6 +323,7 @@ export default function MemberOrderCancel() {
                 size="sm"
                 variant="outline"
                 onClick={handleDownloadTemplate}
+                disabled={!canOrder}
                 data-testid="button-cancel-template"
               >
                 <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -312,7 +332,7 @@ export default function MemberOrderCancel() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={filteredOrders.length === 0 || isDownloading}
+                disabled={!canOrder || filteredOrders.length === 0 || isDownloading}
                 onClick={handleDownloadCancel}
                 data-testid="button-cancel-download"
               >

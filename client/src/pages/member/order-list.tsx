@@ -10,12 +10,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, Truck, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileDown, Truck, Loader2, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { MemberOrderFilter, type MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import type { PendingOrder } from "@shared/schema";
 
-export default function MemberOrderList() {
+interface MemberOrderListProps {
+  canOrder?: boolean;
+}
+
+export default function MemberOrderList({ canOrder = true }: MemberOrderListProps) {
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,6 +92,21 @@ export default function MemberOrderList() {
 
   return (
     <div className="space-y-4">
+      {!canOrder && (
+        <Card className="bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400 mb-2">기능 제한</h3>
+                <p className="text-sm text-muted-foreground">
+                  스타트(START) 등급 이상 회원만 엑셀 다운로드가 가능합니다.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
@@ -110,7 +129,7 @@ export default function MemberOrderList() {
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" data-testid="button-shipping-download">
+              <Button size="sm" variant="outline" disabled={!canOrder} data-testid="button-shipping-download">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
               </Button>

@@ -13,14 +13,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileDown, FileText, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { FileDown, FileText, ChevronLeft, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 import { MemberOrderFilter, MemberOrderFilterState } from "@/components/member/MemberOrderFilter";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { useToast } from "@/hooks/use-toast";
 import type { PendingOrder } from "@shared/schema";
 import * as XLSX from "xlsx";
 
-export default function MemberOrderInvoice() {
+interface MemberOrderInvoiceProps {
+  canOrder?: boolean;
+}
+
+export default function MemberOrderInvoice({ canOrder = true }: MemberOrderInvoiceProps) {
   useSSE();
   const { toast } = useToast();
 
@@ -215,6 +219,21 @@ export default function MemberOrderInvoice() {
 
   return (
     <div className="space-y-4">
+      {!canOrder && (
+        <Card className="bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400 mb-2">기능 제한</h3>
+                <p className="text-sm text-muted-foreground">
+                  스타트(START) 등급 이상 회원만 송장파일 다운로드가 가능합니다.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <Card className="overflow-hidden">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
@@ -264,7 +283,7 @@ export default function MemberOrderInvoice() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={defaultOrders.length === 0 || isDownloading}
+                disabled={!canOrder || defaultOrders.length === 0 || isDownloading}
                 onClick={handleDownloadBasic}
                 data-testid="button-download-basic"
               >
@@ -279,7 +298,7 @@ export default function MemberOrderInvoice() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={postofficeOrders.length === 0 || isDownloading}
+                  disabled={!canOrder || postofficeOrders.length === 0 || isDownloading}
                   onClick={handleDownloadPostOffice}
                   data-testid="button-download-postoffice"
                 >

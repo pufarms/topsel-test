@@ -1247,7 +1247,7 @@ export default function Dashboard() {
                       {/* 액션 버튼 및 페이지네이션 */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-8" data-testid="button-download-orders">
+                          <Button size="sm" variant="outline" className="h-8" disabled={!canOrder} data-testid="button-download-orders">
                             <FileDown className="h-4 w-4 mr-1" />
                             다운로드
                           </Button>
@@ -1255,6 +1255,7 @@ export default function Dashboard() {
                             size="sm" 
                             variant="outline" 
                             className="h-8" 
+                            disabled={!canOrder}
                             data-testid="button-download-form"
                             onClick={handleDownloadTemplate}
                           >
@@ -1263,13 +1264,17 @@ export default function Dashboard() {
                           </Button>
                           <Dialog open={orderDialogOpen} onOpenChange={(open) => {
                               if (open) {
+                                if (!canOrder) {
+                                  toast({ title: "주문 불가", description: "스타트 등급 이상 회원만 주문 등록이 가능합니다.", variant: "destructive" });
+                                  return;
+                                }
                                 setOrderDialogOpen(true);
                               } else {
                                 handleCloseUploadDialog();
                               }
                             }}>
                             <DialogTrigger asChild>
-                              <Button size="sm" className="h-8 bg-primary" data-testid="button-new-order">
+                              <Button size="sm" className="h-8 bg-primary" disabled={!canOrder} data-testid="button-new-order">
                                 <Plus className="h-4 w-4 mr-1" />
                                 엑셀 주문 등록
                               </Button>
@@ -1562,22 +1567,22 @@ export default function Dashboard() {
 
               {/* 주문조정건 확인 탭 */}
               {activeTab === "order-adjust" && (
-                <MemberOrderAdjust />
+                <MemberOrderAdjust canOrder={canOrder} />
               )}
 
               {/* 송장파일 다운로드 탭 */}
               {activeTab === "order-invoice" && (
-                <MemberOrderInvoice />
+                <MemberOrderInvoice canOrder={canOrder} />
               )}
 
               {/* 취소건 등록 탭 */}
               {activeTab === "order-cancel" && (
-                <MemberOrderCancel />
+                <MemberOrderCancel canOrder={canOrder} />
               )}
 
               {/* 배송중 조회 탭 */}
               {activeTab === "order-list" && (
-                <MemberOrderList />
+                <MemberOrderList canOrder={canOrder} />
               )}
           </main>
         </div>
