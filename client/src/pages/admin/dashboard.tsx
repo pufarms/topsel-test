@@ -228,14 +228,14 @@ export default function AdminDashboard() {
   }
 
   
-  const pendingMembers = members.filter(m => m.status === "pending").length;
-  const approvedMembers = members.filter(m => m.status === "approved").length;
+  const activeMembers = members.filter(m => m.status === "활성").length;
+  const pendingMembers = members.filter(m => m.grade === "PENDING").length;
   
   const tierCounts = {
-    준회원: members.filter(m => m.grade === "준회원" && m.status === "approved").length,
-    Start: members.filter(m => m.grade === "Start" && m.status === "approved").length,
-    Driving: members.filter(m => m.grade === "Driving" && m.status === "approved").length,
-    Top: members.filter(m => m.grade === "Top" && m.status === "approved").length,
+    ASSOCIATE: members.filter(m => m.grade === "ASSOCIATE" && m.status === "활성").length,
+    START: members.filter(m => m.grade === "START" && m.status === "활성").length,
+    DRIVING: members.filter(m => m.grade === "DRIVING" && m.status === "활성").length,
+    TOP: members.filter(m => m.grade === "TOP" && m.status === "활성").length,
   };
 
   const sampleEvents = [
@@ -279,34 +279,34 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard
               title="총회원수"
-              value={`${approvedMembers}명`}
+              value={`${activeMembers}명`}
               icon={<Users className="h-4 w-4" />}
               variant="primary"
             />
             <StatCard
-              title="신규회원(승인대기)"
+              title="승인대기"
               value={`${pendingMembers}명`}
               icon={<UserPlus className="h-4 w-4" />}
               variant={pendingMembers > 0 ? "warning" : "default"}
             />
             <StatCard
               title="준회원"
-              value={`${tierCounts.준회원}명`}
+              value={`${tierCounts.ASSOCIATE}명`}
               icon={<UserCheck className="h-4 w-4" />}
             />
             <StatCard
               title="Start회원"
-              value={`${tierCounts.Start}명`}
+              value={`${tierCounts.START}명`}
               icon={<Star className="h-4 w-4" />}
             />
             <StatCard
               title="Driving회원"
-              value={`${tierCounts.Driving}명`}
+              value={`${tierCounts.DRIVING}명`}
               icon={<Zap className="h-4 w-4" />}
             />
             <StatCard
               title="Top회원"
-              value={`${tierCounts.Top}명`}
+              value={`${tierCounts.TOP}명`}
               icon={<Crown className="h-4 w-4" />}
               variant="success"
             />
