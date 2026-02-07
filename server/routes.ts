@@ -7999,8 +7999,12 @@ export async function registerRoutes(
 
         try {
           const result = await db.transaction(async (tx) => {
-            let currentDeposit = memberInfo.deposit;
-            let currentPoint = memberInfo.point;
+            const [lockedMember] = await tx.select({ deposit: members.deposit, point: members.point })
+              .from(members).where(eq(members.id, memberId)).for('update');
+            if (!lockedMember) return { transferred: 0, failed: true, shortage: 0, remainingCount: memberOrders.length };
+
+            let currentDeposit = lockedMember.deposit;
+            let currentPoint = lockedMember.point;
             let memberTransferred = 0;
 
             for (const order of memberOrders) {
@@ -9469,11 +9473,11 @@ export async function registerRoutes(
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "충전 금액을 올바르게 입력해주세요" });
 
-      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
-      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+      const result = await db.transaction(async (tx) => {
+        const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
+        if (!lockedMember) return { error: true, message: "회원을 찾을 수 없습니다" } as const;
 
-      const newDeposit = member[0].deposit + amount;
-      await db.transaction(async (tx) => {
+        const newDeposit = lockedMember.deposit + amount;
         await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
         await tx.insert(depositHistory).values({
           memberId,
@@ -9483,9 +9487,13 @@ export async function registerRoutes(
           description: description || `관리자 예치금 충전`,
           processedBy: req.session.userId,
         });
+        return { error: false, newDeposit } as const;
       });
 
-      res.json({ success: true, message: `${amount.toLocaleString()}원 충전 완료`, newDeposit });
+      if (result.error) {
+        return res.status(404).json({ message: result.message });
+      }
+      res.json({ success: true, message: `${result.newDeposit.toLocaleString()}원 충전 완료`, newDeposit: result.newDeposit });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9504,15 +9512,15 @@ export async function registerRoutes(
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "환급 금액을 올바르게 입력해주세요" });
 
-      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
-      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+      const result = await db.transaction(async (tx) => {
+        const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
+        if (!lockedMember) return { error: true, status: 404, message: "회원을 찾을 수 없습니다" } as const;
 
-      if (member[0].deposit < amount) {
-        return res.status(400).json({ message: `환급 가능 금액이 부족합니다. 현재 예치금: ${member[0].deposit.toLocaleString()}원` });
-      }
+        if (lockedMember.deposit < amount) {
+          return { error: true, status: 400, message: `환급 가능 금액이 부족합니다. 현재 예치금: ${lockedMember.deposit.toLocaleString()}원` } as const;
+        }
 
-      const newDeposit = member[0].deposit - amount;
-      await db.transaction(async (tx) => {
+        const newDeposit = lockedMember.deposit - amount;
         await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
         await tx.insert(depositHistory).values({
           memberId,
@@ -9522,9 +9530,13 @@ export async function registerRoutes(
           description: description || `관리자 예치금 환급`,
           processedBy: req.session.userId,
         });
+        return { error: false, newDeposit } as const;
       });
 
-      res.json({ success: true, message: `${amount.toLocaleString()}원 환급 완료`, newDeposit });
+      if (result.error) {
+        return res.status(result.status).json({ message: result.message });
+      }
+      res.json({ success: true, message: `${amount.toLocaleString()}원 환급 완료`, newDeposit: result.newDeposit });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -9543,11 +9555,11 @@ export async function registerRoutes(
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "지급 금액을 올바르게 입력해주세요" });
 
-      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
-      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+      const result = await db.transaction(async (tx) => {
+        const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
+        if (!lockedMember) return { error: true, message: "회원을 찾을 수 없습니다" } as const;
 
-      const newPoint = member[0].point + amount;
-      await db.transaction(async (tx) => {
+        const newPoint = lockedMember.point + amount;
         await tx.update(members).set({ point: newPoint, updatedAt: new Date() }).where(eq(members.id, memberId));
         await tx.insert(pointerHistory).values({
           memberId,
@@ -9557,9 +9569,13 @@ export async function registerRoutes(
           description: description || `관리자 포인터 지급`,
           processedBy: req.session.userId,
         });
+        return { error: false, newPoint } as const;
       });
 
-      res.json({ success: true, message: `${amount.toLocaleString()}P 지급 완료`, newPoint });
+      if (result.error) {
+        return res.status(404).json({ message: result.message });
+      }
+      res.json({ success: true, message: `${result.newPoint.toLocaleString()}P 지급 완료`, newPoint: result.newPoint });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
