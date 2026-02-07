@@ -1250,7 +1250,9 @@ export default function Dashboard() {
                       ? { card: "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20", icon: "text-blue-600", badge: null as React.ReactNode, valueColor: "text-blue-600", hint: null as string | null }
                       : bal > 0 && bal < 50000
                       ? { card: "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20", icon: "text-amber-600", badge: <Badge variant="outline" className="no-default-active-elevate border-amber-400 text-amber-700 dark:text-amber-400">잔액 적음</Badge>, valueColor: "text-amber-600", hint: "잔액이 적습니다. 주문 전 예치금을 충전해 주세요." }
-                      : { card: "border-destructive/50 bg-red-50/50 dark:bg-red-950/20", icon: "text-destructive", badge: <Badge variant="destructive" className="no-default-active-elevate">잔액 부족</Badge>, valueColor: "text-destructive", hint: "예치금 충전 후 주문 가능합니다." };
+                      : bal <= 0
+                      ? { card: "border-destructive/50 bg-red-50/50 dark:bg-red-950/20", icon: "text-destructive", badge: <Badge variant="destructive" className="no-default-active-elevate">잔액 부족</Badge>, valueColor: "text-destructive", hint: "예치금 충전 후 주문 가능합니다." }
+                      : { card: "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20", icon: "text-blue-600", badge: null as React.ReactNode, valueColor: "text-blue-600", hint: null as string | null };
                     return (
                     <Card className={bannerStyle.card} data-testid="card-balance-banner">
                       <CardContent className="pt-4 pb-4">
@@ -1271,11 +1273,17 @@ export default function Dashboard() {
                               충전하기
                             </Button>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
-                              <span className="text-muted-foreground">예치금 + 포인터</span>
-                              <span className="font-semibold" data-testid="text-balance-total">
-                                {balanceData.deposit.toLocaleString()}원 + {balanceData.point.toLocaleString()}P = {(balanceData.deposit + balanceData.point).toLocaleString()}원
+                              <span className="text-muted-foreground">예치금</span>
+                              <span className="font-semibold" data-testid="text-deposit-amount">
+                                {balanceData.deposit.toLocaleString()}원
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
+                              <span className="text-muted-foreground">포인터</span>
+                              <span className="font-semibold" data-testid="text-pointer-amount">
+                                {balanceData.point.toLocaleString()}P
                               </span>
                             </div>
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">

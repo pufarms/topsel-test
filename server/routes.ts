@@ -9495,9 +9495,9 @@ export async function registerRoutes(
       if (memberId) conditions.push(eq(settlementHistory.memberId, memberId));
       if (type) conditions.push(eq(settlementHistory.settlementType, type));
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(settlementHistory.createdAt, startOfDay));
-        conditions.push(lte(settlementHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(settlementHistory.createdAt, startUTC));
+        conditions.push(lte(settlementHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
@@ -9558,9 +9558,9 @@ export async function registerRoutes(
       if (memberId) conditions.push(eq(depositHistory.memberId, memberId));
       if (type) conditions.push(eq(depositHistory.type, type));
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(depositHistory.createdAt, startOfDay));
-        conditions.push(lte(depositHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(depositHistory.createdAt, startUTC));
+        conditions.push(lte(depositHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
@@ -9618,9 +9618,9 @@ export async function registerRoutes(
       if (memberId) conditions.push(eq(pointerHistory.memberId, memberId));
       if (type) conditions.push(eq(pointerHistory.type, type));
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(pointerHistory.createdAt, startOfDay));
-        conditions.push(lte(pointerHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(pointerHistory.createdAt, startUTC));
+        conditions.push(lte(pointerHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
@@ -9719,9 +9719,9 @@ export async function registerRoutes(
       const conditions: any[] = [eq(settlementHistory.memberId, req.session.userId)];
 
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(settlementHistory.createdAt, startOfDay));
-        conditions.push(lte(settlementHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(settlementHistory.createdAt, startUTC));
+        conditions.push(lte(settlementHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
@@ -9759,9 +9759,9 @@ export async function registerRoutes(
       const conditions: any[] = [eq(depositHistory.memberId, req.session.userId)];
 
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(depositHistory.createdAt, startOfDay));
-        conditions.push(lte(depositHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(depositHistory.createdAt, startUTC));
+        conditions.push(lte(depositHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
@@ -9799,9 +9799,9 @@ export async function registerRoutes(
       const conditions: any[] = [eq(pointerHistory.memberId, req.session.userId)];
 
       if (startDate && endDate) {
-        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
-        conditions.push(gte(pointerHistory.createdAt, startOfDay));
-        conditions.push(lte(pointerHistory.createdAt, endOfDay));
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(pointerHistory.createdAt, startUTC));
+        conditions.push(lte(pointerHistory.createdAt, endUTC));
       }
 
       const pageNum = parseInt(page);
