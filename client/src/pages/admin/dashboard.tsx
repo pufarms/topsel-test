@@ -139,6 +139,16 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: salesStats } = useQuery<{
+    todaySales: number;
+    yesterdaySales: number;
+    lastMonthSales: number;
+    thisMonthSales: number;
+    trendPercent: number | null;
+  }>({
+    queryKey: ["/api/admin/sales-stats"],
+  });
+
   const { data: orderStats } = useQuery<{
     total: number;
     pending: number;
@@ -175,7 +185,6 @@ export default function AdminDashboard() {
     );
   }
 
-  const totalRevenue = orders.reduce((sum, order) => sum + (order.supplyPrice || 0), 0);
   
   const pendingMembers = members.filter(m => m.status === "pending").length;
   const approvedMembers = members.filter(m => m.status === "approved").length;
@@ -260,25 +269,25 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard
               title="금일 총매출"
-              value={`${totalRevenue.toLocaleString("ko-KR")}원`}
+              value={`${(salesStats?.todaySales || 0).toLocaleString("ko-KR")}원`}
               icon={<TrendingUp className="h-4 w-4" />}
               variant="success"
-              trend="up"
-              trendValue="+12.5%"
+              trend={salesStats?.trendPercent != null ? (salesStats.trendPercent >= 0 ? "up" : "down") : undefined}
+              trendValue={salesStats?.trendPercent != null ? `${salesStats.trendPercent >= 0 ? "+" : ""}${salesStats.trendPercent}%` : undefined}
             />
             <StatCard
               title="전일 총매출"
-              value="0원"
+              value={`${(salesStats?.yesterdaySales || 0).toLocaleString("ko-KR")}원`}
               icon={<Clock className="h-4 w-4" />}
             />
             <StatCard
               title="전월 총매출"
-              value="0원"
+              value={`${(salesStats?.lastMonthSales || 0).toLocaleString("ko-KR")}원`}
               icon={<Calendar className="h-4 w-4" />}
             />
             <StatCard
               title="이번달 총매출"
-              value={`${totalRevenue.toLocaleString("ko-KR")}원`}
+              value={`${(salesStats?.thisMonthSales || 0).toLocaleString("ko-KR")}원`}
               icon={<TrendingUp className="h-4 w-4" />}
               variant="primary"
             />

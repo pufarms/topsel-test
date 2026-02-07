@@ -5874,6 +5874,132 @@ export async function registerRoutes(
     }
   });
 
+  // KST 기준 날짜 범위 계산 유틸리티 (금일/전일/전월/이번달)
+  function getKSTDateRanges() {
+    const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const nowUtc = new Date();
+
+    const kstMs = nowUtc.getTime() + KST_OFFSET_MS;
+    const kstYear = new Date(kstMs).getUTCFullYear();
+    const kstMonth = new Date(kstMs).getUTCMonth();
+    const kstDate = new Date(kstMs).getUTCDate();
+
+    const todayStartUTC = new Date(Date.UTC(kstYear, kstMonth, kstDate) - KST_OFFSET_MS);
+    const tomorrowStartUTC = new Date(todayStartUTC.getTime() + DAY_MS);
+    const yesterdayStartUTC = new Date(todayStartUTC.getTime() - DAY_MS);
+
+    const thisMonthStartUTC = new Date(Date.UTC(kstYear, kstMonth, 1) - KST_OFFSET_MS);
+
+    const lastMonthStartUTC = new Date(Date.UTC(kstYear, kstMonth - 1, 1) - KST_OFFSET_MS);
+    const lastMonthEndUTC = thisMonthStartUTC;
+
+    return {
+      today: { start: todayStartUTC, end: tomorrowStartUTC },
+      yesterday: { start: yesterdayStartUTC, end: todayStartUTC },
+      thisMonth: { start: thisMonthStartUTC, end: nowUtc },
+      lastMonth: { start: lastMonthStartUTC, end: lastMonthEndUTC },
+    };
+  }
+
+  // 관리자 매출 현황 API (금일/전일/전월/이번달 매출)
+  app.get('/api/admin/sales-stats', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+        return res.status(403).json({ message: "접근 권한이 없습니다" });
+      }
+
+      const ranges = getKSTDateRanges();
+      
+      // 정상 주문만 매출에 포함 (취소, 회원취소, 주문조정 제외)
+      const excludeStatuses = ['취소', '회원취소', '주문조정'];
+      
+      const calcSales = async (start: Date, end: Date) => {
+        const result = await db.select({
+          total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
+        })
+        .from(pendingOrders)
+        .where(and(
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+        ));
+        return parseInt(result[0]?.total || '0', 10);
+      };
+
+      const [todaySales, yesterdaySales, lastMonthSales, thisMonthSales] = await Promise.all([
+        calcSales(ranges.today.start, ranges.today.end),
+        calcSales(ranges.yesterday.start, ranges.yesterday.end),
+        calcSales(ranges.lastMonth.start, ranges.lastMonth.end),
+        calcSales(ranges.thisMonth.start, ranges.thisMonth.end),
+      ]);
+      
+      // 전일 대비 금일 증감률 계산
+      let trendPercent: number | null = null;
+      if (yesterdaySales > 0) {
+        trendPercent = Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 1000) / 10;
+      }
+
+      res.json({
+        todaySales,
+        yesterdaySales,
+        lastMonthSales,
+        thisMonthSales,
+        trendPercent,
+      });
+    } catch (error: any) {
+      console.error("Sales stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 회원 매입 현황 API (지난달/이번달 매입 총액)
+  app.get('/api/member/purchase-stats', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+    
+    try {
+      const ranges = getKSTDateRanges();
+      const memberId = req.session.userId;
+      
+      // 정상 주문만 매입에 포함 (취소, 회원취소, 주문조정 제외)
+      const excludeStatuses = ['취소', '회원취소', '주문조정'];
+      
+      const calcPurchase = async (start: Date, end: Date) => {
+        const result = await db.select({
+          total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
+        })
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.memberId, memberId),
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+        ));
+        return parseInt(result[0]?.total || '0', 10);
+      };
+
+      const [lastMonthTotal, thisMonthTotal] = await Promise.all([
+        calcPurchase(ranges.lastMonth.start, ranges.lastMonth.end),
+        calcPurchase(ranges.thisMonth.start, ranges.thisMonth.end),
+      ]);
+
+      res.json({
+        lastMonthTotal,
+        thisMonthTotal,
+      });
+    } catch (error: any) {
+      console.error("Purchase stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get pending orders for member
   app.get('/api/member/pending-orders', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {

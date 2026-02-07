@@ -53,7 +53,8 @@ import {
   Building2,
   Star,
   Menu,
-  X
+  X,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
@@ -257,6 +258,14 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
+    enabled: !!user && (isMember || isPreviewMode),
+  });
+
+  const { data: purchaseStats } = useQuery<{
+    lastMonthTotal: number;
+    thisMonthTotal: number;
+  }>({
+    queryKey: ["/api/member/purchase-stats"],
     enabled: !!user && (isMember || isPreviewMode),
   });
 
@@ -658,23 +667,6 @@ export default function Dashboard() {
     updatedAt: new Date(),
   } as Member : null);
 
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-  const thisMonthOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-  });
-
-  const lastMonthOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === lastMonth && orderDate.getFullYear() === lastMonthYear;
-  });
-
-  // Use real order stats from API (member's own orders only)
   const totalOrders = orderStats?.total || 0;
   const pendingOrdersCount = orderStats?.pending || 0;
   const adjustmentOrdersCount = orderStats?.adjustment || 0;
@@ -682,9 +674,6 @@ export default function Dashboard() {
   const readyToShipOrdersCount = orderStats?.readyToShip || 0;
   const memberCancelledOrdersCount = orderStats?.memberCancelled || 0;
   const shippingOrdersCount = orderStats?.shipping || 0;
-  
-  const thisMonthTotal = thisMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
-  const lastMonthTotal = lastMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("ko-KR") + "원";
@@ -826,6 +815,41 @@ export default function Dashboard() {
         <main className="lg:ml-64 min-w-0 p-4 md:p-6">
               {activeTab === "dashboard" && (
               <div className="space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                    <CardTitle className="text-base">매입 현황</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border p-4 bg-card transition-all hover:shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-muted-foreground font-medium">지난 달 매입 총액</span>
+                        <div className="p-2 rounded-lg bg-background/50 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <span className="text-2xl font-bold tracking-tight" data-testid="text-last-month-purchase">
+                        {(purchaseStats?.lastMonthTotal || 0).toLocaleString("ko-KR")}원
+                      </span>
+                    </div>
+                    <div className="rounded-lg border p-4 bg-primary/5 border-primary/20 transition-all hover:shadow-sm">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-muted-foreground font-medium">이번 달 매입 총액</span>
+                        <div className="p-2 rounded-lg bg-background/50 text-primary">
+                          <TrendingUp className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <span className="text-2xl font-bold tracking-tight" data-testid="text-this-month-purchase">
+                        {(purchaseStats?.thisMonthTotal || 0).toLocaleString("ko-KR")}원
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
