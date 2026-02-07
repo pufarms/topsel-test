@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, Star, BarChart3 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { getQueryFn } from "@/lib/queryClient";
-import type { Member, Order } from "@shared/schema";
+import type { Member } from "@shared/schema";
 
 const memberGradeLabels: Record<string, string> = {
   PENDING: "승인대기",
@@ -17,10 +17,9 @@ interface MemberPageBannerProps {
   title: string;
   description?: string;
   memberData?: Member | null;
-  orders?: Order[];
 }
 
-export function MemberPageBanner({ title, description, memberData: externalMemberData, orders: externalOrders }: MemberPageBannerProps) {
+export function MemberPageBanner({ title, description, memberData: externalMemberData }: MemberPageBannerProps) {
   const { user } = useAuth();
 
   const { data: internalMemberData } = useQuery<Member | null>({
@@ -32,42 +31,24 @@ export function MemberPageBanner({ title, description, memberData: externalMembe
     retry: false,
   });
 
-  const { data: internalOrders = [] } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-    enabled: !!user && !externalOrders,
+  const { data: purchaseStats } = useQuery<{
+    lastMonthTotal: number;
+    thisMonthTotal: number;
+  }>({
+    queryKey: ["/api/member/purchase-stats"],
+    enabled: !!user,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
     retry: false,
   });
 
   const memberData = externalMemberData ?? internalMemberData;
-  const orders = externalOrders ?? internalOrders;
 
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-  const thisMonthOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-  });
-
-  const lastMonthOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === lastMonth && orderDate.getFullYear() === lastMonthYear;
-  });
-
-  const thisMonthTotal = thisMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
-  const lastMonthTotal = lastMonthOrders.reduce((sum, order) => sum + order.price * order.quantity, 0);
+  const lastMonthTotal = purchaseStats?.lastMonthTotal || 0;
+  const thisMonthTotal = purchaseStats?.thisMonthTotal || 0;
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("ko-KR", {
-      style: "currency",
-      currency: "KRW",
-      maximumFractionDigits: 0,
-    }).format(price);
+    return price.toLocaleString("ko-KR") + "원";
   };
 
   return (

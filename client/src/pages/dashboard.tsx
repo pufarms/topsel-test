@@ -774,7 +774,6 @@ export default function Dashboard() {
           title="마이페이지 대시보드" 
           description="주문, 예치금, 통계를 한눈에 관리하세요. 탑셀러의 모든 서비스를 이곳에서 확인할 수 있습니다."
           memberData={displayMemberData}
-          orders={orders}
         />
 
         {/* Desktop Fixed Sidebar */}
