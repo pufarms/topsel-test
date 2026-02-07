@@ -104,6 +104,30 @@ Preferred communication style: Simple, everyday language.
 - 관리자: `/admin/settlements` (회원 잔액 현황, 정산/예치금/포인터 이력 탭, 충전/환급/지급 다이얼로그)
 - 회원: 대시보드 예치금충전 탭 (잔액 현황, 정산/예치금/포인터 이력 탭)
 
+### 주문 등록 알림 UI 통합 설계
+
+**잔액 배너 3단계 (주문등록 화면 상단):**
+- ≥10만원: 파란 배경 (정상)
+- <5만원: 주황 배경 + "잔액이 적습니다" 안내
+- 0원 이하: 빨간 배경 + "예치금 충전 후 주문 가능합니다" 안내
+
+**엑셀 업로드 검증 결과 케이스:**
+- A: 상품 오류만, 잔액 OK → 기존 다이얼로그 + 잔액 확인 블록(초록)
+- B: 잔액 부족만 → 잔액 부족 전용 다이얼로그 (max-w-500px)
+- C: 오류 + 잔액 부족 → 복합 다이얼로그 (오류목록 + 잔액부족 두 영역, max-w-560px), "정상건만 등록" 버튼 없음
+- D: 오류 있지만 정상건 잔액 OK → 기존 + 잔액 확인 블록(초록) + "정상건만 등록" 버튼 유지
+- G: 부분 성공 → 토스트에 정산 정보 한 줄 추가
+
+**서버 응답 확장:**
+- `validation_failed`: balanceInfo, totalOrderAmount, balanceSufficient 필드 추가
+- `partial_success`: settlementInfo(orderAmount, remainingBalance) 필드 추가
+- `insufficient_balance`: errors 배열 포함 (오류건 있을 때)
+
+**핵심 규칙:**
+- 한 번에 하나의 다이얼로그만 표시
+- 검증 순서: 등급→파일→중복→상품→잔액→주소→결과
+- 기존 검증 알림/순서 절대 변경 금지
+
 ## System Architecture
 
 ### Frontend

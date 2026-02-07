@@ -295,6 +295,9 @@ export default function Dashboard() {
     errorExcelData?: Record<string, any>[];
     previousUpload?: { fileName: string; uploadedAt: string; rowCount: number };
     currentFileName?: string;
+    totalOrderAmount?: number;
+    balanceInfo?: { deposit: number; point: number; pendingOrdersTotal: number; availableBalance: number };
+    balanceSufficient?: boolean;
   } | null>(null);
 
   const [balanceShortageDialog, setBalanceShortageDialog] = useState<{
@@ -303,6 +306,7 @@ export default function Dashboard() {
     validCount: number;
     errorCount: number;
     totalOrderAmount: number;
+    errors: string[];
     balanceInfo: {
       deposit: number;
       point: number;
@@ -310,7 +314,7 @@ export default function Dashboard() {
       availableBalance: number;
       shortage: number;
     };
-  }>({ open: false, total: 0, validCount: 0, errorCount: 0, totalOrderAmount: 0, balanceInfo: { deposit: 0, point: 0, pendingOrdersTotal: 0, availableBalance: 0, shortage: 0 } });
+  }>({ open: false, total: 0, validCount: 0, errorCount: 0, totalOrderAmount: 0, errors: [], balanceInfo: { deposit: 0, point: 0, pendingOrdersTotal: 0, availableBalance: 0, shortage: 0 } });
 
   // 오류건 엑셀 다운로드 함수 (주문등록 양식과 동일한 컬럼 순서 + 오류사유)
   const downloadErrorExcel = async (errorData: Record<string, any>[]) => {
@@ -407,11 +411,11 @@ export default function Dashboard() {
           validCount: data.validCount || 0,
           errorCount: data.errorCount || 0,
           totalOrderAmount: data.totalOrderAmount || 0,
+          errors: data.errors || [],
           balanceInfo: data.balanceInfo || { deposit: 0, point: 0, pendingOrdersTotal: 0, availableBalance: 0, shortage: 0 },
         });
         queryClient.invalidateQueries({ queryKey: ["/api/member/my-balance"] });
       } else if (data.status === 'validation_failed') {
-        // 검증 오류 - 사용자 결정 필요
         setUploadProgress({ 
           status: 'validation_failed',
           total: data.total || 0,
@@ -420,21 +424,27 @@ export default function Dashboard() {
           success: 0, 
           failed: data.errorCount || 0, 
           errors: data.errors || [],
-          errorExcelData: data.errorExcelData || []
+          errorExcelData: data.errorExcelData || [],
+          totalOrderAmount: data.totalOrderAmount,
+          balanceInfo: data.balanceInfo,
+          balanceSufficient: data.balanceSufficient,
         });
       } else if (data.status === 'partial_success') {
-        // 정상건만 등록 완료 + 오류건 다운로드
         if (data.errorExcelData && data.errorExcelData.length > 0) {
           downloadErrorExcel(data.errorExcelData);
         }
         setOrderDialogOpen(false);
         setExcelFile(null);
         setUploadProgress(null);
+        const settlementLine = data.settlementInfo 
+          ? `\n정산 예정: ${data.settlementInfo.orderAmount.toLocaleString()}원 (잔액: ${data.settlementInfo.remainingBalance.toLocaleString()}원)` 
+          : '';
         toast({ 
           title: "주문 등록 완료", 
-          description: `${data.success}건 등록, ${data.failed}건 오류 (오류건 다운로드됨)` 
+          description: `${data.success}건 등록, ${data.failed}건 오류 (오류건 다운로드됨)${settlementLine}` 
         });
         queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/member/my-balance"] });
       } else {
         // 전체 성공
         setOrderDialogOpen(false);
@@ -1234,17 +1244,22 @@ export default function Dashboard() {
                     </Card>
                   )}
 
-                  {canOrder && balanceData && (
-                    <Card className={balanceData.availableBalance > 0 ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-destructive/50 bg-red-50/50 dark:bg-red-950/20"}>
+                  {canOrder && balanceData && (() => {
+                    const bal = balanceData.availableBalance;
+                    const bannerStyle = bal >= 100000
+                      ? { card: "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20", icon: "text-blue-600", badge: null as React.ReactNode, valueColor: "text-blue-600", hint: null as string | null }
+                      : bal > 0 && bal < 50000
+                      ? { card: "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20", icon: "text-amber-600", badge: <Badge variant="outline" className="no-default-active-elevate border-amber-400 text-amber-700 dark:text-amber-400">잔액 적음</Badge>, valueColor: "text-amber-600", hint: "잔액이 적습니다. 주문 전 예치금을 충전해 주세요." }
+                      : { card: "border-destructive/50 bg-red-50/50 dark:bg-red-950/20", icon: "text-destructive", badge: <Badge variant="destructive" className="no-default-active-elevate">잔액 부족</Badge>, valueColor: "text-destructive", hint: "예치금 충전 후 주문 가능합니다." };
+                    return (
+                    <Card className={bannerStyle.card} data-testid="card-balance-banner">
                       <CardContent className="pt-4 pb-4">
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <Wallet className={`h-4 w-4 ${balanceData.availableBalance > 0 ? "text-emerald-600" : "text-destructive"}`} />
+                              <Wallet className={`h-4 w-4 ${bannerStyle.icon}`} />
                               <span className="text-sm font-medium">잔액 현황</span>
-                              {balanceData.availableBalance <= 0 && (
-                                <Badge variant="destructive" className="no-default-active-elevate">잔액 부족</Badge>
-                              )}
+                              {bannerStyle.badge}
                             </div>
                             <Button
                               size="sm"
@@ -1253,7 +1268,7 @@ export default function Dashboard() {
                               data-testid="button-go-deposit"
                             >
                               <CreditCard className="h-3.5 w-3.5 mr-1" />
-                              예치금 충전하기
+                              충전하기
                             </Button>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
@@ -1264,20 +1279,26 @@ export default function Dashboard() {
                               </span>
                             </div>
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
-                              <span className="text-muted-foreground">진행 중 주문 예상 금액</span>
+                              <span className="text-muted-foreground">진행 중 주문</span>
                               <span className="font-semibold text-amber-600" data-testid="text-pending-total">-{balanceData.pendingOrdersTotal.toLocaleString()}원</span>
                             </div>
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
                               <span className="text-muted-foreground">사용 가능 잔액</span>
-                              <span className={`text-lg font-bold ${balanceData.availableBalance > 0 ? "text-emerald-600" : "text-destructive"}`} data-testid="text-available-balance">
+                              <span className={`text-lg font-bold ${bannerStyle.valueColor}`} data-testid="text-available-balance">
                                 {balanceData.availableBalance.toLocaleString()}원
                               </span>
                             </div>
                           </div>
+                          {bannerStyle.hint && (
+                            <p className={`text-xs mt-1 ${bal <= 0 ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`} data-testid="text-balance-hint">
+                              {bannerStyle.hint}
+                            </p>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
-                  )}
+                    );
+                  })()}
 
                   {/* 주문 등록 안내 */}
                   <Card className="bg-emerald-50 dark:bg-emerald-950/30">
@@ -1482,11 +1503,43 @@ export default function Dashboard() {
                                         </ul>
                                       </div>
                                     )}
-                                    {uploadProgress.status === 'validation_failed' && uploadProgress.validCount > 0 && (
+                                    {uploadProgress.status === 'validation_failed' && uploadProgress.validCount > 0 && uploadProgress.balanceSufficient !== false && (
                                       <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
                                         <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
                                           정상건 {uploadProgress.validCount}건만 등록하고, 오류건 {uploadProgress.errorCount}건은 엑셀로 다운로드할 수 있습니다.
                                         </p>
+                                      </div>
+                                    )}
+                                    {uploadProgress.status === 'validation_failed' && uploadProgress.balanceInfo && uploadProgress.totalOrderAmount !== undefined && (
+                                      <div className={`mt-3 p-3 rounded-md border ${uploadProgress.balanceSufficient 
+                                        ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800" 
+                                        : "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"}`}
+                                        data-testid="block-balance-check"
+                                      >
+                                        <h5 className={`text-sm font-medium mb-2 ${uploadProgress.balanceSufficient ? "text-emerald-700 dark:text-emerald-400" : "text-destructive"}`}>
+                                          잔액 확인 {uploadProgress.balanceSufficient ? "\u2705" : ""}
+                                        </h5>
+                                        <div className="grid grid-cols-2 gap-y-1 text-sm">
+                                          <span className="text-muted-foreground">정상건 주문 총액</span>
+                                          <span className="text-right font-medium">{uploadProgress.totalOrderAmount.toLocaleString()}원</span>
+                                          <span className="text-muted-foreground">사용 가능 잔액</span>
+                                          <span className={`text-right font-medium ${uploadProgress.balanceSufficient ? "text-emerald-600" : "text-destructive"}`}>
+                                            {uploadProgress.balanceInfo.availableBalance.toLocaleString()}원
+                                          </span>
+                                          {!uploadProgress.balanceSufficient && (
+                                            <>
+                                              <span className="text-muted-foreground">부족 금액</span>
+                                              <span className="text-right font-bold text-destructive">
+                                                {(uploadProgress.totalOrderAmount - uploadProgress.balanceInfo.availableBalance).toLocaleString()}원
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                        {uploadProgress.balanceSufficient ? (
+                                          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">등록 가능</p>
+                                        ) : (
+                                          <p className="text-xs text-destructive mt-2">예치금을 충전 후 다시 시도해주세요.</p>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1516,8 +1569,7 @@ export default function Dashboard() {
                                       {uploadExcelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                       그래도 계속 진행
                                     </Button>
-                                  ) : uploadProgress?.status === 'validation_failed' && uploadProgress.validCount > 0 ? (
-                                    /* 검증 실패 상태이고 정상건이 있을 때: 정상건만 등록 버튼 표시 */
+                                  ) : uploadProgress?.status === 'validation_failed' && uploadProgress.validCount > 0 && uploadProgress.balanceSufficient !== false ? (
                                     <Button 
                                       onClick={handlePartialUpload} 
                                       disabled={uploadExcelMutation.isPending} 
@@ -1691,27 +1743,56 @@ export default function Dashboard() {
       </div>
 
       <Dialog open={balanceShortageDialog.open} onOpenChange={(open) => setBalanceShortageDialog(prev => ({ ...prev, open }))}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={balanceShortageDialog.errors.length > 0 ? "max-w-[560px]" : "max-w-[500px]"}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+            <DialogTitle className="flex items-center gap-2 text-destructive" data-testid="text-shortage-title">
               <AlertCircle className="h-5 w-5" />
-              잔액 부족 - 주문 등록 불가
+              {balanceShortageDialog.errors.length > 0
+                ? "주문을 등록할 수 없습니다"
+                : "잔액 부족으로 주문을 등록할 수 없습니다"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {balanceShortageDialog.errors.length > 0 && (
+              <p className="text-sm text-muted-foreground">2가지 문제가 확인되었습니다.</p>
+            )}
+
+            {balanceShortageDialog.errors.length > 0 && (
+              <div className="rounded-lg p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                <h4 className="font-medium mb-2 text-sm text-amber-700 dark:text-amber-400">
+                  1. 상품 오류 ({balanceShortageDialog.errorCount}건)
+                </h4>
+                <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-1 max-h-32 overflow-y-auto">
+                  {balanceShortageDialog.errors.map((error, idx) => (
+                    <li key={idx} className="flex items-start gap-1">
+                      <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span>{error}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="rounded-lg p-4 bg-muted/50">
-              <h4 className="font-medium mb-2 text-sm">주문 내역</h4>
+              <h4 className="font-medium mb-2 text-sm">
+                {balanceShortageDialog.errors.length > 0 ? "2. 잔액 부족" : "주문 내역"}
+              </h4>
               <div className="grid grid-cols-2 gap-y-1.5 text-sm">
-                <span className="text-muted-foreground">전체 업로드 건수</span>
+                <span className="text-muted-foreground">업로드 건수</span>
                 <span className="text-right font-medium">{balanceShortageDialog.total}건</span>
-                <span className="text-muted-foreground">검증 오류 건수</span>
-                <span className="text-right font-medium text-destructive">{balanceShortageDialog.errorCount}건</span>
-                <span className="text-muted-foreground">정상건 수</span>
-                <span className="text-right font-medium text-emerald-600">{balanceShortageDialog.validCount}건</span>
-                <span className="text-muted-foreground">정상건 주문 총액</span>
+                {balanceShortageDialog.errorCount > 0 && (
+                  <>
+                    <span className="text-muted-foreground">검증 오류</span>
+                    <span className="text-right font-medium text-destructive">{balanceShortageDialog.errorCount}건</span>
+                  </>
+                )}
+                <span className="text-muted-foreground">{balanceShortageDialog.errors.length > 0 ? "정상건" : "주문 건수"}</span>
+                <span className="text-right font-medium">{balanceShortageDialog.validCount}건</span>
+                <span className="text-muted-foreground">{balanceShortageDialog.errors.length > 0 ? "정상건 주문 총액" : "주문 총액"}</span>
                 <span className="text-right font-bold">{balanceShortageDialog.totalOrderAmount.toLocaleString()}원</span>
               </div>
             </div>
+
             <div className="rounded-lg p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
               <h4 className="font-medium mb-2 text-sm text-destructive">잔액 현황</h4>
               <div className="grid grid-cols-2 gap-y-1.5 text-sm">
@@ -1729,10 +1810,15 @@ export default function Dashboard() {
                 <span className="text-lg font-bold text-destructive" data-testid="text-shortage-amount">{balanceShortageDialog.balanceInfo.shortage.toLocaleString()}원</span>
               </div>
             </div>
+
+            <p className="text-sm text-muted-foreground">
+              {balanceShortageDialog.errors.length > 0
+                ? "상품 오류를 수정하고, 예치금을 충전한 후 다시 주문해 주세요."
+                : "예치금을 충전한 후 다시 주문해 주세요."}
+            </p>
           </div>
           <div className="flex justify-between gap-2">
             <Button
-              variant="outline"
               onClick={() => {
                 setBalanceShortageDialog(prev => ({ ...prev, open: false }));
                 setActiveTab("deposit");

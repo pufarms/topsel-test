@@ -6302,7 +6302,7 @@ export async function registerRoutes(
       if (balanceInfo.availableBalance < orderPrice) {
         const shortage = orderPrice - balanceInfo.availableBalance;
         return res.status(400).json({
-          message: `잔액이 부족합니다. 주문금액: ${orderPrice.toLocaleString()}원, 사용가능잔액: ${balanceInfo.availableBalance.toLocaleString()}원 (예치금 ${balanceInfo.deposit.toLocaleString()}원 + 포인터 ${balanceInfo.point.toLocaleString()}원 - 진행중주문 ${balanceInfo.pendingOrdersTotal.toLocaleString()}원), 부족금액: ${shortage.toLocaleString()}원. 예치금을 충전 후 다시 시도해주세요.`,
+          message: `잔액 부족 - 주문 등록 불가\n주문 금액: ${orderPrice.toLocaleString()}원 / 사용 가능 잔액: ${balanceInfo.availableBalance.toLocaleString()}원\n부족 금액: ${shortage.toLocaleString()}원\n예치금을 충전 후 다시 시도해주세요.`,
           balanceInfo: {
             orderAmount: orderPrice,
             deposit: balanceInfo.deposit,
@@ -6781,6 +6781,12 @@ export async function registerRoutes(
 
       // 오류가 있고 confirmPartial이 아니면 검증 결과만 반환 (등록하지 않음)
       if (errorRows.length > 0 && !confirmPartial) {
+        let validOrderAmount = 0;
+        for (const vRow of validRows) {
+          validOrderAmount += getSupplyPriceByGrade(vRow.currentProduct, member.grade);
+        }
+        const balanceForValidation = await calculateAvailableBalance(member.id, member.grade);
+
         return res.json({
           status: 'validation_failed',
           message: "검증 오류가 있습니다. 정상건만 등록하거나 취소하세요.",
@@ -6789,6 +6795,14 @@ export async function registerRoutes(
           errorCount: errorRows.length,
           errors: errorRows.map(e => `${e.rowNum}번 줄: ${e.errorReason}`),
           errorExcelData: generateErrorExcelData(errorRows),
+          totalOrderAmount: validOrderAmount,
+          balanceInfo: {
+            deposit: balanceForValidation.deposit,
+            point: balanceForValidation.point,
+            pendingOrdersTotal: balanceForValidation.pendingOrdersTotal,
+            availableBalance: balanceForValidation.availableBalance,
+          },
+          balanceSufficient: balanceForValidation.availableBalance >= validOrderAmount,
         });
       }
 
@@ -6862,6 +6876,12 @@ export async function registerRoutes(
 
       // 오류건이 있었다면 오류 엑셀 데이터도 함께 반환
       if (errorRows.length > 0 && confirmPartial) {
+        let registeredOrderAmount = 0;
+        for (const vRow of validRows) {
+          registeredOrderAmount += getSupplyPriceByGrade(vRow.currentProduct, member.grade);
+        }
+        const balanceAfterOrder = await calculateAvailableBalance(member.id, member.grade);
+
         return res.json({
           status: 'partial_success',
           total: rows.length,
@@ -6869,6 +6889,10 @@ export async function registerRoutes(
           failed: errorRows.length,
           errors: errorRows.map(e => `${e.rowNum}번 줄: ${e.errorReason}`),
           errorExcelData: generateErrorExcelData(errorRows),
+          settlementInfo: {
+            orderAmount: registeredOrderAmount,
+            remainingBalance: balanceAfterOrder.availableBalance,
+          },
         });
       }
 
