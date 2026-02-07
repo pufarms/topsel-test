@@ -67,6 +67,43 @@ Preferred communication style: Simple, everyday language.
    - 확정 주문 (배송중): "배송중 전환" 시점에 가격 확정 (priceConfirmed=true), 이후 가격 변동 없음
    - 통계 API: 확정 주문은 저장된 가격, 미확정 주문은 실시간 계산 (하이브리드 방식)
 
+### 정산 시스템 (Settlement System)
+
+**잔액 구조:**
+- 예치금(deposit): 계좌이체 후 관리자가 충전, 주문 정산 시 차감
+- 포인터(point): 관리자가 지급, 주문 정산 시 우선 차감
+- 사용 가능 잔액 = (예치금 + 포인터) - (대기~배송준비중 주문 총액)
+
+**잔액 검증 시점:**
+1. 개별 주문 등록 시 (⑤-1 단계): 단건 주문금액 vs 사용가능잔액
+2. 엑셀 일괄 업로드 시 (⑩-1 단계): 정상건 총 주문금액 vs 사용가능잔액
+3. 잔액 부족 시 상세 메시지 반환 (부족금액, 예치금, 포인터, 진행중 주문액)
+
+**자동 정산 (배송중 전환 시):**
+- 회원별로 주문 그룹핑 → 순차 정산 처리
+- 차감 순서: 포인터 우선 차감 → 예치금 차감
+- 이력 기록: settlement_history, pointer_history, deposit_history
+- 잔액 부족 시 해당 주문부터 실패 처리, 정상 처리된 건만 전환
+
+**관리자 기능:**
+- 예치금 충전/환급: `/api/admin/members/:memberId/deposit/charge|refund`
+- 포인터 지급: `/api/admin/members/:memberId/pointer/grant`
+- 정산/예치금/포인터 이력 조회: `/api/admin/settlements|deposit-history|pointer-history`
+- 회원별 잔액 현황: `/api/admin/members-balance`
+
+**회원 기능:**
+- 내 잔액 조회: `/api/member/my-balance`
+- 정산/예치금/포인터 이력 조회: `/api/member/my-settlements|my-deposit-history|my-pointer-history`
+
+**DB 테이블:**
+- `settlement_history`: 주문 정산 이력 (포인터차감, 예치금차감, 총액, 잔액)
+- `deposit_history`: 예치금 변동 이력 (충전/환급/차감)
+- `pointer_history`: 포인터 변동 이력 (지급/차감)
+
+**프론트엔드 페이지:**
+- 관리자: `/admin/settlements` (회원 잔액 현황, 정산/예치금/포인터 이력 탭, 충전/환급/지급 다이얼로그)
+- 회원: 대시보드 예치금충전 탭 (잔액 현황, 정산/예치금/포인터 이력 탭)
+
 ### 필수 디자인 요구사항 (모든 페이지 적용)
 1. **반응형 웹 디자인 (필수!)**: 모든 페이지에 모바일/태블릿/데스크톱 반응형 레이아웃 적용
    - 테이블: 데스크톱은 테이블, 모바일/태블릿은 카드 레이아웃
@@ -161,10 +198,10 @@ Preferred communication style: Simple, everyday language.
 - **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import (`multer`, `xlsx`), including partial order uploads with error reporting.
 - **CMS & Configuration**: Site Settings Management, Header Menu Management (dynamic, drag-and-drop), and Page Management for dynamic content with visual editor and access control.
 - **Legal Compliance**: Term Agreement Record Keeping with content snapshots and SHA-256 hashes for integrity.
-- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses during Excel order uploads, utilizing regex, pattern similarity, rule-based validation (Juso.go.kr API), and AI normalization (Anthropic Claude AI) with a learning mechanism. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
+- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses during Excel order uploads, utilizing regex, pattern similarity, rule-based validation, and AI normalization with a learning mechanism. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
 - **AI Address Learning Management**: Admin interface to register error address patterns, enabling AI to analyze, learn, and apply these patterns during order validation. This includes bulk Excel upload for learning and manual registration, inferring `correctionType` and assigning confidence scores.
 - **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events for both administrators and members.
-- **Date Range Filtering (KST)**: All order-related pages (admin 8 pages + dashboard, member dashboard + 2 order tabs) include a `DateRangeFilter` component with preset buttons (Today/Yesterday/This Week/This Month/Custom). Date filtering uses KST timezone (UTC+9) with server-side SQL filtering via `buildDateCondition()` and `parseDateRangeKST()`. Default is "today". Query keys use flat array format: `["/api/...", startDate, endDate]`. Database indexes exist on `pending_orders.created_at` and `orders.created_at`.
+- **Date Range Filtering (KST)**: All order-related pages include a `DateRangeFilter` component with preset buttons. Date filtering uses KST timezone (UTC+9) with server-side SQL filtering. Default is "today".
 
 ## External Dependencies
 

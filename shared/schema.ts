@@ -1406,3 +1406,88 @@ export const orderUploadHistory = pgTable("order_upload_history", {
 
 export type OrderUploadHistory = typeof orderUploadHistory.$inferSelect;
 export type NewOrderUploadHistory = typeof orderUploadHistory.$inferInsert;
+
+// ========================================
+// 정산 시스템 테이블
+// ========================================
+
+// 정산 유형
+export const settlementTypes = ["auto", "manual"] as const;
+// 예치금 변동 유형
+export const depositHistoryTypes = ["charge", "deduct", "refund"] as const;
+// 포인터 변동 유형
+export const pointerHistoryTypes = ["grant", "deduct", "expire"] as const;
+
+// 정산 이력 (배송중 전환 시 자동 차감 기록)
+export const settlementHistory = pgTable("settlement_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  orderId: varchar("order_id").notNull(),
+  settlementType: text("settlement_type").notNull().default("auto"),
+  pointerAmount: integer("pointer_amount").notNull().default(0),
+  depositAmount: integer("deposit_amount").notNull().default(0),
+  totalAmount: integer("total_amount").notNull().default(0),
+  pointerBalance: integer("pointer_balance").notNull().default(0),
+  depositBalance: integer("deposit_balance").notNull().default(0),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdIdx: index("idx_settlement_member_id").on(table.memberId),
+  orderIdIdx: index("idx_settlement_order_id").on(table.orderId),
+  createdAtIdx: index("idx_settlement_created_at").on(table.createdAt),
+}));
+
+export const insertSettlementHistorySchema = createInsertSchema(settlementHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type SettlementHistory = typeof settlementHistory.$inferSelect;
+export type NewSettlementHistory = z.infer<typeof insertSettlementHistorySchema>;
+
+// 예치금 변동 이력
+export const depositHistory = pgTable("deposit_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  type: text("type").notNull(),
+  amount: integer("amount").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  description: text("description"),
+  adminId: varchar("admin_id"),
+  relatedOrderId: varchar("related_order_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdIdx: index("idx_deposit_history_member_id").on(table.memberId),
+  createdAtIdx: index("idx_deposit_history_created_at").on(table.createdAt),
+  typeIdx: index("idx_deposit_history_type").on(table.type),
+}));
+
+export const insertDepositHistorySchema = createInsertSchema(depositHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type DepositHistory = typeof depositHistory.$inferSelect;
+export type NewDepositHistory = z.infer<typeof insertDepositHistorySchema>;
+
+// 포인터 변동 이력
+export const pointerHistory = pgTable("pointer_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberId: varchar("member_id").notNull().references(() => members.id),
+  type: text("type").notNull(),
+  amount: integer("amount").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  description: text("description"),
+  adminId: varchar("admin_id"),
+  relatedOrderId: varchar("related_order_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdIdx: index("idx_pointer_history_member_id").on(table.memberId),
+  createdAtIdx: index("idx_pointer_history_created_at").on(table.createdAt),
+  typeIdx: index("idx_pointer_history_type").on(table.type),
+}));
+
+export const insertPointerHistorySchema = createInsertSchema(pointerHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type PointerHistory = typeof pointerHistory.$inferSelect;
+export type NewPointerHistory = z.infer<typeof insertPointerHistorySchema>;

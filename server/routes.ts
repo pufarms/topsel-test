@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -5824,6 +5824,64 @@ export async function registerRoutes(
     }
   }
 
+  // 회원의 사용 가능 잔액 계산 (예치금 + 포인터 - 진행중 주문 총액)
+  async function calculateAvailableBalance(memberId: string, memberGrade: string): Promise<{
+    deposit: number;
+    point: number;
+    totalBalance: number;
+    pendingOrdersTotal: number;
+    availableBalance: number;
+  }> {
+    // 회원 잔액 조회
+    const memberData = await db.select({
+      deposit: members.deposit,
+      point: members.point,
+    }).from(members).where(eq(members.id, memberId)).limit(1);
+
+    const deposit = memberData[0]?.deposit || 0;
+    const point = memberData[0]?.point || 0;
+    const totalBalance = deposit + point;
+
+    // 진행중 주문 (대기 ~ 배송준비중) 총액 계산
+    const inProgressStatuses = ["대기", "상품준비중", "배송준비중"];
+    const inProgressOrders = await db.select({
+      productCode: pendingOrders.productCode,
+      supplyPrice: pendingOrders.supplyPrice,
+      priceConfirmed: pendingOrders.priceConfirmed,
+    }).from(pendingOrders).where(
+      and(
+        eq(pendingOrders.memberId, memberId),
+        inArray(pendingOrders.status, inProgressStatuses)
+      )
+    );
+
+    let pendingOrdersTotal = 0;
+    for (const order of inProgressOrders) {
+      if (order.priceConfirmed && order.supplyPrice) {
+        // 확정된 가격 사용
+        pendingOrdersTotal += order.supplyPrice;
+      } else if (order.supplyPrice) {
+        // 미확정이지만 공급가가 저장된 경우
+        pendingOrdersTotal += order.supplyPrice;
+      } else {
+        // 공급가 미설정 시 현재공급가에서 조회
+        const product = await db.select().from(currentProducts)
+          .where(eq(currentProducts.productCode, order.productCode)).limit(1);
+        if (product[0]) {
+          pendingOrdersTotal += getSupplyPriceByGrade(product[0], memberGrade);
+        }
+      }
+    }
+
+    return {
+      deposit,
+      point,
+      totalBalance,
+      pendingOrdersTotal,
+      availableBalance: totalBalance - pendingOrdersTotal,
+    };
+  }
+
   function buildDateCondition(table: any, startDate?: string, endDate?: string) {
     if (!startDate && !endDate) {
       const { startUTC, endUTC } = parseDateRangeKST();
@@ -6236,6 +6294,25 @@ export async function registerRoutes(
           message: `"${data.productName}" (${data.productCode})은(는) 현재 공급되지 않는 상품, 또는 상품코드오류입니다. 상품코드를 확인해주세요.` 
         });
       }
+
+      // ⑤-1 잔액 검증: 주문 금액 대비 사용 가능 잔액 확인
+      const orderPrice = getSupplyPriceByGrade(productInfo, member.grade);
+      const balanceInfo = await calculateAvailableBalance(member.id, member.grade);
+
+      if (balanceInfo.availableBalance < orderPrice) {
+        const shortage = orderPrice - balanceInfo.availableBalance;
+        return res.status(400).json({
+          message: `잔액이 부족합니다. 주문금액: ${orderPrice.toLocaleString()}원, 사용가능잔액: ${balanceInfo.availableBalance.toLocaleString()}원 (예치금 ${balanceInfo.deposit.toLocaleString()}원 + 포인터 ${balanceInfo.point.toLocaleString()}원 - 진행중주문 ${balanceInfo.pendingOrdersTotal.toLocaleString()}원), 부족금액: ${shortage.toLocaleString()}원. 예치금을 충전 후 다시 시도해주세요.`,
+          balanceInfo: {
+            orderAmount: orderPrice,
+            deposit: balanceInfo.deposit,
+            point: balanceInfo.point,
+            pendingOrdersTotal: balanceInfo.pendingOrdersTotal,
+            availableBalance: balanceInfo.availableBalance,
+            shortage,
+          }
+        });
+      }
       
       // Generate sequence number with retry logic for concurrent requests
       let newOrder;
@@ -6567,6 +6644,36 @@ export async function registerRoutes(
           volumeUnit,
           currentProduct,
         });
+      }
+
+      // ⑩-1 잔액 검증: 기본 검증 통과한 정상건의 총 주문금액 기준으로 잔액 체크
+      if (pendingValidationRows.length > 0) {
+        let totalOrderAmount = 0;
+        for (const pvRow of pendingValidationRows) {
+          totalOrderAmount += getSupplyPriceByGrade(pvRow.currentProduct, member.grade);
+        }
+
+        const balanceInfo = await calculateAvailableBalance(member.id, member.grade);
+
+        if (balanceInfo.availableBalance < totalOrderAmount) {
+          const shortage = totalOrderAmount - balanceInfo.availableBalance;
+          return res.json({
+            status: 'insufficient_balance',
+            message: '잔액이 부족하여 주문 등록이 불가합니다.',
+            total: rows.length,
+            validCount: pendingValidationRows.length,
+            errorCount: errorRows.length,
+            totalOrderAmount,
+            balanceInfo: {
+              deposit: balanceInfo.deposit,
+              point: balanceInfo.point,
+              pendingOrdersTotal: balanceInfo.pendingOrdersTotal,
+              availableBalance: balanceInfo.availableBalance,
+              shortage,
+            },
+            errors: errorRows.length > 0 ? errorRows.map(e => `${e.rowNum}번 줄: ${e.errorReason}`) : [],
+          });
+        }
       }
 
       // 2단계: 주소 검증 - 병렬 처리 (5건씩 동시 처리)
@@ -7864,31 +7971,131 @@ export async function registerRoutes(
       const memberIds = Array.from(new Set(targetOrders.map(o => o.memberId)));
       const productCodes = Array.from(new Set(targetOrders.map(o => o.productCode)));
 
-      const membersList = await db.select({ id: members.id, grade: members.grade })
+      const membersList = await db.select({ id: members.id, grade: members.grade, deposit: members.deposit, point: members.point, companyName: members.companyName })
         .from(members)
         .where(inArray(members.id, memberIds));
-      const memberGradeMap = new Map(membersList.map(m => [m.id, m.grade]));
+      const memberMap = new Map(membersList.map(m => [m.id, m]));
 
       const productsList = await db.select()
         .from(currentProducts)
         .where(inArray(currentProducts.productCode, productCodes));
       const productPriceMap = new Map(productsList.map(p => [p.productCode, p]));
 
-      let transferredCount = 0;
+      // 회원별로 주문 그룹핑
+      const ordersByMember = new Map<string, typeof targetOrders>();
       for (const order of targetOrders) {
-        const memberGrade = memberGradeMap.get(order.memberId) || 'START';
-        const product = productPriceMap.get(order.productCode);
-        const confirmedPrice = product ? getSupplyPriceByGrade(product, memberGrade) : null;
+        const existing = ordersByMember.get(order.memberId) || [];
+        existing.push(order);
+        ordersByMember.set(order.memberId, existing);
+      }
 
-        await db.update(pendingOrders)
-          .set({
-            status: "배송중",
-            supplyPrice: confirmedPrice ?? undefined,
-            priceConfirmed: true,
-            updatedAt: new Date(),
-          })
-          .where(eq(pendingOrders.id, order.id));
-        transferredCount++;
+      let transferredCount = 0;
+      const failedOrders: { memberId: string; companyName: string; shortage: number; count: number }[] = [];
+
+      // 회원별로 순차 정산 처리
+      for (const [memberId, memberOrders] of ordersByMember) {
+        const memberInfo = memberMap.get(memberId);
+        if (!memberInfo) continue;
+
+        let currentDeposit = memberInfo.deposit;
+        let currentPoint = memberInfo.point;
+        let memberTransferred = 0;
+        let memberFailed = false;
+
+        for (const order of memberOrders) {
+          const product = productPriceMap.get(order.productCode);
+          const confirmedPrice = product ? getSupplyPriceByGrade(product, memberInfo.grade) : 0;
+
+          // 잔액 확인
+          const totalAvailable = currentDeposit + currentPoint;
+          if (totalAvailable < confirmedPrice) {
+            // 잔액 부족 - 이 주문부터 실패
+            memberFailed = true;
+            failedOrders.push({
+              memberId,
+              companyName: memberInfo.companyName,
+              shortage: confirmedPrice - totalAvailable,
+              count: memberOrders.length - memberTransferred,
+            });
+            break;
+          }
+
+          // 포인터 우선 차감 → 예치금 차감
+          let pointerDeduct = 0;
+          let depositDeduct = 0;
+
+          if (currentPoint >= confirmedPrice) {
+            pointerDeduct = confirmedPrice;
+          } else {
+            pointerDeduct = currentPoint;
+            depositDeduct = confirmedPrice - currentPoint;
+          }
+
+          currentPoint -= pointerDeduct;
+          currentDeposit -= depositDeduct;
+
+          // 주문 상태 업데이트 (배송중 + 가격 확정)
+          await db.update(pendingOrders)
+            .set({
+              status: "배송중",
+              supplyPrice: confirmedPrice ?? undefined,
+              priceConfirmed: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(pendingOrders.id, order.id));
+
+          // 정산 이력 기록
+          await db.insert(settlementHistory).values({
+            memberId,
+            orderId: order.id,
+            settlementType: "auto",
+            pointerAmount: pointerDeduct,
+            depositAmount: depositDeduct,
+            totalAmount: confirmedPrice,
+            pointerBalance: currentPoint,
+            depositBalance: currentDeposit,
+            description: `배송중 전환 자동 정산 (주문 ${order.id})`,
+          });
+
+          // 포인터 차감 이력 기록
+          if (pointerDeduct > 0) {
+            await db.insert(pointerHistory).values({
+              memberId,
+              type: "deduct",
+              amount: pointerDeduct,
+              balanceAfter: currentPoint,
+              description: `주문 정산 (배송중 전환)`,
+              relatedOrderId: order.id,
+            });
+          }
+
+          // 예치금 차감 이력 기록
+          if (depositDeduct > 0) {
+            await db.insert(depositHistory).values({
+              memberId,
+              type: "deduct",
+              amount: depositDeduct,
+              balanceAfter: currentDeposit,
+              description: `주문 정산 (배송중 전환)`,
+              relatedOrderId: order.id,
+            });
+          }
+
+          memberTransferred++;
+        }
+
+        // 회원 잔액 업데이트
+        if (memberTransferred > 0) {
+          await db.update(members)
+            .set({
+              deposit: currentDeposit,
+              point: currentPoint,
+              updatedAt: new Date(),
+            })
+            .where(eq(members.id, memberId));
+        }
+
+        transferredCount += memberTransferred;
       }
 
       if (mode === "all") {
@@ -7927,11 +8134,21 @@ export async function registerRoutes(
       sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
       sseManager.broadcast("order-status-changed", { type: "order-status-changed" });
 
-      res.json({
-        success: true,
-        transferredCount,
-        message: `${transferredCount}건의 주문이 배송중으로 전송되었습니다.`
-      });
+      if (failedOrders.length > 0) {
+        const failedSummary = failedOrders.map(f => `${f.companyName}: ${f.count}건 (부족금액 ${f.shortage.toLocaleString()}원)`).join(', ');
+        res.json({
+          success: true,
+          transferredCount,
+          failedOrders,
+          message: `${transferredCount}건 배송중 전환 완료. 잔액 부족으로 ${failedOrders.reduce((s, f) => s + f.count, 0)}건 미처리: ${failedSummary}`
+        });
+      } else {
+        res.json({
+          success: true,
+          transferredCount,
+          message: `${transferredCount}건의 주문이 배송중으로 전송되었습니다.`
+        });
+      }
     } catch (error: any) {
       console.error("Transfer to shipping error:", error);
       res.status(500).json({ message: error.message || "배송중 전송 중 오류가 발생했습니다" });
@@ -9197,6 +9414,490 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Orders to preparation error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===================== 정산 관리 API =====================
+
+  // 관리자: 회원 잔액 조회 (예치금/포인터/사용가능잔액)
+  app.get('/api/admin/members/:memberId/balance', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId } = req.params;
+      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const balanceInfo = await calculateAvailableBalance(memberId, member[0].grade);
+      res.json({
+        memberId,
+        companyName: member[0].companyName,
+        grade: member[0].grade,
+        ...balanceInfo,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 예치금 충전
+  app.post('/api/admin/members/:memberId/deposit/charge', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId } = req.params;
+      const { amount, description } = req.body;
+      if (!amount || amount <= 0) return res.status(400).json({ message: "충전 금액을 올바르게 입력해주세요" });
+
+      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const newDeposit = member[0].deposit + amount;
+      await db.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+
+      await db.insert(depositHistory).values({
+        memberId,
+        type: "charge",
+        amount,
+        balanceAfter: newDeposit,
+        description: description || `관리자 예치금 충전`,
+        processedBy: req.session.userId,
+      });
+
+      res.json({ success: true, message: `${amount.toLocaleString()}원 충전 완료`, newDeposit });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 예치금 환급
+  app.post('/api/admin/members/:memberId/deposit/refund', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId } = req.params;
+      const { amount, description } = req.body;
+      if (!amount || amount <= 0) return res.status(400).json({ message: "환급 금액을 올바르게 입력해주세요" });
+
+      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      if (member[0].deposit < amount) {
+        return res.status(400).json({ message: `환급 가능 금액이 부족합니다. 현재 예치금: ${member[0].deposit.toLocaleString()}원` });
+      }
+
+      const newDeposit = member[0].deposit - amount;
+      await db.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+
+      await db.insert(depositHistory).values({
+        memberId,
+        type: "refund",
+        amount,
+        balanceAfter: newDeposit,
+        description: description || `관리자 예치금 환급`,
+        processedBy: req.session.userId,
+      });
+
+      res.json({ success: true, message: `${amount.toLocaleString()}원 환급 완료`, newDeposit });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 포인터 지급
+  app.post('/api/admin/members/:memberId/pointer/grant', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId } = req.params;
+      const { amount, description } = req.body;
+      if (!amount || amount <= 0) return res.status(400).json({ message: "지급 금액을 올바르게 입력해주세요" });
+
+      const member = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+      if (member.length === 0) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const newPoint = member[0].point + amount;
+      await db.update(members).set({ point: newPoint, updatedAt: new Date() }).where(eq(members.id, memberId));
+
+      await db.insert(pointerHistory).values({
+        memberId,
+        type: "grant",
+        amount,
+        balanceAfter: newPoint,
+        description: description || `관리자 포인터 지급`,
+        processedBy: req.session.userId,
+      });
+
+      res.json({ success: true, message: `${amount.toLocaleString()}P 지급 완료`, newPoint });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 정산 이력 조회
+  app.get('/api/admin/settlements', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId, startDate, endDate, type, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [];
+
+      if (memberId) conditions.push(eq(settlementHistory.memberId, memberId));
+      if (type) conditions.push(eq(settlementHistory.settlementType, type));
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(settlementHistory.createdAt, startOfDay));
+        conditions.push(lte(settlementHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [records, countResult] = await Promise.all([
+        db.select({
+          id: settlementHistory.id,
+          memberId: settlementHistory.memberId,
+          orderId: settlementHistory.orderId,
+          settlementType: settlementHistory.settlementType,
+          pointerAmount: settlementHistory.pointerAmount,
+          depositAmount: settlementHistory.depositAmount,
+          totalAmount: settlementHistory.totalAmount,
+          pointerBalance: settlementHistory.pointerBalance,
+          depositBalance: settlementHistory.depositBalance,
+          description: settlementHistory.description,
+          createdAt: settlementHistory.createdAt,
+          memberCompanyName: members.companyName,
+        })
+          .from(settlementHistory)
+          .leftJoin(members, eq(settlementHistory.memberId, members.id))
+          .where(whereClause)
+          .orderBy(desc(settlementHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(settlementHistory)
+          .where(whereClause),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 예치금 이력 조회
+  app.get('/api/admin/deposit-history', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId, startDate, endDate, type, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [];
+
+      if (memberId) conditions.push(eq(depositHistory.memberId, memberId));
+      if (type) conditions.push(eq(depositHistory.type, type));
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(depositHistory.createdAt, startOfDay));
+        conditions.push(lte(depositHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [records, countResult] = await Promise.all([
+        db.select({
+          id: depositHistory.id,
+          memberId: depositHistory.memberId,
+          type: depositHistory.type,
+          amount: depositHistory.amount,
+          balanceAfter: depositHistory.balanceAfter,
+          description: depositHistory.description,
+          relatedOrderId: depositHistory.relatedOrderId,
+          processedBy: depositHistory.processedBy,
+          createdAt: depositHistory.createdAt,
+          memberCompanyName: members.companyName,
+        })
+          .from(depositHistory)
+          .leftJoin(members, eq(depositHistory.memberId, members.id))
+          .where(whereClause)
+          .orderBy(desc(depositHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(depositHistory)
+          .where(whereClause),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 포인터 이력 조회
+  app.get('/api/admin/pointer-history', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId, startDate, endDate, type, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [];
+
+      if (memberId) conditions.push(eq(pointerHistory.memberId, memberId));
+      if (type) conditions.push(eq(pointerHistory.type, type));
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(pointerHistory.createdAt, startOfDay));
+        conditions.push(lte(pointerHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [records, countResult] = await Promise.all([
+        db.select({
+          id: pointerHistory.id,
+          memberId: pointerHistory.memberId,
+          type: pointerHistory.type,
+          amount: pointerHistory.amount,
+          balanceAfter: pointerHistory.balanceAfter,
+          description: pointerHistory.description,
+          relatedOrderId: pointerHistory.relatedOrderId,
+          processedBy: pointerHistory.processedBy,
+          createdAt: pointerHistory.createdAt,
+          memberCompanyName: members.companyName,
+        })
+          .from(pointerHistory)
+          .leftJoin(members, eq(pointerHistory.memberId, members.id))
+          .where(whereClause)
+          .orderBy(desc(pointerHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(pointerHistory)
+          .where(whereClause),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 회원 목록 잔액 포함 조회
+  app.get('/api/admin/members-balance', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const memberList = await db.select({
+        id: members.id,
+        companyName: members.companyName,
+        grade: members.grade,
+        deposit: members.deposit,
+        point: members.point,
+        username: members.username,
+      })
+        .from(members)
+        .where(inArray(members.grade, ['START', 'DRIVING', 'TOP']))
+        .orderBy(members.companyName);
+
+      res.json(memberList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===================== 회원 정산 API =====================
+
+  // 회원: 내 잔액 조회
+  app.get('/api/member/my-balance', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const member = await db.select().from(members).where(eq(members.id, req.session.userId)).limit(1);
+      if (member.length === 0) return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const balanceInfo = await calculateAvailableBalance(req.session.userId, member[0].grade);
+      res.json({
+        deposit: balanceInfo.deposit,
+        point: balanceInfo.point,
+        pendingOrdersTotal: balanceInfo.pendingOrdersTotal,
+        availableBalance: balanceInfo.availableBalance,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 내 정산 이력 조회
+  app.get('/api/member/my-settlements', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const { startDate, endDate, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [eq(settlementHistory.memberId, req.session.userId)];
+
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(settlementHistory.createdAt, startOfDay));
+        conditions.push(lte(settlementHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+
+      const [records, countResult] = await Promise.all([
+        db.select()
+          .from(settlementHistory)
+          .where(and(...conditions))
+          .orderBy(desc(settlementHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(settlementHistory)
+          .where(and(...conditions)),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 내 예치금 이력 조회
+  app.get('/api/member/my-deposit-history', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const { startDate, endDate, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [eq(depositHistory.memberId, req.session.userId)];
+
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(depositHistory.createdAt, startOfDay));
+        conditions.push(lte(depositHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+
+      const [records, countResult] = await Promise.all([
+        db.select()
+          .from(depositHistory)
+          .where(and(...conditions))
+          .orderBy(desc(depositHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(depositHistory)
+          .where(and(...conditions)),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 내 포인터 이력 조회
+  app.get('/api/member/my-pointer-history', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const { startDate, endDate, page = '1', limit = '30' } = req.query as any;
+      const conditions: any[] = [eq(pointerHistory.memberId, req.session.userId)];
+
+      if (startDate && endDate) {
+        const { startOfDay, endOfDay } = parseDateRangeKST(startDate, endDate);
+        conditions.push(gte(pointerHistory.createdAt, startOfDay));
+        conditions.push(lte(pointerHistory.createdAt, endOfDay));
+      }
+
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+
+      const [records, countResult] = await Promise.all([
+        db.select()
+          .from(pointerHistory)
+          .where(and(...conditions))
+          .orderBy(desc(pointerHistory.createdAt))
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` })
+          .from(pointerHistory)
+          .where(and(...conditions)),
+      ]);
+
+      res.json({
+        records,
+        total: Number(countResult[0]?.count || 0),
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

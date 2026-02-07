@@ -68,6 +68,7 @@ import MemberOrderInvoice from "@/pages/member/order-invoice";
 import MemberOrderCancel from "@/pages/member/order-cancel";
 import MemberOrderList from "@/pages/member/order-list";
 import MemberProductList from "@/pages/member/product-list";
+import MemberSettlementTab from "@/pages/member/settlement-tab";
 
 type SidebarTab = 
   | "dashboard" 
@@ -381,6 +382,16 @@ export default function Dashboard() {
           previousUpload: data.previousUpload,
           currentFileName: data.currentFileName
         });
+      } else if (data.status === 'insufficient_balance') {
+        setOrderDialogOpen(false);
+        setExcelFile(null);
+        setUploadProgress(null);
+        toast({
+          title: "잔액 부족",
+          description: `${data.message} (부족금액: ${data.balanceInfo?.shortage?.toLocaleString()}원)`,
+          variant: "destructive",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/member/my-balance"] });
       } else if (data.status === 'validation_failed') {
         // 검증 오류 - 사용자 결정 필요
         setUploadProgress({ 
@@ -453,6 +464,16 @@ export default function Dashboard() {
   // 카테고리 데이터 쿼리 (상품관리/카테고리관리 연동)
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+  });
+
+  const { data: balanceData } = useQuery<{
+    deposit: number;
+    point: number;
+    pendingOrdersTotal: number;
+    availableBalance: number;
+  }>({
+    queryKey: ["/api/member/my-balance"],
+    enabled: isMember,
   });
 
   // 주문등록 양식 템플릿 조회
@@ -983,7 +1004,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">예치금</p>
-                          <p className="text-xl font-bold">0원</p>
+                          <p className="text-xl font-bold">{(balanceData?.deposit ?? 0).toLocaleString()}원</p>
                         </div>
                       </div>
                     </div>
@@ -994,15 +1015,27 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">포인터</p>
-                          <p className="text-xl font-bold">0원</p>
+                          <p className="text-xl font-bold">{(balanceData?.point ?? 0).toLocaleString()}P</p>
                         </div>
                       </div>
                     </div>
                   </div>
+                  {balanceData && (
+                    <div className="mb-4 border rounded-lg p-3 bg-muted/30">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">진행중 주문 총액</span>
+                        <span className="font-medium">-{balanceData.pendingOrdersTotal.toLocaleString()}원</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm mt-1 pt-1 border-t">
+                        <span className="font-medium">사용 가능 잔액</span>
+                        <span className="font-bold text-emerald-600">{balanceData.availableBalance.toLocaleString()}원</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-center">
                     <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2">
                       <Wallet className="h-4 w-4" />
-                      예치금 충전하기
+                      예치금 충전 안내
                     </Button>
                   </div>
                 </CardContent>
@@ -1177,6 +1210,28 @@ export default function Dashboard() {
                               준회원 이상은 <button onClick={() => setActiveTab("product-list")} className="text-foreground underline font-medium" data-testid="link-product-list">상품리스트</button>에서 현재공급가와 차주예상공급가를 확인하실 수 있습니다.
                             </p>
                           </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {canOrder && balanceData && (
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <Wallet className="h-4 w-4 text-emerald-600" />
+                              <span className="text-sm text-muted-foreground">사용 가능 잔액</span>
+                              <span className="text-lg font-bold text-emerald-600" data-testid="text-available-balance">{balanceData.availableBalance.toLocaleString()}원</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              (예치금 {balanceData.deposit.toLocaleString()}원 + 포인터 {balanceData.point.toLocaleString()}P - 진행중 {balanceData.pendingOrdersTotal.toLocaleString()}원)
+                            </div>
+                          </div>
+                          {balanceData.availableBalance <= 0 && (
+                            <Badge variant="destructive" className="no-default-active-elevate">잔액 부족</Badge>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -1583,6 +1638,11 @@ export default function Dashboard() {
               {/* 배송중 조회 탭 */}
               {activeTab === "order-list" && (
                 <MemberOrderList canOrder={canOrder} />
+              )}
+
+              {/* 예치금충전/정산이력 탭 */}
+              {activeTab === "deposit" && (
+                <MemberSettlementTab />
               )}
           </main>
         </div>
