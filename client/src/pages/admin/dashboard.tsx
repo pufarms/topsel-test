@@ -404,9 +404,9 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border overflow-hidden">
+          <div className="rounded-lg border table-scroll-container">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow className="bg-muted/50">
                   <TableHead className="font-semibold">업체</TableHead>
                   <TableHead className="font-semibold">기간</TableHead>

@@ -646,9 +646,9 @@ export default function AlimtalkPage() {
               <CardTitle>발송 이력</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="table-scroll-container">
                 <table className="w-full">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-background">
                     <tr className="border-b">
                       <th className="text-left p-2">날짜</th>
                       <th className="text-left p-2">템플릿</th>

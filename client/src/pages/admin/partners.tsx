@@ -433,9 +433,9 @@ export default function PartnerManagement() {
               ) : (
                 <>
                   {/* Desktop Table */}
-                  <div className="hidden lg:block overflow-x-auto">
+                  <div className="hidden lg:block table-scroll-container">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead>업체명</TableHead>
                           <TableHead>대표자명</TableHead>

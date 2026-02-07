@@ -62,9 +62,8 @@ export default function MemberOrderAdjust() {
             </Button>
           </div>
 
-          <div className="border rounded-lg max-h-[600px] overflow-x-scroll">
-            <div className="overflow-y-auto max-h-[583px] min-w-[1600px]">
-            <Table className="w-full">
+          <div className="border rounded-lg table-scroll-container">
+            <Table className="min-w-[1600px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow className="bg-muted/50">
                   <TableHead className="font-semibold whitespace-nowrap w-[50px]">
@@ -94,7 +93,6 @@ export default function MemberOrderAdjust() {
                 </TableRow>
               </TableBody>
             </Table>
-            </div>
           </div>
 
           <div className="flex justify-center gap-2">

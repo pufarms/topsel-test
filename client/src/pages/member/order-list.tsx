@@ -142,9 +142,8 @@ export default function MemberOrderList() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg max-h-[600px] overflow-x-scroll">
-              <div className="overflow-y-auto max-h-[583px] min-w-[1600px]">
-                <Table className="w-full">
+            <div className="border rounded-lg table-scroll-container">
+                <Table className="min-w-[1600px]">
                   <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-[100px] font-semibold whitespace-nowrap">주문자명</TableHead>
@@ -198,7 +197,6 @@ export default function MemberOrderList() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
             </div>
           )}
 

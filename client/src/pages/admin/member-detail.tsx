@@ -561,9 +561,9 @@ export default function MemberDetailPage() {
               {member.logs.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">수정 이력이 없습니다</p>
               ) : (
-                <div className="hidden md:block overflow-x-auto">
+                <div className="hidden md:block table-scroll-container">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>일시</TableHead>
                         <TableHead>변경유형</TableHead>

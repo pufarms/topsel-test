@@ -268,9 +268,9 @@ export default function InventoryHistoryPage() {
             </div>
           ) : (
             <>
-              <div className="hidden lg:block overflow-x-auto">
+              <div className="hidden lg:block table-scroll-container">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-16">번호</TableHead>
                       <TableHead className="w-24">구분</TableHead>

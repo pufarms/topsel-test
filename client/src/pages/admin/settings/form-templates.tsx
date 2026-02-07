@@ -425,9 +425,9 @@ export default function FormTemplatesPage() {
               <p className="text-sm mt-1">"기본 양식 생성" 버튼을 클릭하여 기본 양식을 추가하세요.</p>
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg table-scroll-container">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-[180px]">양식 이름</TableHead>
                     <TableHead className="w-[200px]">코드</TableHead>

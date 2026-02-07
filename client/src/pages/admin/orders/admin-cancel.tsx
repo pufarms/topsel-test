@@ -697,7 +697,7 @@ export default function OrdersAdminCancelPage() {
             </div>
           )}
 
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+          <div className="border rounded-lg table-scroll-container">
             <Table className="min-w-[1600px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
@@ -1083,7 +1083,7 @@ export default function OrdersAdminCancelPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
+          <div className="border rounded-lg table-scroll-container">
             <Table className="min-w-[1600px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>

@@ -141,7 +141,7 @@ export default function OrdersCancelledPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+            <div className="border rounded-lg table-scroll-container">
                 <Table className="w-max">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>

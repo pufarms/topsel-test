@@ -245,7 +245,7 @@ export default function MaterialTypesPage() {
           <CardTitle className="text-base">재료타입 목록 ({materialTypes.length}건)</CardTitle>
         </CardHeader>
         <CardContent className="overflow-hidden">
-          <div className="border rounded-lg overflow-x-auto">
+          <div className="border rounded-lg table-scroll-container">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>

@@ -1387,7 +1387,7 @@ export default function Dashboard() {
                       </div>
 
                       {/* 테이블 - 주문대기리스트 형식 (테이블 영역만 가로 스크롤) */}
-                      <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                      <div className="border rounded-lg table-scroll-container">
                         <Table className="w-max">
                           <TableHeader className="sticky top-0 z-10 bg-background">
                             <TableRow className="bg-muted/50">

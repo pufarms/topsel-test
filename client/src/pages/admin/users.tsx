@@ -93,9 +93,9 @@ export default function AdminUsers() {
           ) : (
             <>
               {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden md:block table-scroll-container">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>이메일</TableHead>
                       <TableHead>이름</TableHead>

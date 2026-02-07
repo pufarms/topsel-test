@@ -124,9 +124,9 @@ export default function OrdersPrintWaybillPage() {
               출력 가능한 운송장이 없습니다.
             </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg table-scroll-container">
               <Table className="min-w-[1800px]">
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox

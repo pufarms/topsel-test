@@ -261,7 +261,7 @@ export default function SuspendedProductsPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto" style={{ maxHeight: "calc(40px + 40px * 15)" }}>
+          <div className="table-scroll-container">
             <table className="w-full text-sm" data-testid="suspended-products-table">
               <thead className="bg-muted sticky top-0 z-10">
                 <tr>

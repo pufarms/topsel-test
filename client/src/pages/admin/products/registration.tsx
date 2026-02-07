@@ -1432,7 +1432,7 @@ export default function ProductRegistrationPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0 overflow-x-auto overflow-y-auto border rounded-lg" style={{ maxHeight: 'calc(40px + (36px * 15))' }}>
+        <CardContent className="p-0 border rounded-lg table-scroll-container">
           <table className="text-xs border-collapse" style={{ tableLayout: 'fixed', minWidth: Object.values(columnWidths).reduce((sum, w) => sum + w, 0) }}>
             <thead className="sticky top-0 z-20">
               <tr>

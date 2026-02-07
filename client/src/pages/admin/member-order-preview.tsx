@@ -151,9 +151,9 @@ export default function MemberOrderPreview() {
               </div>
 
               {/* 테이블 */}
-              <div className="border rounded-lg overflow-x-auto">
+              <div className="border rounded-lg table-scroll-container">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-semibold whitespace-nowrap">주문자명</TableHead>
                       <TableHead className="font-semibold whitespace-nowrap">주문자 전화번호</TableHead>
@@ -201,9 +201,9 @@ export default function MemberOrderPreview() {
                 </Button>
               </div>
 
-              <div className="border rounded-lg overflow-x-auto">
+              <div className="border rounded-lg table-scroll-container">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-semibold">대분류</TableHead>
                       <TableHead className="font-semibold">중분류</TableHead>

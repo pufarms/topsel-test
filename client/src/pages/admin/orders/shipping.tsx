@@ -140,9 +140,8 @@ export default function OrdersShippingPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg max-h-[400px] overflow-x-scroll">
-              <div className="overflow-y-auto max-h-[383px] min-w-[1600px]">
-                <Table className="w-full">
+            <div className="border rounded-lg table-scroll-container">
+                <Table className="min-w-[1600px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
@@ -209,7 +208,6 @@ export default function OrdersShippingPage() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </div>
           )}
 

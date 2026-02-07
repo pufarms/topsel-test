@@ -599,9 +599,8 @@ export default function OrdersPreparingPage() {
               상품준비중 내역이 없습니다.
             </div>
           ) : (
-            <div className="border rounded-lg max-h-[400px] overflow-x-scroll">
-              <div className="overflow-y-auto max-h-[383px] min-w-[1600px]">
-                <Table className="w-full">
+            <div className="border rounded-lg table-scroll-container">
+                <Table className="min-w-[1600px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead className="w-12">
@@ -662,7 +661,6 @@ export default function OrdersPreparingPage() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </div>
           )}
 

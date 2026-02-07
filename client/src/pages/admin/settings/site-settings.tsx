@@ -1351,9 +1351,9 @@ function AddressLearningManagement() {
             </div>
           ) : (
             <>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg table-scroll-container">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead className="w-[200px]">원본 주소</TableHead>
                       <TableHead className="w-[200px]">교정 주소</TableHead>
@@ -1785,9 +1785,9 @@ function AddressLearningManagement() {
                       시트: {excelPreview.sheetName} | 총 {excelPreview.totalRows}행
                     </Badge>
                   </div>
-                  <div className="border rounded-lg overflow-x-auto">
+                  <div className="border rounded-lg table-scroll-container">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead className="w-12">행</TableHead>
                           {excelPreview.columns.map((col) => (
@@ -1850,9 +1850,9 @@ function AddressLearningManagement() {
                 </div>
 
                 {processResults.results && processResults.results.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto border rounded">
+                  <div className="border rounded table-scroll-container">
                     <Table>
-                      <TableHeader className="sticky top-0 bg-background">
+                      <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead className="w-12">행</TableHead>
                           <TableHead>주소</TableHead>

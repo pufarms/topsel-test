@@ -451,7 +451,7 @@ export default function OrdersPendingPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+          <div className="border rounded-lg table-scroll-container">
             <Table className="w-max min-w-[2200px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
@@ -647,7 +647,7 @@ export default function OrdersPendingPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+          <div className="border rounded-lg table-scroll-container">
             <Table className="w-max">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>

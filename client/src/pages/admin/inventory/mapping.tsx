@@ -883,7 +883,7 @@ export default function ProductMappingPage() {
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="hidden lg:block">
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               <div className="bg-amber-50 dark:bg-amber-950/30 border-b">
                 <div className="flex">
                   <div className={`${headerCellClass} bg-amber-100/80 dark:bg-amber-900/50 text-center`} style={{ width: columnWidths.checkbox, minWidth: columnWidths.checkbox }}>
@@ -951,7 +951,7 @@ export default function ProductMappingPage() {
                 </div>
               </div>
             </div>
-            <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+            <div className="table-scroll-container">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin" />

@@ -331,9 +331,8 @@ export default function MemberOrderCancel() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="border rounded-lg max-h-[600px] overflow-x-scroll">
-              <div className="overflow-y-auto max-h-[583px] min-w-[1600px]">
-              <Table className="w-full">
+            <div className="border rounded-lg table-scroll-container">
+              <Table className="min-w-[1600px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow className="bg-muted/50">
                     <TableHead className="whitespace-nowrap px-3">
@@ -405,7 +404,6 @@ export default function MemberOrderCancel() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </div>
           )}
 

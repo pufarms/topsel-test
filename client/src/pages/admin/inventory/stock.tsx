@@ -534,9 +534,9 @@ export default function ProductStockPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block table-scroll-container">
             <table className="w-full">
-              <thead className="bg-muted/50">
+              <thead className="bg-muted/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium">대분류</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">중분류</th>
