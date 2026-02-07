@@ -814,7 +814,11 @@ export const pageCategories = [
   "메인/서브페이지",
   "회원마이페이지",
   "주문관리(관리자)",
+  "상품관리(관리자)",
+  "재고관리(관리자)",
+  "회원/업체관리(관리자)",
   "통계관리페이지",
+  "사이트관리(관리자)",
   "가이드페이지",
   "게시판관리페이지",
   "기타페이지"
@@ -822,7 +826,14 @@ export const pageCategories = [
 export type PageCategory = typeof pageCategories[number];
 
 // 관리자 전용 카테고리 (접근권한이 ADMIN으로 고정, 변경 불가)
-export const adminOnlyCategories: readonly string[] = ["주문관리(관리자)", "통계관리페이지"] as const;
+export const adminOnlyCategories: readonly string[] = [
+  "주문관리(관리자)",
+  "상품관리(관리자)",
+  "재고관리(관리자)",
+  "회원/업체관리(관리자)",
+  "통계관리페이지",
+  "사이트관리(관리자)"
+] as const;
 
 // 접근권한 레벨 (계층 순서: SUPER_ADMIN > ADMIN > TOP > DRIVING > START > ASSOCIATE > PENDING > all)
 export const pageAccessLevels = ["all", "PENDING", "ASSOCIATE", "START", "DRIVING", "TOP", "ADMIN", "SUPER_ADMIN"] as const;

@@ -5055,7 +5055,9 @@ export async function registerRoutes(
       const validatedData = insertPageSchema.parse(req.body);
       const { adminOnlyCategories } = await import("@shared/schema");
       if (adminOnlyCategories.includes(validatedData.category)) {
-        validatedData.accessLevel = "ADMIN";
+        if (validatedData.accessLevel !== "ADMIN" && validatedData.accessLevel !== "SUPER_ADMIN") {
+          validatedData.accessLevel = "ADMIN";
+        }
       }
       const page = await storage.createPage(validatedData);
       res.json(page);
@@ -5083,7 +5085,9 @@ export async function registerRoutes(
       const { adminOnlyCategories } = await import("@shared/schema");
       const category = validatedData.category || (await storage.getPage(req.params.id))?.category;
       if (category && adminOnlyCategories.includes(category)) {
-        validatedData.accessLevel = "ADMIN";
+        if (validatedData.accessLevel && validatedData.accessLevel !== "ADMIN" && validatedData.accessLevel !== "SUPER_ADMIN") {
+          validatedData.accessLevel = "ADMIN";
+        }
       }
       const page = await storage.updatePage(req.params.id, validatedData);
       if (!page) {

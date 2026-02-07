@@ -1641,30 +1641,73 @@ export class DatabaseStorage implements IStorage {
       // 2. 메인/서브페이지
       { name: "메인 페이지", path: "/", description: "메인 랜딩 페이지", category: "메인/서브페이지", accessLevel: "all", status: "active", sortOrder: 1, icon: "Home", isSystem: "true" },
       { name: "서브페이지", path: "/sub", description: "서브 페이지 (예정)", category: "메인/서브페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "Layout", isSystem: "false" },
+      { name: "소개 페이지", path: "/about", description: "소개 페이지", category: "메인/서브페이지", accessLevel: "all", status: "active", sortOrder: 3, icon: "Home", isSystem: "false" },
 
       // 3. 회원마이페이지
       { name: "마이페이지 대시보드", path: "/dashboard", description: "회원 전용 대시보드", category: "회원마이페이지", accessLevel: "PENDING", status: "active", sortOrder: 1, icon: "LayoutDashboard", isSystem: "true" },
       { name: "회원정보", path: "/mypage", description: "회원 정보 및 수정", category: "회원마이페이지", accessLevel: "PENDING", status: "active", sortOrder: 2, icon: "User", isSystem: "true" },
-      { name: "신규주문등록", path: "/dashboard?tab=order-new", description: "엑셀 주문 업로드", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 3, icon: "Package", isSystem: "true" },
-      { name: "주문조정건 확인", path: "/dashboard?tab=order-adjust", description: "주문조정 내역 확인", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 4, icon: "ClipboardList", isSystem: "true" },
-      { name: "송장파일 다운로드", path: "/dashboard?tab=order-invoice", description: "송장 파일 다운로드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 5, icon: "FileText", isSystem: "true" },
-      { name: "취소건 등록", path: "/dashboard?tab=order-cancel", description: "취소건 등록", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 6, icon: "XCircle", isSystem: "true" },
-      { name: "주문건 조회", path: "/dashboard?tab=order-list", description: "전체 주문 내역 조회", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 7, icon: "ClipboardList", isSystem: "true" },
+      { name: "상품리스트", path: "/dashboard?tab=product-list", description: "상품 리스트 조회", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 3, icon: "Package", isSystem: "false" },
+      { name: "신규주문등록", path: "/dashboard?tab=order-new", description: "엑셀 주문 업로드", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 10, icon: "Package", isSystem: "true" },
+      { name: "주문조정건 확인", path: "/dashboard?tab=order-adjust", description: "주문조정 내역 확인", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 11, icon: "ClipboardList", isSystem: "true" },
+      { name: "송장파일 다운로드", path: "/dashboard?tab=order-invoice", description: "송장 파일 다운로드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 12, icon: "FileText", isSystem: "true" },
+      { name: "취소건 등록", path: "/dashboard?tab=order-cancel", description: "취소건 등록", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 13, icon: "XCircle", isSystem: "true" },
+      { name: "주문건 조회", path: "/dashboard?tab=order-list", description: "전체 주문 내역 조회", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 14, icon: "ClipboardList", isSystem: "true" },
+      { name: "주소검증/엑셀변환", path: "/dashboard?tab=address-tool", description: "주소 검증 및 엑셀 변환 도구", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 20, icon: "MapPin", isSystem: "false" },
+      { name: "예치금충전", path: "/dashboard?tab=deposit", description: "예치금 충전 관리", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 21, icon: "Wallet", isSystem: "false" },
+      { name: "상품매입통계", path: "/dashboard?tab=purchase-stats", description: "상품 매입 통계", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 22, icon: "BarChart", isSystem: "false" },
+      { name: "정산통계", path: "/dashboard?tab=settlement-stats", description: "정산 통계 조회", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 23, icon: "DollarSign", isSystem: "false" },
+      { name: "문의 게시판", path: "/dashboard?tab=inquiry", description: "문의 게시판", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 24, icon: "MessageSquare", isSystem: "false" },
+      { name: "이용가이드", path: "/dashboard?tab=guide", description: "이용 가이드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 25, icon: "BookOpen", isSystem: "false" },
 
       // 4. 주문관리(관리자)
-      { name: "주문 대기", path: "/orders/pending", description: "주문조정 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "ShoppingCart", isSystem: "false" },
-      { name: "주문조정(직권취소)", path: "/orders/admin-cancel", description: "직권취소 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "XCircle", isSystem: "false" },
-      { name: "상품준비중", path: "/orders/preparing", description: "운송장 출력 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 3, icon: "Download", isSystem: "false" },
-      { name: "배송준비중", path: "/orders/ready-to-ship", description: "회원취소건 접수 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 4, icon: "Package", isSystem: "false" },
-      { name: "취소건 관리", path: "/orders/cancelled", description: "취소된 주문 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 5, icon: "XCircle", isSystem: "false" },
-      { name: "배송중", path: "/orders/shipping", description: "배송중인 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 6, icon: "Truck", isSystem: "false" },
-      { name: "배송완료", path: "/orders/completed", description: "배송 완료된 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 7, icon: "CheckCircle", isSystem: "false" },
+      { name: "주문 현황", path: "/admin/orders", description: "전체 주문 현황 대시보드", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 0, icon: "ShoppingCart", isSystem: "true" },
+      { name: "주문 대기", path: "/admin/orders/pending", description: "주문조정 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "ShoppingCart", isSystem: "false" },
+      { name: "주문조정(직권취소)", path: "/admin/orders/admin-cancel", description: "직권취소 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "XCircle", isSystem: "false" },
+      { name: "상품준비중", path: "/admin/orders/preparing", description: "운송장 출력 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 3, icon: "Download", isSystem: "false" },
+      { name: "운송장 출력", path: "/admin/orders/print-waybill", description: "운송장 출력", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 4, icon: "Download", isSystem: "false" },
+      { name: "배송준비중", path: "/admin/orders/ready-to-ship", description: "회원취소건 접수 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 5, icon: "Package", isSystem: "false" },
+      { name: "취소건 관리", path: "/admin/orders/cancelled", description: "취소된 주문 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 6, icon: "XCircle", isSystem: "false" },
+      { name: "배송중", path: "/admin/orders/shipping", description: "배송중인 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 7, icon: "Truck", isSystem: "false" },
+      { name: "배송완료", path: "/admin/orders/completed", description: "배송 완료된 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 8, icon: "CheckCircle", isSystem: "false" },
+      { name: "회원 주문현황 미리보기", path: "/admin/member-order-preview", description: "회원의 주문 현황 미리보기", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 9, icon: "Eye", isSystem: "true" },
 
-      // 5. 통계관리페이지
-      { name: "상품별 통계관리", path: "/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },
-      { name: "정산 관리", path: "/stats/settlement", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "DollarSign", isSystem: "false" },
+      // 5. 상품관리(관리자)
+      { name: "카테고리 관리", path: "/admin/products/categories", description: "상품 카테고리 관리", category: "상품관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 1, icon: "Settings", isSystem: "true" },
+      { name: "상품등록 (공급가 계산)", path: "/admin/products/registration", description: "상품 등록 및 공급가 계산", category: "상품관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 2, icon: "Package", isSystem: "true" },
+      { name: "차주 예상공급가 상품", path: "/admin/products/next-week", description: "차주 예상공급가 관리", category: "상품관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 3, icon: "Package", isSystem: "true" },
+      { name: "현재 공급가 상품", path: "/admin/products/current", description: "현재 공급가 상품 관리", category: "상품관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 4, icon: "Package", isSystem: "true" },
+      { name: "공급 중지 상품", path: "/admin/products/suspended", description: "공급 중지 상품 관리", category: "상품관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 5, icon: "XCircle", isSystem: "true" },
 
-      // 6. 가이드페이지
+      // 6. 재고관리(관리자)
+      { name: "재료타입 관리", path: "/admin/inventory/material-types", description: "재료타입 관리", category: "재고관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 1, icon: "Settings", isSystem: "true" },
+      { name: "원재료 관리", path: "/admin/inventory/materials", description: "원재료 관리", category: "재고관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 2, icon: "Package", isSystem: "true" },
+      { name: "상품 매핑", path: "/admin/inventory/mapping", description: "상품-재료 매핑 관리", category: "재고관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 3, icon: "Settings", isSystem: "true" },
+      { name: "공급상품 재고 관리", path: "/admin/inventory/stock", description: "재고 현황 관리", category: "재고관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 4, icon: "Package", isSystem: "true" },
+      { name: "재고 이력", path: "/admin/inventory/history", description: "재고 입출고 이력", category: "재고관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 5, icon: "ClipboardList", isSystem: "true" },
+
+      // 7. 회원/업체관리(관리자)
+      { name: "회원관리", path: "/admin/users", description: "회원 목록 및 관리", category: "회원/업체관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 1, icon: "Users", isSystem: "true" },
+      { name: "관리자 관리", path: "/admin/admins", description: "관리자/부관리자 관리", category: "회원/업체관리(관리자)", accessLevel: "SUPER_ADMIN", status: "active", sortOrder: 2, icon: "Shield", isSystem: "true" },
+      { name: "협력업체 관리", path: "/admin/partners", description: "협력업체 목록 관리", category: "회원/업체관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 3, icon: "Users", isSystem: "true" },
+      { name: "약관 동의 기록", path: "/admin/term-agreements", description: "약관 동의 이력 관리", category: "회원/업체관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 4, icon: "ClipboardList", isSystem: "true" },
+
+      // 8. 통계관리페이지
+      { name: "상품별 통계관리", path: "/admin/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },
+      { name: "정산 관리", path: "/admin/stats/settlement", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "DollarSign", isSystem: "false" },
+      { name: "정산관리", path: "/admin/settlements", description: "정산 내역 관리", category: "통계관리페이지", accessLevel: "ADMIN", status: "active", sortOrder: 3, icon: "DollarSign", isSystem: "true" },
+      { name: "통계관리", path: "/admin/stats", description: "통계 대시보드", category: "통계관리페이지", accessLevel: "ADMIN", status: "active", sortOrder: 4, icon: "BarChart", isSystem: "true" },
+
+      // 9. 사이트관리(관리자)
+      { name: "관리자 대시보드", path: "/admin", description: "관리자 메인 대시보드", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 1, icon: "LayoutDashboard", isSystem: "true" },
+      { name: "사이트 설정", path: "/admin/settings/site", description: "사이트 기본 설정", category: "사이트관리(관리자)", accessLevel: "SUPER_ADMIN", status: "active", sortOrder: 2, icon: "Settings", isSystem: "true" },
+      { name: "양식 관리", path: "/admin/settings/form-templates", description: "양식 템플릿 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 3, icon: "FileText", isSystem: "true" },
+      { name: "이미지 갤러리", path: "/admin/settings/gallery", description: "이미지 갤러리 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 4, icon: "FileText", isSystem: "true" },
+      { name: "페이지 관리", path: "/admin/pages", description: "페이지 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 5, icon: "FileText", isSystem: "true" },
+      { name: "쿠폰관리", path: "/admin/coupons", description: "쿠폰 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 6, icon: "Gift", isSystem: "true" },
+      { name: "알림톡 관리", path: "/admin/kakao-notifications/alimtalk", description: "카카오 알림톡 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 7, icon: "MessageSquare", isSystem: "true" },
+      { name: "친구톡 관리", path: "/admin/kakao-notifications/brandtalk", description: "카카오 친구톡 관리", category: "사이트관리(관리자)", accessLevel: "ADMIN", status: "active", sortOrder: 8, icon: "MessageCircle", isSystem: "true" },
+
+      // 10. 가이드페이지
       { name: "회원가입과 등급", path: "/guide/membership", description: "회원가입, 자격, 등급, 혜택 안내", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 1, icon: "BookOpen", isSystem: "false" },
       { name: "주문/발주 관리", path: "/guide/orders", description: "주문발주 순서, 엑셀 일괄주문, 취소 관리", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "ClipboardList", isSystem: "false" },
       { name: "상품", path: "/guide/products", description: "공급상품, 현재/차주공급가, 리스트 주요사항", category: "가이드페이지", accessLevel: "all", status: "draft", sortOrder: 3, icon: "Package", isSystem: "false" },
