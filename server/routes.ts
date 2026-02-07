@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderFormSchema, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -6261,131 +6261,6 @@ export async function registerRoutes(
     const sequentialPart = String(nextNumber).padStart(4, '0');
     return `${datePrefix}${sequentialPart}`;
   }
-
-  // Create pending order (member)
-  app.post('/api/member/pending-orders', async (req, res) => {
-    if (!req.session.userId || req.session.userType !== "member") {
-      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
-    }
-
-    try {
-      // Get member info first for grade check
-      const member = await storage.getMember(req.session.userId);
-      if (!member) {
-        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
-      }
-
-      // 주문 가능 등급 체크: START, DRIVING, TOP만 주문 가능 (body 파싱 전에 체크)
-      const orderableGrades = ['START', 'DRIVING', 'TOP'];
-      if (!orderableGrades.includes(member.grade)) {
-        return res.status(403).json({ 
-          message: "주문 등록은 스타트 등급 이상 회원만 가능합니다. 등급 승인 후 이용해주세요." 
-        });
-      }
-
-      const data = pendingOrderFormSchema.parse(req.body);
-
-      // Look up product info by productCode - 현재공급상품에서 확인
-      const productInfo = await storage.getProductRegistrationByCode(data.productCode);
-      
-      // 상품코드 유효성 체크: 현재공급상품에 없는 상품은 주문 불가
-      if (!productInfo) {
-        return res.status(400).json({ 
-          message: `"${data.productName}" (${data.productCode})은(는) 현재 공급되지 않는 상품, 또는 상품코드오류입니다. 상품코드를 확인해주세요.` 
-        });
-      }
-
-      // ⑤-1 잔액 검증: 주문 금액 대비 사용 가능 잔액 확인
-      const orderPrice = getSupplyPriceByGrade(productInfo, member.grade);
-      const balanceInfo = await calculateAvailableBalance(member.id, member.grade);
-
-      if (balanceInfo.availableBalance < orderPrice) {
-        const shortage = orderPrice - balanceInfo.availableBalance;
-        return res.status(400).json({
-          message: `잔액 부족 - 주문 등록 불가\n주문 금액: ${orderPrice.toLocaleString()}원 / 사용 가능 잔액: ${balanceInfo.availableBalance.toLocaleString()}원\n부족 금액: ${shortage.toLocaleString()}원\n예치금을 충전 후 다시 시도해주세요.`,
-          balanceInfo: {
-            orderAmount: orderPrice,
-            deposit: balanceInfo.deposit,
-            point: balanceInfo.point,
-            pendingOrdersTotal: balanceInfo.pendingOrdersTotal,
-            availableBalance: balanceInfo.availableBalance,
-            shortage,
-          }
-        });
-      }
-      
-      // Generate sequence number with retry logic for concurrent requests
-      let newOrder;
-      let retries = 3;
-      
-      while (retries > 0) {
-        try {
-          // Generate sequence number (아이디+년도2자리+월일+순번4자리)
-          const sequenceNumber = await generateSequenceNumber(member.username);
-          
-          const orderData = {
-            sequenceNumber,
-            orderNumber: generateOrderNumber(),
-            memberId: req.session.userId,
-            memberCompanyName: member.companyName,
-            status: "대기",
-            categoryLarge: productInfo?.categoryLarge || null,
-            categoryMedium: productInfo?.categoryMedium || null,
-            categorySmall: productInfo?.categorySmall || null,
-            productCode: data.productCode,
-            productName: data.productName,
-            supplyPrice: productInfo?.topPrice || null,
-            ordererName: data.ordererName,
-            ordererPhone: data.ordererPhone,
-            ordererAddress: data.ordererAddress || null,
-            recipientName: data.recipientName,
-            recipientMobile: data.recipientMobile,
-            recipientPhone: data.recipientPhone || null,
-            recipientAddress: data.recipientAddress,
-            deliveryMessage: data.deliveryMessage || null,
-            customOrderNumber: data.customOrderNumber,
-            trackingNumber: null,
-            courierCompany: null,
-          };
-
-          [newOrder] = await db.insert(pendingOrders).values(orderData).returning();
-          break; // Success, exit retry loop
-        } catch (insertError: any) {
-          // Check for unique constraint violation (PostgreSQL error code 23505)
-          if (insertError.code === '23505' && insertError.constraint?.includes('sequence_number')) {
-            retries--;
-            if (retries === 0) {
-              throw new Error("순번 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
-            }
-            // Small delay before retry
-            await new Promise(resolve => setTimeout(resolve, 50));
-          } else {
-            throw insertError;
-          }
-        }
-      }
-      
-      // SSE: 관리자에게 새 주문 알림
-      sseManager.sendToAdmins("order-created", { 
-        type: "pending-order",
-        orderId: newOrder?.id,
-        memberCompanyName: member.companyName 
-      });
-      
-      // SSE: 해당 회원에게도 주문 등록 확인 알림
-      sseManager.sendToMember(member.id, "order-created", {
-        type: "pending-order",
-        orderId: newOrder?.id
-      });
-
-      res.status(201).json(newOrder);
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.errors[0].message });
-      }
-      res.status(500).json({ error: error.message });
-    }
-  });
 
   // Member: Excel upload for bulk order registration
   // confirmPartial=true: 오류건 제외하고 정상건만 등록

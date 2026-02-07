@@ -1302,20 +1302,6 @@ export const insertPendingOrderSchema = createInsertSchema(pendingOrders).omit({
   updatedAt: true,
 });
 
-export const pendingOrderFormSchema = z.object({
-  productCode: z.string().min(1, "상품코드를 입력해주세요"),
-  productName: z.string().min(1, "상품명을 입력해주세요"),
-  ordererName: z.string().min(1, "주문자명을 입력해주세요"),
-  ordererPhone: z.string().min(1, "주문자 전화번호를 입력해주세요"),
-  ordererAddress: z.string().optional().or(z.literal("")),
-  recipientName: z.string().min(1, "수령자명을 입력해주세요"),
-  recipientMobile: z.string().min(1, "수령자 휴대폰번호를 입력해주세요"),
-  recipientPhone: z.string().optional().or(z.literal("")),
-  recipientAddress: z.string().min(1, "수령자 주소를 입력해주세요"),
-  deliveryMessage: z.string().optional().or(z.literal("")),
-  customOrderNumber: z.string().min(1, "자체주문번호를 입력해주세요"),
-});
-
 export type InsertPendingOrder = z.infer<typeof insertPendingOrderSchema>;
 export type PendingOrder = typeof pendingOrders.$inferSelect;
 
