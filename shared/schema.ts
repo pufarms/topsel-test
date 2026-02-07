@@ -821,17 +821,49 @@ export const pageCategories = [
 ] as const;
 export type PageCategory = typeof pageCategories[number];
 
-// 접근권한 레벨 (all = 모든 회원, 그 외는 해당 등급 이상)
-export const pageAccessLevels = ["all", "ASSOCIATE", "START", "DRIVING", "TOP"] as const;
+// 접근권한 레벨 (계층 순서: SUPER_ADMIN > ADMIN > TOP > DRIVING > START > ASSOCIATE > PENDING > all)
+export const pageAccessLevels = ["all", "PENDING", "ASSOCIATE", "START", "DRIVING", "TOP", "ADMIN", "SUPER_ADMIN"] as const;
 export type PageAccessLevel = typeof pageAccessLevels[number];
 
 export const pageAccessLevelLabels: Record<PageAccessLevel, string> = {
   all: "전체 공개",
+  PENDING: "보류회원 이상",
   ASSOCIATE: "준회원 이상",
   START: "Start회원 이상",
   DRIVING: "Driving회원 이상",
-  TOP: "Top회원 전용",
+  TOP: "Top회원 이상",
+  ADMIN: "관리자(부관리자) 이상",
+  SUPER_ADMIN: "최고관리자 전용",
 };
+
+// 접근권한 계층 순위 (숫자가 높을수록 높은 권한)
+export const pageAccessLevelRank: Record<string, number> = {
+  all: 0,
+  PENDING: 1,
+  ASSOCIATE: 2,
+  START: 3,
+  DRIVING: 4,
+  TOP: 5,
+  ADMIN: 6,
+  SUPER_ADMIN: 7,
+};
+
+// 사용자의 역할/등급으로 접근권한 순위 확인하는 헬퍼 함수
+export function getUserAccessRank(user: { role?: string; grade?: string } | null): number {
+  if (!user) return 0;
+  if (user.role === "SUPER_ADMIN") return 7;
+  if (user.role === "ADMIN") return 6;
+  if (user.grade) {
+    return pageAccessLevelRank[user.grade] ?? 0;
+  }
+  return 0;
+}
+
+// 사용자가 특정 페이지에 접근 가능한지 확인
+export function canAccessPage(userRank: number, requiredLevel: string): boolean {
+  const requiredRank = pageAccessLevelRank[requiredLevel] ?? 0;
+  return userRank >= requiredRank;
+}
 
 // 페이지 상태
 export const pageStatuses = ["active", "draft", "hidden"] as const;

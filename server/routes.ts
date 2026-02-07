@@ -4977,11 +4977,38 @@ export async function registerRoutes(
         return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
       }
       
-      // Check access level (for public pages, return content)
       // Non-active pages require authentication
       if (page.status !== "active") {
         if (!req.session.userId) {
           return res.status(404).json({ message: "페이지를 찾을 수 없습니다" });
+        }
+      }
+      
+      // 접근권한 체크 (pageAccessLevelRank 기반 계층 구조)
+      const { getUserAccessRank, canAccessPage } = await import("@shared/schema");
+      const requiredLevel = page.accessLevel || "all";
+      
+      if (requiredLevel !== "all") {
+        if (!req.session.userId) {
+          return res.status(403).json({ message: "이 페이지에 접근하려면 로그인이 필요합니다" });
+        }
+        
+        let userInfo: { role?: string; grade?: string } = {};
+        if (req.session.userType === "member") {
+          const member = await storage.getMember(req.session.userId);
+          if (member) {
+            userInfo = { grade: member.grade };
+          }
+        } else {
+          const user = await storage.getUser(req.session.userId);
+          if (user) {
+            userInfo = { role: user.role };
+          }
+        }
+        
+        const userRank = getUserAccessRank(userInfo);
+        if (!canAccessPage(userRank, requiredLevel)) {
+          return res.status(403).json({ message: "이 페이지에 접근할 권한이 없습니다", pageAccessLevelRank: userRank });
         }
       }
       

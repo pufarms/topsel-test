@@ -1643,15 +1643,22 @@ export class DatabaseStorage implements IStorage {
       { name: "서브페이지", path: "/sub", description: "서브 페이지 (예정)", category: "메인/서브페이지", accessLevel: "all", status: "draft", sortOrder: 2, icon: "Layout", isSystem: "false" },
 
       // 3. 회원마이페이지
-      { name: "마이페이지 대시보드", path: "/dashboard", description: "회원 전용 대시보드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 1, icon: "LayoutDashboard", isSystem: "true" },
-      { name: "회원정보", path: "/mypage", description: "회원 정보 및 수정", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 2, icon: "User", isSystem: "true" },
+      { name: "마이페이지 대시보드", path: "/dashboard", description: "회원 전용 대시보드", category: "회원마이페이지", accessLevel: "PENDING", status: "active", sortOrder: 1, icon: "LayoutDashboard", isSystem: "true" },
+      { name: "회원정보", path: "/mypage", description: "회원 정보 및 수정", category: "회원마이페이지", accessLevel: "PENDING", status: "active", sortOrder: 2, icon: "User", isSystem: "true" },
+      { name: "신규주문등록", path: "/dashboard?tab=order-new", description: "엑셀 주문 업로드", category: "회원마이페이지", accessLevel: "START", status: "active", sortOrder: 3, icon: "Package", isSystem: "true" },
+      { name: "주문조정건 확인", path: "/dashboard?tab=order-adjust", description: "주문조정 내역 확인", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 4, icon: "ClipboardList", isSystem: "true" },
+      { name: "송장파일 다운로드", path: "/dashboard?tab=order-invoice", description: "송장 파일 다운로드", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 5, icon: "FileText", isSystem: "true" },
+      { name: "취소건 등록", path: "/dashboard?tab=order-cancel", description: "취소건 등록", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 6, icon: "XCircle", isSystem: "true" },
+      { name: "주문건 조회", path: "/dashboard?tab=order-list", description: "전체 주문 내역 조회", category: "회원마이페이지", accessLevel: "ASSOCIATE", status: "active", sortOrder: 7, icon: "ClipboardList", isSystem: "true" },
 
-      // 4. 주문관리페이지
-      { name: "주문등록", path: "/orders/create", description: "새 주문 등록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 1, icon: "ShoppingCart", isSystem: "false" },
-      { name: "취소건 관리", path: "/orders/cancelled", description: "취소된 주문 관리", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 2, icon: "XCircle", isSystem: "false" },
-      { name: "운송장 다운로드", path: "/orders/shipping", description: "운송장 파일 다운로드", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 3, icon: "Download", isSystem: "false" },
-      { name: "배송중 리스트", path: "/orders/shipping-list", description: "배송 중인 주문 목록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 4, icon: "Truck", isSystem: "false" },
-      { name: "배송완료 리스트", path: "/orders/completed", description: "배송 완료된 주문 목록", category: "주문관리페이지", accessLevel: "ASSOCIATE", status: "draft", sortOrder: 5, icon: "CheckCircle", isSystem: "false" },
+      // 4. 주문관리(관리자)
+      { name: "주문 대기", path: "/orders/pending", description: "주문조정 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 1, icon: "ShoppingCart", isSystem: "false" },
+      { name: "주문조정(직권취소)", path: "/orders/admin-cancel", description: "직권취소 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 2, icon: "XCircle", isSystem: "false" },
+      { name: "상품준비중", path: "/orders/preparing", description: "운송장 출력 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 3, icon: "Download", isSystem: "false" },
+      { name: "배송준비중", path: "/orders/ready-to-ship", description: "회원취소건 접수 단계", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 4, icon: "Package", isSystem: "false" },
+      { name: "취소건 관리", path: "/orders/cancelled", description: "취소된 주문 관리", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 5, icon: "XCircle", isSystem: "false" },
+      { name: "배송중", path: "/orders/shipping", description: "배송중인 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 6, icon: "Truck", isSystem: "false" },
+      { name: "배송완료", path: "/orders/completed", description: "배송 완료된 주문", category: "주문관리(관리자)", accessLevel: "ADMIN", status: "draft", sortOrder: 7, icon: "CheckCircle", isSystem: "false" },
 
       // 5. 통계관리페이지
       { name: "상품별 통계관리", path: "/stats/products", description: "상품별 통계 조회", category: "통계관리페이지", accessLevel: "START", status: "draft", sortOrder: 1, icon: "BarChart", isSystem: "false" },

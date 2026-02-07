@@ -115,6 +115,23 @@ Preferred communication style: Simple, everyday language.
    - **중요**: 검색 필터는 페이지 전체가 아닌 해당 리스트 테이블에만 적용
    - 한 페이지에 여러 리스트 테이블이 있으면 각 테이블마다 독립적인 필터 컴포넌트 적용
 
+### 페이지 접근권한 체계 (8단계 계층)
+- **접근권한 레벨**: `all` < `PENDING` < `ASSOCIATE` < `START` < `DRIVING` < `TOP` < `ADMIN` < `SUPER_ADMIN`
+- **페이지관리**에서 각 페이지의 접근권한을 8단계 중 하나로 설정
+- **계층 구조**: 상위 등급은 하위 등급 페이지에도 접근 가능 (예: ADMIN은 TOP 이하 모든 페이지 접근 가능)
+- **권한 라벨**:
+  - `all`: 전체 공개 (비로그인 포함)
+  - `PENDING`: 보류회원 이상
+  - `ASSOCIATE`: 준회원 이상
+  - `START`: Start회원 이상
+  - `DRIVING`: Driving회원 이상
+  - `TOP`: Top회원 이상
+  - `ADMIN`: 관리자(부관리자) 이상
+  - `SUPER_ADMIN`: 최고관리자 전용
+- **서버 체크**: `/api/pages/by-path` 엔드포인트에서 `pageAccessLevelRank` 기반으로 접근권한 검증
+- **관리자 역할**: SUPER_ADMIN(최고관리자)은 부관리자(ADMIN)의 메뉴 권한을 설정 가능 (12개 메뉴 권한 체크박스)
+- **헬퍼 함수**: `getUserAccessRank()`, `canAccessPage()` (shared/schema.ts)
+
 ## System Architecture
 
 ### Frontend Architecture
