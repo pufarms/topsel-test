@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lt } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 
 // PortOne V2 환경변수
