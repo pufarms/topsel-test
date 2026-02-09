@@ -950,29 +950,28 @@ export default function OrdersAdminCancelPage() {
               </TableBody>
             </Table>
           </div>
+          <div className="flex justify-center py-4">
+            <Button 
+              size="lg" 
+              onClick={handleTransferToPreparation}
+              disabled={isTransferring || isLoadingAdjustment || adjustmentData.length === 0}
+              data-testid="button-transfer-to-preparation"
+            >
+              {isTransferring ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  전송 중...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  상품준비중으로 전송
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
-
-      <div className="flex justify-center py-4">
-        <Button 
-          size="lg" 
-          onClick={handleTransferToPreparation}
-          disabled={isTransferring || isLoadingAdjustment || adjustmentData.length === 0}
-          data-testid="button-transfer-to-preparation"
-        >
-          {isTransferring ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              전송 중...
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 mr-2" />
-              상품준비중으로 전송
-            </>
-          )}
-        </Button>
-      </div>
 
       <Dialog open={showDeficitDialog} onOpenChange={setShowDeficitDialog}>
         <DialogContent className="sm:max-w-[500px]">
