@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { usePartnerAuth } from "@/lib/partner-auth";
+import { usePartnerSSE } from "@/hooks/use-partner-sse";
 import { Button } from "@/components/ui/button";
 import { Loader2, LayoutDashboard, MessageSquareReply, ClipboardList, ScanBarcode, Truck, LogOut, Menu, X, Building2 } from "lucide-react";
 import { useState } from "react";
@@ -16,6 +17,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   const { vendor, isLoading, logout } = usePartnerAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  usePartnerSSE(!!vendor);
 
   if (isLoading) {
     return (

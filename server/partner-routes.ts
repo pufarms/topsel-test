@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { db } from "./db";
 import { vendors, allocationDetails, orderAllocations, pendingOrders } from "@shared/schema";
 import { eq, and, desc, asc, gte, lte, or, sql, inArray, isNull, isNotNull } from "drizzle-orm";
+import { sseManager } from "./sse-manager";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const PARTNER_COOKIE = "partner_token";
@@ -286,6 +287,13 @@ router.put("/allocations/:id/respond", partnerAuth, async (req: Request, res: Re
       }
     }
 
+    sseManager.sendToAdmins("allocation-updated", {
+      type: "vendor-responded",
+      allocationId: detail.allocationId,
+      vendorId,
+      detailId,
+    });
+
     res.json({ message: "응답이 등록되었습니다" });
   } catch (error: any) {
     res.status(500).json({ message: "응답 등록 실패" });
@@ -436,6 +444,11 @@ router.put("/orders/:id/tracking", partnerAuth, async (req: Request, res: Respon
       })
       .where(eq(pendingOrders.id, orderId));
 
+    sseManager.sendToAdmins("pending-orders-updated", { type: "tracking-registered" });
+    if (order.memberId) {
+      sseManager.sendToMember(order.memberId, "order-updated", { type: "tracking-registered", orderId });
+    }
+
     res.json({ message: "운송장이 등록되었습니다" });
   } catch (error: any) {
     res.status(500).json({ message: "운송장 등록 실패" });
@@ -489,6 +502,10 @@ router.post("/orders/tracking/bulk", partnerAuth, async (req: Request, res: Resp
         .set({ trackingNumber, courierCompany, updatedAt: new Date() })
         .where(eq(pendingOrders.id, orderNumber));
       results.success++;
+    }
+
+    if (results.success > 0) {
+      sseManager.sendToAdmins("pending-orders-updated", { type: "bulk-tracking-registered", count: results.success });
     }
 
     res.json(results);
@@ -651,6 +668,46 @@ router.get("/delivery/summary", partnerAuth, async (req: Request, res: Response)
   } catch (error: any) {
     res.status(500).json({ message: "배송 통계 조회 실패" });
   }
+});
+
+router.get("/events", async (req: Request, res: Response) => {
+  const token = req.cookies?.[PARTNER_COOKIE];
+  if (!token) return res.status(401).json({ message: "인증이 필요합니다" });
+  const payload = verifyPartnerToken(token);
+  if (!payload) return res.status(401).json({ message: "유효하지 않은 인증입니다" });
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ message: "Partner SSE connected", vendorId: payload.vendorId })}\n\n`);
+
+  const clientId = `partner-${payload.vendorId}-${Date.now()}`;
+  sseManager.addClient({
+    id: clientId,
+    res,
+    userId: String(payload.vendorId),
+    userType: "partner",
+    vendorId: payload.vendorId,
+  });
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`event: heartbeat\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
+    } catch (e) {
+      clearInterval(heartbeat);
+      sseManager.removeClient(clientId);
+    }
+  }, 30000);
+
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    sseManager.removeClient(clientId);
+  };
+
+  req.on("close", cleanup);
+  req.on("error", cleanup);
 });
 
 export default router;

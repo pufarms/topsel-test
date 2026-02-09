@@ -152,10 +152,38 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       
       queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/member/cancel-deadline-status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/ready-to-ship-status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+    });
+
+    eventSource.addEventListener("pending-orders-updated", (event) => {
+      const data = JSON.parse(event.data);
+      console.log("SSE: pending-orders-updated", data);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ready-to-ship-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/member/cancel-deadline-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/member/my-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlements"] });
+    });
+
+    eventSource.addEventListener("allocation-updated", (event) => {
+      const data = JSON.parse(event.data);
+      console.log("SSE: allocation-updated", data);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
     });
 
     eventSource.onerror = (error) => {

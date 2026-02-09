@@ -45,54 +45,7 @@ declare module "express-session" {
 
 const MemoryStoreSession = MemoryStore(session);
 
-// SSE 이벤트 관리자
-interface SSEClient {
-  id: string;
-  res: any;
-  userId: string;
-  userType: "user" | "member";
-}
-
-class SSEManager {
-  private clients: Map<string, SSEClient> = new Map();
-
-  addClient(client: SSEClient) {
-    this.clients.set(client.id, client);
-    console.log(`SSE client connected: ${client.userId} (${client.userType}), total: ${this.clients.size}`);
-  }
-
-  removeClient(id: string) {
-    this.clients.delete(id);
-    console.log(`SSE client disconnected, total: ${this.clients.size}`);
-  }
-
-  // 특정 회원에게 이벤트 전송
-  sendToMember(memberId: string, event: string, data: any) {
-    this.clients.forEach(client => {
-      if (client.userType === "member" && client.userId === memberId) {
-        client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      }
-    });
-  }
-
-  // 모든 관리자에게 이벤트 전송
-  sendToAdmins(event: string, data: any) {
-    this.clients.forEach(client => {
-      if (client.userType === "user") {
-        client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      }
-    });
-  }
-
-  // 모든 클라이언트에게 이벤트 전송
-  broadcast(event: string, data: any) {
-    this.clients.forEach(client => {
-      client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    });
-  }
-}
-
-const sseManager = new SSEManager();
+import { sseManager } from "./sse-manager";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -10537,6 +10490,16 @@ export async function registerRoutes(
 
       await storage.updateOrderAllocation(allocationId, { status: "waiting" });
 
+      notifiedVendors.forEach((v: any) => {
+        if (v.vendorId) {
+          sseManager.sendToPartner(v.vendorId, "allocation-updated", {
+            type: "allocation-notified",
+            allocationId,
+          });
+        }
+      });
+      sseManager.sendToAdmins("allocation-updated", { type: "allocation-notified", allocationId });
+
       res.json({
         allocationId,
         notifiedVendors,
@@ -10741,6 +10704,13 @@ export async function registerRoutes(
 
       const updatedAllocation = await storage.getOrderAllocationById(allocationId);
 
+      sseManager.sendToAdmins("allocation-updated", { type: "allocation-confirmed", allocationId });
+      confirmedDetails.forEach(d => {
+        if (d.vendorId) {
+          sseManager.sendToPartner(d.vendorId, "allocation-updated", { type: "allocation-confirmed", allocationId });
+        }
+      });
+
       res.json({
         allocationId,
         productCode: allocation.productCode,
@@ -10868,6 +10838,19 @@ export async function registerRoutes(
           updatedAt: new Date(),
         })
         .where(eq(orderAllocations.id, allocationId));
+
+      sseManager.sendToAdmins("allocation-updated", { type: "allocation-assigned", allocationId });
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+      byVendor.forEach((v: any) => {
+        if (v.vendorId) {
+          sseManager.sendToPartner(v.vendorId, "partner-orders-updated", {
+            type: "orders-assigned",
+            allocationId,
+            orderCount: v.orderCount,
+          });
+        }
+      });
 
       if (adjustedOrders > 0) {
         sseManager.sendToAdmins("order-adjusted", {
