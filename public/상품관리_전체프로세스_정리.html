@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>탑셀 상품관리 시스템 - 전체 프로세스 정리</title>
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  @media print {
+    body { font-size: 11px; line-height: 1.5; }
+    .page-break { page-break-before: always; }
+    .no-print { display: none !important; }
+    section { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; }
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 30px;
+  }
+
+  .cover {
+    text-align: center;
+    padding: 80px 0;
+    border-bottom: 3px solid #1a1a2e;
+    margin-bottom: 40px;
+  }
+  .cover h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 12px;
+  }
+  .cover .subtitle {
+    font-size: 18px;
+    color: #555;
+    margin-bottom: 30px;
+  }
+  .cover .meta {
+    font-size: 13px;
+    color: #888;
+  }
+
+  .toc {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 24px 30px;
+    margin-bottom: 40px;
+  }
+  .toc h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #1a1a2e;
+    border: none;
+    padding: 0;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc-counter;
+  }
+  .toc > ol > li {
+    counter-increment: toc-counter;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .toc > ol > li::before {
+    content: counter(toc-counter) ". ";
+    font-weight: 700;
+    color: #2563eb;
+  }
+  .toc a {
+    color: #333;
+    text-decoration: none;
+  }
+  .toc a:hover { text-decoration: underline; }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1a1a2e;
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 8px;
+    margin: 40px 0 20px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e40af;
+    margin: 24px 0 12px;
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #374151;
+    margin: 16px 0 8px;
+  }
+
+  p { margin-bottom: 10px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #1e40af;
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+
+  .info-box {
+    background: #eff6ff;
+    border-left: 4px solid #2563eb;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+
+  .warn-box {
+    background: #fff7ed;
+    border-left: 4px solid #f59e0b;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+
+  .critical-box {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+
+  .flow-diagram {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+  .flow-step {
+    display: inline-block;
+    background: #fff;
+    border: 2px solid #2563eb;
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 4px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .flow-step.active {
+    background: #2563eb;
+    color: #fff;
+  }
+  .flow-arrow {
+    display: inline-block;
+    font-size: 20px;
+    color: #2563eb;
+    vertical-align: middle;
+    margin: 0 4px;
+  }
+
+  ul, ol { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 4px; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-orange { background: #ffedd5; color: #9a3412; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-gray { background: #f3f4f6; color: #374151; }
+
+  .print-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+    z-index: 100;
+  }
+  .print-btn:hover { background: #1d4ed8; }
+
+  .formula {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    margin: 10px 0;
+  }
+
+  .code {
+    font-family: 'Courier New', monospace;
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">PDF 저장 / 인쇄</button>
+
+<div class="container">
+
+<!-- 표지 -->
+<div class="cover">
+  <h1>탑셀 상품관리 시스템</h1>
+  <div class="subtitle">상품 등록 ~ 재고관리 ~ 가격적용 전체 프로세스 정리</div>
+  <div class="meta">
+    작성일: 2026년 2월 9일<br>
+    버전: v1.0<br>
+    대상: 관리자 / 시스템 운영 참고용
+  </div>
+</div>
+
+<!-- 목차 -->
+<div class="toc">
+  <h2>목차</h2>
+  <ol>
+    <li><a href="#s1">시스템 전체 흐름 개요</a></li>
+    <li><a href="#s2">카테고리 체계</a></li>
+    <li><a href="#s3">재료(원자재) 관리</a></li>
+    <li><a href="#s4">상품 등록 (공급가 계산)</a></li>
+    <li><a href="#s5">상품-재료 매핑</a></li>
+    <li><a href="#s6">가격 전송 체계 (3단계)</a></li>
+    <li><a href="#s7">회원 등급별 가격 적용</a></li>
+    <li><a href="#s8">공급 상태 관리 (공급중지/재개)</a></li>
+    <li><a href="#s9">재고관리 시스템</a></li>
+    <li><a href="#s10">주문과 상품/재고 연계</a></li>
+    <li><a href="#s11">정산과 가격 확정</a></li>
+    <li><a href="#s12">관리자 페이지 구성</a></li>
+    <li><a href="#s13">데이터베이스 테이블 관계도</a></li>
+  </ol>
+</div>
+
+<!-- 1. 전체 흐름 -->
+<section id="s1">
+<h2>1. 시스템 전체 흐름 개요</h2>
+
+<div class="flow-diagram">
+  <div class="flow-step">카테고리 설정</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">재료 등록</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step active">상품 등록<br><small>(공급가 계산)</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">상품-재료 매핑</div>
+  <br><br>
+  <span class="flow-arrow">&darr;</span>
+  <br><br>
+  <div class="flow-step">차주 예상공급가<br><small>(10원 올림 적용)</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step active">현재공급가<br><small>(운영 기준)</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">회원 주문 등록<br><small>(등급별 가격 적용)</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">정산/배송</div>
+</div>
+
+<div class="info-box">
+  <strong>핵심 원칙:</strong> 모든 실제 운영(주문, 정산, 통계)의 기준은 <strong>현재공급가(current_products)</strong> 테이블입니다. 상품등록 테이블의 가격은 계산 과정일 뿐이며, 전송 과정을 거쳐야 회원에게 적용됩니다.
+</div>
+</section>
+
+<!-- 2. 카테고리 -->
+<section id="s2">
+<h2>2. 카테고리 체계</h2>
+
+<h3>2.1 상품 카테고리 (3단계 계층)</h3>
+<table>
+  <tr>
+    <th>레벨</th>
+    <th>설명</th>
+    <th>예시</th>
+  </tr>
+  <tr>
+    <td><span class="badge badge-blue">대분류</span></td>
+    <td>최상위 카테고리</td>
+    <td>과일, 채소, 수산물</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-green">중분류</span></td>
+    <td>대분류 하위, parentId로 연결</td>
+    <td>감귤류, 사과류, 엽채류</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-orange">소분류</span></td>
+    <td>중분류 하위, parentId로 연결</td>
+    <td>노지감귤, 하우스감귤</td>
+  </tr>
+</table>
+
+<div class="info-box">
+  <strong>DB 테이블:</strong> <span class="code">categories</span> - id, name, level(대/중/소), parentId(상위 카테고리 참조)
+</div>
+
+<h3>2.2 재료 카테고리 (3단계 독립 테이블)</h3>
+<p>재료(원자재) 분류를 위한 별도의 3단계 카테고리 체계가 존재합니다.</p>
+<table>
+  <tr>
+    <th>테이블</th>
+    <th>역할</th>
+    <th>참조</th>
+  </tr>
+  <tr>
+    <td><span class="code">material_categories_large</span></td>
+    <td>재료 대분류</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td><span class="code">material_categories_medium</span></td>
+    <td>재료 중분류</td>
+    <td>large_category_id &rarr; 대분류</td>
+  </tr>
+  <tr>
+    <td><span class="code">material_categories_small</span></td>
+    <td>재료 소분류</td>
+    <td>medium_category_id &rarr; 중분류</td>
+  </tr>
+</table>
+</section>
+
+<!-- 3. 재료 관리 -->
+<section id="s3">
+<h2>3. 재료(원자재) 관리</h2>
+
+<h3>3.1 재료 유형</h3>
+<table>
+  <tr>
+    <th>유형</th>
+    <th>코드</th>
+    <th>설명</th>
+  </tr>
+  <tr>
+    <td>원재료</td>
+    <td><span class="code">raw</span></td>
+    <td>가공 전 원래 재료 (예: 감귤 원물)</td>
+  </tr>
+  <tr>
+    <td>반재료</td>
+    <td><span class="code">semi</span></td>
+    <td>1차 가공된 중간 재료</td>
+  </tr>
+  <tr>
+    <td>부재료</td>
+    <td><span class="code">sub</span></td>
+    <td>포장재, 박스 등 보조 재료</td>
+  </tr>
+</table>
+
+<h3>3.2 재료 테이블 구조</h3>
+<table>
+  <tr>
+    <th>필드</th>
+    <th>설명</th>
+  </tr>
+  <tr><td>materialType</td><td>재료 유형 (raw/semi/sub)</td></tr>
+  <tr><td>largeCategoryId</td><td>재료 대분류 참조</td></tr>
+  <tr><td>mediumCategoryId</td><td>재료 중분류 참조</td></tr>
+  <tr><td>smallCategoryId</td><td>재료 소분류 참조 (선택)</td></tr>
+  <tr><td>materialCode</td><td>재료코드 (고유값)</td></tr>
+  <tr><td>materialName</td><td>재료명</td></tr>
+  <tr><td>currentStock</td><td>현재 재고 수량</td></tr>
+</table>
+
+<div class="info-box">
+  <strong>관리 기능:</strong> 개별 등록, 엑셀 일괄 업로드, 엑셀 템플릿 다운로드, 일괄 삭제 지원
+</div>
+</section>
+
+<!-- 4. 상품 등록 -->
+<section id="s4" class="page-break">
+<h2>4. 상품 등록 (공급가 계산)</h2>
+
+<h3>4.1 상품 등록 정보 구성</h3>
+<p>상품 등록은 <strong>원가 요소를 입력</strong>하면 시스템이 <strong>등급별 공급가를 자동 계산</strong>하는 구조입니다.</p>
+
+<h4>(1) 기본 정보</h4>
+<table>
+  <tr><th>필드</th><th>설명</th><th>필수</th></tr>
+  <tr><td>categoryLarge / Medium / Small</td><td>상품 카테고리 (대/중/소)</td><td>선택</td></tr>
+  <tr><td>weight</td><td>상품 중량 (kg)</td><td>필수</td></tr>
+  <tr><td>productCode</td><td>상품코드 (고유값)</td><td>필수</td></tr>
+  <tr><td>productName</td><td>상품명</td><td>필수</td></tr>
+</table>
+
+<h4>(2) 원물 원가</h4>
+<table>
+  <tr><th>필드</th><th>설명</th></tr>
+  <tr><td>sourceProduct</td><td>원물 상품명</td></tr>
+  <tr><td>sourcePrice</td><td>원물 단가 (원/kg 등)</td></tr>
+  <tr><td>lossRate</td><td>손실율 (%)</td></tr>
+  <tr><td>sourceWeight</td><td>원물 중량</td></tr>
+</table>
+
+<h4>(3) 추가 비용 항목</h4>
+<table>
+  <tr><th>필드</th><th>설명</th></tr>
+  <tr><td>boxCost</td><td>박스 비용</td></tr>
+  <tr><td>materialCost</td><td>재료비</td></tr>
+  <tr><td>outerBoxCost</td><td>겉박스 비용</td></tr>
+  <tr><td>wrappingCost</td><td>포장비</td></tr>
+  <tr><td>laborCost</td><td>인건비</td></tr>
+  <tr><td>shippingCost</td><td>배송비</td></tr>
+</table>
+
+<h4>(4) 등급별 마진율 및 산출가</h4>
+<table>
+  <tr><th>등급</th><th>마진율 필드</th><th>산출 공급가</th><th>마진금액</th></tr>
+  <tr><td><span class="badge badge-green">START</span></td><td>startMarginRate</td><td>startPrice</td><td>startMargin</td></tr>
+  <tr><td><span class="badge badge-blue">DRIVING</span></td><td>drivingMarginRate</td><td>drivingPrice</td><td>drivingMargin</td></tr>
+  <tr><td><span class="badge badge-orange">TOP</span></td><td>topMarginRate</td><td>topPrice</td><td>topMargin</td></tr>
+</table>
+
+<h3>4.2 가격 자동 계산 공식</h3>
+<div class="formula">
+  <strong>Step 1. 원물 원가 계산</strong><br>
+  손실 반영 단가 = sourcePrice &times; (1 + lossRate / 100)<br>
+  단위 원가 (unitPrice) = 손실 반영 단가 / sourceWeight (반올림)<br>
+  원물 합계 (sourceProductTotal) = unitPrice &times; weight (반올림)
+</div>
+<div class="formula">
+  <strong>Step 2. 총원가 계산</strong><br>
+  totalCost = sourceProductTotal + boxCost + materialCost + outerBoxCost + wrappingCost + laborCost + shippingCost
+</div>
+<div class="formula">
+  <strong>Step 3. 등급별 공급가 계산</strong><br>
+  startPrice = totalCost &times; (1 + startMarginRate / 100) (반올림, 1원 단위)<br>
+  drivingPrice = totalCost &times; (1 + drivingMarginRate / 100) (반올림, 1원 단위)<br>
+  topPrice = totalCost &times; (1 + topMarginRate / 100) (반올림, 1원 단위)
+</div>
+<div class="formula">
+  <strong>Step 4. 마진 금액</strong><br>
+  startMargin = startPrice - totalCost<br>
+  drivingMargin = drivingPrice - totalCost<br>
+  topMargin = topPrice - totalCost
+</div>
+
+<div class="critical-box">
+  <strong>중요:</strong> 이 단계의 가격은 <strong>1원 단위</strong>의 정밀 계산값입니다. 실제 운영에 적용되려면 반드시 <strong>전송(Transmission)</strong> 과정을 거쳐야 합니다. 전송 시 10원 올림이 적용됩니다.
+</div>
+
+<h3>4.3 상품 상태 관리</h3>
+<table>
+  <tr><th>상태</th><th>코드</th><th>설명</th></tr>
+  <tr><td>활성</td><td><span class="code">active</span></td><td>정상 상품, 전송 가능</td></tr>
+  <tr><td>중지</td><td><span class="code">suspended</span></td><td>공급 중지, 전송 불가, 중지일시/사유 기록</td></tr>
+</table>
+</section>
+
+<!-- 5. 상품-재료 매핑 -->
+<section id="s5">
+<h2>5. 상품-재료 매핑</h2>
+
+<h3>5.1 매핑 구조</h3>
+<p>하나의 상품에 여러 재료를 연결하여, 해당 상품 생산에 필요한 재료 구성을 정의합니다.</p>
+
+<table>
+  <tr><th>필드</th><th>설명</th></tr>
+  <tr><td>productCode</td><td>상품코드 (상품 등록 테이블 참조)</td></tr>
+  <tr><td>materialCode</td><td>재료코드 (재료 테이블 참조)</td></tr>
+  <tr><td>materialName</td><td>재료명</td></tr>
+  <tr><td>materialType</td><td>재료 유형 (raw/semi/sub)</td></tr>
+  <tr><td>quantity</td><td>필요 수량</td></tr>
+</table>
+
+<h3>5.2 매핑 상태 (mappingStatus)</h3>
+<table>
+  <tr><th>상태</th><th>설명</th></tr>
+  <tr>
+    <td><span class="badge badge-red">incomplete</span></td>
+    <td>재료 매핑이 완료되지 않은 상품. <strong>전송 불가</strong></td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-green">complete</span></td>
+    <td>재료 매핑 완료. 전송 가능</td>
+  </tr>
+</table>
+
+<div class="warn-box">
+  <strong>전송 전 검증:</strong> 상품을 차주 예상공급가 또는 현재공급가로 전송할 때, 해당 상품에 매핑된 재료가 실제로 재료(materials) 테이블에 존재하는지 반드시 확인합니다. 매핑되지 않았거나 재료가 삭제된 경우 전송이 거부됩니다.
+</div>
+
+<h3>5.3 상품 매핑(Product Mappings) 테이블</h3>
+<p>상품코드와 상품명을 관리하고, 매핑 상태를 추적하는 보조 테이블입니다.</p>
+<table>
+  <tr><th>필드</th><th>설명</th></tr>
+  <tr><td>productCode</td><td>상품코드 (고유값)</td></tr>
+  <tr><td>productName</td><td>상품명</td></tr>
+  <tr><td>usageStatus</td><td>사용 상태 (Y/N)</td></tr>
+  <tr><td>mappingStatus</td><td>매핑 완료 여부 (complete/incomplete)</td></tr>
+</table>
+</section>
+
+<!-- 6. 가격 전송 -->
+<section id="s6" class="page-break">
+<h2>6. 가격 전송 체계 (3단계 테이블)</h2>
+
+<div class="flow-diagram">
+  <div class="flow-step">상품등록<br><small>(product_registrations)</small><br><span class="badge badge-gray">1원 단위 정밀 계산</span></div>
+  <span class="flow-arrow">&xrarr;</span>
+  <div class="flow-step">차주 예상공급가<br><small>(next_week_products)</small><br><span class="badge badge-orange">10원 올림 적용</span></div>
+  <span class="flow-arrow">&xrarr;</span>
+  <div class="flow-step active">현재공급가<br><small>(current_products)</small><br><span class="badge badge-green">운영 기준</span></div>
+</div>
+
+<h3>6.1 1단계: 상품등록 &rarr; 차주 예상공급가 전송</h3>
+
+<h4>API</h4>
+<p><span class="code">POST /api/product-registrations/send-to-next-week</span></p>
+
+<h4>처리 과정</h4>
+<ol>
+  <li>관리자 권한 확인</li>
+  <li>선택된 상품 ID 목록 수신</li>
+  <li><strong>가격 검증:</strong> startPrice, drivingPrice, topPrice가 모두 존재하는지 확인</li>
+  <li><strong>재료 매핑 검증:</strong> productMaterialMappings에 매핑된 재료가 materials 테이블에 존재하는지 확인</li>
+  <li><strong>10원 올림 적용:</strong> <span class="code">Math.ceil(price / 10) * 10</span></li>
+  <li><strong>Upsert:</strong> 기존에 같은 상품코드가 있으면 업데이트, 없으면 신규 생성</li>
+</ol>
+
+<div class="formula">
+  <strong>10원 올림 예시:</strong><br>
+  상품등록 startPrice = 12,345원 &rarr; 차주 예상공급가 startPrice = 12,350원<br>
+  상품등록 drivingPrice = 11,891원 &rarr; 차주 예상공급가 drivingPrice = 11,900원<br>
+  상품등록 topPrice = 11,230원 &rarr; 차주 예상공급가 topPrice = 11,230원 (이미 10원 단위)
+</div>
+
+<h3>6.2 2단계: 차주 예상공급가 &rarr; 현재공급가 전송</h3>
+
+<h4>API</h4>
+<p><span class="code">POST /api/next-week-products/apply-current</span></p>
+
+<h4>처리 과정</h4>
+<ol>
+  <li>관리자 권한 확인</li>
+  <li>선택된 상품 ID 목록 수신</li>
+  <li><strong>재료 매핑 재검증</strong></li>
+  <li><strong>가격 올림 유지:</strong> 이미 10원 단위인 가격을 그대로 유지</li>
+  <li><strong>Upsert:</strong> current_products 테이블에 생성 또는 업데이트</li>
+  <li><strong>appliedAt:</strong> 적용 일시 기록</li>
+</ol>
+
+<h3>6.3 3단계 테이블 비교</h3>
+<table>
+  <tr>
+    <th>구분</th>
+    <th>상품등록<br>(product_registrations)</th>
+    <th>차주 예상공급가<br>(next_week_products)</th>
+    <th>현재공급가<br>(current_products)</th>
+  </tr>
+  <tr>
+    <td><strong>역할</strong></td>
+    <td>원가 계산 및 가격 산출</td>
+    <td>다음 주 적용 예정 가격</td>
+    <td>현재 운영 중인 가격</td>
+  </tr>
+  <tr>
+    <td><strong>가격 단위</strong></td>
+    <td>1원 단위 (정밀)</td>
+    <td>10원 단위 (올림)</td>
+    <td>10원 단위 (올림)</td>
+  </tr>
+  <tr>
+    <td><strong>가격 필드</strong></td>
+    <td>startPrice, drivingPrice, topPrice + 마진율/마진금액/원가 상세</td>
+    <td>startPrice, drivingPrice, topPrice</td>
+    <td>startPrice, drivingPrice, topPrice</td>
+  </tr>
+  <tr>
+    <td><strong>상태 관리</strong></td>
+    <td>active / suspended + mappingStatus</td>
+    <td>supply / suspended</td>
+    <td>supply / suspended</td>
+  </tr>
+  <tr>
+    <td><strong>사용처</strong></td>
+    <td>관리자 가격 계산용</td>
+    <td>회원 미리보기 제공</td>
+    <td><strong>주문 등록 / 정산 기준</strong></td>
+  </tr>
+</table>
+</section>
+
+<!-- 7. 회원 등급별 가격 -->
+<section id="s7" class="page-break">
+<h2>7. 회원 등급별 가격 적용</h2>
+
+<h3>7.1 회원 등급 체계</h3>
+<table>
+  <tr>
+    <th>등급</th>
+    <th>코드</th>
+    <th>주문 가능</th>
+    <th>적용 가격</th>
+    <th>상품리스트 조회</th>
+  </tr>
+  <tr>
+    <td>승인대기</td>
+    <td><span class="badge badge-gray">PENDING</span></td>
+    <td><span class="badge badge-red">불가</span></td>
+    <td>-</td>
+    <td>불가</td>
+  </tr>
+  <tr>
+    <td>준회원</td>
+    <td><span class="badge badge-gray">ASSOCIATE</span></td>
+    <td><span class="badge badge-red">불가</span></td>
+    <td>-</td>
+    <td><span class="badge badge-green">가능</span> (조회/다운로드)</td>
+  </tr>
+  <tr>
+    <td>Start회원</td>
+    <td><span class="badge badge-green">START</span></td>
+    <td><span class="badge badge-green">가능</span></td>
+    <td>startPrice</td>
+    <td><span class="badge badge-green">가능</span></td>
+  </tr>
+  <tr>
+    <td>Driving회원</td>
+    <td><span class="badge badge-blue">DRIVING</span></td>
+    <td><span class="badge badge-green">가능</span></td>
+    <td>drivingPrice</td>
+    <td><span class="badge badge-green">가능</span></td>
+  </tr>
+  <tr>
+    <td>Top회원</td>
+    <td><span class="badge badge-orange">TOP</span></td>
+    <td><span class="badge badge-green">가능</span></td>
+    <td>topPrice</td>
+    <td><span class="badge badge-green">가능</span></td>
+  </tr>
+</table>
+
+<h3>7.2 가격 매핑 함수</h3>
+<div class="formula">
+  <strong>getSupplyPriceByGrade(currentProduct, memberGrade)</strong><br><br>
+  START &rarr; currentProduct.startPrice<br>
+  DRIVING &rarr; currentProduct.drivingPrice<br>
+  TOP &rarr; currentProduct.topPrice<br>
+  ASSOCIATE / PENDING &rarr; currentProduct.startPrice (기본값, 실제 주문 불가)
+</div>
+
+<h3>7.3 주문 등록 시 가격 적용 흐름</h3>
+<ol>
+  <li>회원이 엑셀 파일로 주문 업로드</li>
+  <li>시스템이 <strong>current_products</strong> 테이블에서 상품코드로 상품 존재 여부 확인</li>
+  <li>공급중지(suspended) 상품이면 주문 거부</li>
+  <li>회원의 등급(grade)에 따라 <strong>getSupplyPriceByGrade()</strong>로 해당 등급 공급가 조회</li>
+  <li>조회된 공급가를 주문의 <strong>supplyPrice</strong> 필드에 저장</li>
+  <li>전체 주문 금액으로 잔액 검증 수행</li>
+</ol>
+
+<div class="critical-box">
+  <strong>핵심 규칙:</strong>
+  <ul>
+    <li>PENDING, ASSOCIATE 등급은 주문 등록 시 API가 <strong>403</strong>을 반환합니다.</li>
+    <li>START, DRIVING, TOP만 주문 가능합니다.</li>
+    <li>상품 검증은 반드시 <strong>current_products</strong> 테이블 기준입니다 (product_registrations 아님).</li>
+  </ul>
+</div>
+</section>
+
+<!-- 8. 공급 상태 관리 -->
+<section id="s8">
+<h2>8. 공급 상태 관리 (공급중지/재개)</h2>
+
+<h3>8.1 공급 상태값</h3>
+<table>
+  <tr><th>상태</th><th>코드</th><th>주문 가능</th><th>설명</th></tr>
+  <tr>
+    <td>공급중</td>
+    <td><span class="code">supply</span></td>
+    <td><span class="badge badge-green">가능</span></td>
+    <td>정상 공급 상태</td>
+  </tr>
+  <tr>
+    <td>공급중지</td>
+    <td><span class="code">suspended</span></td>
+    <td><span class="badge badge-red">불가</span></td>
+    <td>중지일시(suspendedAt), 사유(suspendReason) 기록</td>
+  </tr>
+</table>
+
+<h3>8.2 관리 API</h3>
+<table>
+  <tr><th>기능</th><th>API</th><th>설명</th></tr>
+  <tr>
+    <td>공급중지 목록 조회</td>
+    <td><span class="code">GET /api/suspended-products</span></td>
+    <td>현재 공급중지된 상품 목록</td>
+  </tr>
+  <tr>
+    <td>공급 재개</td>
+    <td><span class="code">POST /api/suspended-products/resume</span></td>
+    <td>선택 상품 공급 재개, 중지일시/사유 초기화</td>
+  </tr>
+  <tr>
+    <td>일괄 삭제</td>
+    <td><span class="code">DELETE /api/suspended-products/bulk</span></td>
+    <td>공급중지 상품 일괄 삭제</td>
+  </tr>
+  <tr>
+    <td>개별 삭제</td>
+    <td><span class="code">DELETE /api/suspended-products/:id</span></td>
+    <td>특정 공급중지 상품 삭제</td>
+  </tr>
+</table>
+</section>
+
+<!-- 9. 재고관리 -->
+<section id="s9" class="page-break">
+<h2>9. 재고관리 시스템</h2>
+
+<h3>9.1 재고 관리 대상</h3>
+<table>
+  <tr><th>구분</th><th>테이블</th><th>재고 필드</th><th>설명</th></tr>
+  <tr>
+    <td><strong>공급상품 재고</strong></td>
+    <td><span class="code">product_stocks</span></td>
+    <td>currentStock</td>
+    <td>완제품(공급 가능 상품) 재고</td>
+  </tr>
+  <tr>
+    <td><strong>재료 재고</strong></td>
+    <td><span class="code">materials</span></td>
+    <td>currentStock</td>
+    <td>원재료/반재료/부재료 재고</td>
+  </tr>
+</table>
+
+<h3>9.2 공급상품 재고 관리</h3>
+
+<h4>재고 조작 기능</h4>
+<table>
+  <tr><th>기능</th><th>API</th><th>설명</th></tr>
+  <tr>
+    <td>입고</td>
+    <td><span class="code">POST /api/product-stocks/stock-in</span></td>
+    <td>상품코드 + 수량으로 재고 증가. 재료 매핑이 있으면 연계 재료도 차감</td>
+  </tr>
+  <tr>
+    <td>조정</td>
+    <td><span class="code">POST /api/product-stocks/adjust</span></td>
+    <td>재고 증가(+) 또는 감소(-), 사유 필수 입력</td>
+  </tr>
+  <tr>
+    <td>삭제</td>
+    <td><span class="code">DELETE /api/product-stocks/:productCode</span></td>
+    <td>해당 상품의 재고 기록 삭제</td>
+  </tr>
+  <tr>
+    <td>엑셀 업로드</td>
+    <td><span class="code">POST /api/product-stocks/upload</span></td>
+    <td>엑셀 파일로 일괄 입고 처리</td>
+  </tr>
+  <tr>
+    <td>엑셀 확정</td>
+    <td><span class="code">POST /api/product-stocks/upload/confirm</span></td>
+    <td>업로드 미리보기 후 확정 처리</td>
+  </tr>
+  <tr>
+    <td>템플릿 다운로드</td>
+    <td><span class="code">GET /api/product-stocks/template</span></td>
+    <td>엑셀 업로드 템플릿 다운로드</td>
+  </tr>
+</table>
+
+<h4>입고 시 재료 연계 차감 로직</h4>
+<div class="info-box">
+  <strong>입고(stock-in) 처리 시:</strong>
+  <ol>
+    <li>상품코드로 <span class="code">product_material_mappings</span>에서 필요 재료 목록 조회</li>
+    <li>각 재료별 필요 수량 = mapping.quantity &times; 입고수량</li>
+    <li>재료(materials) 테이블의 currentStock에서 차감</li>
+    <li>공급상품(product_stocks) 재고 증가</li>
+  </ol>
+</div>
+
+<h3>9.3 재고 이력 (Stock History)</h3>
+<p>모든 재고 변동은 <span class="code">stock_history</span> 테이블에 기록됩니다.</p>
+
+<table>
+  <tr><th>필드</th><th>설명</th></tr>
+  <tr><td>stockType</td><td>재고 유형: product(공급상품), raw(원재료), semi(반재료), sub(부재료)</td></tr>
+  <tr><td>actionType</td><td>동작: in(입고), out(출고), adjust(조정)</td></tr>
+  <tr><td>itemCode / itemName</td><td>대상 상품/재료 코드 및 명칭</td></tr>
+  <tr><td>quantity</td><td>변동 수량 (+/-)</td></tr>
+  <tr><td>beforeStock</td><td>변경 전 재고</td></tr>
+  <tr><td>afterStock</td><td>변경 후 재고</td></tr>
+  <tr><td>reason</td><td>조정 사유 (파손, 오차 수정, 폐기, 기타)</td></tr>
+  <tr><td>note</td><td>비고</td></tr>
+  <tr><td>adminId</td><td>담당 관리자 ID</td></tr>
+  <tr><td>source</td><td>처리방식: manual(수동) / order(주문연동)</td></tr>
+  <tr><td>orderId</td><td>주문번호 (주문 연동 시, 미래 확장용)</td></tr>
+</table>
+
+<h4>재고 이력 API</h4>
+<table>
+  <tr><th>API</th><th>기능</th></tr>
+  <tr><td><span class="code">GET /api/stock-history</span></td><td>전체 이력 조회 (필터: 유형/동작/방식/관리자/날짜/키워드)</td></tr>
+  <tr><td><span class="code">GET /api/stock-history/admins</span></td><td>이력에 등록된 관리자 목록</td></tr>
+  <tr><td><span class="code">GET /api/stock-history/download</span></td><td>이력 엑셀 다운로드</td></tr>
+</table>
+
+<h3>9.4 조정 사유 유형</h3>
+<table>
+  <tr><th>사유</th><th>설명</th></tr>
+  <tr><td>파손</td><td>상품/재료 파손으로 인한 재고 감소</td></tr>
+  <tr><td>오차 수정</td><td>실사와 시스템 재고 차이 보정</td></tr>
+  <tr><td>폐기</td><td>유통기한 초과 등으로 폐기</td></tr>
+  <tr><td>기타</td><td>기타 사유 (비고에 상세 기록)</td></tr>
+</table>
+</section>
+
+<!-- 10. 주문 연계 -->
+<section id="s10" class="page-break">
+<h2>10. 주문과 상품/재고 연계</h2>
+
+<h3>10.1 주문 등록 프로세스 (엑셀 업로드)</h3>
+<div class="flow-diagram">
+  <div class="flow-step">엑셀 파일 업로드</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">중복 파일 체크</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">필드 검증</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step active">상품 검증<br><small>(current_products)</small></div>
+  <br><br>
+  <span class="flow-arrow">&darr;</span>
+  <br><br>
+  <div class="flow-step">주소 검증</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step active">잔액 검증</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-step">주문 생성<br><small>(pending_orders)</small></div>
+</div>
+
+<h4>상품 검증 상세</h4>
+<ol>
+  <li>엑셀 행의 상품코드로 <strong>current_products</strong> 테이블 조회</li>
+  <li>상품이 존재하지 않으면 오류 (<span class="badge badge-red">미등록 상품</span>)</li>
+  <li>상품이 공급중지(suspended)면 오류 (<span class="badge badge-red">공급중지 상품</span>)</li>
+  <li>회원 등급에 따른 공급가 조회 (getSupplyPriceByGrade)</li>
+  <li>조회된 공급가를 주문 레코드의 supplyPrice에 저장</li>
+</ol>
+
+<h4>잔액 검증</h4>
+<div class="formula">
+  <strong>사용 가능 잔액 = (예치금 + 포인터) - (대기~배송준비중 주문 총액)</strong><br><br>
+  검증: 사용 가능 잔액 >= 이번 주문 총 금액
+</div>
+
+<h3>10.2 재고와 주문의 현재 연계 상태</h3>
+<div class="warn-box">
+  <strong>현재 상태:</strong> 주문 생성 시 자동 재고 차감 기능은 <strong>아직 구현되지 않았습니다</strong>. 재고 관리는 관리자가 수동으로 처리합니다.<br>
+  <ul>
+    <li>재고 이력의 <span class="code">source</span> 필드에 <span class="code">"order"</span> 값과 <span class="code">orderId</span> 필드가 존재하나, 현재 주문 연동 자동화는 미구현</li>
+    <li>추후 주문 확정 시 자동 재고 차감 기능 추가 예정</li>
+  </ul>
+</div>
+
+<h3>10.3 주문 상태별 가격 처리</h3>
+<table>
+  <tr><th>주문 상태</th><th>가격 처리 방식</th></tr>
+  <tr>
+    <td>대기 ~ 배송준비중</td>
+    <td><span class="badge badge-blue">미확정</span> current_products에서 실시간 등급별 가격 참조</td>
+  </tr>
+  <tr>
+    <td>배송중</td>
+    <td><span class="badge badge-green">확정</span> 전환 시점에 supplyPrice에 가격 저장, priceConfirmed=true</td>
+  </tr>
+</table>
+</section>
+
+<!-- 11. 정산 -->
+<section id="s11">
+<h2>11. 정산과 가격 확정</h2>
+
+<h3>11.1 배송중 전환 시 자동 정산</h3>
+<ol>
+  <li>관리자가 "배송중" 상태로 전환 실행</li>
+  <li>회원별로 주문 그룹핑</li>
+  <li>각 회원의 주문 총액 계산 (등급별 공급가 기준)</li>
+  <li><strong>가격 확정:</strong> 해당 시점의 공급가를 supplyPrice에 저장, priceConfirmed=true</li>
+  <li><strong>잔액 차감:</strong> 포인터 우선 차감 &rarr; 예치금 차감</li>
+  <li>정산 이력(settlement_history), 예치금 이력(deposit_history), 포인터 이력(pointer_history) 기록</li>
+  <li>잔액 부족 시 해당 주문부터 실패 처리</li>
+</ol>
+
+<div class="info-box">
+  <strong>가격 확정 방식:</strong> 배송중 전환 시점에 current_products의 등급별 가격을 supplyPrice 컬럼에 직접 저장하고 priceConfirmed=true 플래그를 설정합니다. 이후 상품 가격이 변경되더라도 이미 확정된 주문 가격은 변하지 않습니다.
+</div>
+</section>
+
+<!-- 12. 관리자 페이지 -->
+<section id="s12" class="page-break">
+<h2>12. 관리자 페이지 구성</h2>
+
+<h3>12.1 상품 관리 메뉴</h3>
+<table>
+  <tr><th>페이지</th><th>경로</th><th>주요 기능</th></tr>
+  <tr>
+    <td>카테고리 관리</td>
+    <td>/admin/products/categories</td>
+    <td>대/중/소분류 CRUD, 계층 구조 관리</td>
+  </tr>
+  <tr>
+    <td>상품 등록 (공급가계산)</td>
+    <td>/admin/products/registration</td>
+    <td>원가 입력, 가격 자동 계산, 전송, 엑셀 업/다운로드</td>
+  </tr>
+  <tr>
+    <td>차주 예상공급가</td>
+    <td>/admin/products/next-week</td>
+    <td>전송된 예상가격 확인, 현재공급가 전송, 공급중지/재개</td>
+  </tr>
+  <tr>
+    <td>현재공급가</td>
+    <td>/admin/products/current</td>
+    <td>현재 운영 중인 가격 관리, 공급중지/재개, 엑셀 다운로드</td>
+  </tr>
+  <tr>
+    <td>공급중지 상품</td>
+    <td>/admin/products/suspended</td>
+    <td>중지 상품 목록, 재개/삭제</td>
+  </tr>
+</table>
+
+<h3>12.2 재고 관리 메뉴</h3>
+<table>
+  <tr><th>페이지</th><th>경로</th><th>주요 기능</th></tr>
+  <tr>
+    <td>재료 분류 관리</td>
+    <td>/admin/inventory/material-types</td>
+    <td>재료 대/중/소 카테고리 CRUD</td>
+  </tr>
+  <tr>
+    <td>재료 관리</td>
+    <td>/admin/inventory/materials</td>
+    <td>재료 등록, 재고 수량 관리, 엑셀 업/다운로드</td>
+  </tr>
+  <tr>
+    <td>상품-재료 매핑</td>
+    <td>/admin/inventory/mapping</td>
+    <td>상품에 재료 연결, 필요 수량 설정</td>
+  </tr>
+  <tr>
+    <td>재고 관리</td>
+    <td>/admin/inventory/stock</td>
+    <td>공급상품 재고 입고/조정, 엑셀 일괄 처리</td>
+  </tr>
+  <tr>
+    <td>재고 이력</td>
+    <td>/admin/inventory/history</td>
+    <td>모든 재고 변동 이력 조회, 필터, 엑셀 다운로드</td>
+  </tr>
+</table>
+</section>
+
+<!-- 13. DB 관계도 -->
+<section id="s13" class="page-break">
+<h2>13. 데이터베이스 테이블 관계도</h2>
+
+<h3>13.1 상품 관련 테이블</h3>
+<div class="flow-diagram" style="text-align: left; padding: 20px;">
+<pre style="font-size: 12px; line-height: 1.6; font-family: 'Courier New', monospace;">
+categories (상품 카테고리)
+  id, name, level, parentId
+
+product_registrations (상품등록 / 공급가계산)
+  id, productCode(UK), productName, weight
+  categoryLarge, categoryMedium, categorySmall
+  sourcePrice, lossRate, sourceWeight, unitPrice, sourceProductTotal
+  boxCost, materialCost, outerBoxCost, wrappingCost, laborCost, shippingCost, totalCost
+  startMarginRate, startPrice, startMargin
+  drivingMarginRate, drivingPrice, drivingMargin
+  topMarginRate, topPrice, topMargin
+  status, mappingStatus
+      |
+      | (전송: 10원 올림)
+      v
+next_week_products (차주 예상공급가)
+  id, productCode(UK), productName, weight
+  categoryLarge, categoryMedium, categorySmall
+  startPrice, drivingPrice, topPrice, supplyStatus
+      |
+      | (전송: 현재공급가 적용)
+      v
+current_products (현재공급가) *** 운영 기준 ***
+  id, productCode(UK), productName, weight
+  categoryLarge, categoryMedium, categorySmall
+  startPrice, drivingPrice, topPrice
+  supplyStatus, suspendedAt, suspendReason, appliedAt
+</pre>
+</div>
+
+<h3>13.2 재고 관련 테이블</h3>
+<div class="flow-diagram" style="text-align: left; padding: 20px;">
+<pre style="font-size: 12px; line-height: 1.6; font-family: 'Courier New', monospace;">
+material_categories_large &rarr; material_categories_medium &rarr; material_categories_small
+      |                              |                              |
+      +------------------------------+------------------------------+
+                                     |
+                                     v
+materials (재료)
+  id, materialCode(UK), materialName, materialType
+  largeCategoryId, mediumCategoryId, smallCategoryId
+  currentStock (재고 수량)
+      |
+      | (매핑)
+      v
+product_material_mappings (상품-재료 매핑)
+  productCode, materialCode, materialName, materialType, quantity
+      |
+      | (입고 시 재료 차감)
+      v
+product_stocks (공급상품 재고)
+  productCode(UK), productName, currentStock
+
+stock_history (재고 이력)
+  stockType, actionType, itemCode, itemName
+  quantity, beforeStock, afterStock
+  reason, note, adminId, source, orderId
+</pre>
+</div>
+
+<h3>13.3 주문/정산 연계</h3>
+<div class="flow-diagram" style="text-align: left; padding: 20px;">
+<pre style="font-size: 12px; line-height: 1.6; font-family: 'Courier New', monospace;">
+members (회원)
+  id, grade, deposit, point
+      |
+      | (주문 등록)
+      v
+pending_orders (주문)
+  memberId, productCode, productName
+  supplyPrice (등급별 공급가)
+  priceConfirmed (가격 확정 여부)
+  status: 대기 &rarr; 상품준비중 &rarr; 배송준비중 &rarr; 배송중
+      |
+      | (배송중 전환 = 가격확정 + 정산)
+      v
+settlement_history (정산 이력)
+deposit_history (예치금 이력)
+pointer_history (포인터 이력)
+</pre>
+</div>
+
+<hr style="margin: 40px 0; border: 1px solid #e0e0e0;">
+<p style="text-align: center; color: #888; font-size: 12px;">
+  탑셀 주문관리시스템 - 상품관리 전체 프로세스 정리 문서<br>
+  2026년 2월 9일 작성 | 시스템 코드 기반 분석 자료
+</p>
+
+</div>
+</body>
+</html>
