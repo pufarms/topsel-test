@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { PageHeader } from "@/components/admin/page-header";
 import {
   Loader2,
   Plus,
@@ -39,7 +39,11 @@ import {
   ToggleRight,
   Search,
   Building2,
+  CheckCircle,
+  XCircle,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface Vendor {
   id: number;
@@ -189,129 +193,313 @@ export default function VendorManagement() {
   const activeCount = vendors.filter(v => v.isActive).length;
   const inactiveCount = vendors.filter(v => !v.isActive).length;
 
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        title="외주업체 관리"
-        description="외주 협력업체를 등록하고 관리합니다"
-        icon={Building2}
-        actions={
-          <Button onClick={openCreate} data-testid="button-add-vendor">
-            <Plus className="h-4 w-4 mr-1" /> 업체 등록
-          </Button>
-        }
-      />
+  const recentVendors = [...vendors].sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ).slice(0, 5);
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1">
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("all")}
-            data-testid="filter-all"
-          >
-            전체 ({vendors.length})
-          </Button>
-          <Button
-            variant={filter === "active" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("active")}
-            data-testid="filter-active"
-          >
-            활성 ({activeCount})
-          </Button>
-          <Button
-            variant={filter === "inactive" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter("inactive")}
-            data-testid="filter-inactive"
-          >
-            비활성 ({inactiveCount})
-          </Button>
-        </div>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="업체명, 담당자명 검색"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-8"
-            data-testid="input-search-vendor"
-          />
-        </div>
+  const settlementStats = Object.entries(settlementCycleLabels).map(([key, label]) => ({
+    label,
+    count: vendors.filter(v => v.settlementCycle === key).length,
+  })).filter(s => s.count > 0);
+
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  };
+
+  const exportToExcel = () => {
+    const data = vendors.map(v => ({
+      "업체명": v.companyName,
+      "담당자명": v.contactName || "",
+      "연락처": v.contactPhone || "",
+      "이메일": v.contactEmail || "",
+      "로그인ID": v.loginId || "",
+      "정산주기": settlementCycleLabels[v.settlementCycle || "monthly"] || v.settlementCycle || "",
+      "은행명": v.bankName || "",
+      "계좌번호": v.bankAccount || "",
+      "예금주": v.bankHolder || "",
+      "상태": v.isActive ? "활성" : "비활성",
+      "등록일": formatDate(v.createdAt),
+      "메모": v.memo || "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "외주업체");
+    XLSX.writeFile(wb, `외주업체_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="text-xl md:text-2xl font-bold">외주업체 관리</h1>
+        <Button onClick={openCreate} data-testid="button-add-vendor">
+          <Plus className="h-4 w-4 mr-2" />
+          외주업체 등록
+        </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : vendors.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              등록된 업체가 없습니다
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>업체명</TableHead>
-                    <TableHead>담당자</TableHead>
-                    <TableHead>연락처</TableHead>
-                    <TableHead>정산주기</TableHead>
-                    <TableHead>로그인ID</TableHead>
-                    <TableHead className="text-center">상태</TableHead>
-                    <TableHead>등록일</TableHead>
-                    <TableHead className="text-center">액션</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vendors.map((v) => (
-                    <TableRow key={v.id} data-testid={`row-vendor-${v.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-vendor-name-${v.id}`}>{v.companyName}</TableCell>
-                      <TableCell>{v.contactName || "-"}</TableCell>
-                      <TableCell>{v.contactPhone || "-"}</TableCell>
-                      <TableCell>{settlementCycleLabels[v.settlementCycle || "monthly"] || v.settlementCycle}</TableCell>
-                      <TableCell>{v.loginId || "-"}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={v.isActive ? "default" : "secondary"} data-testid={`badge-status-${v.id}`}>
-                          {v.isActive ? "활성" : "비활성"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(v.createdAt).toLocaleDateString("ko-KR")}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(v)}
-                            data-testid={`button-edit-vendor-${v.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleMutation.mutate(v.id)}
-                            data-testid={`button-toggle-vendor-${v.id}`}
-                          >
-                            {v.isActive ? (
-                              <ToggleRight className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
+      <Tabs defaultValue="dashboard">
+        <TabsList>
+          <TabsTrigger value="dashboard" data-testid="tab-dashboard">대시보드</TabsTrigger>
+          <TabsTrigger value="list" data-testid="tab-list">외주업체 목록</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">전체 외주업체</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-count">{vendors.length}개</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">활성 업체</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-active-count">{activeCount}개</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+                <CardTitle className="text-sm font-medium">비활성 업체</CardTitle>
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-inactive-count">{inactiveCount}개</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  최근 등록된 외주업체
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentVendors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">등록된 외주업체가 없습니다</p>
+                ) : (
+                  <div className="space-y-3">
+                    {recentVendors.map((vendor) => (
+                      <div key={vendor.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="font-medium">{vendor.companyName}</span>
+                          <Badge variant={vendor.isActive ? "default" : "secondary"} className="ml-2 text-xs">
+                            {vendor.isActive ? "활성" : "비활성"}
+                          </Badge>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <span className="text-muted-foreground">{formatDate(vendor.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  정산주기별 업체 현황
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {settlementStats.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">정산주기 정보가 없습니다</p>
+                ) : (
+                  <div className="space-y-3">
+                    {settlementStats.map((stat) => (
+                      <div key={stat.label} className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{stat.label}</span>
+                        <span className="text-muted-foreground">{stat.count}개 업체</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="list">
+          <Card>
+            <CardHeader>
+              <CardTitle>외주업체 목록</CardTitle>
+              <CardDescription>상품을 공급하는 외주업체 목록</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="업체명, 담당자명 검색..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    className="pl-8"
+                    data-testid="input-search-vendor"
+                  />
+                </div>
+                <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+                  <SelectTrigger className="w-28" data-testid="select-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체 상태</SelectItem>
+                    <SelectItem value="active">활성</SelectItem>
+                    <SelectItem value="inactive">비활성</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={exportToExcel} data-testid="button-export">
+                  <Download className="h-4 w-4 mr-2" />
+                  엑셀 다운로드
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : vendors.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  검색 결과가 없습니다
+                </div>
+              ) : (
+                <>
+                  <div className="hidden lg:block table-scroll-container">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead>업체명</TableHead>
+                          <TableHead>담당자</TableHead>
+                          <TableHead>연락처</TableHead>
+                          <TableHead>정산주기</TableHead>
+                          <TableHead>로그인ID</TableHead>
+                          <TableHead className="text-center">상태</TableHead>
+                          <TableHead>등록일</TableHead>
+                          <TableHead className="w-20 text-center">관리</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vendors.map((v) => (
+                          <TableRow key={v.id} data-testid={`row-vendor-${v.id}`}>
+                            <TableCell className="font-medium" data-testid={`text-vendor-name-${v.id}`}>{v.companyName}</TableCell>
+                            <TableCell>{v.contactName || "-"}</TableCell>
+                            <TableCell>{v.contactPhone || "-"}</TableCell>
+                            <TableCell>{settlementCycleLabels[v.settlementCycle || "monthly"] || v.settlementCycle}</TableCell>
+                            <TableCell>{v.loginId || "-"}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={v.isActive ? "default" : "secondary"} data-testid={`badge-status-${v.id}`}>
+                                {v.isActive ? "활성" : "비활성"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(v.createdAt)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEdit(v)}
+                                  data-testid={`button-edit-vendor-${v.id}`}
+                                  title="수정"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleMutation.mutate(v.id)}
+                                  data-testid={`button-toggle-vendor-${v.id}`}
+                                  title={v.isActive ? "비활성화" : "활성화"}
+                                >
+                                  {v.isActive ? (
+                                    <ToggleRight className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="lg:hidden space-y-3">
+                    {vendors.map((v) => (
+                      <Card key={v.id} className="p-4" data-testid={`card-vendor-${v.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold">{v.companyName}</span>
+                              <Badge variant={v.isActive ? "default" : "secondary"} className="text-xs">
+                                {v.isActive ? "활성" : "비활성"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{v.contactName || "-"}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openEdit(v)}
+                              data-testid={`button-edit-mobile-${v.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => toggleMutation.mutate(v.id)}
+                              data-testid={`button-toggle-mobile-${v.id}`}
+                            >
+                              {v.isActive ? (
+                                <ToggleRight className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">연락처</span>
+                            <p className="font-medium">{v.contactPhone || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">정산주기</span>
+                            <p className="font-medium">{settlementCycleLabels[v.settlementCycle || "monthly"] || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">로그인ID</span>
+                            <p className="font-medium">{v.loginId || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">등록일</span>
+                            <p className="font-medium">{formatDate(v.createdAt)}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

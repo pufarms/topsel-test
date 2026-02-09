@@ -17,7 +17,6 @@ import AdminUsers from "@/pages/admin/users";
 import AdminOrders from "@/pages/admin/orders";
 import AdminGallery from "@/pages/admin/gallery";
 import AdminManagement from "@/pages/admin/admins";
-import PartnerManagement from "@/pages/admin/partners";
 import VendorManagement from "@/pages/admin/vendors";
 import MemberManagement from "@/pages/admin/members";
 import TermAgreementsPage from "@/pages/admin/term-agreements";
@@ -115,9 +114,6 @@ function Router() {
       </Route>
       <Route path="/admin/admins">
         <AdminRoute><AdminManagement /></AdminRoute>
-      </Route>
-      <Route path="/admin/partners">
-        <AdminRoute><PartnerManagement /></AdminRoute>
       </Route>
       <Route path="/admin/vendors">
         <AdminRoute><VendorManagement /></AdminRoute>
