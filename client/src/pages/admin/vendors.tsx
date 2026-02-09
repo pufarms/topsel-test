@@ -42,6 +42,8 @@ import {
   CheckCircle,
   XCircle,
   Download,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -82,12 +84,15 @@ export default function VendorManagement() {
     contactEmail: "",
     loginId: "",
     loginPassword: "",
+    confirmPassword: "",
     settlementCycle: "monthly",
     bankName: "",
     bankAccount: "",
     bankHolder: "",
     memo: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const queryParams = new URLSearchParams();
   if (filter === "active") queryParams.set("isActive", "true");
@@ -104,7 +109,7 @@ export default function VendorManagement() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof form) => {
+    mutationFn: async (data: Omit<typeof form, "confirmPassword">) => {
       await apiRequest("POST", "/api/admin/vendors", data);
     },
     onSuccess: () => {
@@ -118,7 +123,7 @@ export default function VendorManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: typeof form }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Omit<typeof form, "confirmPassword"> }) => {
       await apiRequest("PUT", `/api/admin/vendors/${id}`, data);
     },
     onSuccess: () => {
@@ -147,18 +152,22 @@ export default function VendorManagement() {
   function closeDialog() {
     setDialogOpen(false);
     setEditingVendor(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setForm({
       companyName: "", contactName: "", contactPhone: "", contactEmail: "",
-      loginId: "", loginPassword: "", settlementCycle: "monthly",
+      loginId: "", loginPassword: "", confirmPassword: "", settlementCycle: "monthly",
       bankName: "", bankAccount: "", bankHolder: "", memo: "",
     });
   }
 
   function openCreate() {
     setEditingVendor(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setForm({
       companyName: "", contactName: "", contactPhone: "", contactEmail: "",
-      loginId: "", loginPassword: "", settlementCycle: "monthly",
+      loginId: "", loginPassword: "", confirmPassword: "", settlementCycle: "monthly",
       bankName: "", bankAccount: "", bankHolder: "", memo: "",
     });
     setDialogOpen(true);
@@ -166,6 +175,8 @@ export default function VendorManagement() {
 
   function openEdit(v: Vendor) {
     setEditingVendor(v);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setForm({
       companyName: v.companyName,
       contactName: v.contactName || "",
@@ -173,6 +184,7 @@ export default function VendorManagement() {
       contactEmail: v.contactEmail || "",
       loginId: v.loginId || "",
       loginPassword: "",
+      confirmPassword: "",
       settlementCycle: v.settlementCycle || "monthly",
       bankName: v.bankName || "",
       bankAccount: v.bankAccount || "",
@@ -183,10 +195,19 @@ export default function VendorManagement() {
   }
 
   function handleSubmit() {
+    if (form.loginPassword && form.loginPassword !== form.confirmPassword) {
+      toast({ title: "비밀번호 불일치", description: "비밀번호와 비밀번호 확인이 일치하지 않습니다.", variant: "destructive" });
+      return;
+    }
+    if (!editingVendor && !form.loginPassword) {
+      toast({ title: "비밀번호 필수", description: "신규 등록 시 비밀번호를 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    const { confirmPassword: _, ...submitData } = form;
     if (editingVendor) {
-      updateMutation.mutate({ id: editingVendor.id, data: form });
+      updateMutation.mutate({ id: editingVendor.id, data: submitData });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(submitData);
     }
   }
 
@@ -564,13 +585,59 @@ export default function VendorManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label>{editingVendor ? "비밀번호 (변경 시만)" : "비밀번호 *"}</Label>
-                  <Input
-                    type="password"
-                    value={form.loginPassword}
-                    onChange={(e) => setForm({ ...form, loginPassword: e.target.value })}
-                    placeholder={editingVendor ? "변경할 경우 입력" : "비밀번호"}
-                    data-testid="input-login-password"
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={form.loginPassword}
+                      onChange={(e) => setForm({ ...form, loginPassword: e.target.value })}
+                      placeholder={editingVendor ? "변경할 경우 입력" : "비밀번호"}
+                      className="pr-12"
+                      data-testid="input-login-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 inset-y-0 flex items-center justify-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                      data-testid="button-toggle-password"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{editingVendor ? "비밀번호 확인" : "비밀번호 확인 *"}</Label>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={form.confirmPassword}
+                      onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                      placeholder="비밀번호를 다시 입력하세요"
+                      className="pr-12"
+                      data-testid="input-confirm-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 inset-y-0 flex items-center justify-center"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      data-testid="button-toggle-confirm-password"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
+                  {form.loginPassword && form.confirmPassword && form.loginPassword !== form.confirmPassword && (
+                    <p className="text-xs text-destructive" data-testid="text-password-mismatch">비밀번호가 일치하지 않습니다</p>
+                  )}
+                  {form.loginPassword && form.confirmPassword && form.loginPassword === form.confirmPassword && (
+                    <p className="text-xs text-green-600 dark:text-green-400" data-testid="text-password-match">비밀번호가 일치합니다</p>
+                  )}
                 </div>
               </div>
             </div>
