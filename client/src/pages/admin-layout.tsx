@@ -50,7 +50,7 @@ const menuItems: MenuItem[] = [
     icon: <Users className="h-5 w-5" />,
     children: [
       { id: "admin-users", label: "관리자 관리", path: "/admin/admins" },
-      { id: "vendors", label: "외주업체 관리", path: "/admin/vendors" },
+      { id: "vendors", label: "외주(공급)업체 관리", path: "/admin/vendors" },
       { id: "users", label: "회원관리", path: "/admin/users" },
       { id: "term-agreements", label: "약관 동의 기록", path: "/admin/term-agreements" },
     ]

@@ -236,7 +236,7 @@ export default function VendorManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-xl md:text-2xl font-bold">외주업체 관리</h1>
+        <h1 className="text-xl md:text-2xl font-bold">외주(공급)업체 관리</h1>
         <Button onClick={openCreate} data-testid="button-add-vendor">
           <Plus className="h-4 w-4 mr-2" />
           외주업체 등록
