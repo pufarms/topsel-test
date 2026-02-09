@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2, FileEdit } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2, FileEdit, Building2 } from "lucide-react";
+import { ProductVendorSection } from "@/components/admin/product-vendor-section";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -129,6 +130,7 @@ export default function ProductRegistrationPage() {
   const [searchWeight, setSearchWeight] = useState<string>("all");
   const [searchMappingStatus, setSearchMappingStatus] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
+  const [selectedVendorProduct, setSelectedVendorProduct] = useState<{ code: string; name: string; isVendor: boolean } | null>(null);
     const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
   const [bulkWeight, setBulkWeight] = useState<string>("");
@@ -1794,9 +1796,27 @@ export default function ProductRegistrationPage() {
                     )}
                   </td>
                   <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 text-center overflow-hidden" style={{ width: columnWidths.save }}>
-                    <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} className="h-6 w-6 p-0" data-testid={`button-save-${p.id}`}>
-                      <Save className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center justify-center gap-0.5">
+                      <Button size="sm" variant={p.isNew ? "default" : "ghost"} onClick={() => handleSaveRow(idx)} disabled={createMutation.isPending || updateMutation.isPending} className="h-6 w-6 p-0" data-testid={`button-save-${p.id}`}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      {!p.isNew && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSelectedVendorProduct({
+                            code: p.productCode,
+                            name: p.productName,
+                            isVendor: !!(p as any).isVendorProduct,
+                          })}
+                          className="h-6 w-6 p-0"
+                          data-testid={`button-vendor-${p.id}`}
+                          title="외주업체 관리"
+                        >
+                          <Building2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );})}
@@ -1871,6 +1891,26 @@ export default function ProductRegistrationPage() {
           </Button>
         </div>
       </div>
+
+      {selectedVendorProduct && (
+        <ProductVendorSection
+          productCode={selectedVendorProduct.code}
+          productName={selectedVendorProduct.name}
+          isVendorProduct={selectedVendorProduct.isVendor}
+          onVendorProductChange={async (checked) => {
+            const product = products.find(p => p.productCode === selectedVendorProduct.code);
+            if (product && !product.isNew) {
+              try {
+                await apiRequest("PUT", `/api/product-registrations/${product.id}`, { isVendorProduct: checked });
+                setSelectedVendorProduct(prev => prev ? { ...prev, isVendor: checked } : null);
+                queryClient.invalidateQueries({ queryKey: ["/api/admin/products/registration"] });
+              } catch (err) {
+                console.error("isVendorProduct 업데이트 실패:", err);
+              }
+            }
+          }}
+        />
+      )}
 
       <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
         <DialogContent>

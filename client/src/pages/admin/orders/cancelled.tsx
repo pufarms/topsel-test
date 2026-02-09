@@ -166,13 +166,14 @@ export default function OrdersCancelledPage() {
                     <TableHead className="whitespace-nowrap px-3">주문번호</TableHead>
                     <TableHead className="whitespace-nowrap px-3">운송장번호</TableHead>
                     <TableHead className="whitespace-nowrap px-3">택배사</TableHead>
+                    <TableHead className="whitespace-nowrap px-3">발송구분</TableHead>
                     <TableHead className="whitespace-nowrap px-3">취소일시</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayedOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                         취소 내역이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -210,6 +211,13 @@ export default function OrdersCancelledPage() {
                         {order.trackingNumber || "-"}
                       </TableCell>
                       <TableCell className="whitespace-nowrap px-3" data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3" data-testid={`text-fulfillment-${order.id}`}>
+                        {order.fulfillmentType === "vendor" ? (
+                          <span className="text-orange-600 dark:text-orange-400">외주</span>
+                        ) : (
+                          <span className="text-blue-600 dark:text-blue-400">자체</span>
+                        )}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap px-3 text-sm text-muted-foreground">
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
                       </TableCell>

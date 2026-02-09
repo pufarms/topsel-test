@@ -1107,19 +1107,20 @@ export default function OrdersAdminCancelPage() {
                   <TableHead className="w-[150px]">수령자 연락처</TableHead>
                   <TableHead className="min-w-[250px]">배송지</TableHead>
                   <TableHead className="w-[100px]">상태</TableHead>
+                  <TableHead className="w-[80px]">발송구분</TableHead>
                   <TableHead className="w-[150px]">조정일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8">
+                    <TableCell colSpan={17} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ) : filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                       직권취소 내역이 없습니다.
                     </TableCell>
                   </TableRow>
@@ -1151,6 +1152,13 @@ export default function OrdersAdminCancelPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="border-orange-500 text-orange-500">주문조정</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {order.fulfillmentType === "vendor" ? (
+                          <span className="text-orange-600 dark:text-orange-400">외주</span>
+                        ) : (
+                          <span className="text-blue-600 dark:text-blue-400">자체</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}

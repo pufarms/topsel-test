@@ -39,6 +39,7 @@ export default function CurrentProductsPage() {
   const [searchProductCode, setSearchProductCode] = useState<string>("");
   const [searchProductName, setSearchProductName] = useState<string>("");
   const [searchSupplyStatus, setSearchSupplyStatus] = useState<string>("all");
+  const [searchFulfillmentType, setSearchFulfillmentType] = useState<string>("all");
   
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
@@ -108,8 +109,10 @@ export default function CurrentProductsPage() {
     if (searchProductCode) result = result.filter(p => p.productCode?.toLowerCase().includes(searchProductCode.toLowerCase()));
     if (searchProductName) result = result.filter(p => p.productName?.toLowerCase().includes(searchProductName.toLowerCase()));
     if (searchSupplyStatus !== "all") result = result.filter(p => p.supplyStatus === searchSupplyStatus);
+    if (searchFulfillmentType === "self") result = result.filter(p => !p.isVendorProduct);
+    if (searchFulfillmentType === "vendor") result = result.filter(p => p.isVendorProduct);
     return result;
-  }, [products, searchCategoryLarge, searchCategoryMedium, searchCategorySmall, searchWeight, searchProductCode, searchProductName, searchSupplyStatus]);
+  }, [products, searchCategoryLarge, searchCategoryMedium, searchCategorySmall, searchWeight, searchProductCode, searchProductName, searchSupplyStatus, searchFulfillmentType]);
 
   const stats = useMemo(() => {
     const all = products.filter(p => p.supplyStatus !== "suspended");
@@ -168,6 +171,7 @@ export default function CurrentProductsPage() {
     setSearchProductCode("");
     setSearchProductName("");
     setSearchSupplyStatus("all");
+    setSearchFulfillmentType("all");
   };
 
   const handleDownload = () => {
@@ -272,6 +276,14 @@ export default function CurrentProductsPage() {
                 <SelectItem value="all">전체</SelectItem>
                 <SelectItem value="supply">공급</SelectItem>
                 <SelectItem value="scheduled">공급예정</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={searchFulfillmentType} onValueChange={setSearchFulfillmentType}>
+              <SelectTrigger className="h-9" data-testid="select-fulfillment-filter"><SelectValue placeholder="발송구분" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">전체</SelectItem>
+                <SelectItem value="self">자체발송</SelectItem>
+                <SelectItem value="vendor">외주발송</SelectItem>
               </SelectContent>
             </Select>
           </div>

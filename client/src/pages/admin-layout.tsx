@@ -51,6 +51,7 @@ const menuItems: MenuItem[] = [
     children: [
       { id: "admin-users", label: "관리자 관리", path: "/admin/admins" },
       { id: "partners", label: "협력업체 관리", path: "/admin/partners" },
+      { id: "vendors", label: "외주업체 관리", path: "/admin/vendors" },
       { id: "users", label: "회원관리", path: "/admin/users" },
       { id: "term-agreements", label: "약관 동의 기록", path: "/admin/term-agreements" },
     ]

@@ -481,18 +481,19 @@ export default function OrdersPendingPage() {
                   <TableHead className="font-semibold whitespace-nowrap">자체주문번호</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">운송장번호</TableHead>
                   <TableHead className="font-semibold whitespace-nowrap">택배사</TableHead>
+                  <TableHead className="font-semibold whitespace-nowrap">발송구분</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={20} className="text-center py-12">
+                    <TableCell colSpan={21} className="text-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
                     </TableCell>
                   </TableRow>
                 ) : displayedOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={20} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={21} className="text-center py-12 text-muted-foreground">
                       주문 대기 내역이 없습니다.
                     </TableCell>
                   </TableRow>
@@ -525,6 +526,13 @@ export default function OrdersPendingPage() {
                       <TableCell className="text-sm font-mono">{order.customOrderNumber || "-"}</TableCell>
                       <TableCell className="text-sm">{order.trackingNumber || "-"}</TableCell>
                       <TableCell className="text-sm">{order.courierCompany || "-"}</TableCell>
+                      <TableCell className="text-sm">
+                        {order.fulfillmentType === "vendor" ? (
+                          <span className="text-orange-600 dark:text-orange-400">외주</span>
+                        ) : (
+                          <span className="text-blue-600 dark:text-blue-400">자체</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

@@ -193,3 +193,15 @@ Preferred communication style: Simple, everyday language.
 - **Resend** (email)
 - **Juso.go.kr (행정안전부 주소 API)** (address verification)
 - **Anthropic Claude AI** (address normalization)
+
+## Recent Changes
+
+### 외주/벤더 시스템 Phase 1 (2026-02-09)
+- **DB 테이블**: `vendors` (외주업체), `product_vendors` (상품-업체 매핑) 추가
+- **스키마 확장**: `product_registrations`, `next_week_products`, `current_products`에 `isVendorProduct` 플래그 추가; `pending_orders`에 `vendorId`, `fulfillmentType`, `vendorPrice` 컬럼 추가
+- **관리자 페이지**: `/admin/vendors` 외주업체 CRUD 관리 페이지
+- **상품등록 연동**: 상품등록 페이지 하단에 외주업체 매핑 섹션 (ProductVendorSection)
+- **주문 목록**: 6개 주문 페이지 모두에 발송구분(자체/외주) 컬럼 표시
+- **현재공급가 필터**: 자체/외주 필터 추가
+- **전송 검증 분기**: 외주상품→업체매핑 확인, 자체상품→재료매핑 확인 (4개 전송 API)
+- **재고 로직**: 외주발송(fulfillmentType='vendor') 주문은 재료/상품 재고 차감 건너뜀; 자체발송 주문은 배송중 전환 시 product_stocks 차감 (트랜잭션 보장)

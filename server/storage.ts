@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialTypeRecord, type InsertMaterialType, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialTypesTable, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialTypeRecord, type InsertMaterialType, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, type Vendor, type NewVendor, type ProductVendor, type NewProductVendor, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialTypesTable, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements, vendors, productVendors } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -228,6 +228,21 @@ export interface IStorage {
   createAnnouncement(data: InsertAnnouncement): Promise<Announcement>;
   updateAnnouncement(id: string, data: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
   deleteAnnouncement(id: string): Promise<boolean>;
+
+  // Vendor methods (외주 협력업체)
+  getAllVendors(): Promise<Vendor[]>;
+  getVendor(id: number): Promise<Vendor | undefined>;
+  getVendorByLoginId(loginId: string): Promise<Vendor | undefined>;
+  createVendor(data: NewVendor): Promise<Vendor>;
+  updateVendor(id: number, data: Partial<NewVendor>): Promise<Vendor | undefined>;
+  toggleVendorActive(id: number): Promise<Vendor | undefined>;
+
+  // ProductVendor methods (상품-외주업체 매핑)
+  getProductVendorsByProductCode(productCode: string): Promise<ProductVendor[]>;
+  getProductVendorsByVendorId(vendorId: number): Promise<ProductVendor[]>;
+  createProductVendor(data: NewProductVendor): Promise<ProductVendor>;
+  updateProductVendor(id: number, data: Partial<NewProductVendor>): Promise<ProductVendor | undefined>;
+  deleteProductVendor(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1761,6 +1776,60 @@ export class DatabaseStorage implements IStorage {
   async deleteAnnouncement(id: string): Promise<boolean> {
     const result = await db.delete(announcements).where(eq(announcements.id, id));
     return true;
+  }
+
+  async getAllVendors(): Promise<Vendor[]> {
+    return await db.select().from(vendors).orderBy(desc(vendors.createdAt));
+  }
+
+  async getVendor(id: number): Promise<Vendor | undefined> {
+    const [vendor] = await db.select().from(vendors).where(eq(vendors.id, id));
+    return vendor;
+  }
+
+  async getVendorByLoginId(loginId: string): Promise<Vendor | undefined> {
+    const [vendor] = await db.select().from(vendors).where(eq(vendors.loginId, loginId));
+    return vendor;
+  }
+
+  async createVendor(data: NewVendor): Promise<Vendor> {
+    const [vendor] = await db.insert(vendors).values({ ...data, createdAt: new Date(), updatedAt: new Date() }).returning();
+    return vendor;
+  }
+
+  async updateVendor(id: number, data: Partial<NewVendor>): Promise<Vendor | undefined> {
+    const [vendor] = await db.update(vendors).set({ ...data, updatedAt: new Date() }).where(eq(vendors.id, id)).returning();
+    return vendor;
+  }
+
+  async toggleVendorActive(id: number): Promise<Vendor | undefined> {
+    const existing = await this.getVendor(id);
+    if (!existing) return undefined;
+    const [vendor] = await db.update(vendors).set({ isActive: !existing.isActive, updatedAt: new Date() }).where(eq(vendors.id, id)).returning();
+    return vendor;
+  }
+
+  async getProductVendorsByProductCode(productCode: string): Promise<ProductVendor[]> {
+    return await db.select().from(productVendors).where(eq(productVendors.productCode, productCode));
+  }
+
+  async getProductVendorsByVendorId(vendorId: number): Promise<ProductVendor[]> {
+    return await db.select().from(productVendors).where(eq(productVendors.vendorId, vendorId));
+  }
+
+  async createProductVendor(data: NewProductVendor): Promise<ProductVendor> {
+    const [pv] = await db.insert(productVendors).values({ ...data, updatedAt: new Date() }).returning();
+    return pv;
+  }
+
+  async updateProductVendor(id: number, data: Partial<NewProductVendor>): Promise<ProductVendor | undefined> {
+    const [pv] = await db.update(productVendors).set({ ...data, updatedAt: new Date() }).where(eq(productVendors.id, id)).returning();
+    return pv;
+  }
+
+  async deleteProductVendor(id: number): Promise<boolean> {
+    const result = await db.delete(productVendors).where(eq(productVendors.id, id)).returning();
+    return result.length > 0;
   }
 }
 

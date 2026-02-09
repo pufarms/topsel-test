@@ -427,6 +427,7 @@ export const productRegistrations = pgTable("product_registrations", {
   topMargin: integer("top_margin"),
   
   mappingStatus: text("mapping_status").notNull().default("incomplete"),
+  isVendorProduct: boolean("is_vendor_product").default(false),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -488,6 +489,7 @@ export const nextWeekProducts = pgTable("next_week_products", {
   drivingPrice: integer("driving_price").notNull(),
   topPrice: integer("top_price").notNull(),
   supplyStatus: text("supply_status").notNull().default("supply"),
+  isVendorProduct: boolean("is_vendor_product").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -516,6 +518,7 @@ export const currentProducts = pgTable("current_products", {
   supplyStatus: text("supply_status").notNull().default("supply"), // 'supply' | 'suspended'
   suspendedAt: timestamp("suspended_at"),
   suspendReason: text("suspend_reason"),
+  isVendorProduct: boolean("is_vendor_product").default(false),
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1281,6 +1284,10 @@ export const pendingOrders = pgTable("pending_orders", {
   
   priceConfirmed: boolean("price_confirmed").notNull().default(false),
   
+  vendorId: integer("vendor_id"),
+  fulfillmentType: varchar("fulfillment_type", { length: 10 }).default("self"),
+  vendorPrice: integer("vendor_price"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1477,3 +1484,48 @@ export const insertPointerHistorySchema = createInsertSchema(pointerHistory).omi
 });
 export type PointerHistory = typeof pointerHistory.$inferSelect;
 export type NewPointerHistory = z.infer<typeof insertPointerHistorySchema>;
+
+// 외주 협력업체 테이블
+export const vendors = pgTable("vendors", {
+  id: serial("id").primaryKey(),
+  companyName: varchar("company_name", { length: 100 }).notNull(),
+  contactName: varchar("contact_name", { length: 50 }),
+  contactPhone: varchar("contact_phone", { length: 20 }),
+  contactEmail: varchar("contact_email", { length: 100 }),
+  loginId: varchar("login_id", { length: 50 }).unique(),
+  loginPassword: varchar("login_password", { length: 255 }),
+  settlementCycle: varchar("settlement_cycle", { length: 20 }).default("monthly"),
+  bankName: varchar("bank_name", { length: 50 }),
+  bankAccount: varchar("bank_account", { length: 50 }),
+  bankHolder: varchar("bank_holder", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertVendorSchema = createInsertSchema(vendors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Vendor = typeof vendors.$inferSelect;
+export type NewVendor = z.infer<typeof insertVendorSchema>;
+
+// 상품-외주업체 매핑 테이블
+export const productVendors = pgTable("product_vendors", {
+  id: serial("id").primaryKey(),
+  productCode: varchar("product_code").notNull(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  vendorPrice: integer("vendor_price").notNull(),
+  isActive: boolean("is_active").default(true),
+  memo: text("memo"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProductVendorSchema = createInsertSchema(productVendors).omit({
+  id: true,
+  updatedAt: true,
+});
+export type ProductVendor = typeof productVendors.$inferSelect;
+export type NewProductVendor = z.infer<typeof insertProductVendorSchema>;

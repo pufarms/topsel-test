@@ -308,12 +308,13 @@ export default function OrdersReadyToShipPage() {
                     <TableHead className="w-[140px]">주문번호</TableHead>
                     <TableHead className="w-[140px]">운송장번호</TableHead>
                     <TableHead className="w-[100px]">택배사</TableHead>
+                    <TableHead className="w-[80px]">발송구분</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayedOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                         배송준비중 내역이 없습니다.
                       </TableCell>
                     </TableRow>
@@ -348,6 +349,13 @@ export default function OrdersReadyToShipPage() {
                         {order.trackingNumber || "-"}
                       </TableCell>
                       <TableCell data-testid={`text-courier-${order.id}`}>{order.courierCompany || "-"}</TableCell>
+                      <TableCell data-testid={`text-fulfillment-${order.id}`}>
+                        {order.fulfillmentType === "vendor" ? (
+                          <span className="text-orange-600 dark:text-orange-400">외주</span>
+                        ) : (
+                          <span className="text-blue-600 dark:text-blue-400">자체</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
