@@ -745,7 +745,7 @@ export default function OrdersAdminCancelPage() {
                     <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       {stockFilter === "deficit" 
                         ? "재고 부족인 원재료가 없습니다." 
-                        : "대기 상태의 주문이 없거나, 상품 매핑이 설정되지 않았습니다."}
+                        : "주문이 없거나, 상품 매핑이 설정되지 않았습니다."}
                     </TableCell>
                   </TableRow>
                 ) : (
