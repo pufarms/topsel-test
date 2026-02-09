@@ -637,10 +637,10 @@ export default function OrdersAdminCancelPage() {
 
       <AllocationSection />
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
         <CardHeader className="flex flex-col gap-3">
           <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
-            <CardTitle>원재료 기반 주문조정 재고표</CardTitle>
+            <CardTitle className="text-lg">원재료 기반 주문조정 재고표</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 border rounded-md p-0.5" data-testid="stock-filter-group">
                 <Button
@@ -1019,9 +1019,9 @@ export default function OrdersAdminCancelPage() {
         </DialogContent>
       </Dialog>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30">
         <CardHeader>
-          <CardTitle>주문조정(직권취소) 내역</CardTitle>
+          <CardTitle className="text-lg">주문조정(직권취소) 내역</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
           <DateRangeFilter onChange={setDateRange} />

@@ -246,12 +246,12 @@ export default function AllocationSection() {
   return (
     <>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <Card data-testid="allocation-section">
+        <Card data-testid="allocation-section" className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer flex flex-row items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                <CardTitle className="text-base">외주(공급)업체 일일 배분</CardTitle>
+                <CardTitle className="text-lg">외주(공급)업체 일일 배분</CardTitle>
                 {allocationsData && (
                   <div className="flex gap-2">
                     <Badge variant="secondary" data-testid="badge-alloc-total">상품 {allocationsData.totalProducts}</Badge>
