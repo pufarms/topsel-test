@@ -224,6 +224,9 @@ function Router() {
       <Route path="/partner">
         <PartnerAuthProvider><PartnerLayout><PartnerDashboard /></PartnerLayout></PartnerAuthProvider>
       </Route>
+      <Route path="/partner/dashboard">
+        <PartnerAuthProvider><PartnerLayout><PartnerDashboard /></PartnerLayout></PartnerAuthProvider>
+      </Route>
       <Route path="/partner/allocations">
         <PartnerAuthProvider><PartnerLayout><PartnerAllocations /></PartnerLayout></PartnerAuthProvider>
       </Route>
