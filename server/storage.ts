@@ -1872,7 +1872,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllocationDetailsByAllocationId(allocationId: number): Promise<AllocationDetail[]> {
-    return db.select().from(allocationDetails).where(eq(allocationDetails.allocationId, allocationId)).orderBy(allocationDetails.id);
+    const results = await db.select().from(allocationDetails).where(eq(allocationDetails.allocationId, allocationId)).orderBy(allocationDetails.id);
+    
+    const seen = new Map<string, AllocationDetail>();
+    const duplicateIds: number[] = [];
+    
+    for (const detail of results) {
+      const key = detail.vendorId !== null ? `vendor-${detail.vendorId}` : `self`;
+      if (seen.has(key)) {
+        const existing = seen.get(key)!;
+        const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        const currentTime = detail.updatedAt ? new Date(detail.updatedAt).getTime() : 0;
+        if (currentTime > existingTime) {
+          duplicateIds.push(existing.id);
+          seen.set(key, detail);
+        } else {
+          duplicateIds.push(detail.id);
+        }
+      } else {
+        seen.set(key, detail);
+      }
+    }
+    
+    if (duplicateIds.length > 0) {
+      await db.delete(allocationDetails).where(inArray(allocationDetails.id, duplicateIds));
+      console.log(`[배분 중복 정리] allocation_id=${allocationId}, 삭제된 중복 detail ids: ${duplicateIds.join(', ')}`);
+    }
+    
+    return Array.from(seen.values());
   }
 
   async getAllocationDetailsByVendorId(vendorId: number): Promise<AllocationDetail[]> {

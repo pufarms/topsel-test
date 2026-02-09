@@ -10518,22 +10518,36 @@ export async function registerRoutes(
         return res.status(400).json({ message: "업체 목록을 지정해 주세요" });
       }
 
+      const existingDetails = await storage.getAllocationDetailsByAllocationId(allocationId);
       const notifiedVendors = [];
       const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
       for (const vr of vendorRequests) {
         if (vr.vendorId === 0) {
-          const detail = await storage.createAllocationDetail({
-            allocationId,
-            vendorId: null,
-            vendorName: "자체(탑셀러)",
-            requestedQuantity: vr.requestedQuantity,
-            confirmedQuantity: vr.requestedQuantity,
-            vendorPrice: 0,
-            status: "responded",
-            notifiedAt: new Date(),
-            respondedAt: new Date(),
-          });
+          const existingDetail = existingDetails.find(d => d.vendorId === null && (d.vendorName === "자체(탑셀러)" || d.vendorName === "자체발송"));
+          let detail;
+          if (existingDetail) {
+            detail = await storage.updateAllocationDetail(existingDetail.id, {
+              requestedQuantity: vr.requestedQuantity,
+              confirmedQuantity: vr.requestedQuantity,
+              vendorPrice: 0,
+              status: "responded",
+              notifiedAt: new Date(),
+              respondedAt: new Date(),
+            });
+          } else {
+            detail = await storage.createAllocationDetail({
+              allocationId,
+              vendorId: null,
+              vendorName: "자체(탑셀러)",
+              requestedQuantity: vr.requestedQuantity,
+              confirmedQuantity: vr.requestedQuantity,
+              vendorPrice: 0,
+              status: "responded",
+              notifiedAt: new Date(),
+              respondedAt: new Date(),
+            });
+          }
 
           notifiedVendors.push({
             vendorId: 0,
@@ -10541,7 +10555,7 @@ export async function registerRoutes(
             requestedQuantity: vr.requestedQuantity,
             notified: true,
             kakaoSent: false,
-            detailId: detail.id,
+            detailId: detail!.id,
             selfAllocation: true,
           });
           continue;
@@ -10558,15 +10572,26 @@ export async function registerRoutes(
           ));
         const vPrice = pvList.length > 0 ? pvList[0].vendorPrice : null;
 
-        const detail = await storage.createAllocationDetail({
-          allocationId,
-          vendorId: vr.vendorId,
-          vendorName: vendor.companyName,
-          requestedQuantity: vr.requestedQuantity,
-          vendorPrice: vPrice,
-          status: "notified",
-          notifiedAt: new Date(),
-        });
+        const existingDetail = existingDetails.find(d => d.vendorId === vr.vendorId);
+        let detail;
+        if (existingDetail) {
+          detail = await storage.updateAllocationDetail(existingDetail.id, {
+            requestedQuantity: vr.requestedQuantity,
+            vendorPrice: vPrice,
+            status: "notified",
+            notifiedAt: new Date(),
+          });
+        } else {
+          detail = await storage.createAllocationDetail({
+            allocationId,
+            vendorId: vr.vendorId,
+            vendorName: vendor.companyName,
+            requestedQuantity: vr.requestedQuantity,
+            vendorPrice: vPrice,
+            status: "notified",
+            notifiedAt: new Date(),
+          });
+        }
 
         let kakaoSent = false;
         if (vendor.contactPhone) {
@@ -10585,7 +10610,7 @@ export async function registerRoutes(
           requestedQuantity: vr.requestedQuantity,
           notified: true,
           kakaoSent,
-          detailId: detail.id,
+          detailId: detail!.id,
         });
       }
 
@@ -10682,22 +10707,36 @@ export async function registerRoutes(
         return res.status(400).json({ message: "업체 목록을 지정해 주세요" });
       }
 
+      const existingDetails = await storage.getAllocationDetailsByAllocationId(allocationId);
       const notifiedVendors = [];
       const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
       for (const vr of vendorRequests) {
         if (vr.vendorId === 0) {
-          const detail = await storage.createAllocationDetail({
-            allocationId,
-            vendorId: null,
-            vendorName: "자체(탑셀러)",
-            requestedQuantity: vr.requestedQuantity,
-            confirmedQuantity: vr.requestedQuantity,
-            vendorPrice: 0,
-            status: "responded",
-            notifiedAt: new Date(),
-            respondedAt: new Date(),
-          });
+          const existingDetail = existingDetails.find(d => d.vendorId === null && (d.vendorName === "자체(탑셀러)" || d.vendorName === "자체발송"));
+          let detail;
+          if (existingDetail) {
+            detail = await storage.updateAllocationDetail(existingDetail.id, {
+              requestedQuantity: vr.requestedQuantity,
+              confirmedQuantity: vr.requestedQuantity,
+              vendorPrice: 0,
+              status: "responded",
+              notifiedAt: new Date(),
+              respondedAt: new Date(),
+            });
+          } else {
+            detail = await storage.createAllocationDetail({
+              allocationId,
+              vendorId: null,
+              vendorName: "자체(탑셀러)",
+              requestedQuantity: vr.requestedQuantity,
+              confirmedQuantity: vr.requestedQuantity,
+              vendorPrice: 0,
+              status: "responded",
+              notifiedAt: new Date(),
+              respondedAt: new Date(),
+            });
+          }
 
           notifiedVendors.push({
             vendorId: 0,
@@ -10705,7 +10744,7 @@ export async function registerRoutes(
             requestedQuantity: vr.requestedQuantity,
             notified: true,
             kakaoSent: false,
-            detailId: detail.id,
+            detailId: detail!.id,
             selfAllocation: true,
           });
           continue;
@@ -10722,15 +10761,26 @@ export async function registerRoutes(
           ));
         const vPrice = pvList.length > 0 ? pvList[0].vendorPrice : null;
 
-        const detail = await storage.createAllocationDetail({
-          allocationId,
-          vendorId: vr.vendorId,
-          vendorName: vendor.companyName,
-          requestedQuantity: vr.requestedQuantity,
-          vendorPrice: vPrice,
-          status: "notified",
-          notifiedAt: new Date(),
-        });
+        const existingDetail = existingDetails.find(d => d.vendorId === vr.vendorId);
+        let detail;
+        if (existingDetail) {
+          detail = await storage.updateAllocationDetail(existingDetail.id, {
+            requestedQuantity: vr.requestedQuantity,
+            vendorPrice: vPrice,
+            status: "notified",
+            notifiedAt: new Date(),
+          });
+        } else {
+          detail = await storage.createAllocationDetail({
+            allocationId,
+            vendorId: vr.vendorId,
+            vendorName: vendor.companyName,
+            requestedQuantity: vr.requestedQuantity,
+            vendorPrice: vPrice,
+            status: "notified",
+            notifiedAt: new Date(),
+          });
+        }
 
         let kakaoSent = false;
         if (vendor.contactPhone) {
@@ -10749,7 +10799,7 @@ export async function registerRoutes(
           requestedQuantity: vr.requestedQuantity,
           notified: true,
           kakaoSent,
-          detailId: detail.id,
+          detailId: detail!.id,
         });
       }
 
@@ -10804,17 +10854,30 @@ export async function registerRoutes(
       }
 
       if (selfQuantity && selfQuantity > 0) {
-        const selfDetail = await storage.createAllocationDetail({
-          allocationId,
-          vendorId: null,
-          vendorName: "자체발송",
-          requestedQuantity: selfQuantity,
-          confirmedQuantity: selfQuantity,
-          allocatedQuantity: selfQuantity,
-          status: "confirmed",
-          confirmedAt: new Date(),
-        });
-        confirmedDetails.push(selfDetail);
+        const existingDetails = await storage.getAllocationDetailsByAllocationId(allocationId);
+        const existingSelfDetail = existingDetails.find(d => d.vendorId === null && (d.vendorName === "자체(탑셀러)" || d.vendorName === "자체발송"));
+        let selfDetail;
+        if (existingSelfDetail) {
+          selfDetail = await storage.updateAllocationDetail(existingSelfDetail.id, {
+            requestedQuantity: selfQuantity,
+            confirmedQuantity: selfQuantity,
+            allocatedQuantity: selfQuantity,
+            status: "confirmed",
+            confirmedAt: new Date(),
+          });
+        } else {
+          selfDetail = await storage.createAllocationDetail({
+            allocationId,
+            vendorId: null,
+            vendorName: "자체(탑셀러)",
+            requestedQuantity: selfQuantity,
+            confirmedQuantity: selfQuantity,
+            allocatedQuantity: selfQuantity,
+            status: "confirmed",
+            confirmedAt: new Date(),
+          });
+        }
+        if (selfDetail) confirmedDetails.push(selfDetail);
       }
 
       const unallocated = allocation.totalQuantity - totalAllocated;
