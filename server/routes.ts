@@ -10691,7 +10691,7 @@ export async function registerRoutes(
       }
 
       const unallocated = allocation.totalQuantity - totalAllocated;
-      const newStatus = unallocated === 0 ? "confirmed" : allocation.status;
+      const newStatus = "confirmed";
 
       await storage.updateOrderAllocation(allocationId, {
         allocatedQuantity: totalAllocated,

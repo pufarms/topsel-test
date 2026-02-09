@@ -628,9 +628,23 @@ export default function OrdersAllocationsPage() {
               />
               <span className="text-xs text-muted-foreground">박스</span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              배분 합계: {confirmInputs.reduce((sum, c) => sum + c.allocatedQuantity, 0) + selfQuantity} / {selectedAllocation?.totalQuantity}
-            </div>
+            {(() => {
+              const totalAllocated = confirmInputs.reduce((sum, c) => sum + c.allocatedQuantity, 0) + selfQuantity;
+              const total = selectedAllocation?.totalQuantity || 0;
+              const unallocated = total - totalAllocated;
+              return (
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">
+                    배분 합계: {totalAllocated} / {total}
+                  </div>
+                  {unallocated > 0 && (
+                    <div className="text-xs text-destructive font-medium">
+                      미배분 {unallocated}건은 주문 배정 시 자동으로 "주문조정" 상태로 이동됩니다.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} data-testid="button-cancel-confirm">취소</Button>
