@@ -10844,14 +10844,27 @@ export async function registerRoutes(
             const order = unassignedOrders[orderIdx];
             const isVendor = detail.vendorId !== null;
 
-            await tx.update(pendingOrders)
-              .set({
-                vendorId: detail.vendorId,
-                fulfillmentType: isVendor ? "vendor" : "self",
-                vendorPrice: detail.vendorPrice,
-                updatedAt: new Date(),
-              })
-              .where(eq(pendingOrders.id, order.id));
+            if (isVendor) {
+              await tx.update(pendingOrders)
+                .set({
+                  vendorId: detail.vendorId,
+                  fulfillmentType: "vendor",
+                  vendorPrice: detail.vendorPrice,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pendingOrders.id, order.id));
+            } else {
+              await tx.update(pendingOrders)
+                .set({
+                  vendorId: null,
+                  fulfillmentType: "self",
+                  vendorPrice: null,
+                  status: "주문조정",
+                  memo: "자체배분 - 자체 주문관리 경로로 전환",
+                  updatedAt: new Date(),
+                })
+                .where(eq(pendingOrders.id, order.id));
+            }
 
             assigned++;
             vendorEntry.orderCount++;
