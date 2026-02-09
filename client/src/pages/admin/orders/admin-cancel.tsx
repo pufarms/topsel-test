@@ -644,16 +644,16 @@ export default function OrdersAdminCancelPage() {
 
       <AllocationSection />
 
-      <Collapsible open={isStockOpen} onOpenChange={setIsStockOpen}>
       <Card className="overflow-hidden border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
-        <CollapsibleTrigger asChild>
-        <CardHeader className="cursor-pointer flex flex-col gap-3">
-          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              {isStockOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-              <CardTitle className="text-lg">원재료 기반 주문조정 재고표</CardTitle>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
+        <Collapsible open={isStockOpen} onOpenChange={setIsStockOpen}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer flex flex-col gap-3">
+              <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  {isStockOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                  <CardTitle className="text-lg">원재료 기반 주문조정 재고표</CardTitle>
+                </div>
+            <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1 border rounded-md p-0.5" data-testid="stock-filter-group">
                 <Button
                   size="sm"
@@ -700,11 +700,11 @@ export default function OrdersAdminCancelPage() {
                 주문조정 실행
               </Button>
             </div>
-          </div>
-        </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-        <CardContent className="space-y-4 overflow-hidden">
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4 overflow-hidden">
           {deficitGroups.length > 0 && (
             <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
               <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -984,10 +984,10 @@ export default function OrdersAdminCancelPage() {
               )}
             </Button>
           </div>
-        </CardContent>
-        </CollapsibleContent>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
-      </Collapsible>
 
       <Dialog open={showDeficitDialog} onOpenChange={setShowDeficitDialog}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1034,18 +1034,18 @@ export default function OrdersAdminCancelPage() {
         </DialogContent>
       </Dialog>
 
-      <Collapsible open={isCancelOpen} onOpenChange={setIsCancelOpen}>
       <Card className="overflow-hidden border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30">
-        <CollapsibleTrigger asChild>
-        <CardHeader className="cursor-pointer">
-          <div className="flex items-center gap-2">
-            {isCancelOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-            <CardTitle className="text-lg">주문조정(직권취소) 내역</CardTitle>
-          </div>
-        </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-        <CardContent className="space-y-4 overflow-hidden">
+        <Collapsible open={isCancelOpen} onOpenChange={setIsCancelOpen}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer">
+              <div className="flex items-center gap-2">
+                {isCancelOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                <CardTitle className="text-lg">주문조정(직권취소) 내역</CardTitle>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4 overflow-hidden">
           <DateRangeFilter onChange={setDateRange} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
@@ -1194,10 +1194,10 @@ export default function OrdersAdminCancelPage() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-        </CollapsibleContent>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
-      </Collapsible>
     </div>
   );
 }
