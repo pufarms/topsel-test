@@ -332,9 +332,9 @@ export default function AllocationSection() {
                               )}
                             </td>
                             <td className="py-2 px-2 text-right">
-                              {alloc.status === "assigned" && (alloc.unallocatedQuantity ?? 0) > 0 ? (
+                              {(alloc.status === "confirmed" || alloc.status === "assigned") && (alloc.unallocatedQuantity ?? 0) > 0 ? (
                                 <span className="text-destructive font-medium">{alloc.unallocatedQuantity}</span>
-                              ) : alloc.status === "assigned" ? (
+                              ) : (alloc.status === "confirmed" || alloc.status === "assigned") ? (
                                 <span className="text-muted-foreground">0</span>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
