@@ -257,10 +257,6 @@ export function ProductVendorDialog({
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
-              ) : mappings.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4 border rounded-md">
-                  매핑된 외주업체가 없습니다
-                </p>
               ) : (
                 <div className="border rounded-md">
                   <Table>
@@ -274,6 +270,18 @@ export function ProductVendorDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      <TableRow className="bg-muted/30" data-testid="row-vendor-self-fulfillment">
+                        <TableCell className="text-xs font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">기본</Badge>
+                            자체 발송 (탑셀러)
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-right text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">항상 포함</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">-</TableCell>
+                        <TableCell className="text-xs text-center text-muted-foreground">-</TableCell>
+                      </TableRow>
                       {mappings.map((m) => (
                         <TableRow key={m.id} data-testid={`row-vendor-mapping-${m.id}`}>
                           <TableCell className="text-xs font-medium">{m.vendorName}</TableCell>
