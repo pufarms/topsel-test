@@ -2786,6 +2786,7 @@ export async function registerRoutes(
     
     for (const product of validProducts) {
       const existing = await storage.getCurrentProductByCode(product.productCode);
+      const reg = await storage.getProductRegistrationByCode(product.productCode);
       const productData = {
         productCode: product.productCode,
         productName: product.productName,
@@ -2797,7 +2798,7 @@ export async function registerRoutes(
         drivingPrice: roundUpToTen(product.drivingPrice),
         topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
-        isVendorProduct: product.isVendorProduct || false,
+        isVendorProduct: reg?.isVendorProduct || product.isVendorProduct || false,
         appliedAt: new Date(),
       };
       
@@ -2885,6 +2886,7 @@ export async function registerRoutes(
     
     for (const product of validProducts) {
       const existing = await storage.getCurrentProductByCode(product.productCode);
+      const reg = await storage.getProductRegistrationByCode(product.productCode);
       const productData = {
         productCode: product.productCode,
         productName: product.productName,
@@ -2896,7 +2898,7 @@ export async function registerRoutes(
         drivingPrice: roundUpToTen(product.drivingPrice),
         topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
-        isVendorProduct: product.isVendorProduct || false,
+        isVendorProduct: reg?.isVendorProduct || product.isVendorProduct || false,
         appliedAt: new Date(),
       };
       
@@ -10169,6 +10171,12 @@ export async function registerRoutes(
       if (duplicate) return res.status(400).json({ message: "이미 매핑된 업체입니다" });
 
       const pv = await storage.createProductVendor({ productCode, vendorId, vendorPrice, memo });
+
+      const reg = await storage.getProductRegistrationByCode(productCode);
+      if (reg && !reg.isVendorProduct) {
+        await storage.updateProductRegistration(reg.id, { isVendorProduct: true });
+      }
+
       const vendor = await storage.getVendor(vendorId);
       res.status(201).json({ ...pv, vendorName: vendor?.companyName || "알 수 없음" });
     } catch (error: any) {
@@ -10198,8 +10206,23 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
 
     try {
-      const result = await storage.deleteProductVendor(parseInt(req.params.id));
+      const pvId = parseInt(req.params.id);
+      const allMappings = await db.select().from(productVendors).where(eq(productVendors.id, pvId));
+      const targetMapping = allMappings[0];
+
+      const result = await storage.deleteProductVendor(pvId);
       if (!result) return res.status(404).json({ message: "매핑을 찾을 수 없습니다" });
+
+      if (targetMapping) {
+        const remaining = await storage.getProductVendorsByProductCode(targetMapping.productCode);
+        if (remaining.length === 0) {
+          const reg = await storage.getProductRegistrationByCode(targetMapping.productCode);
+          if (reg && reg.isVendorProduct) {
+            await storage.updateProductRegistration(reg.id, { isVendorProduct: false });
+          }
+        }
+      }
+
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "매핑 삭제 실패" });
