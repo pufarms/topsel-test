@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 interface MemberBalance {
@@ -237,7 +238,14 @@ export default function AdminSettlements() {
 
   return (
     <div>
-      <h1 className="text-xl md:text-2xl font-bold mb-6">정산관리</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
+        <h1 className="text-xl md:text-2xl font-bold">정산관리</h1>
+        <Link href="/admin/settlement-docs">
+          <Button variant="outline" size="sm" data-testid="button-settlement-docs">
+            <FileText className="h-4 w-4 mr-1" />정산 매뉴얼
+          </Button>
+        </Link>
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4 flex-wrap">

@@ -24,6 +24,7 @@ import TermAgreementsPage from "@/pages/admin/term-agreements";
 import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import AdminSettlements from "@/pages/admin/settlements";
+import SettlementDocs from "@/pages/admin/settlement-docs";
 import CategoryManagement from "@/pages/admin/products/categories";
 import ProductRegistrationPage from "@/pages/admin/products/registration";
 import NextWeekProductsPage from "@/pages/admin/products/next-week-products";
@@ -189,6 +190,9 @@ function Router() {
       </Route>
       <Route path="/admin/settlements">
         <AdminRoute><AdminSettlements /></AdminRoute>
+      </Route>
+      <Route path="/admin/settlement-docs">
+        <AdminRoute><SettlementDocs /></AdminRoute>
       </Route>
       <Route path="/admin/stats">
         <AdminRoute><PlaceholderPage title="통계관리" description="통계 데이터를 확인합니다" /></AdminRoute>
