@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial, decimal, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial, decimal, index, unique, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1531,3 +1531,53 @@ export const insertProductVendorSchema = createInsertSchema(productVendors).omit
 });
 export type ProductVendor = typeof productVendors.$inferSelect;
 export type NewProductVendor = z.infer<typeof insertProductVendorSchema>;
+
+export const orderAllocations = pgTable("order_allocations", {
+  id: serial("id").primaryKey(),
+  allocationDate: date("allocation_date").notNull(),
+  productCode: varchar("product_code").notNull(),
+  productName: varchar("product_name", { length: 200 }),
+  totalQuantity: integer("total_quantity").notNull(),
+  allocatedQuantity: integer("allocated_quantity").default(0),
+  unallocatedQuantity: integer("unallocated_quantity"),
+  status: varchar("status", { length: 20 }).default("pending"),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("order_allocations_date_product_unique").on(table.allocationDate, table.productCode),
+]);
+
+export const insertOrderAllocationSchema = createInsertSchema(orderAllocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OrderAllocation = typeof orderAllocations.$inferSelect;
+export type NewOrderAllocation = z.infer<typeof insertOrderAllocationSchema>;
+
+export const allocationDetails = pgTable("allocation_details", {
+  id: serial("id").primaryKey(),
+  allocationId: integer("allocation_id").notNull().references(() => orderAllocations.id),
+  vendorId: integer("vendor_id").references(() => vendors.id),
+  vendorName: varchar("vendor_name", { length: 100 }),
+  requestedQuantity: integer("requested_quantity").default(0),
+  confirmedQuantity: integer("confirmed_quantity"),
+  allocatedQuantity: integer("allocated_quantity").default(0),
+  vendorPrice: integer("vendor_price"),
+  status: varchar("status", { length: 20 }).default("pending"),
+  notifiedAt: timestamp("notified_at"),
+  respondedAt: timestamp("responded_at"),
+  confirmedAt: timestamp("confirmed_at"),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAllocationDetailSchema = createInsertSchema(allocationDetails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AllocationDetail = typeof allocationDetails.$inferSelect;
+export type NewAllocationDetail = z.infer<typeof insertAllocationDetailSchema>;

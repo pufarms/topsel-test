@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -10157,6 +10157,572 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "매핑 삭제 실패" });
+    }
+  });
+
+  // ============================================
+  // Phase 2: 배분 시스템 API
+  // ============================================
+
+  // Phase 2-2: 외주상품 자동 분류 + 수량 집계
+  app.post('/api/admin/allocations/generate', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const { date } = req.body;
+      if (!date) return res.status(400).json({ message: "날짜를 지정해 주세요" });
+
+      const vendorProductCodes = await db.select({ productCode: productVendors.productCode })
+        .from(productVendors)
+        .where(eq(productVendors.isActive, true));
+      const vpCodes = [...new Set(vendorProductCodes.map(v => v.productCode))];
+
+      const regVendorProducts = await db.select({ productCode: productRegistrations.productCode })
+        .from(productRegistrations)
+        .where(eq(productRegistrations.isVendorProduct, true));
+      const regCodes = regVendorProducts.map(r => r.productCode);
+
+      const allVendorCodes = [...new Set([...vpCodes, ...regCodes])];
+      if (allVendorCodes.length === 0) {
+        return res.json({ date, totalProducts: 0, allocations: [] });
+      }
+
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const vendorOrders = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          inArray(pendingOrders.productCode, allVendorCodes),
+          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중")),
+          gte(pendingOrders.createdAt, startOfDay),
+          lte(pendingOrders.createdAt, endOfDay)
+        ));
+
+      const productGroups: Record<string, { productName: string; count: number }> = {};
+      for (const order of vendorOrders) {
+        if (!productGroups[order.productCode]) {
+          productGroups[order.productCode] = { productName: order.productName, count: 0 };
+        }
+        productGroups[order.productCode].count++;
+      }
+
+      const allocations = [];
+      for (const [productCode, info] of Object.entries(productGroups)) {
+        const existing = await db.select().from(orderAllocations)
+          .where(and(
+            eq(orderAllocations.allocationDate, date),
+            eq(orderAllocations.productCode, productCode)
+          ));
+
+        let allocation;
+        if (existing.length > 0) {
+          allocation = await storage.updateOrderAllocation(existing[0].id, {
+            totalQuantity: info.count,
+            unallocatedQuantity: info.count - (existing[0].allocatedQuantity || 0),
+            productName: info.productName,
+          });
+        } else {
+          allocation = await storage.createOrderAllocation({
+            allocationDate: date,
+            productCode,
+            productName: info.productName,
+            totalQuantity: info.count,
+            allocatedQuantity: 0,
+            unallocatedQuantity: info.count,
+            status: "pending",
+          });
+        }
+
+        const availableVendors = await db.select({
+          vendorId: productVendors.vendorId,
+          vendorPrice: productVendors.vendorPrice,
+        }).from(productVendors)
+          .where(and(
+            eq(productVendors.productCode, productCode),
+            eq(productVendors.isActive, true)
+          ));
+
+        const vendorInfos = [];
+        for (const pv of availableVendors) {
+          const vendor = await storage.getVendor(pv.vendorId);
+          if (vendor && vendor.isActive) {
+            vendorInfos.push({
+              vendorId: pv.vendorId,
+              companyName: vendor.companyName,
+              vendorPrice: pv.vendorPrice,
+            });
+          }
+        }
+
+        allocations.push({
+          ...allocation,
+          availableVendors: vendorInfos,
+        });
+      }
+
+      res.json({ date, totalProducts: allocations.length, allocations });
+    } catch (error: any) {
+      console.error("배분 집계 실패:", error);
+      res.status(500).json({ message: error.message || "배분 집계 실패" });
+    }
+  });
+
+  // Phase 2-2: 날짜별 배분 현황 조회
+  app.get('/api/admin/allocations', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const date = req.query.date as string;
+      if (!date) return res.status(400).json({ message: "날짜를 지정해 주세요" });
+
+      const allocationsList = await storage.getOrderAllocationsByDate(date);
+
+      const result = [];
+      let totalProducts = 0, confirmedCount = 0, pendingCount = 0;
+
+      for (const alloc of allocationsList) {
+        totalProducts++;
+        if (alloc.status === "confirmed") confirmedCount++;
+        else pendingCount++;
+
+        const details = await storage.getAllocationDetailsByAllocationId(alloc.id);
+
+        const availableVendors = await db.select({
+          vendorId: productVendors.vendorId,
+          vendorPrice: productVendors.vendorPrice,
+        }).from(productVendors)
+          .where(and(
+            eq(productVendors.productCode, alloc.productCode),
+            eq(productVendors.isActive, true)
+          ));
+
+        const vendorInfos = [];
+        for (const pv of availableVendors) {
+          const vendor = await storage.getVendor(pv.vendorId);
+          if (vendor && vendor.isActive) {
+            vendorInfos.push({
+              vendorId: pv.vendorId,
+              companyName: vendor.companyName,
+              vendorPrice: pv.vendorPrice,
+            });
+          }
+        }
+
+        result.push({
+          ...alloc,
+          details,
+          availableVendors: vendorInfos,
+        });
+      }
+
+      res.json({
+        date,
+        totalProducts,
+        confirmedCount,
+        pendingCount,
+        allocations: result,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "배분 현황 조회 실패" });
+    }
+  });
+
+  // Phase 2-2: 특정 배분 마스터 상세 조회
+  app.get('/api/admin/allocations/:id', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const id = parseInt(req.params.id);
+      const allocation = await storage.getOrderAllocationById(id);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      const details = await storage.getAllocationDetailsByAllocationId(id);
+
+      const relatedOrders = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.productCode, allocation.productCode),
+          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
+        ))
+        .orderBy(pendingOrders.createdAt);
+
+      res.json({ ...allocation, details, relatedOrders });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "배분 상세 조회 실패" });
+    }
+  });
+
+  // Phase 2-3: 업체 알림 발송
+  app.post('/api/admin/allocations/:allocationId/notify', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      const { vendors: vendorRequests } = req.body;
+      if (!vendorRequests || !Array.isArray(vendorRequests) || vendorRequests.length === 0) {
+        return res.status(400).json({ message: "업체 목록을 지정해 주세요" });
+      }
+
+      const notifiedVendors = [];
+      const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
+
+      for (const vr of vendorRequests) {
+        const vendor = await storage.getVendor(vr.vendorId);
+        if (!vendor) continue;
+
+        const pvList = await db.select().from(productVendors)
+          .where(and(
+            eq(productVendors.productCode, allocation.productCode),
+            eq(productVendors.vendorId, vr.vendorId),
+            eq(productVendors.isActive, true)
+          ));
+        const vPrice = pvList.length > 0 ? pvList[0].vendorPrice : null;
+
+        const detail = await storage.createAllocationDetail({
+          allocationId,
+          vendorId: vr.vendorId,
+          vendorName: vendor.companyName,
+          requestedQuantity: vr.requestedQuantity,
+          vendorPrice: vPrice,
+          status: "notified",
+          notifiedAt: new Date(),
+        });
+
+        let kakaoSent = false;
+        if (vendor.contactPhone) {
+          try {
+            const message = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            await solapiService.sendSMS(vendor.contactPhone, message);
+            kakaoSent = true;
+          } catch (err) {
+            console.error(`[배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
+          }
+        }
+
+        notifiedVendors.push({
+          vendorId: vr.vendorId,
+          companyName: vendor.companyName,
+          requestedQuantity: vr.requestedQuantity,
+          notified: true,
+          kakaoSent,
+          detailId: detail.id,
+        });
+      }
+
+      await storage.updateOrderAllocation(allocationId, { status: "waiting" });
+
+      res.json({
+        allocationId,
+        notifiedVendors,
+        deadline: deadline.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("업체 알림 발송 실패:", error);
+      res.status(500).json({ message: error.message || "알림 발송 실패" });
+    }
+  });
+
+  // Phase 2-3: 알림/회신 현황 조회
+  app.get('/api/admin/allocations/:allocationId/details', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      const details = await storage.getAllocationDetailsByAllocationId(allocationId);
+
+      const enrichedDetails = details.map(d => ({
+        ...d,
+        deadlineExceeded: d.notifiedAt ? (Date.now() - new Date(d.notifiedAt).getTime()) > 2 * 60 * 60 * 1000 : false,
+      }));
+
+      res.json({ allocation, details: enrichedDetails });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "알림/회신 현황 조회 실패" });
+    }
+  });
+
+  // Phase 2-4: 가능수량 접수 (관리자 대신 입력)
+  app.put('/api/admin/allocation-details/:detailId/respond', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const detailId = parseInt(req.params.detailId);
+      const { confirmedQuantity, memo } = req.body;
+      if (confirmedQuantity === undefined || confirmedQuantity === null) {
+        return res.status(400).json({ message: "확인수량을 입력해 주세요" });
+      }
+
+      const updated = await storage.updateAllocationDetail(detailId, {
+        confirmedQuantity,
+        status: "responded",
+        respondedAt: new Date(),
+        memo: memo || undefined,
+      });
+      if (!updated) return res.status(404).json({ message: "배분 상세를 찾을 수 없습니다" });
+
+      const allocation = await storage.getOrderAllocationById(updated.allocationId);
+      const sufficient = confirmedQuantity >= (updated.requestedQuantity || 0);
+
+      res.json({ ...updated, sufficient, allocation });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "가능수량 접수 실패" });
+    }
+  });
+
+  // Phase 2-4: 추가 업체 알림
+  app.post('/api/admin/allocations/:allocationId/notify-additional', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      const { vendors: vendorRequests } = req.body;
+      if (!vendorRequests || !Array.isArray(vendorRequests) || vendorRequests.length === 0) {
+        return res.status(400).json({ message: "업체 목록을 지정해 주세요" });
+      }
+
+      const notifiedVendors = [];
+      const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
+
+      for (const vr of vendorRequests) {
+        const vendor = await storage.getVendor(vr.vendorId);
+        if (!vendor) continue;
+
+        const pvList = await db.select().from(productVendors)
+          .where(and(
+            eq(productVendors.productCode, allocation.productCode),
+            eq(productVendors.vendorId, vr.vendorId),
+            eq(productVendors.isActive, true)
+          ));
+        const vPrice = pvList.length > 0 ? pvList[0].vendorPrice : null;
+
+        const detail = await storage.createAllocationDetail({
+          allocationId,
+          vendorId: vr.vendorId,
+          vendorName: vendor.companyName,
+          requestedQuantity: vr.requestedQuantity,
+          vendorPrice: vPrice,
+          status: "notified",
+          notifiedAt: new Date(),
+        });
+
+        let kakaoSent = false;
+        if (vendor.contactPhone) {
+          try {
+            const message = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            await solapiService.sendSMS(vendor.contactPhone, message);
+            kakaoSent = true;
+          } catch (err) {
+            console.error(`[추가 배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
+          }
+        }
+
+        notifiedVendors.push({
+          vendorId: vr.vendorId,
+          companyName: vendor.companyName,
+          requestedQuantity: vr.requestedQuantity,
+          notified: true,
+          kakaoSent,
+          detailId: detail.id,
+        });
+      }
+
+      res.json({ allocationId, notifiedVendors, deadline: deadline.toISOString() });
+    } catch (error: any) {
+      console.error("추가 알림 발송 실패:", error);
+      res.status(500).json({ message: error.message || "추가 알림 발송 실패" });
+    }
+  });
+
+  // Phase 2-4: 배분 확정
+  app.post('/api/admin/allocations/:allocationId/confirm', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      const { details: detailUpdates, selfQuantity } = req.body;
+      if (!detailUpdates || !Array.isArray(detailUpdates)) {
+        return res.status(400).json({ message: "배분 상세 정보를 지정해 주세요" });
+      }
+
+      let totalAllocated = 0;
+      const confirmedDetails = [];
+
+      for (const du of detailUpdates) {
+        const qty = du.allocatedQuantity || 0;
+        totalAllocated += qty;
+
+        const status = qty > 0 ? "confirmed" : "rejected";
+        const updated = await storage.updateAllocationDetail(du.detailId, {
+          allocatedQuantity: qty,
+          status,
+          confirmedAt: qty > 0 ? new Date() : undefined,
+        });
+        if (updated) confirmedDetails.push(updated);
+      }
+
+      if (selfQuantity && selfQuantity > 0) {
+        totalAllocated += selfQuantity;
+        const selfDetail = await storage.createAllocationDetail({
+          allocationId,
+          vendorId: null,
+          vendorName: "자체발송",
+          requestedQuantity: selfQuantity,
+          confirmedQuantity: selfQuantity,
+          allocatedQuantity: selfQuantity,
+          status: "confirmed",
+          confirmedAt: new Date(),
+        });
+        confirmedDetails.push(selfDetail);
+      }
+
+      if (totalAllocated > allocation.totalQuantity) {
+        return res.status(400).json({
+          message: `배분 총량(${totalAllocated})이 필요수량(${allocation.totalQuantity})을 초과합니다`,
+        });
+      }
+
+      const unallocated = allocation.totalQuantity - totalAllocated;
+      const newStatus = unallocated === 0 ? "confirmed" : allocation.status;
+
+      await storage.updateOrderAllocation(allocationId, {
+        allocatedQuantity: totalAllocated,
+        unallocatedQuantity: unallocated,
+        status: newStatus,
+      });
+
+      const updatedAllocation = await storage.getOrderAllocationById(allocationId);
+
+      res.json({
+        allocationId,
+        productCode: allocation.productCode,
+        totalQuantity: allocation.totalQuantity,
+        allocatedQuantity: totalAllocated,
+        unallocatedQuantity: unallocated,
+        details: confirmedDetails.map(d => ({
+          detailId: d.id,
+          vendorId: d.vendorId,
+          vendorName: d.vendorName,
+          allocatedQuantity: d.allocatedQuantity,
+          vendorPrice: d.vendorPrice,
+          status: d.status,
+        })),
+        status: newStatus,
+      });
+    } catch (error: any) {
+      console.error("배분 확정 실패:", error);
+      res.status(500).json({ message: error.message || "배분 확정 실패" });
+    }
+  });
+
+  // Phase 2-5: 배분 확정 → 주문 배정
+  app.post('/api/admin/allocations/:allocationId/assign-orders', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      if (allocation.status !== "confirmed") {
+        return res.status(400).json({ message: "배분이 확정되지 않았습니다. 먼저 배분을 확정해 주세요." });
+      }
+
+      const confirmedDetails = await db.select()
+        .from(allocationDetails)
+        .where(and(
+          eq(allocationDetails.allocationId, allocationId),
+          eq(allocationDetails.status, "confirmed")
+        ))
+        .orderBy(allocationDetails.id);
+
+      if (confirmedDetails.length === 0) {
+        return res.status(400).json({ message: "확정된 배분 상세가 없습니다" });
+      }
+
+      const unassignedOrders = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.productCode, allocation.productCode),
+          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중")),
+          sql`${pendingOrders.vendorId} IS NULL`
+        ))
+        .orderBy(pendingOrders.createdAt);
+
+      const byVendor: { vendorId: number | null; companyName: string; orderCount: number; totalQuantity: number }[] = [];
+
+      await db.transaction(async (tx) => {
+        let orderIdx = 0;
+        for (const detail of confirmedDetails) {
+          let assigned = 0;
+          const vendorEntry = { vendorId: detail.vendorId, companyName: detail.vendorName || "자체발송", orderCount: 0, totalQuantity: 0 };
+
+          while (assigned < (detail.allocatedQuantity || 0) && orderIdx < unassignedOrders.length) {
+            const order = unassignedOrders[orderIdx];
+            const isVendor = detail.vendorId !== null;
+
+            await tx.update(pendingOrders)
+              .set({
+                vendorId: detail.vendorId,
+                fulfillmentType: isVendor ? "vendor" : "self",
+                vendorPrice: detail.vendorPrice,
+                updatedAt: new Date(),
+              })
+              .where(eq(pendingOrders.id, order.id));
+
+            assigned++;
+            vendorEntry.orderCount++;
+            vendorEntry.totalQuantity++;
+            orderIdx++;
+          }
+
+          byVendor.push(vendorEntry);
+        }
+      });
+
+      const totalAssigned = byVendor.reduce((sum, v) => sum + v.orderCount, 0);
+
+      res.json({
+        allocationId,
+        assignedOrders: totalAssigned,
+        byVendor,
+      });
+    } catch (error: any) {
+      console.error("주문 배정 실패:", error);
+      res.status(500).json({ message: error.message || "주문 배정 실패" });
     }
   });
 

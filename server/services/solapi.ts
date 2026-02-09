@@ -565,6 +565,28 @@ class SolapiService {
       };
     }
   }
+  async sendSMS(to: string, text: string): Promise<SendResult> {
+    if (!this.messageService) {
+      console.warn('[Solapi] API 키 미설정 - SMS 발송 건너뜀');
+      return { successCount: 0, failCount: 1, data: { error: 'API key not configured' } };
+    }
+    if (!this.sender) {
+      console.warn('[Solapi] 발신번호 미설정 - SMS 발송 건너뜀');
+      return { successCount: 0, failCount: 1, data: { error: 'Sender not configured' } };
+    }
+    try {
+      const result = await this.messageService.send([{
+        to,
+        from: this.sender,
+        text,
+      }]);
+      console.log(`[Solapi] SMS 발송 완료: ${to}`);
+      return { successCount: 1, failCount: 0, data: result };
+    } catch (error: any) {
+      console.error(`[Solapi] SMS 발송 실패 (${to}):`, error.message);
+      return { successCount: 0, failCount: 1, data: { error: error.message } };
+    }
+  }
 }
 
 export const solapiService = new SolapiService();

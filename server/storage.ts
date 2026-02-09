@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialTypeRecord, type InsertMaterialType, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, type Vendor, type NewVendor, type ProductVendor, type NewProductVendor, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialTypesTable, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements, vendors, productVendors } from "@shared/schema";
+import { type User, type InsertUser, type Order, type InsertOrder, type Image, type InsertImage, type ImageSubcategory, type InsertSubcategory, type Partner, type InsertPartner, type Product, type InsertProduct, type PartnerProduct, type InsertPartnerProduct, type Member, type InsertMember, type MemberLog, type InsertMemberLog, type Category, type InsertCategory, type ProductRegistration, type InsertProductRegistration, type NextWeekProduct, type InsertNextWeekProduct, type CurrentProduct, type InsertCurrentProduct, type MaterialTypeRecord, type InsertMaterialType, type MaterialCategoryLarge, type InsertMaterialCategoryLarge, type MaterialCategoryMedium, type InsertMaterialCategoryMedium, type MaterialCategorySmall, type InsertMaterialCategorySmall, type Material, type InsertMaterial, type ProductMapping, type InsertProductMapping, type ProductMaterialMapping, type InsertProductMaterialMapping, type ProductStock, type InsertProductStock, type StockHistory, type InsertStockHistory, type SiteSetting, type InsertSiteSetting, type HeaderMenu, type InsertHeaderMenu, type Page, type InsertPage, type Announcement, type InsertAnnouncement, type Vendor, type NewVendor, type ProductVendor, type NewProductVendor, type OrderAllocation, type NewOrderAllocation, type AllocationDetail, type NewAllocationDetail, users, orders, images, imageSubcategories, partners, products, partnerProducts, members, memberLogs, categories, productRegistrations, nextWeekProducts, currentProducts, materialTypesTable, materialCategoriesLarge, materialCategoriesMedium, materialCategoriesSmall, materials, productMappings, productMaterialMappings, productStocks, stockHistory, siteSettings, headerMenus, pages, announcements, vendors, productVendors, orderAllocations, allocationDetails } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, and, inArray, gte, lte, like } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -243,6 +243,19 @@ export interface IStorage {
   createProductVendor(data: NewProductVendor): Promise<ProductVendor>;
   updateProductVendor(id: number, data: Partial<NewProductVendor>): Promise<ProductVendor | undefined>;
   deleteProductVendor(id: number): Promise<boolean>;
+
+  // OrderAllocation methods (배분 마스터)
+  createOrderAllocation(data: NewOrderAllocation): Promise<OrderAllocation>;
+  getOrderAllocationsByDate(date: string): Promise<OrderAllocation[]>;
+  getOrderAllocationById(id: number): Promise<OrderAllocation | undefined>;
+  updateOrderAllocation(id: number, data: Partial<NewOrderAllocation>): Promise<OrderAllocation | undefined>;
+
+  // AllocationDetail methods (배분 상세)
+  createAllocationDetail(data: NewAllocationDetail): Promise<AllocationDetail>;
+  getAllocationDetailsByAllocationId(allocationId: number): Promise<AllocationDetail[]>;
+  getAllocationDetailsByVendorId(vendorId: number): Promise<AllocationDetail[]>;
+  updateAllocationDetail(id: number, data: Partial<NewAllocationDetail>): Promise<AllocationDetail | undefined>;
+  deleteAllocationDetail(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1829,6 +1842,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductVendor(id: number): Promise<boolean> {
     const result = await db.delete(productVendors).where(eq(productVendors.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // OrderAllocation methods (배분 마스터)
+  async createOrderAllocation(data: NewOrderAllocation): Promise<OrderAllocation> {
+    const [result] = await db.insert(orderAllocations).values({ ...data, updatedAt: new Date() }).returning();
+    return result;
+  }
+
+  async getOrderAllocationsByDate(date: string): Promise<OrderAllocation[]> {
+    return db.select().from(orderAllocations).where(eq(orderAllocations.allocationDate, date)).orderBy(orderAllocations.productCode);
+  }
+
+  async getOrderAllocationById(id: number): Promise<OrderAllocation | undefined> {
+    const [result] = await db.select().from(orderAllocations).where(eq(orderAllocations.id, id));
+    return result;
+  }
+
+  async updateOrderAllocation(id: number, data: Partial<NewOrderAllocation>): Promise<OrderAllocation | undefined> {
+    const [result] = await db.update(orderAllocations).set({ ...data, updatedAt: new Date() }).where(eq(orderAllocations.id, id)).returning();
+    return result;
+  }
+
+  // AllocationDetail methods (배분 상세)
+  async createAllocationDetail(data: NewAllocationDetail): Promise<AllocationDetail> {
+    const [result] = await db.insert(allocationDetails).values({ ...data, updatedAt: new Date() }).returning();
+    return result;
+  }
+
+  async getAllocationDetailsByAllocationId(allocationId: number): Promise<AllocationDetail[]> {
+    return db.select().from(allocationDetails).where(eq(allocationDetails.allocationId, allocationId)).orderBy(allocationDetails.id);
+  }
+
+  async getAllocationDetailsByVendorId(vendorId: number): Promise<AllocationDetail[]> {
+    return db.select().from(allocationDetails).where(eq(allocationDetails.vendorId, vendorId)).orderBy(desc(allocationDetails.createdAt));
+  }
+
+  async updateAllocationDetail(id: number, data: Partial<NewAllocationDetail>): Promise<AllocationDetail | undefined> {
+    const [result] = await db.update(allocationDetails).set({ ...data, updatedAt: new Date() }).where(eq(allocationDetails.id, id)).returning();
+    return result;
+  }
+
+  async deleteAllocationDetail(id: number): Promise<boolean> {
+    const result = await db.delete(allocationDetails).where(eq(allocationDetails.id, id)).returning();
     return result.length > 0;
   }
 }
