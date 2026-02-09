@@ -45,6 +45,15 @@ interface Allocation {
   availableVendors?: AvailableVendor[];
 }
 
+interface AssignResult {
+  allocationId: number;
+  assignedOrders: number;
+  adjustedOrders: number;
+  adjustReason?: string;
+  byVendor: { vendorId: number | null; companyName: string; orderCount: number; totalQuantity: number }[];
+  adjustedOrderIds?: string[];
+}
+
 interface AllocationsResponse {
   date: string;
   totalProducts: number;
@@ -84,6 +93,8 @@ export default function OrdersAllocationsPage() {
   const [additionalNotifyDialogOpen, setAdditionalNotifyDialogOpen] = useState(false);
   const [respondDialogOpen, setRespondDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignTargetAllocation, setAssignTargetAllocation] = useState<Allocation | null>(null);
 
   const [vendorInputs, setVendorInputs] = useState<{ vendorId: number; companyName: string; requestedQuantity: number; vendorPrice: number }[]>([]);
   const [additionalVendorInputs, setAdditionalVendorInputs] = useState<{ vendorId: number; companyName: string; requestedQuantity: number; vendorPrice: number }[]>([]);
@@ -104,6 +115,8 @@ export default function OrdersAllocationsPage() {
   const refreshAll = () => {
     refetch();
     if (selectedAllocation?.id) refetchDetails();
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
   };
 
   const generateMutation = useMutation({
@@ -160,14 +173,24 @@ export default function OrdersAllocationsPage() {
   });
 
   const assignMutation = useMutation({
-    mutationFn: (allocationId: number) =>
-      apiRequest("POST", `/api/admin/allocations/${allocationId}/assign-orders`),
-    onSuccess: async (res) => {
-      const result = await res.json();
-      toast({ title: "주문 배정 완료", description: `${result.assignedOrders}건 배정됨` });
+    mutationFn: async (allocationId: number) => {
+      const res = await apiRequest("POST", `/api/admin/allocations/${allocationId}/assign-orders`);
+      return await res.json() as AssignResult;
+    },
+    onSuccess: (result: AssignResult) => {
+      const desc = result.adjustedOrders > 0
+        ? `${result.assignedOrders}건 배정, ${result.adjustedOrders}건 주문조정 처리됨`
+        : `${result.assignedOrders}건 배정 완료`;
+      toast({ title: "주문 배정 완료", description: desc });
+      setAssignDialogOpen(false);
+      setAssignTargetAllocation(null);
       refreshAll();
     },
-    onError: (err: any) => toast({ title: "주문 배정 실패", description: err.message, variant: "destructive" }),
+    onError: (err: any) => {
+      toast({ title: "주문 배정 실패", description: err.message, variant: "destructive" });
+      setAssignDialogOpen(false);
+      setAssignTargetAllocation(null);
+    },
   });
 
   const openNotifyDialog = (alloc: Allocation) => {
@@ -299,7 +322,15 @@ export default function OrdersAllocationsPage() {
                         <td className="py-2 px-2">{alloc.productName}</td>
                         <td className="py-2 px-2 text-right font-bold">{alloc.totalQuantity}</td>
                         <td className="py-2 px-2 text-right">{alloc.allocatedQuantity || 0}</td>
-                        <td className="py-2 px-2 text-right">{alloc.unallocatedQuantity ?? alloc.totalQuantity}</td>
+                        <td className="py-2 px-2 text-right">
+                          {(alloc.unallocatedQuantity != null && alloc.unallocatedQuantity > 0) ? (
+                            <span className="text-destructive font-medium">{alloc.unallocatedQuantity}</span>
+                          ) : (
+                            alloc.status === "confirmed"
+                              ? <span>{(alloc.totalQuantity - (alloc.allocatedQuantity || 0))}</span>
+                              : <span>{alloc.unallocatedQuantity ?? alloc.totalQuantity}</span>
+                          )}
+                        </td>
                         <td className="py-2 px-2 text-center">
                           <Badge variant={sc.variant} data-testid={`badge-status-${alloc.id}`}>{sc.label}</Badge>
                         </td>
@@ -311,7 +342,7 @@ export default function OrdersAllocationsPage() {
                               </Button>
                             )}
                             {alloc.status === "confirmed" && (
-                              <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); assignMutation.mutate(alloc.id); }} disabled={assignMutation.isPending} data-testid={`button-assign-${alloc.id}`}>
+                              <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); setAssignTargetAllocation(alloc); setAssignDialogOpen(true); }} disabled={assignMutation.isPending} data-testid={`button-assign-${alloc.id}`}>
                                 <Truck className="h-3 w-3 mr-1" />배정
                               </Button>
                             )}
@@ -610,6 +641,63 @@ export default function OrdersAllocationsPage() {
             >
               {confirmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               배분 확정
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>주문 배정 확인</DialogTitle>
+          </DialogHeader>
+          {assignTargetAllocation && (
+            <div className="space-y-3">
+              <div className="text-sm">
+                <span className="font-medium">상품:</span> {assignTargetAllocation.productName} ({assignTargetAllocation.productCode})
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>총 필요수량:</span>
+                  <span className="font-bold">{assignTargetAllocation.totalQuantity}건</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>배정 가능:</span>
+                  <span className="font-bold text-foreground">{assignTargetAllocation.allocatedQuantity || 0}건</span>
+                </div>
+                {(() => {
+                  const unalloc = assignTargetAllocation.totalQuantity - (assignTargetAllocation.allocatedQuantity || 0);
+                  return unalloc > 0 ? (
+                    <div className="flex justify-between">
+                      <span>미배정 (주문조정 예정):</span>
+                      <span className="font-bold text-destructive">{unalloc}건</span>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+              {(() => {
+                const unalloc = assignTargetAllocation.totalQuantity - (assignTargetAllocation.allocatedQuantity || 0);
+                return unalloc > 0 ? (
+                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 inline mr-1" />
+                    배정을 진행하면 미배정 주문 {unalloc}건은 자동으로 주문조정 처리됩니다.
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAssignDialogOpen(false); setAssignTargetAllocation(null); }} data-testid="button-cancel-assign">취소</Button>
+            <Button
+              onClick={() => {
+                if (!assignTargetAllocation) return;
+                assignMutation.mutate(assignTargetAllocation.id);
+              }}
+              disabled={assignMutation.isPending}
+              data-testid="button-submit-assign"
+            >
+              {assignMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Truck className="h-4 w-4 mr-1" />}
+              배정 진행
             </Button>
           </DialogFooter>
         </DialogContent>

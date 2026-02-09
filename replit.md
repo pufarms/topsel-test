@@ -124,14 +124,14 @@ Preferred communication style: Simple, everyday language.
 ### Frontend
 -   **Framework**: React 18 with TypeScript, Wouter for routing.
 -   **State Management**: TanStack React Query for server state, React Context for authentication.
--   **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS (theming, responsive design).
+-   **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS.
 -   **Form Handling**: React Hook Form with Zod validation.
 -   **Build Tool**: Vite.
 -   **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography.
 
 ### Backend
 -   **Framework**: Express 5 on Node.js with TypeScript.
--   **Session Management**: express-session with memorystore (development).
+-   **Session Management**: express-session.
 -   **API Design**: RESTful JSON API endpoints under `/api`.
 -   **Authentication**: Session-based with SHA256 password hashing and role-based access control (SUPER_ADMIN, ADMIN, seller).
 
@@ -141,21 +141,21 @@ Preferred communication style: Simple, everyday language.
 -   **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, and `siteSettings`.
 
 ### Core Features
--   **User Portals**: Member Mypage and Admin dashboards for product, inventory, and site management.
+-   **User Portals**: Member Mypage and Admin dashboards.
 -   **Product & Inventory Management**: Tools for categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
 -   **Admin Design System**: Standardized components and design rules.
--   **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter` for distinct user roles with cascading category selection.
+-   **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter`.
 -   **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
--   **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management with dynamic content and access control.
--   **Legal Compliance**: Term Agreement Record Keeping with content snapshots and SHA-256 hashes.
--   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms. It categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
--   **AI Address Learning Management**: Admin interface to register error address patterns for AI analysis and application during order validation, including bulk Excel upload and manual registration.
+-   **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management.
+-   **Legal Compliance**: Term Agreement Record Keeping.
+-   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms, categorizing addresses as `VALID`, `WARNING`, or `INVALID`.
+-   **AI Address Learning Management**: Admin interface to register error address patterns for AI analysis and application.
 -   **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
 -   **Date Range Filtering (KST)**: All order-related pages include a `DateRangeFilter` component with preset buttons. Date filtering uses KST timezone (UTC+9) with server-side SQL filtering.
 -   **Design Requirements**: All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
--   **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation based on `pageAccessLevelRank`. ADMIN can set menu permissions for other ADMINs.
--   **Outsourcing/Vendor System**: Includes `vendors` and `product_vendors` tables. `product_registrations`, `next_week_products`, `current_products`, and `pending_orders` schemas are extended to support vendor products. Admin pages for vendor CRUD and product mapping. Order lists display fulfillment type. Stock logic differentiates between vendor and self-fulfilled orders, with transactional stock deduction for self-fulfilled orders upon shipment.
--   **Allocation System (Phase 2 of Outsourcing)**: New DB tables `order_allocations` and `allocation_details`. APIs for generating allocations (`/api/admin/allocations/generate`), viewing status (`/api/admin/allocations?date=`), details (`/api/admin/allocations/:id`), vendor notification (`/api/admin/allocations/:id/notify`), response submission (`/api/admin/allocation-details/:id/respond`), additional vendor notification (`/api/admin/allocations/:id/notify-additional`), allocation confirmation (`/api/admin/allocations/:id/confirm`), and order assignment (`/api/admin/allocations/:id/assign-orders`). Admin page at `/admin/orders/allocations` for managing the 5-step workflow (aggregation → notification → response → confirmation → assignment). Allocation statuses include `pending`, `waiting`, `confirmed` for master allocations and `pending`, `notified`, `responded`, `confirmed`/`rejected` for detailed allocations. Vendor notifications currently use SMS via `sendSMS` (TODO: 솔라피 알림톡 템플릿 등록 후 알림톡으로 전환 예정). Order assignment is date-filtered to match the allocation date. selfQuantity creates allocation_detail with vendorId=null and status=confirmed. Quantity validation occurs before DB writes to prevent partial failures.
+-   **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
+-   **Outsourcing/Vendor System**: Includes `vendors` and `product_vendors` tables. Extends product schemas to support vendor products. Admin pages for vendor CRUD and product mapping. Stock logic differentiates between vendor and self-fulfilled orders.
+-   **Allocation System**: New DB tables `order_allocations` and `allocation_details`. APIs and admin page for managing a 5-step workflow (aggregation → notification → response → confirmation → assignment). Features auto-adjustment for insufficient vendor supply, moving unallocated orders to "주문조정" status.
 
 ## External Dependencies
 

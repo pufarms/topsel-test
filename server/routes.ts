@@ -10699,6 +10699,7 @@ export async function registerRoutes(
         .orderBy(pendingOrders.createdAt);
 
       const byVendor: { vendorId: number | null; companyName: string; orderCount: number; totalQuantity: number }[] = [];
+      const adjustedOrderIds: string[] = [];
 
       await db.transaction(async (tx) => {
         let orderIdx = 0;
@@ -10727,14 +10728,48 @@ export async function registerRoutes(
 
           byVendor.push(vendorEntry);
         }
+
+        const remainingOrders = unassignedOrders.slice(orderIdx);
+        if (remainingOrders.length > 0) {
+          for (const order of remainingOrders) {
+            await tx.update(pendingOrders)
+              .set({
+                status: "주문조정",
+                memo: "외주상품 재고부족 - 자동 주문조정",
+                updatedAt: new Date(),
+              })
+              .where(eq(pendingOrders.id, order.id));
+            adjustedOrderIds.push(order.id);
+          }
+        }
       });
 
       const totalAssigned = byVendor.reduce((sum, v) => sum + v.orderCount, 0);
+      const adjustedOrders = adjustedOrderIds.length;
+
+      if (adjustedOrders > 0) {
+        await db.update(orderAllocations)
+          .set({
+            unallocatedQuantity: adjustedOrders,
+            updatedAt: new Date(),
+          })
+          .where(eq(orderAllocations.id, allocationId));
+
+        sseManager.sendToAdmins("order-adjusted", {
+          type: "order-adjustment",
+          allocationId,
+          productCode: allocation.productCode,
+          adjustedCount: adjustedOrders,
+        });
+      }
 
       res.json({
         allocationId,
         assignedOrders: totalAssigned,
+        adjustedOrders,
+        adjustReason: adjustedOrders > 0 ? "외주상품 재고부족" : undefined,
         byVendor,
+        adjustedOrderIds: adjustedOrders > 0 ? adjustedOrderIds : undefined,
       });
     } catch (error: any) {
       console.error("주문 배정 실패:", error);
