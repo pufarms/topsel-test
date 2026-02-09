@@ -10406,15 +10406,11 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            const senderNumber = process.env.SOLAPI_SENDER || '';
-            const content = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
-            // TODO: 알림톡 템플릿 등록 후 sendAlimTalk으로 변경 필요
-            const result = await solapiService.sendBrandTalkDirect({
-              to: [vendor.contactPhone.replace(/-/g, '')],
-              from: senderNumber,
-              content,
-            });
-            kakaoSent = result.success;
+            // TODO: 솔라피 알림톡 템플릿 등록 후 알림톡(카카오톡)으로 전환 예정
+            // 현재는 SMS fallback으로 발송 중
+            const message = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            await solapiService.sendSMS(vendor.contactPhone, message);
+            kakaoSent = true;
           } catch (err) {
             console.error(`[배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
           }
@@ -10541,15 +10537,11 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            const senderNumber = process.env.SOLAPI_SENDER || '';
-            const content = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
-            // TODO: 알림톡 템플릿 등록 후 sendAlimTalk으로 변경 필요
-            const result = await solapiService.sendBrandTalkDirect({
-              to: [vendor.contactPhone.replace(/-/g, '')],
-              from: senderNumber,
-              content,
-            });
-            kakaoSent = result.success;
+            // TODO: 솔라피 알림톡 템플릿 등록 후 알림톡(카카오톡)으로 전환 예정
+            // 현재는 SMS fallback으로 발송 중
+            const message = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            await solapiService.sendSMS(vendor.contactPhone, message);
+            kakaoSent = true;
           } catch (err) {
             console.error(`[추가 배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
           }
