@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -42,19 +48,23 @@ interface ProductVendorMapping {
   vendorName: string;
 }
 
-interface ProductVendorSectionProps {
+interface ProductVendorDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   productCode: string;
   productName: string;
   isVendorProduct?: boolean;
   onVendorProductChange?: (checked: boolean) => void;
 }
 
-export function ProductVendorSection({
+export function ProductVendorDialog({
+  open,
+  onOpenChange,
   productCode,
   productName,
   isVendorProduct = false,
   onVendorProductChange,
-}: ProductVendorSectionProps) {
+}: ProductVendorDialogProps) {
   const { toast } = useToast();
   const [showSection, setShowSection] = useState(isVendorProduct);
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
@@ -71,6 +81,7 @@ export function ProductVendorSection({
       if (!res.ok) throw new Error("업체 조회 실패");
       return res.json();
     },
+    enabled: open,
   });
 
   const { data: mappings = [], isLoading } = useQuery<ProductVendorMapping[]>({
@@ -80,7 +91,7 @@ export function ProductVendorSection({
       if (!res.ok) throw new Error("매핑 조회 실패");
       return res.json();
     },
-    enabled: showSection,
+    enabled: open && showSection,
   });
 
   const addMutation = useMutation({
@@ -163,152 +174,170 @@ export function ProductVendorSection({
   );
 
   return (
-    <Card className="mt-4">
-      <CardHeader className="py-3 px-4">
-        <div className="flex items-center gap-3">
-          <Checkbox
-            checked={showSection}
-            onCheckedChange={(checked) => handleCheckChange(!!checked)}
-            data-testid="checkbox-vendor-product"
-          />
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            외주업체 공급 가능
-            {showSection && (
-              <Badge variant="secondary" className="ml-2">
-                {productCode} - {productName}
-              </Badge>
-            )}
-          </CardTitle>
-        </div>
-      </CardHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[560px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            외주업체 설정
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            상품에 외주업체를 매핑하고 매입가를 설정합니다
+          </DialogDescription>
+        </DialogHeader>
 
-      {showSection && (
-        <CardContent className="pt-0 px-4 pb-4 space-y-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="space-y-1 min-w-[180px]">
-              <Label className="text-xs">업체 선택</Label>
-              <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-vendor">
-                  <SelectValue placeholder="업체 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableVendors.map((v) => (
-                    <SelectItem key={v.id} value={v.id.toString()}>
-                      {v.companyName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="space-y-4">
+          <div className="rounded-md border p-3 bg-muted/30">
+            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+              <span className="text-muted-foreground font-medium">상품코드</span>
+              <span className="font-mono" data-testid="text-vendor-dialog-code">{productCode}</span>
+              <span className="text-muted-foreground font-medium">상품명</span>
+              <span data-testid="text-vendor-dialog-name">{productName}</span>
             </div>
-            <div className="space-y-1 min-w-[120px]">
-              <Label className="text-xs">매입가 (원)</Label>
-              <Input
-                type="number"
-                value={vendorPrice}
-                onChange={(e) => setVendorPrice(e.target.value)}
-                className="h-8 text-xs"
-                placeholder="매입가"
-                data-testid="input-vendor-price"
-              />
-            </div>
-            <div className="space-y-1 min-w-[150px]">
-              <Label className="text-xs">메모</Label>
-              <Input
-                value={vendorMemo}
-                onChange={(e) => setVendorMemo(e.target.value)}
-                className="h-8 text-xs"
-                placeholder="메모 (선택)"
-                data-testid="input-vendor-mapping-memo"
-              />
-            </div>
-            <Button size="sm" onClick={handleAdd} disabled={addMutation.isPending} data-testid="button-add-vendor-mapping">
-              {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />}
-              추가
-            </Button>
           </div>
 
-          {isLoading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={showSection}
+              onCheckedChange={(checked) => handleCheckChange(!!checked)}
+              data-testid="checkbox-vendor-product"
+            />
+            <Label className="text-sm font-medium cursor-pointer flex items-center gap-2">
+              외주업체 공급 가능
+              {showSection && (
+                <Badge variant="secondary">활성</Badge>
+              )}
+            </Label>
+          </div>
+
+          {showSection && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1 min-w-[160px] flex-1">
+                  <Label className="text-xs">업체 선택</Label>
+                  <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                    <SelectTrigger data-testid="select-vendor">
+                      <SelectValue placeholder="업체 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableVendors.map((v) => (
+                        <SelectItem key={v.id} value={v.id.toString()}>
+                          {v.companyName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 min-w-[100px]">
+                  <Label className="text-xs">매입가 (원)</Label>
+                  <Input
+                    type="number"
+                    value={vendorPrice}
+                    onChange={(e) => setVendorPrice(e.target.value)}
+                    placeholder="매입가"
+                    data-testid="input-vendor-price"
+                  />
+                </div>
+                <div className="space-y-1 min-w-[120px] flex-1">
+                  <Label className="text-xs">메모</Label>
+                  <Input
+                    value={vendorMemo}
+                    onChange={(e) => setVendorMemo(e.target.value)}
+                    placeholder="메모 (선택)"
+                    data-testid="input-vendor-mapping-memo"
+                  />
+                </div>
+                <Button size="sm" onClick={handleAdd} disabled={addMutation.isPending} data-testid="button-add-vendor-mapping">
+                  {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3 mr-1" />}
+                  추가
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : mappings.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4 border rounded-md">
+                  매핑된 외주업체가 없습니다
+                </p>
+              ) : (
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">업체명</TableHead>
+                        <TableHead className="text-xs text-right">매입가</TableHead>
+                        <TableHead className="text-xs">메모</TableHead>
+                        <TableHead className="text-xs">수정일</TableHead>
+                        <TableHead className="text-xs text-center">액션</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mappings.map((m) => (
+                        <TableRow key={m.id} data-testid={`row-vendor-mapping-${m.id}`}>
+                          <TableCell className="text-xs font-medium">{m.vendorName}</TableCell>
+                          <TableCell className="text-xs text-right">
+                            {editingId === m.id ? (
+                              <Input
+                                type="number"
+                                value={editPrice}
+                                onChange={(e) => setEditPrice(e.target.value)}
+                                className="h-7 text-xs w-20 ml-auto"
+                                data-testid="input-edit-vendor-price"
+                              />
+                            ) : (
+                              <span data-testid={`text-vendor-price-${m.id}`}>{m.vendorPrice.toLocaleString()}원</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {editingId === m.id ? (
+                              <Input
+                                value={editMemo}
+                                onChange={(e) => setEditMemo(e.target.value)}
+                                className="h-7 text-xs w-28"
+                                data-testid="input-edit-vendor-memo"
+                              />
+                            ) : (
+                              m.memo || "-"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(m.updatedAt).toLocaleDateString("ko-KR")}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              {editingId === m.id ? (
+                                <>
+                                  <Button variant="ghost" size="icon" onClick={saveEdit} disabled={updateMutation.isPending} data-testid="button-save-edit">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => setEditingId(null)} data-testid="button-cancel-edit">
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button variant="ghost" size="icon" onClick={() => startEdit(m)} data-testid={`button-edit-mapping-${m.id}`}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(m.id)} data-testid={`button-delete-mapping-${m.id}`}>
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
-          ) : mappings.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              매핑된 외주업체가 없습니다
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">업체명</TableHead>
-                  <TableHead className="text-xs text-right">매입가</TableHead>
-                  <TableHead className="text-xs">메모</TableHead>
-                  <TableHead className="text-xs">수정일</TableHead>
-                  <TableHead className="text-xs text-center">액션</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mappings.map((m) => (
-                  <TableRow key={m.id} data-testid={`row-vendor-mapping-${m.id}`}>
-                    <TableCell className="text-xs font-medium">{m.vendorName}</TableCell>
-                    <TableCell className="text-xs text-right">
-                      {editingId === m.id ? (
-                        <Input
-                          type="number"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(e.target.value)}
-                          className="h-6 text-xs w-20 ml-auto"
-                          data-testid="input-edit-vendor-price"
-                        />
-                      ) : (
-                        <span data-testid={`text-vendor-price-${m.id}`}>{m.vendorPrice.toLocaleString()}원</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {editingId === m.id ? (
-                        <Input
-                          value={editMemo}
-                          onChange={(e) => setEditMemo(e.target.value)}
-                          className="h-6 text-xs w-32"
-                          data-testid="input-edit-vendor-memo"
-                        />
-                      ) : (
-                        m.memo || "-"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(m.updatedAt).toLocaleDateString("ko-KR")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-1">
-                        {editingId === m.id ? (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={saveEdit} disabled={updateMutation.isPending} data-testid="button-save-edit">
-                              <Check className="h-3 w-3 text-green-500" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setEditingId(null)} data-testid="button-cancel-edit">
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={() => startEdit(m)} data-testid={`button-edit-mapping-${m.id}`}>
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(m.id)} data-testid={`button-delete-mapping-${m.id}`}>
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           )}
-        </CardContent>
-      )}
-    </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

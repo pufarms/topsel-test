@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2, FileEdit, Building2 } from "lucide-react";
-import { ProductVendorSection } from "@/components/admin/product-vendor-section";
+import { ProductVendorDialog } from "@/components/admin/product-vendor-section";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -131,7 +131,7 @@ export default function ProductRegistrationPage() {
   const [searchMappingStatus, setSearchMappingStatus] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
   const [selectedVendorProduct, setSelectedVendorProduct] = useState<{ code: string; name: string; isVendor: boolean } | null>(null);
-  const vendorSectionRef = useRef<HTMLDivElement>(null);
+  const [vendorDialogOpen, setVendorDialogOpen] = useState(false);
     const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
   const [bulkWeight, setBulkWeight] = useState<string>("");
@@ -1811,9 +1811,7 @@ export default function ProductRegistrationPage() {
                               name: p.productName,
                               isVendor: !!(p as any).isVendorProduct,
                             });
-                            setTimeout(() => {
-                              vendorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }, 100);
+                            setVendorDialogOpen(true);
                           }}
                           className="h-6 w-6 p-0"
                           data-testid={`button-vendor-${p.id}`}
@@ -1899,8 +1897,12 @@ export default function ProductRegistrationPage() {
       </div>
 
       {selectedVendorProduct && (
-        <div ref={vendorSectionRef}>
-        <ProductVendorSection
+        <ProductVendorDialog
+          open={vendorDialogOpen}
+          onOpenChange={(open) => {
+            setVendorDialogOpen(open);
+            if (!open) setSelectedVendorProduct(null);
+          }}
           productCode={selectedVendorProduct.code}
           productName={selectedVendorProduct.name}
           isVendorProduct={selectedVendorProduct.isVendor}
@@ -1917,7 +1919,6 @@ export default function ProductRegistrationPage() {
             }
           }}
         />
-        </div>
       )}
 
       <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
