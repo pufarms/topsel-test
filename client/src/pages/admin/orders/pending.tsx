@@ -82,6 +82,8 @@ export default function OrdersPendingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       setSelectedOrders([]);
       toast({ title: "선택한 주문이 삭제되었습니다." });
     },
@@ -96,6 +98,8 @@ export default function OrdersPendingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       setSelectedOrders([]);
       toast({ title: "모든 주문이 삭제되었습니다." });
     },

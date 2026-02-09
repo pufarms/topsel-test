@@ -8338,6 +8338,36 @@ export async function registerRoutes(
         .where(inArray(pendingOrders.id, ids))
         .returning();
 
+      // 삭제된 주문의 상품코드별로 배분 데이터 정리
+      const deletedProductCodes = [...new Set(deleted.map(d => d.productCode).filter(Boolean))];
+      if (deletedProductCodes.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const productCode of deletedProductCodes) {
+            const relatedAllocations = await tx.select().from(orderAllocations)
+              .where(eq(orderAllocations.productCode, productCode!));
+            
+            for (const allocation of relatedAllocations) {
+              const remainingOrders = await tx.select().from(pendingOrders)
+                .where(eq(pendingOrders.productCode, productCode!));
+              
+              if (remainingOrders.length === 0) {
+                await tx.delete(allocationDetails).where(eq(allocationDetails.allocationId, allocation.id));
+                await tx.delete(orderAllocations).where(eq(orderAllocations.id, allocation.id));
+                console.log(`선택 삭제 - 배분 데이터 정리: ${productCode} 배분 삭제`);
+              } else {
+                const totalQty = remainingOrders.reduce((sum, o) => sum + (o.quantity || 1), 0);
+                await tx.update(orderAllocations)
+                  .set({ 
+                    totalQuantity: totalQty,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orderAllocations.id, allocation.id));
+              }
+            }
+          }
+        });
+      }
+
       // SSE: 해당 회원들에게 주문 삭제 알림
       const memberIds = Array.from(new Set(deleted.map(d => d.memberId).filter(Boolean)));
       memberIds.forEach(memberId => {

@@ -98,6 +98,8 @@ export function useSSE(options: UseSSEOptions = {}, enabled: boolean = true) {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
       
       optionsRef.current.onOrdersDeleted?.(data);
     });
