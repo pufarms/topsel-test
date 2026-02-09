@@ -251,7 +251,7 @@ export default function AllocationSection() {
             <CardHeader className="cursor-pointer flex flex-row items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                <CardTitle className="text-lg">외주(공급)업체 일일 배분</CardTitle>
+                <CardTitle className="text-lg">외주(공급)업체 주문 배분</CardTitle>
                 {allocationsData && (
                   <div className="flex gap-2">
                     <Badge variant="secondary" data-testid="badge-alloc-total">상품 {allocationsData.totalProducts}</Badge>
