@@ -72,6 +72,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   notifying: { label: "알림 발송중", variant: "default" },
   waiting: { label: "회신 대기", variant: "outline" },
   confirmed: { label: "배분 완료", variant: "default" },
+  assigned: { label: "배정 완료", variant: "default" },
   cancelled: { label: "취소", variant: "destructive" },
 };
 

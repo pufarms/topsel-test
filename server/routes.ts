@@ -10665,6 +10665,10 @@ export async function registerRoutes(
       const allocation = await storage.getOrderAllocationById(allocationId);
       if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
 
+      if (allocation.status === "assigned") {
+        return res.status(400).json({ message: "이미 주문 배정이 완료된 배분입니다. 중복 실행할 수 없습니다." });
+      }
+
       if (allocation.status !== "confirmed") {
         return res.status(400).json({ message: "배분이 확정되지 않았습니다. 먼저 배분을 확정해 주세요." });
       }
@@ -10747,14 +10751,16 @@ export async function registerRoutes(
       const totalAssigned = byVendor.reduce((sum, v) => sum + v.orderCount, 0);
       const adjustedOrders = adjustedOrderIds.length;
 
-      if (adjustedOrders > 0) {
-        await db.update(orderAllocations)
-          .set({
-            unallocatedQuantity: adjustedOrders,
-            updatedAt: new Date(),
-          })
-          .where(eq(orderAllocations.id, allocationId));
+      await db.update(orderAllocations)
+        .set({
+          status: "assigned",
+          allocatedQuantity: totalAssigned,
+          unallocatedQuantity: adjustedOrders,
+          updatedAt: new Date(),
+        })
+        .where(eq(orderAllocations.id, allocationId));
 
+      if (adjustedOrders > 0) {
         sseManager.sendToAdmins("order-adjusted", {
           type: "order-adjustment",
           allocationId,
