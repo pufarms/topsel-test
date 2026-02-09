@@ -634,6 +634,48 @@ export async function registerRoutes(
         });
       }
       
+      // If not found in users or members, try vendors table (partner login)
+      const bcryptModule = await import("bcryptjs");
+      const [vendor] = await db.select().from(vendors).where(eq(vendors.loginId, data.username)).limit(1);
+      if (vendor && vendor.loginPassword) {
+        const validVendor = await bcryptModule.compare(data.password, vendor.loginPassword);
+        if (validVendor) {
+          if (!vendor.isActive) {
+            return res.status(401).json({ message: "비활성 계정입니다. 관리자에게 문의해 주세요." });
+          }
+
+          // 파트너 JWT 토큰 발급
+          const JWT_SECRET = process.env.JWT_SECRET;
+          if (JWT_SECRET) {
+            const jwt = await import("jsonwebtoken");
+            const partnerToken = jwt.default.sign(
+              {
+                vendorId: vendor.id,
+                loginId: vendor.loginId,
+                companyName: vendor.companyName,
+                userType: "vendor",
+              },
+              JWT_SECRET,
+              { expiresIn: "7d" }
+            );
+            res.cookie("partner_token", partnerToken, {
+              httpOnly: true,
+              secure: isProduction,
+              sameSite: isProduction ? "strict" as const : "lax" as const,
+              maxAge: 7 * 24 * 60 * 60 * 1000,
+              path: "/",
+            });
+          }
+
+          const { loginPassword: _lp, ...vendorData } = vendor;
+          return res.json({
+            ...vendorData,
+            role: "vendor",
+            redirectTo: "/partner",
+          });
+        }
+      }
+
       return res.status(401).json({ message: "아이디 또는 비밀번호가 올바르지 않습니다" });
     } catch (error) {
       if (error instanceof z.ZodError) {

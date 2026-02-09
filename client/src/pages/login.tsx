@@ -96,7 +96,18 @@ export default function Login() {
         localStorage.removeItem(SAVED_USERNAME_KEY);
         localStorage.removeItem(REMEMBER_ME_KEY);
       }
-      await login(data.username, data.password);
+
+      const resData = await login(data.username, data.password);
+
+      if (resData.role === "vendor" && resData.redirectTo) {
+        toast({ 
+          title: "협력업체 로그인 성공", 
+          description: `${resData.companyName || "협력업체"} 포털로 이동합니다.` 
+        });
+        window.location.href = resData.redirectTo;
+        return;
+      }
+
       toast({ 
         title: messages.success_title || "로그인 성공", 
         description: messages.success_description || "환영합니다!" 

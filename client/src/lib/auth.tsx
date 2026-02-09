@@ -3,10 +3,17 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "./queryClient";
 import type { User } from "@shared/schema";
 
+interface LoginResponse {
+  role?: string;
+  redirectTo?: string;
+  companyName?: string;
+  [key: string]: any;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<LoginResponse>;
   register: (username: string, password: string, name: string, phone?: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -22,11 +29,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      await apiRequest("POST", "/api/auth/login", { username, password });
+    mutationFn: async ({ username, password }: { username: string; password: string }): Promise<LoginResponse> => {
+      const res = await apiRequest("POST", "/api/auth/login", { username, password });
+      return await res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    onSuccess: (data) => {
+      if (data.role !== "vendor") {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      }
     },
   });
 
@@ -49,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const login = async (username: string, password: string) => {
-    await loginMutation.mutateAsync({ username, password });
+  const login = async (username: string, password: string): Promise<LoginResponse> => {
+    return await loginMutation.mutateAsync({ username, password });
   };
 
   const register = async (username: string, password: string, name: string, phone?: string, email?: string) => {
