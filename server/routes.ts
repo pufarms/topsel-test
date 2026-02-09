@@ -8385,6 +8385,22 @@ export async function registerRoutes(
         count: deleted.length
       });
 
+      // SSE: 삭제된 주문의 상품코드와 관련된 파트너(외주업체)에게도 알림
+      if (deletedProductCodes.length > 0) {
+        const relatedVendorDetails = await db.select({ vendorId: allocationDetails.vendorId })
+          .from(allocationDetails)
+          .innerJoin(orderAllocations, eq(allocationDetails.allocationId, orderAllocations.id))
+          .where(sql`${orderAllocations.productCode} IN (${sql.join(deletedProductCodes.map(c => sql`${c}`), sql`, `)})`)
+          .groupBy(allocationDetails.vendorId);
+        
+        for (const detail of relatedVendorDetails) {
+          sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
+            type: "orders-deleted",
+            productCodes: deletedProductCodes,
+          });
+        }
+      }
+
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -8444,6 +8460,11 @@ export async function registerRoutes(
 
       const deleted = await db.delete(pendingOrders).returning();
 
+      // 배분 데이터 삭제 전 관련 파트너 벤더 ID 조회
+      const affectedVendors = await db.select({ vendorId: allocationDetails.vendorId })
+        .from(allocationDetails)
+        .groupBy(allocationDetails.vendorId);
+
       // 전체 주문 삭제이므로 모든 배분 데이터도 함께 전역 삭제 (allocation_details → order_allocations 순서)
       await db.transaction(async (tx) => {
         const existingAllocations = await tx.select().from(orderAllocations);
@@ -8470,6 +8491,13 @@ export async function registerRoutes(
         type: "pending-order",
         count: deleted.length
       });
+
+      // SSE: 관련 파트너(외주업체)에게도 배분 삭제 알림
+      for (const vendor of affectedVendors) {
+        sseManager.sendToPartner(vendor.vendorId, "allocation-updated", {
+          type: "orders-deleted-all",
+        });
+      }
 
       res.json({ message: `${deleted.length}건의 주문이 삭제되었습니다`, deletedCount: deleted.length });
     } catch (error: any) {
@@ -8550,6 +8578,22 @@ export async function registerRoutes(
         }
         return deletedOrder;
       });
+
+      // SSE: 삭제된 주문의 상품코드 관련 파트너에게 알림
+      if (deleted && deleted.productCode) {
+        const relatedVendorDetails = await db.select({ vendorId: allocationDetails.vendorId })
+          .from(allocationDetails)
+          .innerJoin(orderAllocations, eq(allocationDetails.allocationId, orderAllocations.id))
+          .where(eq(orderAllocations.productCode, deleted.productCode))
+          .groupBy(allocationDetails.vendorId);
+        
+        for (const detail of relatedVendorDetails) {
+          sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
+            type: "order-deleted",
+            productCode: deleted.productCode,
+          });
+        }
+      }
 
       res.json({ message: "주문이 삭제되었습니다" });
     } catch (error: any) {
