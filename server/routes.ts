@@ -10310,7 +10310,9 @@ export async function registerRoutes(
             eq(productVendors.isActive, true)
           ));
 
-        const vendorInfos = [];
+        const vendorInfos = [
+          { vendorId: 0, companyName: "자체(탑셀러)", vendorPrice: 0 },
+        ];
         for (const pv of availableVendors) {
           const vendor = await storage.getVendor(pv.vendorId);
           if (vendor && vendor.isActive) {
@@ -10366,7 +10368,9 @@ export async function registerRoutes(
             eq(productVendors.isActive, true)
           ));
 
-        const vendorInfos = [];
+        const vendorInfos = [
+          { vendorId: 0, companyName: "자체(탑셀러)", vendorPrice: 0 },
+        ];
         for (const pv of availableVendors) {
           const vendor = await storage.getVendor(pv.vendorId);
           if (vendor && vendor.isActive) {
@@ -10444,6 +10448,31 @@ export async function registerRoutes(
       const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
       for (const vr of vendorRequests) {
+        if (vr.vendorId === 0) {
+          const detail = await storage.createAllocationDetail({
+            allocationId,
+            vendorId: null,
+            vendorName: "자체(탑셀러)",
+            requestedQuantity: vr.requestedQuantity,
+            confirmedQuantity: vr.requestedQuantity,
+            vendorPrice: 0,
+            status: "responded",
+            notifiedAt: new Date(),
+            respondedAt: new Date(),
+          });
+
+          notifiedVendors.push({
+            vendorId: 0,
+            companyName: "자체(탑셀러)",
+            requestedQuantity: vr.requestedQuantity,
+            notified: true,
+            kakaoSent: false,
+            detailId: detail.id,
+            selfAllocation: true,
+          });
+          continue;
+        }
+
         const vendor = await storage.getVendor(vr.vendorId);
         if (!vendor) continue;
 
@@ -10468,8 +10497,6 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            // TODO: 솔라피 알림톡 템플릿 등록 후 알림톡(카카오톡)으로 전환 예정
-            // 현재는 SMS fallback으로 발송 중
             const message = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
             await solapiService.sendSMS(vendor.contactPhone, message);
             kakaoSent = true;
@@ -10585,6 +10612,31 @@ export async function registerRoutes(
       const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
       for (const vr of vendorRequests) {
+        if (vr.vendorId === 0) {
+          const detail = await storage.createAllocationDetail({
+            allocationId,
+            vendorId: null,
+            vendorName: "자체(탑셀러)",
+            requestedQuantity: vr.requestedQuantity,
+            confirmedQuantity: vr.requestedQuantity,
+            vendorPrice: 0,
+            status: "responded",
+            notifiedAt: new Date(),
+            respondedAt: new Date(),
+          });
+
+          notifiedVendors.push({
+            vendorId: 0,
+            companyName: "자체(탑셀러)",
+            requestedQuantity: vr.requestedQuantity,
+            notified: true,
+            kakaoSent: false,
+            detailId: detail.id,
+            selfAllocation: true,
+          });
+          continue;
+        }
+
         const vendor = await storage.getVendor(vr.vendorId);
         if (!vendor) continue;
 
@@ -10609,8 +10661,6 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            // TODO: 솔라피 알림톡 템플릿 등록 후 알림톡(카카오톡)으로 전환 예정
-            // 현재는 SMS fallback으로 발송 중
             const message = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
             await solapiService.sendSMS(vendor.contactPhone, message);
             kakaoSent = true;

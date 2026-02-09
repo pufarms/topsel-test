@@ -100,7 +100,7 @@ export default function OrdersAllocationsPage() {
   const [vendorInputs, setVendorInputs] = useState<{ vendorId: number; companyName: string; requestedQuantity: number; vendorPrice: number }[]>([]);
   const [additionalVendorInputs, setAdditionalVendorInputs] = useState<{ vendorId: number; companyName: string; requestedQuantity: number; vendorPrice: number }[]>([]);
   const [respondDetail, setRespondDetail] = useState<{ detailId: number; vendorName: string; confirmedQuantity: number; memo: string } | null>(null);
-  const [confirmInputs, setConfirmInputs] = useState<{ detailId: number; vendorName: string; allocatedQuantity: number }[]>([]);
+  const [confirmInputs, setConfirmInputs] = useState<{ detailId: number; vendorName: string; vendorId: number | null; allocatedQuantity: number }[]>([]);
   const [selfQuantity, setSelfQuantity] = useState(0);
 
   const { data: allocationsData, isLoading, refetch } = useQuery<AllocationsResponse>({
@@ -204,7 +204,11 @@ export default function OrdersAllocationsPage() {
   const openAdditionalNotifyDialog = () => {
     if (!selectedAllocation) return;
     const existingVendorIds = new Set((detailsData?.details || []).map(d => d.vendorId));
-    const available = (selectedAllocation.availableVendors || []).filter(v => !existingVendorIds.has(v.vendorId));
+    const hasSelf = (detailsData?.details || []).some(d => d.vendorId === null || d.vendorId === 0);
+    const available = (selectedAllocation.availableVendors || []).filter(v => {
+      if (v.vendorId === 0) return !hasSelf;
+      return !existingVendorIds.has(v.vendorId);
+    });
     setAdditionalVendorInputs(available.map(v => ({ vendorId: v.vendorId, companyName: v.companyName, requestedQuantity: 0, vendorPrice: v.vendorPrice })));
     setAdditionalNotifyDialogOpen(true);
   };
@@ -226,10 +230,12 @@ export default function OrdersAllocationsPage() {
       .map(d => ({
         detailId: d.id,
         vendorName: d.vendorName || "알 수 없음",
+        vendorId: d.vendorId,
         allocatedQuantity: d.confirmedQuantity ?? d.requestedQuantity ?? 0,
       }));
     setConfirmInputs(inputs);
-    setSelfQuantity(0);
+    const hasSelfDetail = inputs.some(i => i.vendorId === null || i.vendorId === 0);
+    setSelfQuantity(hasSelfDetail ? 0 : 0);
     setConfirmDialogOpen(true);
   };
 
@@ -345,7 +351,7 @@ export default function OrdersAllocationsPage() {
                           <div className="flex gap-1 justify-center flex-wrap">
                             {(alloc.status === "pending" || alloc.status === "waiting") && (
                               <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openNotifyDialog(alloc); }} data-testid={`button-notify-${alloc.id}`}>
-                                <Send className="h-3 w-3 mr-1" />알림
+                                <Package className="h-3 w-3 mr-1" />배분
                               </Button>
                             )}
                             {alloc.status === "confirmed" && (
@@ -406,13 +412,20 @@ export default function OrdersAllocationsPage() {
                   <tbody>
                     {details.map((detail) => {
                       const ds = detailStatusConfig[detail.status || "pending"] || detailStatusConfig.pending;
+                      const isSelf = detail.vendorId === null || detail.vendorId === 0;
                       return (
-                        <tr key={detail.id} className="border-b" data-testid={`row-detail-${detail.id}`}>
-                          <td className="py-2 px-2">{detail.vendorName || "자체발송"}</td>
+                        <tr key={detail.id} className={`border-b ${isSelf ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`} data-testid={`row-detail-${detail.id}`}>
+                          <td className="py-2 px-2">
+                            {isSelf ? (
+                              <Badge variant="default" className="text-xs">자체(탑셀러)</Badge>
+                            ) : (
+                              detail.vendorName || "알 수 없음"
+                            )}
+                          </td>
                           <td className="py-2 px-2 text-right">{detail.requestedQuantity}</td>
                           <td className="py-2 px-2 text-right">{detail.confirmedQuantity ?? "-"}</td>
                           <td className="py-2 px-2 text-right">{detail.allocatedQuantity || "-"}</td>
-                          <td className="py-2 px-2 text-right">{detail.vendorPrice ? detail.vendorPrice.toLocaleString() + "원" : "-"}</td>
+                          <td className="py-2 px-2 text-right">{isSelf ? "-" : (detail.vendorPrice ? detail.vendorPrice.toLocaleString() + "원" : "-")}</td>
                           <td className="py-2 px-2 text-center">
                             <Badge variant={ds.variant}>{ds.label}</Badge>
                             {detail.deadlineExceeded && detail.status === "notified" && (
@@ -420,7 +433,7 @@ export default function OrdersAllocationsPage() {
                             )}
                           </td>
                           <td className="py-2 px-2 text-center">
-                            {(detail.status === "notified" || detail.status === "responded") && (
+                            {!isSelf && (detail.status === "notified" || detail.status === "responded") && (
                               <Button size="sm" variant="outline" onClick={() => openRespondDialog(detail)} data-testid={`button-respond-${detail.id}`}>
                                 {detail.status === "responded" ? "수정" : "가능수량 입력"}
                               </Button>
@@ -440,67 +453,40 @@ export default function OrdersAllocationsPage() {
       <Dialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>업체 알림 발송</DialogTitle>
+            <DialogTitle>배분 수량 입력</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="text-sm text-muted-foreground">
               상품: {selectedAllocation?.productName} | 총 필요수량: {selectedAllocation?.totalQuantity}
             </div>
-            {vendorInputs.map((vi, idx) => (
-              <div key={vi.vendorId} className="flex items-center gap-2">
-                <span className="text-sm min-w-[80px]">{vi.companyName}</span>
-                <span className="text-xs text-muted-foreground min-w-[60px]">{vi.vendorPrice.toLocaleString()}원</span>
-                <Input
-                  type="number"
-                  min={0}
-                  value={vi.requestedQuantity}
-                  onChange={(e) => {
-                    const updated = [...vendorInputs];
-                    updated[idx].requestedQuantity = parseInt(e.target.value) || 0;
-                    setVendorInputs(updated);
-                  }}
-                  className="w-20"
-                  data-testid={`input-notify-qty-${vi.vendorId}`}
-                />
-                <span className="text-xs text-muted-foreground">박스</span>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNotifyDialogOpen(false)} data-testid="button-cancel-notify">취소</Button>
-            <Button
-              onClick={() => {
-                if (!selectedAllocation) return;
-                const filtered = vendorInputs.filter(v => v.requestedQuantity > 0).map(v => ({ vendorId: v.vendorId, requestedQuantity: v.requestedQuantity }));
-                if (filtered.length === 0) {
-                  toast({ title: "요청수량을 입력해 주세요", variant: "destructive" });
-                  return;
-                }
-                notifyMutation.mutate({ allocationId: selectedAllocation.id, vendors: filtered });
-              }}
-              disabled={notifyMutation.isPending}
-              data-testid="button-send-notify"
-            >
-              {notifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-              알림 발송
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={additionalNotifyDialogOpen} onOpenChange={setAdditionalNotifyDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>추가 업체 알림 발송</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="text-sm text-muted-foreground">
-              상품: {selectedAllocation?.productName} | 부족분에 대해 추가 업체에 알림을 보냅니다.
-            </div>
-            {additionalVendorInputs.length === 0 ? (
-              <div className="text-sm text-center text-muted-foreground py-2">추가 가능한 업체가 없습니다.</div>
-            ) : (
-              additionalVendorInputs.map((vi, idx) => (
+            {vendorInputs.filter(vi => vi.vendorId === 0).map((vi, idx) => {
+              const realIdx = vendorInputs.findIndex(v => v.vendorId === vi.vendorId);
+              return (
+                <div key={vi.vendorId} className="flex items-center gap-2 p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                  <Badge variant="default" className="min-w-[80px] justify-center">자체(탑셀러)</Badge>
+                  <span className="text-xs text-muted-foreground min-w-[60px]">직접처리</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={vi.requestedQuantity}
+                    onChange={(e) => {
+                      const updated = [...vendorInputs];
+                      updated[realIdx].requestedQuantity = parseInt(e.target.value) || 0;
+                      setVendorInputs(updated);
+                    }}
+                    className="w-20"
+                    data-testid="input-notify-qty-self"
+                  />
+                  <span className="text-xs text-muted-foreground">박스</span>
+                </div>
+              );
+            })}
+            {vendorInputs.filter(vi => vi.vendorId !== 0).length > 0 && (
+              <div className="text-xs text-muted-foreground pt-1 border-t">외주 업체</div>
+            )}
+            {vendorInputs.filter(vi => vi.vendorId !== 0).map((vi) => {
+              const realIdx = vendorInputs.findIndex(v => v.vendorId === vi.vendorId);
+              return (
                 <div key={vi.vendorId} className="flex items-center gap-2">
                   <span className="text-sm min-w-[80px]">{vi.companyName}</span>
                   <span className="text-xs text-muted-foreground min-w-[60px]">{vi.vendorPrice.toLocaleString()}원</span>
@@ -509,16 +495,101 @@ export default function OrdersAllocationsPage() {
                     min={0}
                     value={vi.requestedQuantity}
                     onChange={(e) => {
-                      const updated = [...additionalVendorInputs];
-                      updated[idx].requestedQuantity = parseInt(e.target.value) || 0;
-                      setAdditionalVendorInputs(updated);
+                      const updated = [...vendorInputs];
+                      updated[realIdx].requestedQuantity = parseInt(e.target.value) || 0;
+                      setVendorInputs(updated);
                     }}
                     className="w-20"
-                    data-testid={`input-additional-qty-${vi.vendorId}`}
+                    data-testid={`input-notify-qty-${vi.vendorId}`}
                   />
                   <span className="text-xs text-muted-foreground">박스</span>
                 </div>
-              ))
+              );
+            })}
+            <div className="text-xs text-muted-foreground border-t pt-2">
+              합계: {vendorInputs.reduce((sum, v) => sum + v.requestedQuantity, 0)} / {selectedAllocation?.totalQuantity || 0} 박스
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyDialogOpen(false)} data-testid="button-cancel-notify">취소</Button>
+            <Button
+              onClick={() => {
+                if (!selectedAllocation) return;
+                const filtered = vendorInputs.filter(v => v.requestedQuantity > 0).map(v => ({ vendorId: v.vendorId, requestedQuantity: v.requestedQuantity }));
+                if (filtered.length === 0) {
+                  toast({ title: "배분 수량을 입력해 주세요", variant: "destructive" });
+                  return;
+                }
+                notifyMutation.mutate({ allocationId: selectedAllocation.id, vendors: filtered });
+              }}
+              disabled={notifyMutation.isPending}
+              data-testid="button-send-notify"
+            >
+              {notifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+              배분 실행
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={additionalNotifyDialogOpen} onOpenChange={setAdditionalNotifyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>추가 배분</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              상품: {selectedAllocation?.productName} | 부족분에 대해 추가 배분합니다.
+            </div>
+            {additionalVendorInputs.length === 0 ? (
+              <div className="text-sm text-center text-muted-foreground py-2">추가 가능한 업체가 없습니다.</div>
+            ) : (
+              <>
+                {additionalVendorInputs.filter(vi => vi.vendorId === 0).map((vi) => {
+                  const realIdx = additionalVendorInputs.findIndex(v => v.vendorId === vi.vendorId);
+                  return (
+                    <div key={vi.vendorId} className="flex items-center gap-2 p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <Badge variant="default" className="min-w-[80px] justify-center">자체(탑셀러)</Badge>
+                      <span className="text-xs text-muted-foreground min-w-[60px]">직접처리</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={vi.requestedQuantity}
+                        onChange={(e) => {
+                          const updated = [...additionalVendorInputs];
+                          updated[realIdx].requestedQuantity = parseInt(e.target.value) || 0;
+                          setAdditionalVendorInputs(updated);
+                        }}
+                        className="w-20"
+                        data-testid="input-additional-qty-self"
+                      />
+                      <span className="text-xs text-muted-foreground">박스</span>
+                    </div>
+                  );
+                })}
+                {additionalVendorInputs.filter(vi => vi.vendorId !== 0).map((vi) => {
+                  const realIdx = additionalVendorInputs.findIndex(v => v.vendorId === vi.vendorId);
+                  return (
+                    <div key={vi.vendorId} className="flex items-center gap-2">
+                      <span className="text-sm min-w-[80px]">{vi.companyName}</span>
+                      <span className="text-xs text-muted-foreground min-w-[60px]">{vi.vendorPrice.toLocaleString()}원</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={vi.requestedQuantity}
+                        onChange={(e) => {
+                          const updated = [...additionalVendorInputs];
+                          updated[realIdx].requestedQuantity = parseInt(e.target.value) || 0;
+                          setAdditionalVendorInputs(updated);
+                        }}
+                        className="w-20"
+                        data-testid={`input-additional-qty-${vi.vendorId}`}
+                      />
+                      <span className="text-xs text-muted-foreground">박스</span>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
           <DialogFooter>
@@ -528,7 +599,7 @@ export default function OrdersAllocationsPage() {
                 if (!selectedAllocation) return;
                 const filtered = additionalVendorInputs.filter(v => v.requestedQuantity > 0).map(v => ({ vendorId: v.vendorId, requestedQuantity: v.requestedQuantity }));
                 if (filtered.length === 0) {
-                  toast({ title: "요청수량을 입력해 주세요", variant: "destructive" });
+                  toast({ title: "배분 수량을 입력해 주세요", variant: "destructive" });
                   return;
                 }
                 additionalNotifyMutation.mutate({ allocationId: selectedAllocation.id, vendors: filtered });
@@ -537,7 +608,7 @@ export default function OrdersAllocationsPage() {
               data-testid="button-send-additional-notify"
             >
               {additionalNotifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-              추가 알림 발송
+              추가 배분 실행
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -598,36 +669,45 @@ export default function OrdersAllocationsPage() {
             <div className="text-sm text-muted-foreground">
               총 필요수량: {selectedAllocation?.totalQuantity}
             </div>
-            {confirmInputs.map((ci, idx) => (
-              <div key={ci.detailId} className="flex items-center gap-2">
-                <span className="text-sm min-w-[80px]">{ci.vendorName}</span>
+            {confirmInputs.map((ci, idx) => {
+              const isSelf = ci.vendorId === null || ci.vendorId === 0;
+              return (
+                <div key={ci.detailId} className={`flex items-center gap-2 ${isSelf ? "p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" : ""}`}>
+                  {isSelf ? (
+                    <Badge variant="default" className="min-w-[80px] justify-center text-xs">자체(탑셀러)</Badge>
+                  ) : (
+                    <span className="text-sm min-w-[80px]">{ci.vendorName}</span>
+                  )}
+                  <Input
+                    type="number"
+                    min={0}
+                    value={ci.allocatedQuantity}
+                    onChange={(e) => {
+                      const updated = [...confirmInputs];
+                      updated[idx].allocatedQuantity = parseInt(e.target.value) || 0;
+                      setConfirmInputs(updated);
+                    }}
+                    className="w-20"
+                    data-testid={`input-confirm-qty-${ci.detailId}`}
+                  />
+                  <span className="text-xs text-muted-foreground">박스</span>
+                </div>
+              );
+            })}
+            {!confirmInputs.some(ci => ci.vendorId === null || ci.vendorId === 0) && (
+              <div className="flex items-center gap-2 border-t pt-2">
+                <span className="text-sm min-w-[80px] font-medium">자체발송</span>
                 <Input
                   type="number"
                   min={0}
-                  value={ci.allocatedQuantity}
-                  onChange={(e) => {
-                    const updated = [...confirmInputs];
-                    updated[idx].allocatedQuantity = parseInt(e.target.value) || 0;
-                    setConfirmInputs(updated);
-                  }}
+                  value={selfQuantity}
+                  onChange={(e) => setSelfQuantity(parseInt(e.target.value) || 0)}
                   className="w-20"
-                  data-testid={`input-confirm-qty-${ci.detailId}`}
+                  data-testid="input-self-qty"
                 />
                 <span className="text-xs text-muted-foreground">박스</span>
               </div>
-            ))}
-            <div className="flex items-center gap-2 border-t pt-2">
-              <span className="text-sm min-w-[80px] font-medium">자체발송</span>
-              <Input
-                type="number"
-                min={0}
-                value={selfQuantity}
-                onChange={(e) => setSelfQuantity(parseInt(e.target.value) || 0)}
-                className="w-20"
-                data-testid="input-self-qty"
-              />
-              <span className="text-xs text-muted-foreground">박스</span>
-            </div>
+            )}
             {(() => {
               const totalAllocated = confirmInputs.reduce((sum, c) => sum + c.allocatedQuantity, 0) + selfQuantity;
               const total = selectedAllocation?.totalQuantity || 0;
@@ -651,10 +731,11 @@ export default function OrdersAllocationsPage() {
             <Button
               onClick={() => {
                 if (!selectedAllocation) return;
+                const hasSelfInDetails = confirmInputs.some(ci => ci.vendorId === null || ci.vendorId === 0);
                 confirmMutation.mutate({
                   allocationId: selectedAllocation.id,
                   details: confirmInputs.map(c => ({ detailId: c.detailId, allocatedQuantity: c.allocatedQuantity })),
-                  selfQuantity,
+                  selfQuantity: hasSelfInDetails ? 0 : selfQuantity,
                 });
               }}
               disabled={confirmMutation.isPending}
