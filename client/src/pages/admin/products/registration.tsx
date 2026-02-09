@@ -131,6 +131,7 @@ export default function ProductRegistrationPage() {
   const [searchMappingStatus, setSearchMappingStatus] = useState<string>("all");
   const [searchName, setSearchName] = useState("");
   const [selectedVendorProduct, setSelectedVendorProduct] = useState<{ code: string; name: string; isVendor: boolean } | null>(null);
+  const vendorSectionRef = useRef<HTMLDivElement>(null);
     const [tempProducts, setTempProducts] = useState<ProductRow[]>([]);
   
   const [bulkWeight, setBulkWeight] = useState<string>("");
@@ -1804,11 +1805,16 @@ export default function ProductRegistrationPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setSelectedVendorProduct({
-                            code: p.productCode,
-                            name: p.productName,
-                            isVendor: !!(p as any).isVendorProduct,
-                          })}
+                          onClick={() => {
+                            setSelectedVendorProduct({
+                              code: p.productCode,
+                              name: p.productName,
+                              isVendor: !!(p as any).isVendorProduct,
+                            });
+                            setTimeout(() => {
+                              vendorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }, 100);
+                          }}
                           className="h-6 w-6 p-0"
                           data-testid={`button-vendor-${p.id}`}
                           title="외주업체 관리"
@@ -1893,6 +1899,7 @@ export default function ProductRegistrationPage() {
       </div>
 
       {selectedVendorProduct && (
+        <div ref={vendorSectionRef}>
         <ProductVendorSection
           productCode={selectedVendorProduct.code}
           productName={selectedVendorProduct.name}
@@ -1910,6 +1917,7 @@ export default function ProductRegistrationPage() {
             }
           }}
         />
+        </div>
       )}
 
       <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
