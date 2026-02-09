@@ -10335,7 +10335,7 @@ export async function registerRoutes(
         .from(pendingOrders)
         .where(and(
           inArray(pendingOrders.productCode, allVendorCodes),
-          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중")),
+          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "주문조정"), eq(pendingOrders.status, "상품준비중")),
           gte(pendingOrders.createdAt, startOfDay),
           lte(pendingOrders.createdAt, endOfDay)
         ));
