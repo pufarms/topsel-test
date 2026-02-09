@@ -8015,13 +8015,18 @@ export async function registerRoutes(
 
               // 자체발송 주문인 경우 product_stocks 재고 차감
               if (order.fulfillmentType !== "vendor" && order.productCode) {
-                await tx.update(productStocks)
+                const stockResult = await tx.update(productStocks)
                   .set({
                     currentStock: sql`GREATEST(0, ${productStocks.currentStock} - 1)`,
                     updatedAt: new Date(),
                   })
-                  .where(eq(productStocks.productCode, order.productCode));
-                console.log(`[배송중 전환 재고 차감] 상품코드: ${order.productCode}, 자체발송`);
+                  .where(eq(productStocks.productCode, order.productCode))
+                  .returning();
+                if (stockResult.length === 0) {
+                  console.warn(`[재고차감] product_stocks에 해당 상품 없음: ${order.productCode}`);
+                } else {
+                  console.log(`[배송중 전환 재고 차감] 상품코드: ${order.productCode}, 자체발송`);
+                }
               }
 
               memberTransferred++;
@@ -8217,13 +8222,18 @@ export async function registerRoutes(
             .where(eq(pendingOrders.id, id))
             .returning();
           if (orderResult) {
-            await tx.update(productStocks)
+            const stockResult = await tx.update(productStocks)
               .set({
                 currentStock: sql`GREATEST(0, ${productStocks.currentStock} - 1)`,
                 updatedAt: new Date(),
               })
-              .where(eq(productStocks.productCode, currentOrder.productCode!));
-            console.log(`[배송중 전환 재고 차감] 상품코드: ${currentOrder.productCode}, 자체발송 (개별)`);
+              .where(eq(productStocks.productCode, currentOrder.productCode!))
+              .returning();
+            if (stockResult.length === 0) {
+              console.warn(`[재고차감] product_stocks에 해당 상품 없음: ${currentOrder.productCode}`);
+            } else {
+              console.log(`[배송중 전환 재고 차감] 상품코드: ${currentOrder.productCode}, 자체발송 (개별)`);
+            }
           }
           return orderResult;
         });

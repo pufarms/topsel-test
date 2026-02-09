@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial, decimal, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, jsonb, boolean, serial, decimal, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1521,7 +1521,9 @@ export const productVendors = pgTable("product_vendors", {
   isActive: boolean("is_active").default(true),
   memo: text("memo"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  unique("product_vendors_product_vendor_unique").on(table.productCode, table.vendorId),
+]);
 
 export const insertProductVendorSchema = createInsertSchema(productVendors).omit({
   id: true,
