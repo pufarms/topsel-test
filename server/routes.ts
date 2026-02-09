@@ -8856,10 +8856,10 @@ export async function registerRoutes(
     }
 
     try {
-      // 1. 대기 및 주문조정 상태의 주문들을 상품코드별로 그룹화
+      // 1. 대기 상태의 주문들을 상품코드별로 그룹화 (주문조정 완료건은 제외)
       const pendingOrdersList = await db.select()
         .from(pendingOrders)
-        .where(inArray(pendingOrders.status, ["대기", "주문조정"]));
+        .where(eq(pendingOrders.status, "대기"));
       
       // 상품코드별 주문 합계 계산
       const productOrderSummary: Record<string, {
