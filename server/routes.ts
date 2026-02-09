@@ -10826,6 +10826,45 @@ export async function registerRoutes(
         status: newStatus,
       });
 
+      // 미배분 수량이 있으면 해당 주문들을 자동으로 "주문조정" 상태로 변경
+      let adjustedOrderIds: string[] = [];
+      if (unallocated > 0 && allocation.productCode) {
+        const targetOrders = await db.select()
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.productCode, allocation.productCode),
+            or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
+          ))
+          .orderBy(desc(pendingOrders.createdAt))
+          .limit(unallocated);
+
+        if (targetOrders.length > 0) {
+          adjustedOrderIds = targetOrders.map(o => o.id);
+          await db.update(pendingOrders)
+            .set({ status: "주문조정", updatedAt: new Date() })
+            .where(inArray(pendingOrders.id, adjustedOrderIds));
+          console.log(`배분 확정 - 미배분 ${unallocated}건 주문조정 처리: ${adjustedOrderIds.join(", ")}`);
+
+          // SSE: 주문조정 처리 알림
+          sseManager.sendToAdmins("order-adjusted", {
+            type: "allocation-unallocated",
+            count: adjustedOrderIds.length,
+            productCode: allocation.productCode,
+          });
+
+          // 해당 회원들에게도 알림
+          const memberIds = [...new Set(targetOrders.map(o => o.memberId).filter(Boolean))];
+          memberIds.forEach(memberId => {
+            if (memberId) {
+              sseManager.sendToMember(memberId, "order-updated", {
+                type: "order-adjusted",
+                reason: "배분 미배정",
+              });
+            }
+          });
+        }
+      }
+
       const updatedAllocation = await storage.getOrderAllocationById(allocationId);
 
       sseManager.sendToAdmins("allocation-updated", { type: "allocation-confirmed", allocationId });
@@ -10841,6 +10880,8 @@ export async function registerRoutes(
         totalQuantity: allocation.totalQuantity,
         allocatedQuantity: totalAllocated,
         unallocatedQuantity: unallocated,
+        adjustedOrderIds,
+        adjustedOrders: adjustedOrderIds.length,
         details: confirmedDetails.map(d => ({
           detailId: d.id,
           vendorId: d.vendorId,

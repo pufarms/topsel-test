@@ -172,10 +172,15 @@ export default function AllocationSection() {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (data: { allocationId: number; details: { detailId: number; allocatedQuantity: number }[]; selfQuantity: number }) =>
-      apiRequest("POST", `/api/admin/allocations/${data.allocationId}/confirm`, { details: data.details, selfQuantity: data.selfQuantity }),
-    onSuccess: () => {
-      toast({ title: "배분 확정 완료" });
+    mutationFn: async (data: { allocationId: number; details: { detailId: number; allocatedQuantity: number }[]; selfQuantity: number }) => {
+      const res = await apiRequest("POST", `/api/admin/allocations/${data.allocationId}/confirm`, { details: data.details, selfQuantity: data.selfQuantity });
+      return await res.json();
+    },
+    onSuccess: (result: any) => {
+      const desc = result.adjustedOrders > 0
+        ? `배분 ${result.allocatedQuantity}건 확정, ${result.adjustedOrders}건 주문조정 처리됨`
+        : `배분 ${result.allocatedQuantity || ""}건 확정 완료`;
+      toast({ title: "배분 확정 완료", description: desc });
       setConfirmDialogOpen(false);
       refreshAll();
     },
