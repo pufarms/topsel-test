@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,12 @@ export function ProductVendorDialog({
   const { toast } = useToast();
   const [showSection, setShowSection] = useState(isVendorProduct);
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+
+  useEffect(() => {
+    if (open) {
+      setShowSection(isVendorProduct);
+    }
+  }, [open, isVendorProduct]);
   const [vendorPrice, setVendorPrice] = useState("");
   const [vendorMemo, setVendorMemo] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
