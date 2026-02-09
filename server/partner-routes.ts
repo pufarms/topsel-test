@@ -49,11 +49,23 @@ function verifyPartnerToken(token: string): PartnerPayload | null {
   }
 }
 
-function partnerAuth(req: Request, res: Response, next: NextFunction) {
+async function partnerAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.[PARTNER_COOKIE];
   if (!token) return res.status(401).json({ message: "인증이 필요합니다" });
   const payload = verifyPartnerToken(token);
   if (!payload) return res.status(401).json({ message: "유효하지 않은 인증입니다" });
+
+  try {
+    const [vendor] = await db.select({ isActive: vendors.isActive }).from(vendors).where(eq(vendors.id, payload.vendorId)).limit(1);
+    if (!vendor || !vendor.isActive) {
+      res.clearCookie(PARTNER_COOKIE, { path: "/" });
+      return res.status(403).json({ message: "비활성 계정입니다. 관리자에게 문의해 주세요." });
+    }
+  } catch (error) {
+    console.error("Partner auth DB check error:", error);
+    return res.status(500).json({ message: "인증 확인 중 오류가 발생했습니다" });
+  }
+
   req.partner = payload;
   next();
 }
@@ -197,21 +209,32 @@ router.get("/allocations", partnerAuth, async (req: Request, res: Response) => {
     .where(and(...conditions))
     .orderBy(desc(allocationDetails.createdAt));
 
-    const result = details.map(d => ({
-      id: d.detail.id,
-      allocationId: d.detail.allocationId,
-      allocationDate: d.allocation.allocationDate,
-      productCode: d.allocation.productCode,
-      productName: d.allocation.productName,
-      requestedQuantity: d.detail.requestedQuantity,
-      confirmedQuantity: d.detail.confirmedQuantity,
-      status: d.detail.status,
-      notifiedAt: d.detail.notifiedAt,
-      respondedAt: d.detail.respondedAt,
-      confirmedAt: d.detail.confirmedAt,
-      memo: d.detail.memo,
-      allocationStatus: d.allocation.status,
-    }));
+    const DEADLINE_HOURS = 2;
+    const result = details.map(d => {
+      const deadlineExceeded = d.detail.notifiedAt 
+        ? (Date.now() - new Date(d.detail.notifiedAt).getTime()) > DEADLINE_HOURS * 60 * 60 * 1000 
+        : false;
+      const remainingMs = d.detail.notifiedAt
+        ? Math.max(0, DEADLINE_HOURS * 60 * 60 * 1000 - (Date.now() - new Date(d.detail.notifiedAt).getTime()))
+        : null;
+      return {
+        id: d.detail.id,
+        allocationId: d.detail.allocationId,
+        allocationDate: d.allocation.allocationDate,
+        productCode: d.allocation.productCode,
+        productName: d.allocation.productName,
+        requestedQuantity: d.detail.requestedQuantity,
+        confirmedQuantity: d.detail.confirmedQuantity,
+        status: d.detail.status,
+        notifiedAt: d.detail.notifiedAt,
+        respondedAt: d.detail.respondedAt,
+        confirmedAt: d.detail.confirmedAt,
+        memo: d.detail.memo,
+        allocationStatus: d.allocation.status,
+        deadlineExceeded,
+        remainingMinutes: remainingMs !== null ? Math.ceil(remainingMs / 60000) : null,
+      };
+    });
 
     res.json(result);
   } catch (error: any) {
@@ -234,6 +257,14 @@ router.put("/allocations/:id/respond", partnerAuth, async (req: Request, res: Re
     if (detail.vendorId !== vendorId) return res.status(403).json({ message: "권한이 없습니다" });
     if (detail.status !== "notified" && detail.status !== "pending") {
       return res.status(400).json({ message: "이미 응답한 배분입니다" });
+    }
+
+    const DEADLINE_HOURS = 2;
+    if (detail.notifiedAt) {
+      const elapsed = Date.now() - new Date(detail.notifiedAt).getTime();
+      if (elapsed > DEADLINE_HOURS * 60 * 60 * 1000) {
+        return res.status(400).json({ message: "응답 마감시간이 초과되었습니다. 관리자에게 문의해 주세요." });
+      }
     }
 
     await db.update(allocationDetails)

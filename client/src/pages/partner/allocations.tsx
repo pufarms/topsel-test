@@ -24,6 +24,8 @@ interface AllocationItem {
   confirmedAt: string | null;
   memo: string | null;
   allocationStatus: string;
+  deadlineExceeded: boolean;
+  remainingMinutes: number | null;
 }
 
 const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -139,40 +141,54 @@ export default function PartnerAllocations() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingItems.map(item => (
-                        <tr key={item.id} className="border-b">
-                          <td className="py-2 px-2">{item.allocationDate}</td>
-                          <td className="py-2 px-2">{item.productName} <span className="text-xs text-muted-foreground">({item.productCode})</span></td>
-                          <td className="py-2 px-2 text-right font-bold">{item.requestedQuantity}</td>
-                          <td className="py-2 px-2 text-center">
-                            <Button size="sm" onClick={() => openRespondDialog(item)} data-testid={`button-respond-${item.id}`}>
-                              <Send className="h-3 w-3 mr-1" />응답
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {pendingItems.map(item => {
+                        const isUrgent = item.remainingMinutes !== null && item.remainingMinutes <= 60 && !item.deadlineExceeded;
+                        const isExpired = item.deadlineExceeded;
+                        return (
+                          <tr key={item.id} className={`border-b ${isExpired ? "bg-destructive/5" : isUrgent ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
+                            <td className="py-2 px-2">{item.allocationDate}</td>
+                            <td className="py-2 px-2">
+                              {item.productName} <span className="text-xs text-muted-foreground">({item.productCode})</span>
+                              {isExpired && <span className="ml-1 text-xs text-destructive font-medium">[마감 초과]</span>}
+                              {isUrgent && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400 font-medium">[{item.remainingMinutes}분 남음]</span>}
+                            </td>
+                            <td className="py-2 px-2 text-right font-bold">{item.requestedQuantity}</td>
+                            <td className="py-2 px-2 text-center">
+                              <Button size="sm" onClick={() => openRespondDialog(item)} disabled={isExpired} data-testid={`button-respond-${item.id}`}>
+                                <Send className="h-3 w-3 mr-1" />{isExpired ? "마감" : "응답"}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
                 <div className="md:hidden space-y-2">
-                  {pendingItems.map(item => (
-                    <Card key={item.id}>
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-sm">{item.productName}</div>
-                            <div className="text-xs text-muted-foreground">{item.productCode} | {item.allocationDate}</div>
+                  {pendingItems.map(item => {
+                    const isUrgent = item.remainingMinutes !== null && item.remainingMinutes <= 60 && !item.deadlineExceeded;
+                    const isExpired = item.deadlineExceeded;
+                    return (
+                      <Card key={item.id} className={isExpired ? "border-destructive/50" : isUrgent ? "border-amber-400" : ""}>
+                        <CardContent className="p-3 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-sm">{item.productName}</div>
+                              <div className="text-xs text-muted-foreground">{item.productCode} | {item.allocationDate}</div>
+                              {isExpired && <div className="text-xs text-destructive font-medium mt-0.5">[마감 초과]</div>}
+                              {isUrgent && <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">[{item.remainingMinutes}분 남음]</div>}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold">{item.requestedQuantity}개</div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold">{item.requestedQuantity}개</div>
-                          </div>
-                        </div>
-                        <Button size="sm" className="w-full" onClick={() => openRespondDialog(item)} data-testid={`button-respond-mobile-${item.id}`}>
-                          <Send className="h-3 w-3 mr-1" />응답하기
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+                          <Button size="sm" className="w-full" onClick={() => openRespondDialog(item)} disabled={isExpired} data-testid={`button-respond-mobile-${item.id}`}>
+                            <Send className="h-3 w-3 mr-1" />{isExpired ? "마감됨" : "응답하기"}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
