@@ -3761,11 +3761,11 @@ export async function registerRoutes(
 
   // 상품등록에서 가져올 수 있는 상품 목록 (이미 매핑된 상품 제외)
   app.get("/api/product-mappings/available-products", async (req, res) => {
-    const productRegistrations = await storage.getAllProductRegistrations("active");
+    const allProductRegs = await storage.getAllProductRegistrations("active");
     const existingMappings = await storage.getAllProductMappings();
     const existingCodes = new Set(existingMappings.map(m => m.productCode));
     
-    const availableProducts = productRegistrations.filter(p => !existingCodes.has(p.productCode));
+    const availableProducts = allProductRegs.filter(p => !existingCodes.has(p.productCode));
     return res.json(availableProducts.map(p => ({
       productCode: p.productCode,
       productName: p.productName,
@@ -10406,9 +10406,15 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            const message = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
-            await solapiService.sendSMS(vendor.contactPhone, message);
-            kakaoSent = true;
+            const senderNumber = process.env.SOLAPI_SENDER || '';
+            const content = `[탑셀러] 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            // TODO: 알림톡 템플릿 등록 후 sendAlimTalk으로 변경 필요
+            const result = await solapiService.sendBrandTalkDirect({
+              to: [vendor.contactPhone.replace(/-/g, '')],
+              from: senderNumber,
+              content,
+            });
+            kakaoSent = result.success;
           } catch (err) {
             console.error(`[배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
           }
@@ -10535,9 +10541,15 @@ export async function registerRoutes(
         let kakaoSent = false;
         if (vendor.contactPhone) {
           try {
-            const message = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
-            await solapiService.sendSMS(vendor.contactPhone, message);
-            kakaoSent = true;
+            const senderNumber = process.env.SOLAPI_SENDER || '';
+            const content = `[탑셀러] 추가 배분 요청\n상품: ${allocation.productName}\n요청수량: ${vr.requestedQuantity}박스\n매입가: ${vPrice ? vPrice.toLocaleString() + '원' : '미정'}\n마감시간: ${deadline.toLocaleString('ko-KR')}\n대시보드에서 가능수량을 입력해 주세요.`;
+            // TODO: 알림톡 템플릿 등록 후 sendAlimTalk으로 변경 필요
+            const result = await solapiService.sendBrandTalkDirect({
+              to: [vendor.contactPhone.replace(/-/g, '')],
+              from: senderNumber,
+              content,
+            });
+            kakaoSent = result.success;
           } catch (err) {
             console.error(`[추가 배분 알림] 솔라피 발송 실패 (${vendor.companyName}):`, err);
           }
@@ -10577,12 +10589,23 @@ export async function registerRoutes(
       }
 
       let totalAllocated = 0;
+      for (const du of detailUpdates) {
+        totalAllocated += (du.allocatedQuantity || 0);
+      }
+      if (selfQuantity && selfQuantity > 0) {
+        totalAllocated += selfQuantity;
+      }
+
+      if (totalAllocated > allocation.totalQuantity) {
+        return res.status(400).json({
+          message: `배분 총량(${totalAllocated})이 필요수량(${allocation.totalQuantity})을 초과합니다`,
+        });
+      }
+
       const confirmedDetails = [];
 
       for (const du of detailUpdates) {
         const qty = du.allocatedQuantity || 0;
-        totalAllocated += qty;
-
         const status = qty > 0 ? "confirmed" : "rejected";
         const updated = await storage.updateAllocationDetail(du.detailId, {
           allocatedQuantity: qty,
@@ -10593,7 +10616,6 @@ export async function registerRoutes(
       }
 
       if (selfQuantity && selfQuantity > 0) {
-        totalAllocated += selfQuantity;
         const selfDetail = await storage.createAllocationDetail({
           allocationId,
           vendorId: null,
@@ -10605,12 +10627,6 @@ export async function registerRoutes(
           confirmedAt: new Date(),
         });
         confirmedDetails.push(selfDetail);
-      }
-
-      if (totalAllocated > allocation.totalQuantity) {
-        return res.status(400).json({
-          message: `배분 총량(${totalAllocated})이 필요수량(${allocation.totalQuantity})을 초과합니다`,
-        });
       }
 
       const unallocated = allocation.totalQuantity - totalAllocated;
@@ -10673,12 +10689,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "확정된 배분 상세가 없습니다" });
       }
 
+      const targetDate = new Date(allocation.allocationDate);
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
       const unassignedOrders = await db.select()
         .from(pendingOrders)
         .where(and(
           eq(pendingOrders.productCode, allocation.productCode),
           or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중")),
-          sql`${pendingOrders.vendorId} IS NULL`
+          sql`${pendingOrders.vendorId} IS NULL`,
+          gte(pendingOrders.createdAt, startOfDay),
+          lte(pendingOrders.createdAt, endOfDay)
         ))
         .orderBy(pendingOrders.createdAt);
 
