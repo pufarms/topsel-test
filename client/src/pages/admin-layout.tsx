@@ -61,7 +61,7 @@ const menuItems: MenuItem[] = [
     icon: <ShoppingCart className="h-5 w-5" />,
     children: [
       { id: "orders-pending", label: "주문 대기", path: "/admin/orders/pending" },
-      { id: "orders-admin-cancel", label: "주문조정(직권취소)", path: "/admin/orders/admin-cancel" },
+      { id: "orders-admin-cancel", label: "주문조정(직권취소)/외주 주문 배분", path: "/admin/orders/admin-cancel" },
       { id: "orders-preparing", label: "상품준비중", path: "/admin/orders/preparing" },
       { id: "orders-print-waybill", label: "운송장 출력", path: "/admin/orders/print-waybill" },
       { id: "orders-ready-to-ship", label: "배송준비중", path: "/admin/orders/ready-to-ship" },
