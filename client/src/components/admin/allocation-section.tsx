@@ -119,6 +119,11 @@ export default function AllocationSection() {
     enabled: !!selectedAllocation?.id,
   });
 
+  const { data: assignDetailsData } = useQuery<DetailsResponse>({
+    queryKey: ["/api/admin/allocations", String(assignTargetAllocation?.id || ""), "details"],
+    enabled: !!assignTargetAllocation?.id,
+  });
+
   const refreshAll = () => {
     refetch();
     if (selectedAllocation?.id) refetchDetails();
@@ -769,7 +774,7 @@ export default function AllocationSection() {
                   <span className="font-bold">{assignTargetAllocation.totalQuantity}건</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>배정 가능:</span>
+                  <span>배정 수량:</span>
                   <span className="font-bold text-foreground">{assignTargetAllocation.allocatedQuantity || 0}건</span>
                 </div>
                 {(() => {
@@ -782,6 +787,28 @@ export default function AllocationSection() {
                   ) : null;
                 })()}
               </div>
+
+              {assignDetailsData?.details && assignDetailsData.details.filter(d => d.status === "confirmed").length > 0 && (
+                <div className="rounded-md border p-3 space-y-2">
+                  <div className="text-sm font-medium">배정 협력업체</div>
+                  <div className="space-y-1">
+                    {assignDetailsData.details
+                      .filter(d => d.status === "confirmed")
+                      .map(d => (
+                        <div key={d.id} className="flex justify-between items-center text-sm py-1 border-b last:border-b-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={d.vendorId ? "outline" : "secondary"} className="text-xs">
+                              {d.vendorId ? "협력업체" : "자체발송"}
+                            </Badge>
+                            <span>{d.vendorName || "자체(탑셀러)"}</span>
+                          </div>
+                          <span className="font-bold">{d.allocatedQuantity}건</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               {(() => {
                 const unalloc = assignTargetAllocation.totalQuantity - (assignTargetAllocation.allocatedQuantity || 0);
                 return unalloc > 0 ? (
