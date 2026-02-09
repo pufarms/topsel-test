@@ -18,7 +18,7 @@ export default function PartnerDashboard() {
   });
 
   const cards = [
-    { label: "응답 대기 배분", value: data?.pendingAllocations || 0, icon: MessageSquareReply, href: "/partner/allocations", color: "text-amber-600" },
+    { label: "예상 발주수량", value: data?.pendingAllocations || 0, icon: MessageSquareReply, href: "/partner/allocations", color: "text-amber-600" },
     { label: "미처리 주문", value: data?.unprocessedOrders || 0, icon: ClipboardList, href: "/partner/orders", color: "text-blue-600" },
     { label: "미등록 운송장", value: data?.unregisteredTracking || 0, icon: ScanBarcode, href: "/partner/tracking", color: "text-orange-600" },
     { label: "배송 중", value: data?.inShipping || 0, icon: Truck, href: "/partner/delivery", color: "text-green-600" },
