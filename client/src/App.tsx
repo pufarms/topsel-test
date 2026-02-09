@@ -48,7 +48,6 @@ import OrdersReadyToShipPage from "@/pages/admin/orders/ready-to-ship";
 import OrdersCancelledPage from "@/pages/admin/orders/cancelled";
 import OrdersShippingPage from "@/pages/admin/orders/shipping";
 import OrdersCompletedPage from "@/pages/admin/orders/completed";
-import OrdersAllocationsPage from "@/pages/admin/orders/allocations";
 import PublicPreviewPage from "@/pages/public-preview";
 import MemberOrderPreview from "@/pages/admin/member-order-preview";
 import MyPage from "@/pages/mypage";
@@ -147,9 +146,6 @@ function Router() {
       </Route>
       <Route path="/admin/orders/completed">
         <AdminRoute><OrdersCompletedPage /></AdminRoute>
-      </Route>
-      <Route path="/admin/orders/allocations">
-        <AdminRoute><OrdersAllocationsPage /></AdminRoute>
       </Route>
       <Route path="/admin/products/categories">
         <AdminRoute><CategoryManagement /></AdminRoute>

@@ -68,7 +68,6 @@ const menuItems: MenuItem[] = [
       { id: "orders-cancelled", label: "취소건 관리", path: "/admin/orders/cancelled" },
       { id: "orders-shipping", label: "배송중", path: "/admin/orders/shipping" },
       { id: "orders-completed", label: "배송완료", path: "/admin/orders/completed" },
-      { id: "orders-allocations", label: "일일 배분", path: "/admin/orders/allocations" },
     ]
   },
   { 

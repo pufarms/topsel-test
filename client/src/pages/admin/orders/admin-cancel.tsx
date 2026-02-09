@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import OrderStatsBanner from "@/components/order-stats-banner";
+import AllocationSection from "@/components/admin/allocation-section";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -633,6 +634,8 @@ export default function OrdersAdminCancelPage() {
       </div>
 
       <OrderStatsBanner />
+
+      <AllocationSection />
 
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-col gap-3">
