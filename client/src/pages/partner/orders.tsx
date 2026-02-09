@@ -1,0 +1,185 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
+
+interface OrdersResponse {
+  orders: any[];
+  total: number;
+  page: number;
+  limit: number;
+  statusCounts: Record<string, number>;
+}
+
+const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  "대기": { label: "신규배정", variant: "default" },
+  "상품준비중": { label: "상품준비중", variant: "outline" },
+  "배송준비중": { label: "배송준비중", variant: "secondary" },
+  "배송중": { label: "배송중", variant: "default" },
+  "배송완료": { label: "배송완료", variant: "default" },
+};
+
+export default function PartnerOrders() {
+  const today = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [status, setStatus] = useState("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const queryParams = new URLSearchParams({
+    startDate, endDate, status, search, page: String(page), limit: "50",
+  }).toString();
+
+  const { data, isLoading } = useQuery<OrdersResponse>({
+    queryKey: ["/api/partner/orders", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/partner/orders?${queryParams}`, { credentials: "include" });
+      if (!res.ok) throw new Error("조회 실패");
+      return res.json();
+    },
+  });
+
+  const handleDownload = () => {
+    const params = new URLSearchParams({ startDate, endDate, status }).toString();
+    window.open(`/api/partner/orders/download?${params}`, "_blank");
+  };
+
+  const orders = data?.orders || [];
+  const total = data?.total || 0;
+  const totalPages = Math.ceil(total / 50);
+
+  return (
+    <div className="space-y-4 pb-20 lg:pb-0">
+      <h1 className="text-xl font-bold" data-testid="text-orders-title">주문 현황</h1>
+
+      <Card>
+        <CardContent className="p-3 space-y-3">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">시작일</label>
+              <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-36" data-testid="input-start-date" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">종료일</label>
+              <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-36" data-testid="input-end-date" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">상태</label>
+              <select
+                className="h-9 px-3 rounded-md border text-sm bg-background"
+                value={status}
+                onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+                data-testid="select-status"
+              >
+                <option value="all">전체</option>
+                <option value="대기">신규배정</option>
+                <option value="상품준비중">상품준비중</option>
+                <option value="배송준비중">배송준비중</option>
+                <option value="배송중">배송중</option>
+              </select>
+            </div>
+            <div className="space-y-1 flex-1 min-w-[120px]">
+              <label className="text-xs text-muted-foreground">검색</label>
+              <div className="flex gap-1">
+                <Input placeholder="상품명/수취인명" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="input-search" />
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleDownload} data-testid="button-download">
+              <Download className="h-4 w-4 mr-1" />엑셀
+            </Button>
+          </div>
+          {data?.statusCounts && (
+            <div className="flex gap-2 flex-wrap text-xs text-muted-foreground">
+              <span>총 {total}건</span>
+              {Object.entries(data.statusCounts).map(([s, c]) => (
+                <span key={s}>| {s}: {c}건</span>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : orders.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            조회된 주문이 없습니다.
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left py-2 px-3">주문번호</th>
+                    <th className="text-left py-2 px-3">수취인</th>
+                    <th className="text-left py-2 px-3">연락처</th>
+                    <th className="text-left py-2 px-3">주소</th>
+                    <th className="text-left py-2 px-3">상품명</th>
+                    <th className="text-right py-2 px-3">수량</th>
+                    <th className="text-center py-2 px-3">상태</th>
+                    <th className="text-left py-2 px-3">주문일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o: any) => {
+                    const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                    return (
+                      <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
+                        <td className="py-2 px-3 font-mono text-xs">{o.id}</td>
+                        <td className="py-2 px-3">{o.recipientName}</td>
+                        <td className="py-2 px-3 text-xs">{o.recipientPhone}</td>
+                        <td className="py-2 px-3 text-xs max-w-[200px] truncate">{o.address} {o.addressDetail}</td>
+                        <td className="py-2 px-3">{o.productName}</td>
+                        <td className="py-2 px-3 text-right">{o.quantity || 1}</td>
+                        <td className="py-2 px-3 text-center"><Badge variant={sb.variant}>{sb.label}</Badge></td>
+                        <td className="py-2 px-3 text-xs">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ko-KR") : ""}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden space-y-2 p-3">
+              {orders.map((o: any) => {
+                const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                return (
+                  <Card key={o.id} data-testid={`card-order-${o.id}`}>
+                    <CardContent className="p-3 space-y-1">
+                      <div className="flex justify-between items-start">
+                        <span className="font-mono text-xs text-muted-foreground">{o.id}</span>
+                        <Badge variant={sb.variant}>{sb.label}</Badge>
+                      </div>
+                      <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>
+                      <div className="text-xs">{o.recipientName} | {o.recipientPhone}</div>
+                      <div className="text-xs text-muted-foreground">{o.address} {o.addressDetail}</div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm">{page} / {totalPages}</span>
+          <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -156,6 +156,7 @@ Preferred communication style: Simple, everyday language.
 -   **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
 -   **Outsourcing/Vendor System**: Includes `vendors` and `product_vendors` tables. Extends product schemas to support vendor products. Admin pages for vendor CRUD and product mapping. Stock logic differentiates between vendor and self-fulfilled orders.
 -   **Allocation System**: New DB tables `order_allocations` and `allocation_details`. APIs and admin page for managing a 5-step workflow (aggregation → notification → response → confirmation → assignment). Features auto-adjustment for insufficient vendor supply, moving unallocated orders to "주문조정" status.
+-   **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication (`partner_token` cookie), independent from admin auth. Routes in `server/partner-routes.ts`, frontend pages in `client/src/pages/partner/`. Features: login/dashboard, allocation response, order list + Excel download, tracking registration (individual + bulk Excel), delivery status with carrier tracking URLs. All data scoped by vendorId for security. Auth context in `client/src/lib/partner-auth.tsx`.
 
 ## External Dependencies
 

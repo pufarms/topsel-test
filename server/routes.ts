@@ -18,6 +18,7 @@ import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
 import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
+import partnerRouter from "./partner-routes";
 
 // PortOne V2 환경변수
 const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
@@ -117,6 +118,9 @@ export async function registerRoutes(
 
   // 주소 검증 API 라우터
   app.use("/api/address", addressValidationRouter);
+
+  // 외주업체 파트너 API 라우터
+  app.use("/api/partner", partnerRouter);
 
   // SSE 이벤트 스트림 엔드포인트
   app.get("/api/events", async (req, res) => {

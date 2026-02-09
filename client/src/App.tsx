@@ -53,6 +53,14 @@ import PublicPreviewPage from "@/pages/public-preview";
 import MemberOrderPreview from "@/pages/admin/member-order-preview";
 import MyPage from "@/pages/mypage";
 import DynamicPage from "@/pages/dynamic-page";
+import { PartnerAuthProvider } from "@/lib/partner-auth";
+import PartnerLogin from "@/pages/partner/login";
+import PartnerLayout from "@/pages/partner/layout";
+import PartnerDashboard from "@/pages/partner/dashboard";
+import PartnerAllocations from "@/pages/partner/allocations";
+import PartnerOrders from "@/pages/partner/orders";
+import PartnerTracking from "@/pages/partner/tracking";
+import PartnerDelivery from "@/pages/partner/delivery";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -208,6 +216,25 @@ function Router() {
       </Route>
       <Route path="/admin/settings/gallery">
         <AdminRoute><AdminGallery /></AdminRoute>
+      </Route>
+
+      <Route path="/partner/login">
+        <PartnerAuthProvider><PartnerLogin /></PartnerAuthProvider>
+      </Route>
+      <Route path="/partner">
+        <PartnerAuthProvider><PartnerLayout><PartnerDashboard /></PartnerLayout></PartnerAuthProvider>
+      </Route>
+      <Route path="/partner/allocations">
+        <PartnerAuthProvider><PartnerLayout><PartnerAllocations /></PartnerLayout></PartnerAuthProvider>
+      </Route>
+      <Route path="/partner/orders">
+        <PartnerAuthProvider><PartnerLayout><PartnerOrders /></PartnerLayout></PartnerAuthProvider>
+      </Route>
+      <Route path="/partner/tracking">
+        <PartnerAuthProvider><PartnerLayout><PartnerTracking /></PartnerLayout></PartnerAuthProvider>
+      </Route>
+      <Route path="/partner/delivery">
+        <PartnerAuthProvider><PartnerLayout><PartnerDelivery /></PartnerLayout></PartnerAuthProvider>
       </Route>
       
       {/* Dynamic CMS pages - catch-all route */}

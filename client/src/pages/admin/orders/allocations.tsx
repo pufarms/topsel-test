@@ -302,9 +302,9 @@ export default function OrdersAllocationsPage() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-2">상품코드</th>
                     <th className="text-left py-2 px-2">상품명</th>
-                    <th className="text-right py-2 px-2">총 필요수량</th>
-                    <th className="text-right py-2 px-2">배분완료</th>
-                    <th className="text-right py-2 px-2">미배분</th>
+                    <th className="text-right py-2 px-2">총 주문수량</th>
+                    <th className="text-right py-2 px-2">배정수량</th>
+                    <th className="text-right py-2 px-2">주문조정</th>
                     <th className="text-center py-2 px-2">상태</th>
                     <th className="text-center py-2 px-2">액션</th>
                   </tr>
@@ -322,14 +322,20 @@ export default function OrdersAllocationsPage() {
                         <td className="py-2 px-2 font-mono text-xs">{alloc.productCode}</td>
                         <td className="py-2 px-2">{alloc.productName}</td>
                         <td className="py-2 px-2 text-right font-bold">{alloc.totalQuantity}</td>
-                        <td className="py-2 px-2 text-right">{alloc.allocatedQuantity || 0}</td>
                         <td className="py-2 px-2 text-right">
-                          {(alloc.unallocatedQuantity != null && alloc.unallocatedQuantity > 0) ? (
-                            <span className="text-destructive font-medium">{alloc.unallocatedQuantity}</span>
+                          {alloc.status === "assigned" ? (
+                            <span className="text-green-600 font-medium">{alloc.allocatedQuantity || 0}</span>
                           ) : (
-                            alloc.status === "confirmed"
-                              ? <span>{(alloc.totalQuantity - (alloc.allocatedQuantity || 0))}</span>
-                              : <span>{alloc.unallocatedQuantity ?? alloc.totalQuantity}</span>
+                            <span>{alloc.allocatedQuantity || 0}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-right">
+                          {alloc.status === "assigned" && (alloc.unallocatedQuantity ?? 0) > 0 ? (
+                            <span className="text-destructive font-medium">{alloc.unallocatedQuantity}</span>
+                          ) : alloc.status === "assigned" ? (
+                            <span className="text-muted-foreground">0</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </td>
                         <td className="py-2 px-2 text-center">
