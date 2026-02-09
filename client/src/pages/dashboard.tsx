@@ -1370,6 +1370,26 @@ export default function Dashboard() {
                         ]}
                       />
 
+                      {/* 신규주문건 매입총액 */}
+                      {(() => {
+                        const pendingOnlyOrders = (pendingOrders || []).filter(o => o.status === "대기");
+                        const totalPurchase = pendingOnlyOrders.reduce((sum, o) => sum + (o.supplyPrice || 0), 0);
+                        return (
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-blue-50 dark:bg-blue-950/30 px-4 py-3" data-testid="new-order-purchase-total">
+                            <div className="flex items-center gap-2">
+                              <ShoppingCart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">신규주문건 매입총액</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-muted-foreground">{pendingOnlyOrders.length}건</span>
+                              <span className="text-base font-bold text-blue-700 dark:text-blue-300" data-testid="text-new-order-total">
+                                {totalPurchase.toLocaleString()}원
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* 액션 버튼 및 페이지네이션 */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-2">
