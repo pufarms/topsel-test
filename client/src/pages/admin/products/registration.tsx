@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Download, Calculator, Send, StopCircle, Search, RotateCcw, Save, Check, CheckCircle, AlertTriangle, Link2, FileEdit } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/admin";
@@ -168,6 +170,41 @@ export default function ProductRegistrationPage() {
   
   // Track products already sent to next week
   const [nextWeekProductCodes, setNextWeekProductCodes] = useState<Set<string>>(new Set());
+
+  // Manual registration dialog state
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    categoryLarge: "",
+    categoryMedium: "",
+    categorySmall: "",
+    weight: "",
+    productCode: "",
+    productName: "",
+    sourceProduct: "",
+    sourcePrice: "",
+    lossRate: "0",
+    sourceWeight: "",
+    boxCost: "0",
+    materialCost: "0",
+    outerBoxCost: "0",
+    wrappingCost: "0",
+    laborCost: "0",
+    shippingCost: "0",
+    startMarginRate: "",
+    drivingMarginRate: "",
+    topMarginRate: "",
+  });
+  const [manualCalc, setManualCalc] = useState({
+    unitPrice: 0,
+    sourceProductTotal: 0,
+    totalCost: 0,
+    startPrice: 0,
+    startMargin: 0,
+    drivingPrice: 0,
+    drivingMargin: 0,
+    topPrice: 0,
+    topMargin: 0,
+  });
   
   const [location, setLocation] = useLocation();
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
@@ -717,6 +754,120 @@ export default function ProductRegistrationPage() {
       bulkUpdateMutation.mutate({ ids: existingRowIds, data });
     } else {
       toast({ title: "일괄 적용 완료" });
+    }
+  };
+
+  // Manual form real-time price calculation
+  useEffect(() => {
+    const sp = parseInt(manualForm.sourcePrice) || 0;
+    const lr = parseInt(manualForm.lossRate) || 0;
+    const sw = parseInt(manualForm.sourceWeight) || 0;
+    const w = parseFloat(manualForm.weight) || 0;
+
+    const priceAfterLoss = sp * (1 + lr / 100);
+    const unitPrice = sw > 0 ? Math.round(priceAfterLoss / sw) : 0;
+    const sourceProductTotal = Math.round(unitPrice * w);
+
+    const bc = parseInt(manualForm.boxCost) || 0;
+    const mc = parseInt(manualForm.materialCost) || 0;
+    const oc = parseInt(manualForm.outerBoxCost) || 0;
+    const wc = parseInt(manualForm.wrappingCost) || 0;
+    const lc = parseInt(manualForm.laborCost) || 0;
+    const sc = parseInt(manualForm.shippingCost) || 0;
+    const totalCost = sourceProductTotal + bc + mc + oc + wc + lc + sc;
+
+    const smr = parseFloat(manualForm.startMarginRate);
+    const dmr = parseFloat(manualForm.drivingMarginRate);
+    const tmr = parseFloat(manualForm.topMarginRate);
+    const startPrice = !isNaN(smr) ? Math.round(totalCost * (1 + smr / 100)) : 0;
+    const drivingPrice = !isNaN(dmr) ? Math.round(totalCost * (1 + dmr / 100)) : 0;
+    const topPrice = !isNaN(tmr) ? Math.round(totalCost * (1 + tmr / 100)) : 0;
+
+    setManualCalc({
+      unitPrice,
+      sourceProductTotal,
+      totalCost,
+      startPrice,
+      startMargin: startPrice - totalCost,
+      drivingPrice,
+      drivingMargin: drivingPrice - totalCost,
+      topPrice,
+      topMargin: topPrice - totalCost,
+    });
+  }, [manualForm]);
+
+  const resetManualForm = () => {
+    setManualForm({
+      categoryLarge: "", categoryMedium: "", categorySmall: "",
+      weight: "", productCode: "", productName: "",
+      sourceProduct: "", sourcePrice: "", lossRate: "0", sourceWeight: "",
+      boxCost: "0", materialCost: "0", outerBoxCost: "0",
+      wrappingCost: "0", laborCost: "0", shippingCost: "0",
+      startMarginRate: "", drivingMarginRate: "", topMarginRate: "",
+    });
+  };
+
+  const handleManualFormChange = (field: string, value: string) => {
+    setManualForm(prev => {
+      const updated = { ...prev, [field]: value };
+      if (field === "categoryLarge") {
+        updated.categoryMedium = "";
+        updated.categorySmall = "";
+      } else if (field === "categoryMedium") {
+        updated.categorySmall = "";
+      }
+      return updated;
+    });
+  };
+
+  const handleManualSave = async () => {
+    if (!manualForm.productCode || !manualForm.productName || !manualForm.weight) {
+      toast({ variant: "destructive", title: "필수 항목 누락", description: "상품코드, 상품명, 중량은 필수입니다" });
+      return;
+    }
+
+    const smr = parseFloat(manualForm.startMarginRate);
+    const dmr = parseFloat(manualForm.drivingMarginRate);
+    const tmr = parseFloat(manualForm.topMarginRate);
+
+    if (isNaN(smr) || isNaN(dmr) || isNaN(tmr)) {
+      toast({ variant: "destructive", title: "마진율 누락", description: "S/D/T 마진율을 모두 입력해주세요" });
+      return;
+    }
+
+    if (manualCalc.startPrice === 0 && manualCalc.drivingPrice === 0 && manualCalc.topPrice === 0) {
+      toast({ variant: "destructive", title: "가격 오류", description: "공급가가 0원입니다. 원가 항목을 확인해주세요" });
+      return;
+    }
+
+    try {
+      const res = await createMutation.mutateAsync({
+        categoryLarge: manualForm.categoryLarge || null,
+        categoryMedium: manualForm.categoryMedium || null,
+        categorySmall: manualForm.categorySmall || null,
+        weight: manualForm.weight,
+        productCode: manualForm.productCode,
+        productName: manualForm.productName,
+        sourceProduct: manualForm.sourceProduct || null,
+        sourcePrice: parseInt(manualForm.sourcePrice) || null,
+        lossRate: parseInt(manualForm.lossRate) || 0,
+        sourceWeight: parseInt(manualForm.sourceWeight) || null,
+        boxCost: parseInt(manualForm.boxCost) || 0,
+        materialCost: parseInt(manualForm.materialCost) || 0,
+        outerBoxCost: parseInt(manualForm.outerBoxCost) || 0,
+        wrappingCost: parseInt(manualForm.wrappingCost) || 0,
+        laborCost: parseInt(manualForm.laborCost) || 0,
+        shippingCost: parseInt(manualForm.shippingCost) || 0,
+        startMarginRate: smr,
+        drivingMarginRate: dmr,
+        topMarginRate: tmr,
+      });
+      toast({ title: "상품 등록 완료", description: `"${manualForm.productName}" 상품이 등록되었습니다` });
+      resetManualForm();
+      setManualDialogOpen(false);
+      searchMutation.mutate();
+    } catch (err: any) {
+      // Error handled in createMutation onError
     }
   };
 
@@ -1417,6 +1568,10 @@ export default function ProductRegistrationPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => { resetManualForm(); setManualDialogOpen(true); }} data-testid="button-manual-register">
+          <FileEdit className="h-4 w-4 mr-1" />
+          수동 등록
+        </Button>
         <Button size="sm" variant="outline" onClick={handleAddRow} data-testid="button-add-row">
           <Plus className="h-4 w-4 mr-1" />
           새 행 추가
@@ -1894,6 +2049,241 @@ export default function ProductRegistrationPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manual Registration Dialog */}
+      <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileEdit className="h-5 w-5" />
+              상품 수동 등록
+            </DialogTitle>
+            <DialogDescription>상품 정보를 입력하면 공급가가 자동 계산됩니다.</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-5 pb-2">
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                  <span className="w-1.5 h-4 bg-primary rounded-full" />
+                  기본 정보
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">대분류</Label>
+                    <select
+                      value={manualForm.categoryLarge}
+                      onChange={e => handleManualFormChange("categoryLarge", e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      data-testid="manual-select-large"
+                    >
+                      <option value="">선택</option>
+                      {largeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">중분류</Label>
+                    <select
+                      value={manualForm.categoryMedium}
+                      onChange={e => handleManualFormChange("categoryMedium", e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                      disabled={!manualForm.categoryLarge}
+                      data-testid="manual-select-medium"
+                    >
+                      <option value="">선택</option>
+                      {getMediumCategoriesByLargeName(manualForm.categoryLarge || null).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">소분류</Label>
+                    <select
+                      value={manualForm.categorySmall}
+                      onChange={e => handleManualFormChange("categorySmall", e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                      disabled={!manualForm.categoryMedium}
+                      data-testid="manual-select-small"
+                    >
+                      <option value="">선택</option>
+                      {getSmallCategoriesByMediumName(manualForm.categoryLarge || null, manualForm.categoryMedium || null).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">상품코드 <span className="text-destructive">*</span></Label>
+                    <Input
+                      value={manualForm.productCode}
+                      onChange={e => handleManualFormChange("productCode", e.target.value)}
+                      placeholder="예: PR-001"
+                      data-testid="manual-input-code"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">상품명 <span className="text-destructive">*</span></Label>
+                    <Input
+                      value={manualForm.productName}
+                      onChange={e => handleManualFormChange("productName", e.target.value)}
+                      placeholder="예: 감귤 3kg"
+                      data-testid="manual-input-name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">중량(kg) <span className="text-destructive">*</span></Label>
+                    <Input
+                      value={manualForm.weight}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
+                          handleManualFormChange("weight", val);
+                        }
+                      }}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="예: 3"
+                      data-testid="manual-input-weight"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                  <span className="w-1.5 h-4 bg-orange-500 rounded-full" />
+                  원물 원가
+                </h4>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">원상품명</Label>
+                    <Input
+                      value={manualForm.sourceProduct}
+                      onChange={e => handleManualFormChange("sourceProduct", e.target.value)}
+                      placeholder="원물명"
+                      data-testid="manual-input-source-product"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">기준가 (원)</Label>
+                    <Input
+                      value={manualForm.sourcePrice}
+                      onChange={e => handleManualFormChange("sourcePrice", e.target.value)}
+                      type="number"
+                      placeholder="0"
+                      data-testid="manual-input-source-price"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">로스율 (%)</Label>
+                    <Input
+                      value={manualForm.lossRate}
+                      onChange={e => handleManualFormChange("lossRate", e.target.value)}
+                      type="number"
+                      placeholder="0"
+                      data-testid="manual-input-loss-rate"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">기준중량</Label>
+                    <Input
+                      value={manualForm.sourceWeight}
+                      onChange={e => handleManualFormChange("sourceWeight", e.target.value)}
+                      type="number"
+                      placeholder="0"
+                      data-testid="manual-input-source-weight"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-md px-3 py-2">
+                    <span className="text-xs text-muted-foreground">개별단가:</span>
+                    <span className="text-sm font-medium ml-2" data-testid="manual-calc-unit-price">{manualCalc.unitPrice.toLocaleString()}원</span>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-md px-3 py-2">
+                    <span className="text-xs text-muted-foreground">원상품합계:</span>
+                    <span className="text-sm font-medium ml-2" data-testid="manual-calc-source-total">{manualCalc.sourceProductTotal.toLocaleString()}원</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                  <span className="w-1.5 h-4 bg-green-500 rounded-full" />
+                  추가 비용
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">박스비</Label>
+                    <Input value={manualForm.boxCost} onChange={e => handleManualFormChange("boxCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-box-cost" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">자재비</Label>
+                    <Input value={manualForm.materialCost} onChange={e => handleManualFormChange("materialCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-material-cost" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">아웃박스</Label>
+                    <Input value={manualForm.outerBoxCost} onChange={e => handleManualFormChange("outerBoxCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-outer-box" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">보자기</Label>
+                    <Input value={manualForm.wrappingCost} onChange={e => handleManualFormChange("wrappingCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-wrapping" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">작업비</Label>
+                    <Input value={manualForm.laborCost} onChange={e => handleManualFormChange("laborCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-labor" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">택배비</Label>
+                    <Input value={manualForm.shippingCost} onChange={e => handleManualFormChange("shippingCost", e.target.value)} type="number" placeholder="0" data-testid="manual-input-shipping" />
+                  </div>
+                </div>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-md px-3 py-2 mt-2">
+                  <span className="text-xs text-muted-foreground">총원가:</span>
+                  <span className="text-sm font-bold ml-2" data-testid="manual-calc-total-cost">{manualCalc.totalCost.toLocaleString()}원</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                  <span className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                  등급별 마진율 및 공급가
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 rounded-md p-3">
+                    <Label className="text-xs font-semibold text-blue-700 dark:text-blue-300">START 마진율 (%)</Label>
+                    <Input value={manualForm.startMarginRate} onChange={e => handleManualFormChange("startMarginRate", e.target.value)} type="number" step="0.1" placeholder="0" data-testid="manual-input-start-margin" />
+                    <div className="text-xs space-y-1">
+                      <div className="flex justify-between"><span className="text-muted-foreground">마진:</span><span data-testid="manual-calc-start-margin">{manualCalc.startMargin.toLocaleString()}원</span></div>
+                      <div className="flex justify-between font-bold"><span className="text-muted-foreground">공급가:</span><span data-testid="manual-calc-start-price">{manualCalc.startPrice.toLocaleString()}원</span></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 bg-green-50 dark:bg-green-900/20 rounded-md p-3">
+                    <Label className="text-xs font-semibold text-green-700 dark:text-green-300">DRIVING 마진율 (%)</Label>
+                    <Input value={manualForm.drivingMarginRate} onChange={e => handleManualFormChange("drivingMarginRate", e.target.value)} type="number" step="0.1" placeholder="0" data-testid="manual-input-driving-margin" />
+                    <div className="text-xs space-y-1">
+                      <div className="flex justify-between"><span className="text-muted-foreground">마진:</span><span data-testid="manual-calc-driving-margin">{manualCalc.drivingMargin.toLocaleString()}원</span></div>
+                      <div className="flex justify-between font-bold"><span className="text-muted-foreground">공급가:</span><span data-testid="manual-calc-driving-price">{manualCalc.drivingPrice.toLocaleString()}원</span></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 bg-red-50 dark:bg-red-900/20 rounded-md p-3">
+                    <Label className="text-xs font-semibold text-red-700 dark:text-red-300">TOP 마진율 (%)</Label>
+                    <Input value={manualForm.topMarginRate} onChange={e => handleManualFormChange("topMarginRate", e.target.value)} type="number" step="0.1" placeholder="0" data-testid="manual-input-top-margin" />
+                    <div className="text-xs space-y-1">
+                      <div className="flex justify-between"><span className="text-muted-foreground">마진:</span><span data-testid="manual-calc-top-margin">{manualCalc.topMargin.toLocaleString()}원</span></div>
+                      <div className="flex justify-between font-bold"><span className="text-muted-foreground">공급가:</span><span data-testid="manual-calc-top-price">{manualCalc.topPrice.toLocaleString()}원</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter className="gap-2 pt-3 border-t">
+            <Button variant="outline" onClick={() => setManualDialogOpen(false)} data-testid="manual-button-cancel">취소</Button>
+            <Button onClick={handleManualSave} disabled={createMutation.isPending} data-testid="manual-button-save">
+              {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Save className="h-4 w-4 mr-2" />
+              상품 등록
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New Products Dialog */}
       <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
