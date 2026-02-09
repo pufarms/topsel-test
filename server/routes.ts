@@ -8461,6 +8461,17 @@ export async function registerRoutes(
 
       const deleted = await db.delete(pendingOrders).returning();
 
+      // 관련 배분 데이터도 함께 삭제 (allocation_details → order_allocations 순서)
+      const existingAllocations = await db.select().from(orderAllocations);
+      if (existingAllocations.length > 0) {
+        const allocationIds = existingAllocations.map(a => a.id);
+        await db.delete(allocationDetails).where(
+          inArray(allocationDetails.allocationId, allocationIds)
+        );
+        await db.delete(orderAllocations);
+        console.log(`전체 삭제 - 배분 데이터 정리 완료: ${existingAllocations.length}개 배분, 관련 상세 삭제`);
+      }
+
       // SSE: 해당 회원들에게 주문 삭제 알림
       const memberIds = Array.from(new Set(deleted.map(d => d.memberId).filter(Boolean)));
       memberIds.forEach(memberId => {
@@ -8527,6 +8538,35 @@ export async function registerRoutes(
       const [deleted] = await db.delete(pendingOrders)
         .where(eq(pendingOrders.id, id))
         .returning();
+
+      // 삭제된 주문의 상품코드에 해당하는 배분이 있으면 수량 재계산
+      if (deleted && deleted.productCode) {
+        const relatedAllocations = await db.select().from(orderAllocations)
+          .where(eq(orderAllocations.productCode, deleted.productCode));
+        
+        for (const allocation of relatedAllocations) {
+          const remainingOrders = await db.select().from(pendingOrders)
+            .where(and(
+              eq(pendingOrders.productCode, deleted.productCode),
+              or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
+            ));
+          
+          if (remainingOrders.length === 0) {
+            // 해당 상품 주문이 없으면 배분 데이터 삭제
+            await db.delete(allocationDetails).where(eq(allocationDetails.allocationId, allocation.id));
+            await db.delete(orderAllocations).where(eq(orderAllocations.id, allocation.id));
+            console.log(`개별 삭제 - 배분 데이터 정리: ${deleted.productCode} 배분 삭제`);
+          } else {
+            // 남은 주문 수에 맞게 배분 수량 업데이트
+            await db.update(orderAllocations)
+              .set({ 
+                totalQuantity: remainingOrders.length,
+                updatedAt: new Date(),
+              })
+              .where(eq(orderAllocations.id, allocation.id));
+          }
+        }
+      }
 
       res.json({ message: "주문이 삭제되었습니다" });
     } catch (error: any) {
