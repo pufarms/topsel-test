@@ -1815,7 +1815,7 @@ export default function ProductRegistrationPage() {
                           }}
                           className="h-6 w-6 p-0"
                           data-testid={`button-vendor-${p.id}`}
-                          title="외주업체 관리"
+                          title="외주업체등록/수정"
                         >
                           <Building2 className="h-3 w-3" />
                         </Button>
