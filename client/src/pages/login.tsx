@@ -63,22 +63,20 @@ export default function Login() {
   const fields = content.fields || {};
   const messages = content.messages || {};
 
+  const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY) === "true";
+  const savedUsername = savedRememberMe ? (localStorage.getItem(SAVED_USERNAME_KEY) || "") : "";
+
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      username: savedUsername,
       password: "",
     },
   });
 
   useEffect(() => {
-    const savedRememberMe = localStorage.getItem(REMEMBER_ME_KEY) === "true";
-    const savedUsername = localStorage.getItem(SAVED_USERNAME_KEY) || "";
     setRememberMe(savedRememberMe);
-    if (savedRememberMe && savedUsername) {
-      form.setValue("username", savedUsername);
-    }
-  }, [form]);
+  }, []);
 
   if (user) {
     const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
@@ -135,7 +133,7 @@ export default function Login() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" autoComplete="off">
                 <FormField
                   control={form.control}
                   name="username"
@@ -146,6 +144,7 @@ export default function Login() {
                         <Input 
                           type="text" 
                           placeholder={fields.username_placeholder || "아이디를 입력하세요"} 
+                          autoComplete="off"
                           data-testid="input-username"
                           {...field} 
                         />
@@ -166,6 +165,7 @@ export default function Login() {
                             type={showPassword ? "text" : "password"}
                             placeholder={fields.password_placeholder || "••••••••"} 
                             className="pr-12"
+                            autoComplete="new-password"
                             data-testid="input-password"
                             {...field} 
                           />
