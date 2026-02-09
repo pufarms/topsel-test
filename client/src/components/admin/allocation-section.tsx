@@ -123,7 +123,10 @@ export default function AllocationSection() {
     refetch();
     if (selectedAllocation?.id) refetchDetails();
     queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
     queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
   };
 
   const generateMutation = useMutation({
