@@ -1,302 +1,184 @@
-import { useState, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Download, ScanBarcode, CheckCircle, AlertCircle } from "lucide-react";
-
-const courierOptions = [
-  "CJ대한통운", "한진택배", "롯데택배", "우체국택배", "로젠택배", "경동택배", "기타"
-];
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface OrdersResponse {
   orders: any[];
   total: number;
+  page: number;
+  limit: number;
+  statusCounts: Record<string, number>;
 }
 
-interface BulkResult {
-  success: number;
-  failed: number;
-  failedList: { row: number; orderNumber: string; reason: string }[];
+function cleanDeliveryMessage(msg: string | null | undefined): string {
+  if (!msg) return "";
+  return msg.replace(/\[주소확인필요:[^\]]*\]/g, "").trim();
 }
+
+function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const cleaned = phone.replace(/[^0-9-]/g, "");
+  if (cleaned && !cleaned.startsWith("0")) {
+    return "0" + cleaned;
+  }
+  return cleaned;
+}
+
+const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  "상품준비중": { label: "상품준비중", variant: "outline" },
+  "배송준비중": { label: "배송준비중", variant: "secondary" },
+  "배송중": { label: "배송중", variant: "default" },
+};
 
 export default function PartnerTracking() {
-  const { toast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [trackingTarget, setTrackingTarget] = useState<any>(null);
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [courierCompany, setCourierCompany] = useState(courierOptions[0]);
-  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
+  const today = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { data: unregistered, isLoading: loadingUnreg } = useQuery<OrdersResponse>({
-    queryKey: ["/api/partner/orders", "unregistered"],
+  const queryParams = new URLSearchParams({
+    startDate, endDate, status: "배송준비중", search, page: String(page), limit: "50",
+  }).toString();
+
+  const { data, isLoading } = useQuery<OrdersResponse>({
+    queryKey: ["/api/partner/orders", "tracking-tab", queryParams],
     queryFn: async () => {
-      const res = await fetch("/api/partner/orders?status=all&limit=200", { credentials: "include" });
+      const res = await fetch(`/api/partner/orders?${queryParams}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
-      const data = await res.json();
-      return {
-        orders: data.orders.filter((o: any) => !o.trackingNumber && o.vendorId),
-        total: data.orders.filter((o: any) => !o.trackingNumber && o.vendorId).length,
-      };
+      return res.json();
     },
   });
 
-  const { data: registered, isLoading: loadingReg } = useQuery<OrdersResponse>({
-    queryKey: ["/api/partner/orders", "registered"],
-    queryFn: async () => {
-      const res = await fetch("/api/partner/orders?status=all&limit=200", { credentials: "include" });
-      if (!res.ok) throw new Error("조회 실패");
-      const data = await res.json();
-      return {
-        orders: data.orders.filter((o: any) => o.trackingNumber),
-        total: data.orders.filter((o: any) => o.trackingNumber).length,
-      };
-    },
-  });
-
-  const trackingMutation = useMutation({
-    mutationFn: async ({ orderId, trackingNumber, courierCompany }: { orderId: string; trackingNumber: string; courierCompany: string }) => {
-      await apiRequest("PUT", `/api/partner/orders/${orderId}/tracking`, { trackingNumber, courierCompany });
-    },
-    onSuccess: () => {
-      toast({ title: "등록 완료", description: "운송장이 등록되었습니다" });
-      queryClient.invalidateQueries({ queryKey: ["/api/partner/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/partner/dashboard"] });
-      setTrackingTarget(null);
-    },
-    onError: (err: any) => {
-      toast({ title: "등록 실패", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const bulkMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/partner/orders/tracking/bulk", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("업로드 실패");
-      return res.json() as Promise<BulkResult>;
-    },
-    onSuccess: (result) => {
-      setBulkResult(result);
-      queryClient.invalidateQueries({ queryKey: ["/api/partner/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/partner/dashboard"] });
-      if (result.success > 0) {
-        toast({ title: "일괄 등록 완료", description: `성공: ${result.success}건, 실패: ${result.failed}건` });
-      }
-    },
-    onError: (err: any) => {
-      toast({ title: "업로드 실패", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const handleTrackingSubmit = () => {
-    if (!trackingTarget || !trackingNumber.trim()) {
-      toast({ title: "입력 오류", description: "운송장 번호를 입력해 주세요", variant: "destructive" });
-      return;
-    }
-    trackingMutation.mutate({ orderId: trackingTarget.id, trackingNumber: trackingNumber.trim(), courierCompany });
-  };
-
-  const openTrackingDialog = (order: any) => {
-    setTrackingTarget(order);
-    setTrackingNumber(order.trackingNumber || "");
-    setCourierCompany(order.courierCompany || courierOptions[0]);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) bulkMutation.mutate(file);
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const handleTemplateDownload = () => {
-    window.open("/api/partner/orders/tracking/template", "_blank");
-  };
-
-  const unregOrders = unregistered?.orders || [];
-  const regOrders = registered?.orders || [];
+  const orders = data?.orders || [];
+  const total = data?.total || 0;
+  const totalPages = Math.ceil(total / 50);
 
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
       <h1 className="text-xl font-bold" data-testid="text-tracking-title">운송장 등록</h1>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-            미등록 주문 ({unregOrders.length}건)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleTemplateDownload} data-testid="button-template-download">
-              <Download className="h-4 w-4 mr-1" />양식 다운로드
-            </Button>
-            <div className="relative">
-              <input type="file" ref={fileRef} accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={bulkMutation.isPending} data-testid="button-bulk-upload">
-                {bulkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                엑셀 일괄 등록
-              </Button>
+        <CardContent className="p-3 space-y-3">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">시작일</label>
+              <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="w-36" data-testid="input-tracking-start-date" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">종료일</label>
+              <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="w-36" data-testid="input-tracking-end-date" />
+            </div>
+            <div className="space-y-1 flex-1 min-w-[120px]">
+              <label className="text-xs text-muted-foreground">검색</label>
+              <div className="flex gap-1">
+                <Input placeholder="상품명/수취인명/주문번호" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="input-tracking-search" />
+              </div>
             </div>
           </div>
-
-          {bulkResult && (
-            <div className="p-3 rounded-md border text-sm space-y-1">
-              <div>성공: <span className="font-bold text-green-600">{bulkResult.success}건</span> / 실패: <span className="font-bold text-destructive">{bulkResult.failed}건</span></div>
-              {bulkResult.failedList.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {bulkResult.failedList.map((f, i) => (
-                    <div key={i} className="text-xs text-destructive">행 {f.row}: {f.orderNumber} - {f.reason}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {loadingUnreg ? (
-            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
-          ) : unregOrders.length === 0 ? (
-            <div className="text-center text-muted-foreground py-4 text-sm">미등록 주문이 없습니다.</div>
-          ) : (
-            <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-2">주문번호</th>
-                      <th className="text-left py-2 px-2">수취인</th>
-                      <th className="text-left py-2 px-2">상품명</th>
-                      <th className="text-right py-2 px-2">수량</th>
-                      <th className="text-center py-2 px-2">액션</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {unregOrders.map((o: any) => (
-                      <tr key={o.id} className="border-b">
-                        <td className="py-2 px-2 font-mono text-xs">{o.id}</td>
-                        <td className="py-2 px-2">{o.recipientName}</td>
-                        <td className="py-2 px-2">{o.productName}</td>
-                        <td className="py-2 px-2 text-right">{o.quantity || 1}</td>
-                        <td className="py-2 px-2 text-center">
-                          <Button size="sm" onClick={() => openTrackingDialog(o)} data-testid={`button-register-${o.id}`}>
-                            <ScanBarcode className="h-3 w-3 mr-1" />등록
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="md:hidden space-y-2">
-                {unregOrders.map((o: any) => (
-                  <Card key={o.id}>
-                    <CardContent className="p-3 flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-medium">{o.productName} x{o.quantity || 1}</div>
-                        <div className="text-xs text-muted-foreground">{o.recipientName} | {o.id}</div>
-                      </div>
-                      <Button size="sm" onClick={() => openTrackingDialog(o)}>등록</Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </>
-          )}
+          <div className="text-xs text-muted-foreground">총 {total}건</div>
         </CardContent>
       </Card>
 
-      {regOrders.length > 0 && (
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : orders.length === 0 ? (
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              등록 완료 ({regOrders.length}건)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-2">주문번호</th>
-                    <th className="text-left py-2 px-2">수취인</th>
-                    <th className="text-left py-2 px-2">택배사</th>
-                    <th className="text-left py-2 px-2">운송장번호</th>
-                    <th className="text-center py-2 px-2">수정</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {regOrders.map((o: any) => (
-                    <tr key={o.id} className="border-b">
-                      <td className="py-2 px-2 font-mono text-xs">{o.id}</td>
-                      <td className="py-2 px-2">{o.recipientName}</td>
-                      <td className="py-2 px-2">{o.courierCompany}</td>
-                      <td className="py-2 px-2 font-mono text-xs">{o.trackingNumber}</td>
-                      <td className="py-2 px-2 text-center">
-                        <Button size="sm" variant="outline" onClick={() => openTrackingDialog(o)}>수정</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            운송장 등록된 주문이 없습니다.
           </CardContent>
         </Card>
+      ) : (
+        <>
+          <div className="hidden md:block border rounded-md overflow-x-auto" style={{ maxWidth: "100%" }}>
+            <table className="text-sm" style={{ minWidth: "1800px", width: "1800px" }}>
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left py-2 px-2 whitespace-nowrap">주문자명</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">주문자 전화번호</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">주문자 주소</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">수령자명</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">수령자 휴대폰번호</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">수령자 전화번호</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">수령자 주소</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">배송메시지</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">상품코드</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">상품명</th>
+                  <th className="text-right py-2 px-2 whitespace-nowrap">수량</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">주문번호</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">운송장번호</th>
+                  <th className="text-left py-2 px-2 whitespace-nowrap">택배사</th>
+                  <th className="text-center py-2 px-2 whitespace-nowrap">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o: any) => {
+                  const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                  return (
+                    <tr key={o.id} className="border-b" data-testid={`row-tracking-${o.id}`}>
+                      <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.ordererPhone)}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererAddress || ""}</td>
+                      <td className="py-2 px-2 whitespace-nowrap">{o.recipientName || ""}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientMobile)}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientPhone)}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientAddress || ""}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{cleanDeliveryMessage(o.deliveryMessage)}</td>
+                      <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
+                      <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
+                      <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
+                      <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.customOrderNumber || ""}</td>
+                      <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
+                      <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
+                      <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="md:hidden space-y-2 p-3">
+            {orders.map((o: any) => {
+              const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+              return (
+                <Card key={o.id} data-testid={`card-tracking-${o.id}`}>
+                  <CardContent className="p-3 space-y-1">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{o.customOrderNumber}</span>
+                      <Badge variant={sb.variant}>{sb.label}</Badge>
+                    </div>
+                    <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>
+                    <div className="text-xs text-muted-foreground">{o.productCode}</div>
+                    <div className="text-xs">주문자: {o.ordererName} {formatPhone(o.ordererPhone)}</div>
+                    <div className="text-xs">수령자: {o.recipientName} {formatPhone(o.recipientMobile)}</div>
+                    <div className="text-xs text-muted-foreground">{o.recipientAddress}</div>
+                    {cleanDeliveryMessage(o.deliveryMessage) && <div className="text-xs text-muted-foreground">배송메시지: {cleanDeliveryMessage(o.deliveryMessage)}</div>}
+                    <div className="text-xs">
+                      운송장: {o.courierCompany} {o.trackingNumber}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <Dialog open={!!trackingTarget} onOpenChange={(open) => { if (!open) setTrackingTarget(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>운송장 {trackingTarget?.trackingNumber ? "수정" : "등록"}</DialogTitle>
-          </DialogHeader>
-          {trackingTarget && (
-            <div className="space-y-4">
-              <div className="text-sm space-y-1">
-                <div><span className="text-muted-foreground">주문번호:</span> {trackingTarget.id}</div>
-                <div><span className="text-muted-foreground">수취인:</span> {trackingTarget.recipientName}</div>
-                <div><span className="text-muted-foreground">상품:</span> {trackingTarget.productName}</div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">택배사</label>
-                <select
-                  className="w-full h-9 px-3 rounded-md border text-sm bg-background"
-                  value={courierCompany}
-                  onChange={(e) => setCourierCompany(e.target.value)}
-                  data-testid="select-courier"
-                >
-                  {courierOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">운송장 번호</label>
-                <Input
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  placeholder="운송장 번호를 입력하세요"
-                  data-testid="input-tracking-number"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setTrackingTarget(null)}>취소</Button>
-            <Button onClick={handleTrackingSubmit} disabled={trackingMutation.isPending} data-testid="button-submit-tracking">
-              {trackingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm">{page} / {totalPages}</span>
+          <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
