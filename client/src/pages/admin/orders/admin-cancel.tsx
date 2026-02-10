@@ -637,7 +637,7 @@ export default function OrdersAdminCancelPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">주문조정(직권취소)</h1>
+        <h1 className="text-2xl font-bold">주문조정(직권취소)/외주주문 배분</h1>
       </div>
 
       <OrderStatsBanner />
