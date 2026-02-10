@@ -6,17 +6,22 @@ import { Input } from "@/components/ui/input";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SettlementItem {
+  type: "order" | "payment";
   date: string;
   productName: string;
   productCode: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  payment: number;
+  memo?: string;
 }
 
 interface SettlementResponse {
   items: SettlementItem[];
-  totalAmount: number;
+  totalOrderAmount: number;
+  totalPayment: number;
+  totalBalance: number;
 }
 
 type PeriodKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "custom";
@@ -98,12 +103,15 @@ export default function PartnerSettlement() {
   };
 
   const allItems = data?.items || [];
-  const totalAmount = data?.totalAmount || 0;
+  const totalOrderAmount = data?.totalOrderAmount || 0;
+  const totalPayment = data?.totalPayment || 0;
+  const totalBalance = data?.totalBalance || 0;
 
   let runningBalance = 0;
   const itemsWithBalance = allItems.map((item) => {
     runningBalance += item.subtotal;
-    return { ...item, payment: 0, balance: runningBalance };
+    runningBalance -= item.payment;
+    return { ...item, balance: runningBalance };
   });
 
   const totalPages = Math.ceil(itemsWithBalance.length / ITEMS_PER_PAGE);
@@ -153,7 +161,9 @@ export default function PartnerSettlement() {
 
           <div className="flex flex-wrap gap-4 items-center text-sm">
             <span className="text-muted-foreground">총 {allItems.length}건</span>
-            <span className="font-semibold">합계: {formatCurrency(totalAmount)}</span>
+            <span className="font-semibold">매출합계: {formatCurrency(totalOrderAmount)}</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">결재합계: {formatCurrency(totalPayment)}</span>
+            <span className="font-semibold">잔액: {formatCurrency(totalBalance)}</span>
           </div>
         </CardContent>
       </Card>
@@ -183,13 +193,31 @@ export default function PartnerSettlement() {
               </thead>
               <tbody>
                 {pagedItems.map((item, idx) => (
-                  <tr key={`${item.date}-${item.productCode}-${item.unitPrice}-${idx}`} className="border-b" data-testid={`row-settlement-${idx}`}>
+                  <tr
+                    key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
+                    className={`border-b ${item.type === "payment" ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                    data-testid={`row-settlement-${idx}`}
+                  >
                     <td className="py-2 px-3 text-center whitespace-nowrap">{item.date}</td>
-                    <td className="py-2 px-3 whitespace-nowrap">{item.productName}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap">{item.quantity}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap">{formatCurrency(item.unitPrice)}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.subtotal)}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap text-muted-foreground">{formatCurrency(item.payment)}</td>
+                    <td className="py-2 px-3 whitespace-nowrap">
+                      {item.type === "payment" ? (
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">
+                          결재{item.memo ? ` (${item.memo})` : ""}
+                        </span>
+                      ) : item.productName}
+                    </td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      {item.type === "order" ? item.quantity : ""}
+                    </td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      {item.type === "order" ? formatCurrency(item.unitPrice) : ""}
+                    </td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
+                      {item.type === "order" ? formatCurrency(item.subtotal) : ""}
+                    </td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap font-medium text-blue-600 dark:text-blue-400">
+                      {item.payment > 0 ? formatCurrency(item.payment) : ""}
+                    </td>
                     <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
                   </tr>
                 ))}
@@ -197,11 +225,13 @@ export default function PartnerSettlement() {
               <tfoot>
                 <tr className="bg-muted/20 font-semibold">
                   <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
-                  <td className="py-2 px-3 text-right">{allItems.reduce((s, i) => s + i.quantity, 0)}</td>
+                  <td className="py-2 px-3 text-right">
+                    {allItems.filter(i => i.type === "order").reduce((s, i) => s + i.quantity, 0)}
+                  </td>
                   <td className="py-2 px-3"></td>
-                  <td className="py-2 px-3 text-right">{formatCurrency(totalAmount)}</td>
-                  <td className="py-2 px-3 text-right">{formatCurrency(0)}</td>
-                  <td className="py-2 px-3 text-right">{formatCurrency(totalAmount)}</td>
+                  <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
+                  <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(totalPayment)}</td>
+                  <td className="py-2 px-3 text-right">{formatCurrency(totalBalance)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -209,25 +239,48 @@ export default function PartnerSettlement() {
 
           <div className="md:hidden space-y-2">
             {pagedItems.map((item, idx) => (
-              <Card key={`${item.date}-${item.productCode}-${item.unitPrice}-${idx}`} data-testid={`card-settlement-${idx}`}>
+              <Card
+                key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
+                className={item.type === "payment" ? "border-blue-200 dark:border-blue-800" : ""}
+                data-testid={`card-settlement-${idx}`}
+              >
                 <CardContent className="p-3 space-y-1">
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-xs text-muted-foreground">{item.date}</span>
                     <span className="text-xs font-medium">잔액: {formatCurrency(item.balance)}</span>
                   </div>
-                  <div className="font-medium text-sm">{item.productName}</div>
-                  <div className="flex justify-between text-xs">
-                    <span>{item.quantity}개 x {formatCurrency(item.unitPrice)}</span>
-                    <span className="font-medium">{formatCurrency(item.subtotal)}</span>
-                  </div>
+                  {item.type === "payment" ? (
+                    <div className="font-medium text-sm text-blue-600 dark:text-blue-400">
+                      결재: {formatCurrency(item.payment)}
+                      {item.memo && <span className="text-xs text-muted-foreground ml-1">({item.memo})</span>}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="font-medium text-sm">{item.productName}</div>
+                      <div className="flex justify-between text-xs">
+                        <span>{item.quantity}개 x {formatCurrency(item.unitPrice)}</span>
+                        <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
             <Card>
               <CardContent className="p-3">
-                <div className="flex justify-between font-semibold text-sm">
-                  <span>합계</span>
-                  <span>{formatCurrency(totalAmount)}</span>
+                <div className="flex flex-col gap-1 text-sm">
+                  <div className="flex justify-between font-semibold">
+                    <span>매출합계</span>
+                    <span>{formatCurrency(totalOrderAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                    <span>결재합계</span>
+                    <span>{formatCurrency(totalPayment)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t pt-1">
+                    <span>잔액</span>
+                    <span>{formatCurrency(totalBalance)}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

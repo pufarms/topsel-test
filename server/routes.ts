@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -10594,6 +10594,96 @@ export async function registerRoutes(
       res.json(rest);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "활성 상태 변경 실패" });
+    }
+  });
+
+  // ==============================
+  // Vendor Payment API (업체 결재 관리)
+  // ==============================
+
+  app.get('/api/admin/vendor-payments', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const { vendorId, startDate, endDate } = req.query;
+      const conditions: any[] = [];
+      if (vendorId) conditions.push(eq(vendorPayments.vendorId, parseInt(vendorId as string)));
+      if (startDate) conditions.push(gte(vendorPayments.paymentDate, startDate as string));
+      if (endDate) conditions.push(lte(vendorPayments.paymentDate, endDate as string));
+
+      const payments = await db.select({
+        id: vendorPayments.id,
+        vendorId: vendorPayments.vendorId,
+        vendorName: vendors.companyName,
+        amount: vendorPayments.amount,
+        paymentDate: vendorPayments.paymentDate,
+        memo: vendorPayments.memo,
+        createdBy: vendorPayments.createdBy,
+        createdAt: vendorPayments.createdAt,
+      })
+        .from(vendorPayments)
+        .innerJoin(vendors, eq(vendorPayments.vendorId, vendors.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(vendorPayments.createdAt));
+
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "결재 내역 조회 실패" });
+    }
+  });
+
+  app.post('/api/admin/vendor-payments', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const { vendorId, amount, paymentDate, memo } = req.body;
+      if (!vendorId || amount === undefined || amount === null || !paymentDate) {
+        return res.status(400).json({ message: "업체, 금액, 결재일은 필수입니다" });
+      }
+      const parsedAmount = parseInt(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "결재 금액은 0보다 큰 숫자여야 합니다" });
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
+        return res.status(400).json({ message: "결재일 형식이 올바르지 않습니다 (YYYY-MM-DD)" });
+      }
+      const parsedVendorId = parseInt(vendorId);
+      const vendor = await storage.getVendor(parsedVendorId);
+      if (!vendor) {
+        return res.status(404).json({ message: "업체를 찾을 수 없습니다" });
+      }
+
+      const [payment] = await db.insert(vendorPayments).values({
+        vendorId: parsedVendorId,
+        amount: parsedAmount,
+        paymentDate,
+        memo: memo || null,
+        createdBy: req.session.userId,
+      }).returning();
+
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "결재 등록 실패" });
+    }
+  });
+
+  app.delete('/api/admin/vendor-payments/:id', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const [deleted] = await db.delete(vendorPayments)
+        .where(eq(vendorPayments.id, parseInt(req.params.id)))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "결재 내역을 찾을 수 없습니다" });
+      res.json({ message: "삭제되었습니다" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "결재 삭제 실패" });
     }
   });
 

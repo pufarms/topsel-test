@@ -1582,3 +1582,20 @@ export const insertAllocationDetailSchema = createInsertSchema(allocationDetails
 });
 export type AllocationDetail = typeof allocationDetails.$inferSelect;
 export type NewAllocationDetail = z.infer<typeof insertAllocationDetailSchema>;
+
+export const vendorPayments = pgTable("vendor_payments", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  amount: integer("amount").notNull(),
+  paymentDate: date("payment_date").notNull(),
+  memo: text("memo"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertVendorPaymentSchema = createInsertSchema(vendorPayments).omit({
+  id: true,
+  createdAt: true,
+});
+export type VendorPayment = typeof vendorPayments.$inferSelect;
+export type NewVendorPayment = z.infer<typeof insertVendorPaymentSchema>;

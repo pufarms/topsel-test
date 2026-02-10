@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "./db";
-import { vendors, allocationDetails, orderAllocations, pendingOrders, productVendors } from "@shared/schema";
+import { vendors, allocationDetails, orderAllocations, pendingOrders, productVendors, vendorPayments } from "@shared/schema";
 import { eq, and, desc, asc, gte, lte, or, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import { sseManager } from "./sse-manager";
 
@@ -782,24 +782,29 @@ router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
     const vendorId = req.partner!.vendorId;
     const { startDate, endDate } = req.query;
 
-    const conditions = [
+    const orderConditions = [
       eq(pendingOrders.vendorId, vendorId),
       isNotNull(pendingOrders.trackingNumber),
       isNotNull(pendingOrders.trackingRegisteredAt),
+    ];
+    const paymentConditions = [
+      eq(vendorPayments.vendorId, vendorId),
     ];
 
     if (startDate) {
       const start = new Date(startDate as string);
       start.setHours(0, 0, 0, 0);
-      conditions.push(gte(pendingOrders.trackingRegisteredAt, start));
+      orderConditions.push(gte(pendingOrders.trackingRegisteredAt, start));
+      paymentConditions.push(gte(sql`${vendorPayments.paymentDate}::timestamp`, start));
     }
     if (endDate) {
       const end = new Date(endDate as string);
       end.setHours(23, 59, 59, 999);
-      conditions.push(lte(pendingOrders.trackingRegisteredAt, end));
+      orderConditions.push(lte(pendingOrders.trackingRegisteredAt, end));
+      paymentConditions.push(lte(sql`${vendorPayments.paymentDate}::timestamp`, end));
     }
 
-    const rows = await db.select({
+    const orderRows = await db.select({
       trackingDate: sql<string>`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
       productName: pendingOrders.productName,
       productCode: pendingOrders.productCode,
@@ -807,32 +812,80 @@ router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
       quantity: sql<number>`COUNT(*)::int`,
     })
       .from(pendingOrders)
-      .where(and(...conditions))
+      .where(and(...orderConditions))
       .groupBy(
         sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
         pendingOrders.productName,
         pendingOrders.productCode,
         pendingOrders.vendorPrice,
-      )
-      .orderBy(
-        sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') ASC`,
-        sql`${pendingOrders.productName} ASC`,
       );
 
-    const settlementRows = rows.map((row) => ({
-      date: row.trackingDate,
-      productName: row.productName,
-      productCode: row.productCode,
-      quantity: row.quantity,
-      unitPrice: row.vendorPrice || 0,
-      subtotal: (row.vendorPrice || 0) * row.quantity,
-    }));
+    const paymentRows = await db.select({
+      id: vendorPayments.id,
+      paymentDate: sql<string>`TO_CHAR(${vendorPayments.paymentDate}::date, 'YYYY-MM-DD')`,
+      amount: vendorPayments.amount,
+      memo: vendorPayments.memo,
+    })
+      .from(vendorPayments)
+      .where(and(...paymentConditions));
 
-    const totalAmount = settlementRows.reduce((sum, r) => sum + r.subtotal, 0);
+    type SettlementRow = {
+      type: "order" | "payment";
+      date: string;
+      productName: string;
+      productCode: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      payment: number;
+      memo?: string;
+    };
+
+    const items: SettlementRow[] = [];
+
+    for (const row of orderRows) {
+      items.push({
+        type: "order",
+        date: row.trackingDate,
+        productName: row.productName || "",
+        productCode: row.productCode || "",
+        quantity: row.quantity,
+        unitPrice: row.vendorPrice || 0,
+        subtotal: (row.vendorPrice || 0) * row.quantity,
+        payment: 0,
+      });
+    }
+
+    for (const row of paymentRows) {
+      items.push({
+        type: "payment",
+        date: row.paymentDate,
+        productName: "",
+        productCode: "",
+        quantity: 0,
+        unitPrice: 0,
+        subtotal: 0,
+        payment: row.amount,
+        memo: row.memo || undefined,
+      });
+    }
+
+    items.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      if (a.type === "order" && b.type === "payment") return -1;
+      if (a.type === "payment" && b.type === "order") return 1;
+      return (a.productName || "").localeCompare(b.productName || "");
+    });
+
+    const totalOrderAmount = items.filter(i => i.type === "order").reduce((s, i) => s + i.subtotal, 0);
+    const totalPayment = items.filter(i => i.type === "payment").reduce((s, i) => s + i.payment, 0);
 
     res.json({
-      items: settlementRows,
-      totalAmount,
+      items,
+      totalOrderAmount,
+      totalPayment,
+      totalBalance: totalOrderAmount - totalPayment,
     });
   } catch (error: any) {
     console.error("Settlement query error:", error);
