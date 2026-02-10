@@ -14,6 +14,15 @@ interface OrdersResponse {
   statusCounts: Record<string, number>;
 }
 
+function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const cleaned = phone.replace(/[^0-9-]/g, "");
+  if (cleaned && !cleaned.startsWith("0")) {
+    return "0" + cleaned;
+  }
+  return cleaned;
+}
+
 const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   "상품준비중": { label: "상품준비중", variant: "outline" },
   "배송준비중": { label: "배송준비중", variant: "secondary" },
@@ -140,17 +149,17 @@ export default function PartnerOrders() {
                     return (
                       <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
                         <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
-                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererPhone || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.ordererPhone)}</td>
                         <td className="py-2 px-2 text-xs max-w-[150px] truncate" title={ordererFullAddress}>{ordererFullAddress}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.recipientName || ""}</td>
-                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientMobile || ""}</td>
-                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientPhone || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientMobile)}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientPhone)}</td>
                         <td className="py-2 px-2 text-xs max-w-[180px] truncate" title={o.recipientAddress || ""}>{o.recipientAddress || ""}</td>
                         <td className="py-2 px-2 text-xs max-w-[120px] truncate" title={o.deliveryMessage || ""}>{o.deliveryMessage || ""}</td>
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                         <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
-                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.id}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.orderNumber || ""}</td>
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
                         <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
@@ -168,13 +177,13 @@ export default function PartnerOrders() {
                   <Card key={o.id} data-testid={`card-order-${o.id}`}>
                     <CardContent className="p-3 space-y-1">
                       <div className="flex justify-between items-start gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{o.id}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{o.orderNumber}</span>
                         <Badge variant={sb.variant}>{sb.label}</Badge>
                       </div>
                       <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>
                       <div className="text-xs text-muted-foreground">{o.productCode}</div>
-                      <div className="text-xs">주문자: {o.ordererName} {o.ordererPhone}</div>
-                      <div className="text-xs">수령자: {o.recipientName} {o.recipientMobile}</div>
+                      <div className="text-xs">주문자: {o.ordererName} {formatPhone(o.ordererPhone)}</div>
+                      <div className="text-xs">수령자: {o.recipientName} {formatPhone(o.recipientMobile)}</div>
                       <div className="text-xs text-muted-foreground">{o.recipientAddress}</div>
                       {o.deliveryMessage && <div className="text-xs text-muted-foreground">배송메시지: {o.deliveryMessage}</div>}
                       {o.trackingNumber && <div className="text-xs">운송장: {o.courierCompany} {o.trackingNumber}</div>}
