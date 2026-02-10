@@ -10565,6 +10565,26 @@ export async function registerRoutes(
   // Product-Vendor Mapping API (상품-외주업체 매핑)
   // ==============================
 
+  app.get('/api/admin/product-vendors-all', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allMappings = await db.select({
+        productCode: productVendors.productCode,
+        vendorId: productVendors.vendorId,
+        vendorName: vendors.companyName,
+      })
+        .from(productVendors)
+        .innerJoin(vendors, eq(productVendors.vendorId, vendors.id))
+        .where(eq(productVendors.isActive, true));
+      res.json(allMappings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "전체 상품-업체 매핑 조회 실패" });
+    }
+  });
+
   app.get('/api/admin/product-vendors/:productCode', async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
     const user = await storage.getUser(req.session.userId);
