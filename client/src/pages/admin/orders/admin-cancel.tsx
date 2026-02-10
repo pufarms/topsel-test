@@ -65,6 +65,14 @@ interface MaterialProduct {
   orderIds: string[];
 }
 
+interface AllocationDetailInfo {
+  detailId: number;
+  vendorId: number | null;
+  vendorName: string | null;
+  allocatedQuantity: number;
+  vendorPrice: number | null;
+}
+
 interface MaterialGroup {
   materialCode: string;
   materialName: string;
@@ -73,6 +81,9 @@ interface MaterialGroup {
   currentStock: number;
   remainingStock: number;
   isDeficit: boolean;
+  stockSource?: "material" | "allocation";
+  allocationId?: number | null;
+  allocationDetails?: AllocationDetailInfo[] | null;
   alternateMaterialName?: string;
   alternateMaterialStock?: number;
   products: MaterialProduct[];
@@ -114,6 +125,25 @@ export default function OrdersAdminCancelPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "deficit">("all");
   const [isStockOpen, setIsStockOpen] = useState(true);
   const [isCancelOpen, setIsCancelOpen] = useState(true);
+  const [allocationConfirmDialog, setAllocationConfirmDialog] = useState<{
+    open: boolean;
+    allocationId: number | null;
+    productCode: string;
+    productName: string;
+    totalOrders: number;
+    availableStock: number;
+    isDeficit: boolean;
+    details: AllocationDetailInfo[];
+  }>({
+    open: false,
+    allocationId: null,
+    productCode: "",
+    productName: "",
+    totalOrders: 0,
+    availableStock: 0,
+    isDeficit: false,
+    details: [],
+  });
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
@@ -179,6 +209,30 @@ export default function OrdersAdminCancelPage() {
         title: "주문조정 실패", 
         description: error.message, 
         variant: "destructive" 
+      });
+    },
+  });
+
+  const executeAllocationAdjustmentMutation = useMutation({
+    mutationFn: async (data: { allocationId: number; productCode: string }) => {
+      return await apiRequest("POST", "/api/admin/order-adjustment-allocation-execute", data);
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      setSelectedProducts([]);
+      toast({
+        title: "외주상품 주문조정 완료",
+        description: result.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "외주상품 주문조정 실패",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -750,6 +804,7 @@ export default function OrdersAdminCancelPage() {
                   </TableRow>
                 ) : (
                   filteredAdjustmentData.map((group) => {
+                    const isAllocation = group.stockSource === "allocation";
                     const selection = alternateSelections.get(group.materialCode);
                     const adjustedRemaining = getAdjustedRemainingStock(group);
                     const stillDeficit = isStillDeficit(group);
@@ -757,28 +812,71 @@ export default function OrdersAdminCancelPage() {
                     return group.products.map((product, productIndex) => (
                       <TableRow 
                         key={`${group.materialCode}-${product.productCode}`}
-                        className={stillDeficit ? "bg-destructive/5" : group.isDeficit ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}
+                        className={isAllocation 
+                          ? (stillDeficit ? "bg-blue-100/50 dark:bg-blue-900/20" : "bg-blue-50/30 dark:bg-blue-950/10") 
+                          : (stillDeficit ? "bg-destructive/5" : group.isDeficit ? "bg-yellow-50 dark:bg-yellow-900/10" : "")}
                       >
                         {productIndex === 0 && (
                           <TableCell 
                             rowSpan={group.products.length} 
                             className="font-medium align-middle border-r bg-muted/30 text-sm min-w-[160px]"
                           >
-                            {group.materialName}
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {group.materialType === "raw" ? "원물" : group.materialType === "semi" ? "반재료" : group.materialType}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {group.materialName}
+                              {isAllocation && (
+                                <Badge variant="outline" className="text-[10px] border-blue-400 text-blue-600 dark:text-blue-400">외주</Badge>
+                              )}
                             </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {isAllocation ? "배분상품" : group.materialType === "raw" ? "원물" : group.materialType === "semi" ? "반재료" : group.materialType}
+                            </div>
+                            {isAllocation && group.allocationDetails && group.allocationDetails.length > 0 && (
+                              <div className="mt-1.5 space-y-0.5">
+                                {group.allocationDetails.map((d, i) => (
+                                  <div key={i} className="text-[10px] text-muted-foreground">
+                                    {d.vendorName || "자체(탑셀러)"}: {d.allocatedQuantity}개
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </TableCell>
                         )}
                         <TableCell className="font-mono text-xs min-w-[120px]">{product.productCode}</TableCell>
                         <TableCell className="text-sm min-w-[280px]">{product.productName}</TableCell>
                         <TableCell className="text-center">
-                          <Checkbox
-                            checked={isProductSelected(group.materialCode, product.productCode)}
-                            onCheckedChange={(checked) => handleSelectProduct(group.materialCode, product.productCode, !!checked)}
-                            disabled={!stillDeficit}
-                            data-testid={`checkbox-product-${product.productCode}`}
-                          />
+                          {isAllocation ? (
+                            <Button
+                              size="sm"
+                              variant={stillDeficit ? "destructive" : "default"}
+                              disabled={executeAllocationAdjustmentMutation.isPending}
+                              onClick={() => {
+                                if (group.allocationId) {
+                                  setAllocationConfirmDialog({
+                                    open: true,
+                                    allocationId: group.allocationId,
+                                    productCode: product.productCode,
+                                    productName: product.productName,
+                                    totalOrders: product.orderCount,
+                                    availableStock: group.currentStock,
+                                    isDeficit: stillDeficit,
+                                    details: group.allocationDetails || [],
+                                  });
+                                }
+                              }}
+                              data-testid={`button-allocation-execute-${product.productCode}`}
+                            >
+                              {executeAllocationAdjustmentMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : stillDeficit ? "공정배분" : "전환"}
+                            </Button>
+                          ) : (
+                            <Checkbox
+                              checked={isProductSelected(group.materialCode, product.productCode)}
+                              onCheckedChange={(checked) => handleSelectProduct(group.materialCode, product.productCode, !!checked)}
+                              disabled={!stillDeficit}
+                              data-testid={`checkbox-product-${product.productCode}`}
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-center font-medium">{product.orderCount}</TableCell>
                         <TableCell className="text-center">{product.requiredMaterial}</TableCell>
@@ -795,7 +893,9 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            {group.currentStock}
+                            {isAllocation ? (
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">{group.currentStock}</span>
+                            ) : group.currentStock}
                           </TableCell>
                         )}
                         {productIndex === 0 && (
@@ -806,7 +906,7 @@ export default function OrdersAdminCancelPage() {
                             }`}
                           >
                             {adjustedRemaining}
-                            {selection && selection.alternateQuantity > 0 && (
+                            {!isAllocation && selection && selection.alternateQuantity > 0 && (
                               <div className="text-xs text-muted-foreground">
                                 (대체: +{selection.alternateQuantity})
                               </div>
@@ -818,12 +918,16 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            <Checkbox
-                              checked={selection?.useAlternate || false}
-                              onCheckedChange={(checked) => handleAlternateCheck(group.materialCode, !!checked)}
-                              disabled={!group.isDeficit}
-                              data-testid={`checkbox-alternate-${group.materialCode}`}
-                            />
+                            {isAllocation ? (
+                              <span className="text-muted-foreground">-</span>
+                            ) : (
+                              <Checkbox
+                                checked={selection?.useAlternate || false}
+                                onCheckedChange={(checked) => handleAlternateCheck(group.materialCode, !!checked)}
+                                disabled={!group.isDeficit}
+                                data-testid={`checkbox-alternate-${group.materialCode}`}
+                              />
+                            )}
                           </TableCell>
                         )}
                         {productIndex === 0 && (
@@ -831,7 +935,7 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            {group.isDeficit && selection?.useAlternate ? (
+                            {!isAllocation && group.isDeficit && selection?.useAlternate ? (
                               <div className="flex items-center gap-1">
                                 <Popover 
                                   open={openPopovers.get(group.materialCode) || false} 
@@ -911,7 +1015,7 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            {selection?.alternateMaterialCode ? (
+                            {!isAllocation && selection?.alternateMaterialCode ? (
                               <span className="font-medium">{selection.alternateMaterialStock}</span>
                             ) : (
                               <span className="text-muted-foreground">-</span>
@@ -923,7 +1027,7 @@ export default function OrdersAdminCancelPage() {
                             rowSpan={group.products.length} 
                             className="text-center align-middle border-l"
                           >
-                            {selection?.alternateMaterialCode ? (
+                            {!isAllocation && selection?.alternateMaterialCode ? (
                               <div className="flex items-center justify-center gap-1">
                                 <Input
                                   type="number"
@@ -1029,6 +1133,101 @@ export default function OrdersAdminCancelPage() {
               className="w-full sm:w-auto"
             >
               부족 상품 제외하고 전송
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog 
+        open={allocationConfirmDialog.open} 
+        onOpenChange={(open) => setAllocationConfirmDialog(prev => ({ ...prev, open }))}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {allocationConfirmDialog.isDeficit ? (
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              ) : (
+                <Send className="h-5 w-5 text-blue-600" />
+              )}
+              {allocationConfirmDialog.isDeficit ? "외주상품 공정배분 실행" : "외주상품 상품준비중 전환"}
+            </DialogTitle>
+            <DialogDescription>
+              {allocationConfirmDialog.isDeficit 
+                ? "확정 수량이 주문 수보다 부족합니다. 공정 배분 알고리즘으로 회원별 균등하게 조정합니다."
+                : "확정 수량이 충분합니다. 모든 주문을 상품준비중으로 전환합니다."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-3">
+            <div className="p-3 border rounded-lg bg-muted/30">
+              <div className="text-sm font-medium mb-2">{allocationConfirmDialog.productName}</div>
+              <div className="text-xs text-muted-foreground">{allocationConfirmDialog.productCode}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 border rounded-lg text-center">
+                <div className="text-xs text-muted-foreground">주문 수</div>
+                <div className="text-lg font-bold">{allocationConfirmDialog.totalOrders}</div>
+              </div>
+              <div className="p-3 border rounded-lg text-center">
+                <div className="text-xs text-muted-foreground">확정 수량</div>
+                <div className={`text-lg font-bold ${allocationConfirmDialog.isDeficit ? "text-destructive" : "text-green-600"}`}>
+                  {allocationConfirmDialog.availableStock}
+                </div>
+              </div>
+            </div>
+            {allocationConfirmDialog.details.length > 0 && (
+              <div className="p-3 border rounded-lg">
+                <div className="text-xs font-medium text-muted-foreground mb-2">배분 상세</div>
+                {allocationConfirmDialog.details.map((d, i) => (
+                  <div key={i} className="flex justify-between text-sm py-1">
+                    <span>{d.vendorName || "자체(탑셀러)"}</span>
+                    <span className="font-medium">{d.allocatedQuantity}개</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {allocationConfirmDialog.isDeficit && (
+              <div className="p-3 border border-destructive/20 rounded-lg bg-destructive/5">
+                <div className="text-xs text-destructive font-medium">
+                  부족 수량: {allocationConfirmDialog.totalOrders - allocationConfirmDialog.availableStock}건이 주문조정으로 전환됩니다.
+                  회원별 균등 배분 후, 순번이 높은(늦은) 주문부터 우선 조정됩니다.
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setAllocationConfirmDialog(prev => ({ ...prev, open: false }))}
+              className="w-full sm:w-auto"
+              data-testid="button-allocation-confirm-cancel"
+            >
+              취소
+            </Button>
+            <Button 
+              variant={allocationConfirmDialog.isDeficit ? "destructive" : "default"}
+              disabled={executeAllocationAdjustmentMutation.isPending}
+              onClick={() => {
+                if (allocationConfirmDialog.allocationId) {
+                  executeAllocationAdjustmentMutation.mutate({
+                    allocationId: allocationConfirmDialog.allocationId,
+                    productCode: allocationConfirmDialog.productCode,
+                  }, {
+                    onSettled: () => {
+                      setAllocationConfirmDialog(prev => ({ ...prev, open: false }));
+                    }
+                  });
+                }
+              }}
+              className="w-full sm:w-auto"
+              data-testid="button-allocation-confirm-execute"
+            >
+              {executeAllocationAdjustmentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : null}
+              {allocationConfirmDialog.isDeficit ? "공정배분 실행" : "상품준비중 전환"}
             </Button>
           </DialogFooter>
         </DialogContent>

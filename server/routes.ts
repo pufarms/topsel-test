@@ -8991,6 +8991,9 @@ export async function registerRoutes(
         currentStock: group.currentStock,
         remainingStock: group.remainingStock,
         isDeficit: group.remainingStock < 0,
+        stockSource: "material" as const,
+        allocationId: null as number | null,
+        allocationDetails: null as any,
         products: group.products.map(p => {
           // 순번 내림차순 정렬 (높은 순번이 먼저 취소됨)
           const sortedOrders = [...p.orders].sort((a, b) => {
@@ -9008,6 +9011,77 @@ export async function registerRoutes(
           };
         })
       }));
+
+      // 6. 외주상품 배분 데이터 통합 - confirmed 또는 assigned 상태의 배분
+      const confirmedAllocations = await db.select()
+        .from(orderAllocations)
+        .where(
+          or(
+            eq(orderAllocations.status, "confirmed"),
+            eq(orderAllocations.status, "assigned")
+          )
+        );
+
+      for (const allocation of confirmedAllocations) {
+        if (!allocation.productCode) continue;
+
+        // 해당 상품의 대기 주문 조회
+        const allocationOrders = await db.select()
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.productCode, allocation.productCode),
+            eq(pendingOrders.status, "대기")
+          ));
+
+        if (allocationOrders.length === 0) continue;
+
+        // 배분 확정 수량 = 가용재고 개념
+        const allocatedQty = allocation.allocatedQuantity || 0;
+        const totalOrders = allocationOrders.length;
+        const deficit = totalOrders - allocatedQty;
+
+        // 배분 상세 조회 (확정된 것만)
+        const confirmedDetailsForAlloc = await db.select()
+          .from(allocationDetails)
+          .where(and(
+            eq(allocationDetails.allocationId, allocation.id),
+            eq(allocationDetails.status, "confirmed")
+          ));
+
+        // 순번 내림차순 정렬
+        const sortedAllocOrders = [...allocationOrders].sort((a, b) => {
+          const seqA = typeof a.sequenceNumber === 'string' ? parseInt(a.sequenceNumber.replace(/\D/g, ''), 10) || 0 : (a.sequenceNumber || 0);
+          const seqB = typeof b.sequenceNumber === 'string' ? parseInt(b.sequenceNumber.replace(/\D/g, ''), 10) || 0 : (b.sequenceNumber || 0);
+          return seqB - seqA;
+        });
+
+        result.push({
+          materialCode: `alloc_${allocation.id}`,
+          materialName: allocation.productName || allocation.productCode,
+          materialType: "allocation",
+          totalRequired: totalOrders,
+          currentStock: allocatedQty,
+          remainingStock: allocatedQty - totalOrders,
+          isDeficit: deficit > 0,
+          stockSource: "allocation" as const,
+          allocationId: allocation.id,
+          allocationDetails: confirmedDetailsForAlloc.map(d => ({
+            detailId: d.id,
+            vendorId: d.vendorId,
+            vendorName: d.vendorName,
+            allocatedQuantity: d.allocatedQuantity,
+            vendorPrice: d.vendorPrice,
+          })),
+          products: [{
+            productCode: allocation.productCode,
+            productName: allocation.productName || "",
+            orderCount: totalOrders,
+            materialQuantity: 1,
+            requiredMaterial: totalOrders,
+            orderIds: sortedAllocOrders.map(o => o.id)
+          }]
+        });
+      }
 
       res.json(result);
     } catch (error: any) {
@@ -9250,6 +9324,333 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Order adjustment execute error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 외주상품 주문조정 실행 API - 배분 확정 수량 기반 공정 배분 + vendorId 배정
+  app.post('/api/admin/order-adjustment-allocation-execute', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { allocationId, productCode } = req.body;
+      
+      if (!allocationId || !productCode) {
+        return res.status(400).json({ message: "잘못된 요청입니다 (allocationId, productCode 필요)" });
+      }
+
+      // 배분 정보 조회
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) {
+        return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+      }
+
+      if (allocation.status !== "confirmed" && allocation.status !== "assigned") {
+        return res.status(400).json({ message: "배분이 확정되지 않았습니다" });
+      }
+
+      // 배분 상세 (확정된 것만)
+      const confirmedDetails = await db.select()
+        .from(allocationDetails)
+        .where(and(
+          eq(allocationDetails.allocationId, allocationId),
+          eq(allocationDetails.status, "confirmed")
+        ))
+        .orderBy(allocationDetails.id);
+
+      const availableStock = confirmedDetails.reduce((sum, d) => sum + (d.allocatedQuantity || 0), 0);
+
+      // 해당 상품의 대기 주문 조회
+      const targetOrders = await db.select()
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.status, "대기"),
+          eq(pendingOrders.productCode, productCode)
+        ))
+        .orderBy(pendingOrders.sequenceNumber);
+
+      if (targetOrders.length === 0) {
+        return res.json({ 
+          message: "조정 대상 주문이 없습니다.",
+          adjusted: false 
+        });
+      }
+
+      const totalRequired = targetOrders.length;
+
+      // 재고가 충분한 경우 - 모든 주문을 상품준비중으로
+      if (totalRequired <= availableStock) {
+        await db.transaction(async (tx) => {
+          let orderIdx = 0;
+          for (const detail of confirmedDetails) {
+            let assigned = 0;
+            while (assigned < (detail.allocatedQuantity || 0) && orderIdx < targetOrders.length) {
+              const order = targetOrders[orderIdx];
+              const isVendor = detail.vendorId !== null;
+              await tx.update(pendingOrders)
+                .set({
+                  status: "상품준비중",
+                  vendorId: isVendor ? detail.vendorId : null,
+                  fulfillmentType: isVendor ? "vendor" : "self",
+                  vendorPrice: isVendor ? detail.vendorPrice : null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(pendingOrders.id, order.id));
+              assigned++;
+              orderIdx++;
+            }
+          }
+        });
+
+        // allocation 상태 업데이트
+        await db.update(orderAllocations)
+          .set({ status: "assigned", updatedAt: new Date() })
+          .where(eq(orderAllocations.id, allocationId));
+
+        sseManager.sendToAdmins("order-adjusted", { type: "allocation-adjustment-complete", allocationId });
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        // 파트너에게 알림
+        for (const detail of confirmedDetails) {
+          if (detail.vendorId) {
+            sseManager.sendToPartner(detail.vendorId, "partner-orders-updated", {
+              type: "orders-assigned",
+              allocationId,
+            });
+          }
+        }
+
+        return res.json({
+          adjusted: false,
+          message: "재고가 충분합니다. 모든 주문이 상품준비중으로 전환되었습니다.",
+          keptOrders: totalRequired,
+          cancelledOrders: 0,
+        });
+      }
+
+      // 공정 배분 알고리즘 적용 (비율 기반 + 끝번호 우선 취소)
+      const ratio = availableStock / totalRequired;
+      console.log(`외주상품 공평 배분 - 비율: ${ratio.toFixed(4)} (확정수량: ${availableStock} / 주문: ${totalRequired})`);
+
+      interface OrderItem {
+        id: string;
+        memberId: string | null;
+        productCode: string | null;
+        productName: string | null;
+        sequenceNum: number;
+        keepOrder: boolean;
+      }
+
+      const ordersForDistribution: OrderItem[] = targetOrders.map(order => ({
+        id: order.id,
+        memberId: order.memberId,
+        productCode: order.productCode,
+        productName: order.productName,
+        sequenceNum: parseInt(order.sequenceNumber, 10) || 0,
+        keepOrder: true,
+      }));
+
+      // 회원+상품별 그룹화
+      interface MemberGroup {
+        memberId: string;
+        productCode: string;
+        orders: OrderItem[];
+        originalCount: number;
+        keepCount: number;
+        cancelCount: number;
+      }
+
+      const groupMap = new Map<string, MemberGroup>();
+      for (const order of ordersForDistribution) {
+        const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            memberId: order.memberId || 'unknown',
+            productCode: order.productCode || 'unknown',
+            orders: [],
+            originalCount: 0,
+            keepCount: 0,
+            cancelCount: 0,
+          });
+        }
+        const group = groupMap.get(key)!;
+        group.orders.push(order);
+        group.originalCount++;
+      }
+
+      // 비율 적용 (내림)
+      const groupList = Array.from(groupMap.values());
+      for (const group of groupList) {
+        group.keepCount = Math.floor(group.originalCount * ratio);
+        group.cancelCount = group.originalCount - group.keepCount;
+        group.orders.sort((a, b) => a.sequenceNum - b.sequenceNum);
+        group.orders.forEach((order, idx) => {
+          order.keepOrder = idx < group.keepCount;
+        });
+      }
+
+      // 소모량 검증
+      let totalKept = groupList.reduce((sum, g) => sum + g.keepCount, 0);
+
+      // 재고 초과 시 끝번호부터 추가 취소
+      if (totalKept > availableStock) {
+        const allKeptOrders: OrderItem[] = [];
+        for (const group of groupList) {
+          for (const order of group.orders) {
+            if (order.keepOrder) allKeptOrders.push(order);
+          }
+        }
+        allKeptOrders.sort((a, b) => b.sequenceNum - a.sequenceNum);
+
+        for (const order of allKeptOrders) {
+          if (totalKept <= availableStock) break;
+          order.keepOrder = false;
+          totalKept--;
+          const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+          const group = groupMap.get(key);
+          if (group) {
+            group.keepCount--;
+            group.cancelCount++;
+          }
+        }
+      }
+
+      // 유지 건이 부족할 경우 추가 유지 (재고에 여유가 있으면)
+      if (totalKept < availableStock) {
+        const allCancelledOrders: OrderItem[] = [];
+        for (const group of groupList) {
+          for (const order of group.orders) {
+            if (!order.keepOrder) allCancelledOrders.push(order);
+          }
+        }
+        allCancelledOrders.sort((a, b) => a.sequenceNum - b.sequenceNum);
+
+        for (const order of allCancelledOrders) {
+          if (totalKept >= availableStock) break;
+          order.keepOrder = true;
+          totalKept++;
+          const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+          const group = groupMap.get(key);
+          if (group) {
+            group.keepCount++;
+            group.cancelCount--;
+          }
+        }
+      }
+
+      console.log(`외주상품 공평 배분 - 최종 유지: ${totalKept}, 취소: ${totalRequired - totalKept}`);
+
+      // DB 업데이트 - 유지 주문은 상품준비중 + vendorId, 취소 주문은 주문조정
+      const cancelledOrderIds: string[] = [];
+      const keptOrderIds: string[] = [];
+
+      await db.transaction(async (tx) => {
+        // 유지 주문 수집 (순번 오름차순)
+        const keptOrders = ordersForDistribution.filter(o => o.keepOrder).sort((a, b) => a.sequenceNum - b.sequenceNum);
+        
+        // vendorId 배정: 확정된 상세 순서대로 유지 주문에 배정
+        let orderIdx = 0;
+        for (const detail of confirmedDetails) {
+          let assigned = 0;
+          while (assigned < (detail.allocatedQuantity || 0) && orderIdx < keptOrders.length) {
+            const order = keptOrders[orderIdx];
+            const isVendor = detail.vendorId !== null;
+            await tx.update(pendingOrders)
+              .set({
+                status: "상품준비중",
+                vendorId: isVendor ? detail.vendorId : null,
+                fulfillmentType: isVendor ? "vendor" : "self",
+                vendorPrice: isVendor ? detail.vendorPrice : null,
+                updatedAt: new Date(),
+              })
+              .where(eq(pendingOrders.id, order.id));
+            keptOrderIds.push(order.id);
+            assigned++;
+            orderIdx++;
+          }
+        }
+
+        // 취소 주문 처리
+        for (const order of ordersForDistribution) {
+          if (!order.keepOrder) {
+            await tx.update(pendingOrders)
+              .set({
+                status: "주문조정",
+                fulfillmentType: "vendor",
+                updatedAt: new Date(),
+              })
+              .where(eq(pendingOrders.id, order.id));
+            cancelledOrderIds.push(order.id);
+          }
+        }
+      });
+
+      // allocation 상태 업데이트
+      await db.update(orderAllocations)
+        .set({ status: "assigned", updatedAt: new Date() })
+        .where(eq(orderAllocations.id, allocationId));
+
+      // SSE 알림
+      sseManager.sendToAdmins("order-adjusted", {
+        type: "allocation-adjustment",
+        allocationId,
+        cancelledCount: cancelledOrderIds.length,
+        keptCount: keptOrderIds.length,
+      });
+      sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+      // 파트너에게 주문 배정 알림
+      for (const detail of confirmedDetails) {
+        if (detail.vendorId) {
+          sseManager.sendToPartner(detail.vendorId, "partner-orders-updated", {
+            type: "orders-assigned",
+            allocationId,
+          });
+        }
+      }
+
+      // 주문조정된 회원에게 알림
+      const adjustedMemberIds = [...new Set(
+        ordersForDistribution.filter(o => !o.keepOrder).map(o => o.memberId).filter(Boolean)
+      )];
+      adjustedMemberIds.forEach(memberId => {
+        if (memberId) {
+          sseManager.sendToMember(memberId, "order-updated", {
+            type: "order-adjusted",
+            reason: "외주상품 공정배분",
+          });
+        }
+      });
+
+      res.json({
+        adjusted: true,
+        message: `공정 배분 완료: 유지 ${keptOrderIds.length}건 (상품준비중), 조정 ${cancelledOrderIds.length}건 (주문조정)`,
+        keptOrders: keptOrderIds.length,
+        cancelledOrders: cancelledOrderIds.length,
+        cancelledOrderIds,
+        adjustedGroups: groupList.map(g => ({
+          memberId: g.memberId,
+          productCode: g.productCode,
+          originalCount: g.originalCount,
+          keepCount: g.keepCount,
+          cancelCount: g.cancelCount,
+        })),
+        summary: {
+          availableStock,
+          totalRequired,
+          ratio: ratio.toFixed(4),
+          totalKept,
+          totalCancelled: cancelledOrderIds.length,
+        }
+      });
+    } catch (error: any) {
+      console.error("외주상품 주문조정 실행 오류:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -10889,44 +11290,9 @@ export async function registerRoutes(
         status: newStatus,
       });
 
-      // 미배분 수량이 있으면 해당 주문들을 자동으로 "주문조정" 상태로 변경
-      let adjustedOrderIds: string[] = [];
-      if (unallocated > 0 && allocation.productCode) {
-        const targetOrders = await db.select()
-          .from(pendingOrders)
-          .where(and(
-            eq(pendingOrders.productCode, allocation.productCode),
-            or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
-          ))
-          .orderBy(desc(pendingOrders.createdAt))
-          .limit(unallocated);
-
-        if (targetOrders.length > 0) {
-          adjustedOrderIds = targetOrders.map(o => o.id);
-          await db.update(pendingOrders)
-            .set({ status: "주문조정", fulfillmentType: "vendor", updatedAt: new Date() })
-            .where(inArray(pendingOrders.id, adjustedOrderIds));
-          console.log(`배분 확정 - 미배분 ${unallocated}건 주문조정 처리: ${adjustedOrderIds.join(", ")}`);
-
-          // SSE: 주문조정 처리 알림
-          sseManager.sendToAdmins("order-adjusted", {
-            type: "allocation-unallocated",
-            count: adjustedOrderIds.length,
-            productCode: allocation.productCode,
-          });
-
-          // 해당 회원들에게도 알림
-          const memberIds = [...new Set(targetOrders.map(o => o.memberId).filter(Boolean))];
-          memberIds.forEach(memberId => {
-            if (memberId) {
-              sseManager.sendToMember(memberId, "order-updated", {
-                type: "order-adjusted",
-                reason: "배분 미배정",
-              });
-            }
-          });
-        }
-      }
+      // 배분 확정: 수량만 확정, 주문 상태는 변경하지 않음
+      // 미배분 주문은 "대기" 상태를 유지하고, 주문조정(직권취소) 등록 단계에서 공정 배분 처리
+      console.log(`배분 확정 - 확정수량: ${totalAllocated}, 미배분: ${unallocated} (주문 상태 변경 없음, 공정배분 대기)`);
 
       const updatedAllocation = await storage.getOrderAllocationById(allocationId);
 
@@ -10943,8 +11309,6 @@ export async function registerRoutes(
         totalQuantity: allocation.totalQuantity,
         allocatedQuantity: totalAllocated,
         unallocatedQuantity: unallocated,
-        adjustedOrderIds,
-        adjustedOrders: adjustedOrderIds.length,
         details: confirmedDetails.map(d => ({
           detailId: d.id,
           vendorId: d.vendorId,
@@ -10980,102 +11344,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "배분이 확정되지 않았습니다. 먼저 배분을 확정해 주세요." });
       }
 
-      const confirmedDetails = await db.select()
-        .from(allocationDetails)
-        .where(and(
-          eq(allocationDetails.allocationId, allocationId),
-          eq(allocationDetails.status, "confirmed")
-        ))
-        .orderBy(allocationDetails.id);
-
-      if (confirmedDetails.length === 0) {
-        return res.status(400).json({ message: "확정된 배분 상세가 없습니다" });
-      }
-
-      const targetDate = new Date(allocation.allocationDate);
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const unassignedOrders = await db.select()
-        .from(pendingOrders)
-        .where(and(
-          eq(pendingOrders.productCode, allocation.productCode),
-          or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중")),
-          sql`${pendingOrders.vendorId} IS NULL`,
-          gte(pendingOrders.createdAt, startOfDay),
-          lte(pendingOrders.createdAt, endOfDay)
-        ))
-        .orderBy(pendingOrders.createdAt);
-
-      const byVendor: { vendorId: number | null; companyName: string; orderCount: number; totalQuantity: number }[] = [];
-      const adjustedOrderIds: string[] = [];
-
-      await db.transaction(async (tx) => {
-        let orderIdx = 0;
-        for (const detail of confirmedDetails) {
-          let assigned = 0;
-          const vendorEntry = { vendorId: detail.vendorId, companyName: detail.vendorName || "자체발송", orderCount: 0, totalQuantity: 0 };
-
-          while (assigned < (detail.allocatedQuantity || 0) && orderIdx < unassignedOrders.length) {
-            const order = unassignedOrders[orderIdx];
-            const isVendor = detail.vendorId !== null;
-
-            if (isVendor) {
-              await tx.update(pendingOrders)
-                .set({
-                  vendorId: detail.vendorId,
-                  fulfillmentType: "vendor",
-                  vendorPrice: detail.vendorPrice,
-                  updatedAt: new Date(),
-                })
-                .where(eq(pendingOrders.id, order.id));
-            } else {
-              await tx.update(pendingOrders)
-                .set({
-                  vendorId: null,
-                  fulfillmentType: "self",
-                  vendorPrice: null,
-                  status: "주문조정",
-                  memo: "자체배분 - 자체 주문관리 경로로 전환",
-                  updatedAt: new Date(),
-                })
-                .where(eq(pendingOrders.id, order.id));
-            }
-
-            assigned++;
-            vendorEntry.orderCount++;
-            vendorEntry.totalQuantity++;
-            orderIdx++;
-          }
-
-          byVendor.push(vendorEntry);
-        }
-
-        const remainingOrders = unassignedOrders.slice(orderIdx);
-        if (remainingOrders.length > 0) {
-          for (const order of remainingOrders) {
-            await tx.update(pendingOrders)
-              .set({
-                status: "주문조정",
-                memo: "외주상품 재고부족 - 자동 주문조정",
-                updatedAt: new Date(),
-              })
-              .where(eq(pendingOrders.id, order.id));
-            adjustedOrderIds.push(order.id);
-          }
-        }
-      });
-
-      const totalAssigned = byVendor.reduce((sum, v) => sum + v.orderCount, 0);
-      const adjustedOrders = adjustedOrderIds.length;
-
+      // 배정(assign)은 이제 주문 상태를 변경하지 않음
+      // 실제 vendorId 배정과 상태 전환은 주문조정(직권취소) 등록의 공정 배분 실행에서 처리
+      // 여기서는 allocation 상태만 assigned로 변경
       await db.update(orderAllocations)
         .set({
           status: "assigned",
-          allocatedQuantity: totalAssigned,
-          unallocatedQuantity: adjustedOrders,
           updatedAt: new Date(),
         })
         .where(eq(orderAllocations.id, allocationId));
@@ -11083,32 +11357,13 @@ export async function registerRoutes(
       sseManager.sendToAdmins("allocation-updated", { type: "allocation-assigned", allocationId });
       sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
 
-      byVendor.forEach((v: any) => {
-        if (v.vendorId) {
-          sseManager.sendToPartner(v.vendorId, "partner-orders-updated", {
-            type: "orders-assigned",
-            allocationId,
-            orderCount: v.orderCount,
-          });
-        }
-      });
-
-      if (adjustedOrders > 0) {
-        sseManager.sendToAdmins("order-adjusted", {
-          type: "order-adjustment",
-          allocationId,
-          productCode: allocation.productCode,
-          adjustedCount: adjustedOrders,
-        });
-      }
+      console.log(`배정 완료 - allocationId: ${allocationId}, 확정수량: ${allocation.allocatedQuantity}, 공정배분 대기`);
 
       res.json({
         allocationId,
-        assignedOrders: totalAssigned,
-        adjustedOrders,
-        adjustReason: adjustedOrders > 0 ? "외주상품 재고부족" : undefined,
-        byVendor,
-        adjustedOrderIds: adjustedOrders > 0 ? adjustedOrderIds : undefined,
+        message: "배분 상태가 '배정완료'로 변경되었습니다. 주문조정(직권취소) 등록에서 공정 배분을 진행해 주세요.",
+        allocatedQuantity: allocation.allocatedQuantity,
+        unallocatedQuantity: allocation.unallocatedQuantity,
       });
     } catch (error: any) {
       console.error("주문 배정 실패:", error);
