@@ -119,9 +119,7 @@ export default function PartnerOrders() {
         </Card>
       ) : (
         <>
-          <div className="hidden md:block overflow-x-auto">
-            <Card>
-              <CardContent className="p-0">
+          <div className="hidden md:block border rounded-md overflow-x-auto">
                 <table className="w-full text-sm min-w-[1200px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b bg-muted/30">
@@ -167,8 +165,6 @@ export default function PartnerOrders() {
                     })}
                   </tbody>
                 </table>
-              </CardContent>
-            </Card>
           </div>
           <div className="md:hidden space-y-2 p-3">
             {orders.map((o: any) => {
