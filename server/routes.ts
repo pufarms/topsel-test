@@ -10904,7 +10904,7 @@ export async function registerRoutes(
         if (targetOrders.length > 0) {
           adjustedOrderIds = targetOrders.map(o => o.id);
           await db.update(pendingOrders)
-            .set({ status: "주문조정", updatedAt: new Date() })
+            .set({ status: "주문조정", fulfillmentType: "vendor", updatedAt: new Date() })
             .where(inArray(pendingOrders.id, adjustedOrderIds));
           console.log(`배분 확정 - 미배분 ${unallocated}건 주문조정 처리: ${adjustedOrderIds.join(", ")}`);
 

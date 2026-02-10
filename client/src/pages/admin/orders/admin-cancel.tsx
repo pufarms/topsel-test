@@ -1108,32 +1108,32 @@ export default function OrdersAdminCancelPage() {
             </div>
           </div>
 
-          <div className="border rounded-lg table-scroll-container">
-            <Table className="min-w-[1600px]">
+          <div className="border rounded-lg table-scroll-container overflow-x-auto">
+            <Table className="w-max min-w-full">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <Checkbox
                       checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="w-[100px]">순번</TableHead>
-                  <TableHead className="w-[120px]">상호명</TableHead>
-                  <TableHead className="w-[120px]">대분류</TableHead>
-                  <TableHead className="w-[120px]">중분류</TableHead>
-                  <TableHead className="w-[120px]">소분류</TableHead>
-                  <TableHead className="w-[140px]">상품코드</TableHead>
-                  <TableHead className="min-w-[200px]">상품명</TableHead>
-                  <TableHead className="w-[100px]">수량</TableHead>
-                  <TableHead className="w-[120px]">공급가</TableHead>
-                  <TableHead className="w-[100px]">주문자</TableHead>
-                  <TableHead className="w-[100px]">수령자</TableHead>
-                  <TableHead className="w-[150px]">수령자 연락처</TableHead>
-                  <TableHead className="min-w-[250px]">배송지</TableHead>
-                  <TableHead className="w-[100px]">상태</TableHead>
-                  <TableHead className="w-[80px]">발송구분</TableHead>
-                  <TableHead className="w-[150px]">조정일시</TableHead>
+                  <TableHead className="whitespace-nowrap">순번</TableHead>
+                  <TableHead className="whitespace-nowrap">상호명</TableHead>
+                  <TableHead className="whitespace-nowrap">대분류</TableHead>
+                  <TableHead className="whitespace-nowrap">중분류</TableHead>
+                  <TableHead className="whitespace-nowrap">소분류</TableHead>
+                  <TableHead className="whitespace-nowrap">상품코드</TableHead>
+                  <TableHead className="whitespace-nowrap">상품명</TableHead>
+                  <TableHead className="whitespace-nowrap">수량</TableHead>
+                  <TableHead className="whitespace-nowrap">공급가</TableHead>
+                  <TableHead className="whitespace-nowrap">주문자</TableHead>
+                  <TableHead className="whitespace-nowrap">수령자</TableHead>
+                  <TableHead className="whitespace-nowrap">수령자 연락처</TableHead>
+                  <TableHead className="whitespace-nowrap">배송지</TableHead>
+                  <TableHead className="whitespace-nowrap">상태</TableHead>
+                  <TableHead className="whitespace-nowrap">발송구분</TableHead>
+                  <TableHead className="whitespace-nowrap">조정일시</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1158,34 +1158,34 @@ export default function OrdersAdminCancelPage() {
                           onCheckedChange={(checked) => handleSelectOrder(order.id, !!checked)}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{order.sequenceNumber || index + 1}</TableCell>
-                      <TableCell>{order.memberCompanyName || "-"}</TableCell>
-                      <TableCell>{order.categoryLarge || "-"}</TableCell>
-                      <TableCell>{order.categoryMedium || "-"}</TableCell>
-                      <TableCell>{order.categorySmall || "-"}</TableCell>
-                      <TableCell className="font-mono">{order.productCode || "-"}</TableCell>
-                      <TableCell>{order.productName || "-"}</TableCell>
-                      <TableCell>1</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="font-mono text-sm whitespace-nowrap">{order.sequenceNumber || index + 1}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.memberCompanyName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.categoryLarge || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.categoryMedium || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.categorySmall || "-"}</TableCell>
+                      <TableCell className="font-mono whitespace-nowrap">{order.productCode || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.productName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">1</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         {order.supplyPrice ? order.supplyPrice.toLocaleString() + "원" : "-"}
                       </TableCell>
-                      <TableCell>{order.ordererName || "-"}</TableCell>
-                      <TableCell>{order.recipientName || "-"}</TableCell>
-                      <TableCell>{order.recipientMobile || order.recipientPhone || "-"}</TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={order.recipientAddress || ""}>
+                      <TableCell className="whitespace-nowrap">{order.ordererName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.recipientName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{order.recipientMobile || order.recipientPhone || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap" title={order.recipientAddress || ""}>
                         {order.recipientAddress || "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge variant="outline" className="border-orange-500 text-orange-500">주문조정</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {order.fulfillmentType === "vendor" ? (
-                          <span className="text-orange-600 dark:text-orange-400">외주</span>
+                          <Badge variant="outline" className="border-orange-500 text-orange-600">외주</Badge>
                         ) : (
-                          <span className="text-blue-600 dark:text-blue-400">자체</span>
+                          <Badge variant="outline" className="border-blue-500 text-blue-600">자체</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
                       </TableCell>
                     </TableRow>
