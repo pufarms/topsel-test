@@ -115,7 +115,6 @@ export default function PartnerOrders() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b bg-muted/30">
-                    <th className="text-left py-2 px-2 whitespace-nowrap">주문번호</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">주문자명</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">주문자 전화번호</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">주문자 주소</th>
@@ -127,6 +126,7 @@ export default function PartnerOrders() {
                     <th className="text-left py-2 px-2 whitespace-nowrap">상품코드</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">상품명</th>
                     <th className="text-right py-2 px-2 whitespace-nowrap">수량</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">주문번호</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">운송장번호</th>
                     <th className="text-left py-2 px-2 whitespace-nowrap">택배사</th>
                     <th className="text-center py-2 px-2 whitespace-nowrap">상태</th>
@@ -139,7 +139,6 @@ export default function PartnerOrders() {
                     const ordererFullAddress = o.ordererAddress || "";
                     return (
                       <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
-                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.id}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererPhone || ""}</td>
                         <td className="py-2 px-2 text-xs max-w-[150px] truncate" title={ordererFullAddress}>{ordererFullAddress}</td>
@@ -151,6 +150,7 @@ export default function PartnerOrders() {
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                         <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.id}</td>
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
                         <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
