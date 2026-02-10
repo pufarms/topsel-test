@@ -7390,6 +7390,13 @@ export async function registerRoutes(
 
         conditions.push(isNotNull(pendingOrders.trackingNumber));
 
+        if (filters?.fulfillmentType && filters.fulfillmentType !== "all") {
+          conditions.push(eq(pendingOrders.fulfillmentType, filters.fulfillmentType));
+        }
+        if (filters?.vendorId && filters.vendorId !== "all") {
+          conditions.push(eq(pendingOrders.vendorId, Number(filters.vendorId)));
+        }
+
         const result = await db.update(pendingOrders)
           .set({
             trackingNumber: null,
@@ -7510,6 +7517,12 @@ export async function registerRoutes(
         }
         if (filters?.uploadFormat) {
           conditions.push(eq(pendingOrders.uploadFormat, filters.uploadFormat));
+        }
+        if (filters?.fulfillmentType && filters.fulfillmentType !== "all") {
+          conditions.push(eq(pendingOrders.fulfillmentType, filters.fulfillmentType));
+        }
+        if (filters?.vendorId && filters.vendorId !== "all") {
+          conditions.push(eq(pendingOrders.vendorId, Number(filters.vendorId)));
         }
 
         const result = await db.update(pendingOrders)

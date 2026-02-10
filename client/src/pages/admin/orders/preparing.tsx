@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +70,8 @@ export default function OrdersPreparingPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<"default" | "lotte" | "postoffice">("default");
   const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<"all" | "self" | "vendor">("all");
+  const [vendorFilter, setVendorFilter] = useState<"all" | number>("all");
   
   // 운송장 업로드 관련 상태
   const [showResetSelectedDialog, setShowResetSelectedDialog] = useState(false);
@@ -105,6 +107,20 @@ export default function OrdersPreparingPage() {
     },
   });
 
+  const { data: productVendorMappings = [] } = useQuery<{ productCode: string; vendorId: number; vendorName: string }[]>({
+    queryKey: ["/api/admin/product-vendors-all"],
+  });
+
+  const productVendorMap = useMemo(() => {
+    const map = new Map<string, { vendorId: number; vendorName: string }[]>();
+    for (const mapping of productVendorMappings) {
+      const existing = map.get(mapping.productCode) || [];
+      existing.push({ vendorId: mapping.vendorId, vendorName: mapping.vendorName });
+      map.set(mapping.productCode, existing);
+    }
+    return map;
+  }, [productVendorMappings]);
+
   const restoreToWaitingMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       const results = await Promise.all(
@@ -132,6 +148,26 @@ export default function OrdersPreparingPage() {
   // 상품준비중 페이지는 "상품준비중" 상태만 표시
   const preparingOrders = allPendingOrders.filter(o => o.status === "상품준비중");
 
+  const relevantVendors = useMemo(() => {
+    const vendorOrders = preparingOrders.filter(o => o.fulfillmentType === "vendor" && o.productCode);
+    const uniqueProductCodes = Array.from(new Set(vendorOrders.map(o => o.productCode!)));
+    
+    const vendorIds = new Set<number>();
+    const result: { id: number; companyName: string }[] = [];
+    
+    for (const code of uniqueProductCodes) {
+      const pvList = productVendorMap.get(code) || [];
+      for (const pv of pvList) {
+        if (!vendorIds.has(pv.vendorId)) {
+          vendorIds.add(pv.vendorId);
+          result.push({ id: pv.vendorId, companyName: pv.vendorName });
+        }
+      }
+    }
+    
+    return result;
+  }, [preparingOrders, productVendorMap]);
+
   const getFields = useCallback((order: PendingOrder) => ({
     memberId: order.memberId || undefined,
     categoryLarge: order.categoryLarge || undefined,
@@ -145,10 +181,27 @@ export default function OrdersPreparingPage() {
 
   const categoryFilteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
   
-  // 업로드 양식 필터 적용
-  const filteredOrders = uploadFormatFilter === "all" 
-    ? categoryFilteredOrders 
-    : categoryFilteredOrders.filter(o => (o.uploadFormat || "default") === uploadFormatFilter);
+  const filteredOrders = useMemo(() => {
+    let orders = categoryFilteredOrders;
+    
+    if (uploadFormatFilter !== "all") {
+      orders = orders.filter(o => (o.uploadFormat || "default") === uploadFormatFilter);
+    }
+    
+    if (fulfillmentFilter !== "all") {
+      orders = orders.filter(o => (o.fulfillmentType || "self") === fulfillmentFilter);
+    }
+    
+    if (fulfillmentFilter === "vendor" && vendorFilter !== "all") {
+      orders = orders.filter(o => {
+        if (o.vendorId === vendorFilter) return true;
+        const pvList = productVendorMap.get(o.productCode || "") || [];
+        return pvList.some(pv => pv.vendorId === vendorFilter);
+      });
+    }
+    
+    return orders;
+  }, [categoryFilteredOrders, uploadFormatFilter, fulfillmentFilter, vendorFilter, productVendorMap]);
   
   const totalPages = tablePageSize === "all" ? 1 : Math.ceil(filteredOrders.length / tablePageSize);
   const displayedOrders = tablePageSize === "all" 
@@ -266,6 +319,8 @@ export default function OrdersPreparingPage() {
           categoryMedium: filters.categoryMedium || undefined,
           categorySmall: filters.categorySmall || undefined,
           search: filters.searchTerm || undefined,
+          fulfillmentType: fulfillmentFilter !== "all" ? fulfillmentFilter : undefined,
+          vendorId: fulfillmentFilter === "vendor" && vendorFilter !== "all" ? vendorFilter : undefined,
         },
       });
       const data = await res.json();
@@ -319,6 +374,8 @@ export default function OrdersPreparingPage() {
           searchFilter: filters.searchFilter !== "선택 없음" ? filters.searchFilter : undefined,
           search: filters.searchTerm || undefined,
           uploadFormat: uploadFormatFilter !== "all" ? uploadFormatFilter : undefined,
+          fulfillmentType: fulfillmentFilter !== "all" ? fulfillmentFilter : undefined,
+          vendorId: fulfillmentFilter === "vendor" && vendorFilter !== "all" ? vendorFilter : undefined,
         },
       });
       const data = await res.json();
@@ -450,6 +507,67 @@ export default function OrdersPreparingPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <span className="text-sm font-semibold text-orange-700 dark:text-orange-300 ml-4">발송구분:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="default" className="bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-fulfillment-filter">
+                  {fulfillmentFilter === "all" ? "전체" : fulfillmentFilter === "vendor" ? "외주" : "자체"}
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem 
+                  onClick={() => { setFulfillmentFilter("all"); setVendorFilter("all"); setCurrentPage(1); }}
+                  data-testid="menu-fulfillment-filter-all"
+                >
+                  전체
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setFulfillmentFilter("self"); setVendorFilter("all"); setCurrentPage(1); }}
+                  data-testid="menu-fulfillment-filter-self"
+                >
+                  자체
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => { setFulfillmentFilter("vendor"); setCurrentPage(1); }}
+                  data-testid="menu-fulfillment-filter-vendor"
+                >
+                  외주
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {fulfillmentFilter === "vendor" && relevantVendors.length > 0 && (
+              <>
+                <span className="text-sm font-semibold text-orange-700 dark:text-orange-300 ml-2">외주업체:</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="default" className="bg-orange-500 hover:bg-orange-600 text-white" data-testid="button-vendor-filter">
+                      {vendorFilter === "all" ? "전체" : relevantVendors.find(v => v.id === vendorFilter)?.companyName || "전체"}
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem 
+                      onClick={() => { setVendorFilter("all"); setCurrentPage(1); }}
+                      data-testid="menu-vendor-filter-all"
+                    >
+                      전체
+                    </DropdownMenuItem>
+                    {relevantVendors.map(vendor => (
+                      <DropdownMenuItem 
+                        key={vendor.id}
+                        onClick={() => { setVendorFilter(vendor.id); setCurrentPage(1); }}
+                        data-testid={`menu-vendor-filter-${vendor.id}`}
+                      >
+                        {vendor.companyName}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-between flex-wrap gap-2">
