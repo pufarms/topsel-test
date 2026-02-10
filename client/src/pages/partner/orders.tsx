@@ -76,7 +76,12 @@ export default function PartnerOrders() {
 
   const handleDownload = () => {
     const params = new URLSearchParams({ startDate, endDate, status }).toString();
-    window.open(`/api/partner/orders/download?${params}`, "_blank");
+    const a = document.createElement("a");
+    a.href = `/api/partner/orders/download?${params}`;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleTrackingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
