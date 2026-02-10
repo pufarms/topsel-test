@@ -143,9 +143,9 @@ export default function PartnerOrders() {
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererPhone || ""}</td>
                         <td className="py-2 px-2 text-xs max-w-[150px] truncate" title={ordererFullAddress}>{ordererFullAddress}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.recipientName || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientMobile || ""}</td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientPhone || ""}</td>
-                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientPhone2 || ""}</td>
-                        <td className="py-2 px-2 text-xs max-w-[180px] truncate" title={fullAddress}>{fullAddress}</td>
+                        <td className="py-2 px-2 text-xs max-w-[180px] truncate" title={o.recipientAddress || ""}>{o.recipientAddress || ""}</td>
                         <td className="py-2 px-2 text-xs max-w-[120px] truncate" title={o.deliveryMessage || ""}>{o.deliveryMessage || ""}</td>
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
@@ -174,8 +174,8 @@ export default function PartnerOrders() {
                       <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>
                       <div className="text-xs text-muted-foreground">{o.productCode}</div>
                       <div className="text-xs">주문자: {o.ordererName} {o.ordererPhone}</div>
-                      <div className="text-xs">수령자: {o.recipientName} {o.recipientPhone}</div>
-                      <div className="text-xs text-muted-foreground">{fullAddress}</div>
+                      <div className="text-xs">수령자: {o.recipientName} {o.recipientMobile}</div>
+                      <div className="text-xs text-muted-foreground">{o.recipientAddress}</div>
                       {o.deliveryMessage && <div className="text-xs text-muted-foreground">배송메시지: {o.deliveryMessage}</div>}
                       {o.trackingNumber && <div className="text-xs">운송장: {o.courierCompany} {o.trackingNumber}</div>}
                     </CardContent>
