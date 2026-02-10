@@ -455,6 +455,7 @@ router.put("/orders/:id/tracking", partnerAuth, async (req: Request, res: Respon
       .set({
         trackingNumber,
         courierCompany,
+        status: "배송준비중",
         updatedAt: new Date(),
       })
       .where(sql`${pendingOrders.id} = ${orderId}`);
@@ -564,7 +565,12 @@ router.post("/orders/tracking/bulk-register", partnerAuth, async (req: Request, 
       }
 
       await db.update(pendingOrders)
-        .set({ trackingNumber: String(trackingNumber), courierCompany: String(courierCompany), updatedAt: new Date() })
+        .set({
+          trackingNumber: String(trackingNumber),
+          courierCompany: String(courierCompany),
+          status: "배송준비중",
+          updatedAt: new Date(),
+        })
         .where(eq(pendingOrders.id, order.id));
       results.success++;
     }
