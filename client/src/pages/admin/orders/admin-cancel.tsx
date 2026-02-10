@@ -125,25 +125,6 @@ export default function OrdersAdminCancelPage() {
   const [stockFilter, setStockFilter] = useState<"all" | "deficit">("all");
   const [isStockOpen, setIsStockOpen] = useState(true);
   const [isCancelOpen, setIsCancelOpen] = useState(true);
-  const [allocationConfirmDialog, setAllocationConfirmDialog] = useState<{
-    open: boolean;
-    allocationId: number | null;
-    productCode: string;
-    productName: string;
-    totalOrders: number;
-    availableStock: number;
-    isDeficit: boolean;
-    details: AllocationDetailInfo[];
-  }>({
-    open: false,
-    allocationId: null,
-    productCode: "",
-    productName: "",
-    totalOrders: 0,
-    availableStock: 0,
-    isDeficit: false,
-    details: [],
-  });
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
@@ -213,29 +194,6 @@ export default function OrdersAdminCancelPage() {
     },
   });
 
-  const executeAllocationAdjustmentMutation = useMutation({
-    mutationFn: async (data: { allocationId: number; productCode: string }) => {
-      return await apiRequest("POST", "/api/admin/order-adjustment-allocation-execute", data);
-    },
-    onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
-      setSelectedProducts([]);
-      toast({
-        title: "외주상품 주문조정 완료",
-        description: result.message,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "외주상품 주문조정 실패",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const executeAlternateShipmentMutation = useMutation({
     mutationFn: async (data: { 
@@ -490,7 +448,23 @@ export default function OrdersAdminCancelPage() {
 
       for (const materialCode of materialCodes) {
         const group = adjustmentData.find(g => g.materialCode === materialCode);
-        if (group) {
+        if (!group) continue;
+
+        if (group.stockSource === "allocation" && group.allocationId) {
+          const selectedProductCodes = selectedProducts
+            .filter(p => p.materialCode === materialCode)
+            .map(p => p.productCode);
+
+          for (const pc of selectedProductCodes) {
+            const result: any = await apiRequest("POST", "/api/admin/order-adjustment-allocation-execute", {
+              allocationId: group.allocationId,
+              productCode: pc,
+            });
+            if (result.adjusted && result.cancelledOrderIds) {
+              totalOrdersAdjusted += result.cancelledOrderIds.length;
+            }
+          }
+        } else {
           const selectedProductCodes = selectedProducts
             .filter(p => p.materialCode === materialCode)
             .map(p => p.productCode);
@@ -514,6 +488,7 @@ export default function OrdersAdminCancelPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/allocations"] });
       
       setSelectedProducts([]);
       setAlternateSelections(new Map());
@@ -844,39 +819,12 @@ export default function OrdersAdminCancelPage() {
                         <TableCell className="font-mono text-xs min-w-[120px]">{product.productCode}</TableCell>
                         <TableCell className="text-sm min-w-[280px]">{product.productName}</TableCell>
                         <TableCell className="text-center">
-                          {isAllocation ? (
-                            <Button
-                              size="sm"
-                              variant={stillDeficit ? "destructive" : "default"}
-                              disabled={executeAllocationAdjustmentMutation.isPending}
-                              onClick={() => {
-                                if (group.allocationId) {
-                                  setAllocationConfirmDialog({
-                                    open: true,
-                                    allocationId: group.allocationId,
-                                    productCode: product.productCode,
-                                    productName: product.productName,
-                                    totalOrders: product.orderCount,
-                                    availableStock: group.currentStock,
-                                    isDeficit: stillDeficit,
-                                    details: group.allocationDetails || [],
-                                  });
-                                }
-                              }}
-                              data-testid={`button-allocation-execute-${product.productCode}`}
-                            >
-                              {executeAllocationAdjustmentMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : stillDeficit ? "공정배분" : "전환"}
-                            </Button>
-                          ) : (
                             <Checkbox
                               checked={isProductSelected(group.materialCode, product.productCode)}
                               onCheckedChange={(checked) => handleSelectProduct(group.materialCode, product.productCode, !!checked)}
                               disabled={!stillDeficit}
                               data-testid={`checkbox-product-${product.productCode}`}
                             />
-                          )}
                         </TableCell>
                         <TableCell className="text-center font-medium">{product.orderCount}</TableCell>
                         <TableCell className="text-center">{product.requiredMaterial}</TableCell>
@@ -1133,101 +1081,6 @@ export default function OrdersAdminCancelPage() {
               className="w-full sm:w-auto"
             >
               부족 상품 제외하고 전송
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog 
-        open={allocationConfirmDialog.open} 
-        onOpenChange={(open) => setAllocationConfirmDialog(prev => ({ ...prev, open }))}
-      >
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {allocationConfirmDialog.isDeficit ? (
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              ) : (
-                <Send className="h-5 w-5 text-blue-600" />
-              )}
-              {allocationConfirmDialog.isDeficit ? "외주상품 공정배분 실행" : "외주상품 상품준비중 전환"}
-            </DialogTitle>
-            <DialogDescription>
-              {allocationConfirmDialog.isDeficit 
-                ? "확정 수량이 주문 수보다 부족합니다. 공정 배분 알고리즘으로 회원별 균등하게 조정합니다."
-                : "확정 수량이 충분합니다. 모든 주문을 상품준비중으로 전환합니다."}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-3 py-3">
-            <div className="p-3 border rounded-lg bg-muted/30">
-              <div className="text-sm font-medium mb-2">{allocationConfirmDialog.productName}</div>
-              <div className="text-xs text-muted-foreground">{allocationConfirmDialog.productCode}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 border rounded-lg text-center">
-                <div className="text-xs text-muted-foreground">주문 수</div>
-                <div className="text-lg font-bold">{allocationConfirmDialog.totalOrders}</div>
-              </div>
-              <div className="p-3 border rounded-lg text-center">
-                <div className="text-xs text-muted-foreground">확정 수량</div>
-                <div className={`text-lg font-bold ${allocationConfirmDialog.isDeficit ? "text-destructive" : "text-green-600"}`}>
-                  {allocationConfirmDialog.availableStock}
-                </div>
-              </div>
-            </div>
-            {allocationConfirmDialog.details.length > 0 && (
-              <div className="p-3 border rounded-lg">
-                <div className="text-xs font-medium text-muted-foreground mb-2">배분 상세</div>
-                {allocationConfirmDialog.details.map((d, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
-                    <span>{d.vendorName || "자체(탑셀러)"}</span>
-                    <span className="font-medium">{d.allocatedQuantity}개</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {allocationConfirmDialog.isDeficit && (
-              <div className="p-3 border border-destructive/20 rounded-lg bg-destructive/5">
-                <div className="text-xs text-destructive font-medium">
-                  부족 수량: {allocationConfirmDialog.totalOrders - allocationConfirmDialog.availableStock}건이 주문조정으로 전환됩니다.
-                  회원별 균등 배분 후, 순번이 높은(늦은) 주문부터 우선 조정됩니다.
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setAllocationConfirmDialog(prev => ({ ...prev, open: false }))}
-              className="w-full sm:w-auto"
-              data-testid="button-allocation-confirm-cancel"
-            >
-              취소
-            </Button>
-            <Button 
-              variant={allocationConfirmDialog.isDeficit ? "destructive" : "default"}
-              disabled={executeAllocationAdjustmentMutation.isPending}
-              onClick={() => {
-                if (allocationConfirmDialog.allocationId) {
-                  executeAllocationAdjustmentMutation.mutate({
-                    allocationId: allocationConfirmDialog.allocationId,
-                    productCode: allocationConfirmDialog.productCode,
-                  }, {
-                    onSettled: () => {
-                      setAllocationConfirmDialog(prev => ({ ...prev, open: false }));
-                    }
-                  });
-                }
-              }}
-              className="w-full sm:w-auto"
-              data-testid="button-allocation-confirm-execute"
-            >
-              {executeAllocationAdjustmentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : null}
-              {allocationConfirmDialog.isDeficit ? "공정배분 실행" : "상품준비중 전환"}
             </Button>
           </DialogFooter>
         </DialogContent>

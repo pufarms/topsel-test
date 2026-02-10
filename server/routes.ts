@@ -8991,7 +8991,7 @@ export async function registerRoutes(
         currentStock: group.currentStock,
         remainingStock: group.remainingStock,
         isDeficit: group.remainingStock < 0,
-        stockSource: "material" as const,
+        stockSource: "material" as "material" | "allocation",
         allocationId: null as number | null,
         allocationDetails: null as any,
         products: group.products.map(p => {
@@ -9384,53 +9384,10 @@ export async function registerRoutes(
 
       const totalRequired = targetOrders.length;
 
-      // 재고가 충분한 경우 - 모든 주문을 상품준비중으로
       if (totalRequired <= availableStock) {
-        await db.transaction(async (tx) => {
-          let orderIdx = 0;
-          for (const detail of confirmedDetails) {
-            let assigned = 0;
-            while (assigned < (detail.allocatedQuantity || 0) && orderIdx < targetOrders.length) {
-              const order = targetOrders[orderIdx];
-              const isVendor = detail.vendorId !== null;
-              await tx.update(pendingOrders)
-                .set({
-                  status: "상품준비중",
-                  vendorId: isVendor ? detail.vendorId : null,
-                  fulfillmentType: isVendor ? "vendor" : "self",
-                  vendorPrice: isVendor ? detail.vendorPrice : null,
-                  updatedAt: new Date(),
-                })
-                .where(eq(pendingOrders.id, order.id));
-              assigned++;
-              orderIdx++;
-            }
-          }
-        });
-
-        // allocation 상태 업데이트
-        await db.update(orderAllocations)
-          .set({ status: "assigned", updatedAt: new Date() })
-          .where(eq(orderAllocations.id, allocationId));
-
-        sseManager.sendToAdmins("order-adjusted", { type: "allocation-adjustment-complete", allocationId });
-        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
-
-        // 파트너에게 알림
-        for (const detail of confirmedDetails) {
-          if (detail.vendorId) {
-            sseManager.sendToPartner(detail.vendorId, "partner-orders-updated", {
-              type: "orders-assigned",
-              allocationId,
-            });
-          }
-        }
-
-        return res.json({
-          adjusted: false,
-          message: "재고가 충분합니다. 모든 주문이 상품준비중으로 전환되었습니다.",
-          keptOrders: totalRequired,
-          cancelledOrders: 0,
+        return res.json({ 
+          message: "확정 수량이 충분합니다. 조정이 필요하지 않습니다.",
+          adjusted: false 
         });
       }
 
@@ -9546,54 +9503,28 @@ export async function registerRoutes(
 
       console.log(`외주상품 공평 배분 - 최종 유지: ${totalKept}, 취소: ${totalRequired - totalKept}`);
 
-      // DB 업데이트 - 유지 주문은 상품준비중 + vendorId, 취소 주문은 주문조정
+      // DB 업데이트 - 취소 대상만 주문조정으로 변경, 유지 주문은 대기 유지
       const cancelledOrderIds: string[] = [];
-      const keptOrderIds: string[] = [];
 
-      await db.transaction(async (tx) => {
-        // 유지 주문 수집 (순번 오름차순)
-        const keptOrders = ordersForDistribution.filter(o => o.keepOrder).sort((a, b) => a.sequenceNum - b.sequenceNum);
-        
-        // vendorId 배정: 확정된 상세 순서대로 유지 주문에 배정
-        let orderIdx = 0;
-        for (const detail of confirmedDetails) {
-          let assigned = 0;
-          while (assigned < (detail.allocatedQuantity || 0) && orderIdx < keptOrders.length) {
-            const order = keptOrders[orderIdx];
-            const isVendor = detail.vendorId !== null;
-            await tx.update(pendingOrders)
-              .set({
-                status: "상품준비중",
-                vendorId: isVendor ? detail.vendorId : null,
-                fulfillmentType: isVendor ? "vendor" : "self",
-                vendorPrice: isVendor ? detail.vendorPrice : null,
-                updatedAt: new Date(),
-              })
-              .where(eq(pendingOrders.id, order.id));
-            keptOrderIds.push(order.id);
-            assigned++;
-            orderIdx++;
-          }
-        }
+      const ordersToCancel = ordersForDistribution.filter(o => !o.keepOrder);
+      ordersToCancel.sort((a, b) => b.sequenceNum - a.sequenceNum);
 
-        // 취소 주문 처리
-        for (const order of ordersForDistribution) {
-          if (!order.keepOrder) {
-            await tx.update(pendingOrders)
-              .set({
-                status: "주문조정",
-                fulfillmentType: "vendor",
-                updatedAt: new Date(),
-              })
-              .where(eq(pendingOrders.id, order.id));
-            cancelledOrderIds.push(order.id);
-          }
-        }
-      });
+      for (const order of ordersToCancel) {
+        await db.update(pendingOrders)
+          .set({ 
+            status: "주문조정",
+            updatedAt: new Date()
+          })
+          .where(eq(pendingOrders.id, order.id));
+        cancelledOrderIds.push(order.id);
+      }
 
-      // allocation 상태 업데이트
+      // 배분 확정 수량을 실제 유지 수량으로 갱신
       await db.update(orderAllocations)
-        .set({ status: "assigned", updatedAt: new Date() })
+        .set({ 
+          allocatedQuantity: totalKept,
+          updatedAt: new Date() 
+        })
         .where(eq(orderAllocations.id, allocationId));
 
       // SSE 알림
@@ -9601,24 +9532,13 @@ export async function registerRoutes(
         type: "allocation-adjustment",
         allocationId,
         cancelledCount: cancelledOrderIds.length,
-        keptCount: keptOrderIds.length,
       });
       sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
 
-      // 파트너에게 주문 배정 알림
-      for (const detail of confirmedDetails) {
-        if (detail.vendorId) {
-          sseManager.sendToPartner(detail.vendorId, "partner-orders-updated", {
-            type: "orders-assigned",
-            allocationId,
-          });
-        }
-      }
-
       // 주문조정된 회원에게 알림
-      const adjustedMemberIds = [...new Set(
+      const adjustedMemberIds = Array.from(new Set(
         ordersForDistribution.filter(o => !o.keepOrder).map(o => o.memberId).filter(Boolean)
-      )];
+      ));
       adjustedMemberIds.forEach(memberId => {
         if (memberId) {
           sseManager.sendToMember(memberId, "order-updated", {
@@ -9630,9 +9550,7 @@ export async function registerRoutes(
 
       res.json({
         adjusted: true,
-        message: `공정 배분 완료: 유지 ${keptOrderIds.length}건 (상품준비중), 조정 ${cancelledOrderIds.length}건 (주문조정)`,
-        keptOrders: keptOrderIds.length,
-        cancelledOrders: cancelledOrderIds.length,
+        message: `${cancelledOrderIds.length}건의 주문이 공평 배분 방식으로 조정되었습니다.`,
         cancelledOrderIds,
         adjustedGroups: groupList.map(g => ({
           memberId: g.memberId,
