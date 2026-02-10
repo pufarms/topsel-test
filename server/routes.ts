@@ -9519,6 +9519,9 @@ export async function registerRoutes(
       // DB 업데이트 - 취소 대상만 주문조정으로 변경, 유지 주문은 대기 유지
       const cancelledOrderIds: string[] = [];
 
+      // 배분 상세에서 첫 번째 벤더 ID 추출 (이 배분에 참여한 벤더)
+      const primaryVendorId = confirmedDetails.length > 0 ? confirmedDetails[0].vendorId : null;
+
       const ordersToCancel = ordersForDistribution.filter(o => !o.keepOrder);
       ordersToCancel.sort((a, b) => b.sequenceNum - a.sequenceNum);
 
@@ -9527,18 +9530,20 @@ export async function registerRoutes(
           .set({ 
             status: "주문조정",
             fulfillmentType: "vendor",
+            vendorId: primaryVendorId,
             updatedAt: new Date()
           })
           .where(eq(pendingOrders.id, order.id));
         cancelledOrderIds.push(order.id);
       }
 
-      // 유지 주문도 외주 상품이므로 fulfillmentType을 vendor로 설정
+      // 유지 주문도 외주 상품이므로 fulfillmentType과 vendorId를 설정
       const ordersToKeep = ordersForDistribution.filter(o => o.keepOrder);
       for (const order of ordersToKeep) {
         await db.update(pendingOrders)
           .set({ 
             fulfillmentType: "vendor",
+            vendorId: primaryVendorId,
             updatedAt: new Date()
           })
           .where(eq(pendingOrders.id, order.id));
@@ -9792,42 +9797,61 @@ export async function registerRoutes(
         });
       }
 
-      // 외주 상품 코드 조회 (product_vendors에 등록된 상품)
+      // 외주 상품 코드 조회 (product_vendors에 등록된 상품) + vendorId 매핑
       const uniqueProductCodes = Array.from(new Set(ordersToTransfer.map(o => o.productCode).filter(Boolean))) as string[];
+      const productVendorMap: Record<string, number> = {};
       let vendorProductCodes: string[] = [];
       if (uniqueProductCodes.length > 0) {
-        const vendorProducts = await db.select({ productCode: productVendors.productCode })
+        const vendorProducts = await db.select({ 
+            productCode: productVendors.productCode,
+            vendorId: productVendors.vendorId 
+          })
           .from(productVendors)
           .where(and(
             inArray(productVendors.productCode, uniqueProductCodes),
             eq(productVendors.isActive, true)
           ));
         vendorProductCodes = vendorProducts.map(vp => vp.productCode);
+        for (const vp of vendorProducts) {
+          productVendorMap[vp.productCode] = vp.vendorId;
+        }
       }
 
       // 자체 주문과 외주 주문 분리
       const selfOrderIds = ordersToTransfer.filter(o => !vendorProductCodes.includes(o.productCode || '')).map(o => o.id);
-      const vendorOrderIds = ordersToTransfer.filter(o => vendorProductCodes.includes(o.productCode || '')).map(o => o.id);
+      const vendorOrders = ordersToTransfer.filter(o => vendorProductCodes.includes(o.productCode || ''));
 
       // 자체 주문 상태 업데이트
       if (selfOrderIds.length > 0) {
         await db.update(pendingOrders)
           .set({ 
             status: "상품준비중",
+            fulfillmentType: "self",
             updatedAt: new Date()
           })
           .where(inArray(pendingOrders.id, selfOrderIds));
       }
 
-      // 외주 주문 상태 업데이트 (fulfillmentType = vendor)
-      if (vendorOrderIds.length > 0) {
+      // 외주 주문 상태 업데이트 (fulfillmentType = vendor, vendorId 할당)
+      // 벤더별로 그룹핑하여 vendorId를 각각 설정
+      const vendorGroups: Record<number, string[]> = {};
+      for (const order of vendorOrders) {
+        const vId = productVendorMap[order.productCode || ''];
+        if (vId) {
+          if (!vendorGroups[vId]) vendorGroups[vId] = [];
+          vendorGroups[vId].push(order.id);
+        }
+      }
+
+      for (const [vId, orderIdGroup] of Object.entries(vendorGroups)) {
         await db.update(pendingOrders)
           .set({ 
             status: "상품준비중",
             fulfillmentType: "vendor",
+            vendorId: Number(vId),
             updatedAt: new Date()
           })
-          .where(inArray(pendingOrders.id, vendorOrderIds));
+          .where(inArray(pendingOrders.id, orderIdGroup));
       }
 
       const orderIds = ordersToTransfer.map(o => o.id);
