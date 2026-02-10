@@ -1,10 +1,12 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Download, Upload, Search, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 
 interface OrdersResponse {
   orders: any[];
@@ -12,6 +14,12 @@ interface OrdersResponse {
   page: number;
   limit: number;
   statusCounts: Record<string, number>;
+}
+
+interface TrackingEntry {
+  customOrderNumber: string;
+  courierCompany: string;
+  trackingNumber: string;
 }
 
 function cleanDeliveryMessage(msg: string | null | undefined): string {
@@ -41,6 +49,12 @@ export default function PartnerOrders() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [uploadedTracking, setUploadedTracking] = useState<Map<string, TrackingEntry>>(new Map());
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const queryParams = new URLSearchParams({
     startDate, endDate, status, search, page: String(page), limit: "50",
@@ -60,9 +74,98 @@ export default function PartnerOrders() {
     window.open(`/api/partner/orders/download?${params}`, "_blank");
   };
 
+  const handleTrackingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+
+      const trackingMap = new Map<string, TrackingEntry>();
+      let validCount = 0;
+      let invalidCount = 0;
+
+      for (const row of rows) {
+        const customOrderNumber = String(row["주문번호"] || "").trim();
+        const courierCompany = String(row["택배사"] || "").trim();
+        const trackingNumber = String(row["운송장번호"] || "").trim();
+
+        if (customOrderNumber && courierCompany && trackingNumber) {
+          trackingMap.set(customOrderNumber, { customOrderNumber, courierCompany, trackingNumber });
+          validCount++;
+        } else if (customOrderNumber || courierCompany || trackingNumber) {
+          invalidCount++;
+        }
+      }
+
+      setUploadedTracking(trackingMap);
+
+      toast({
+        title: "운송장 업로드 완료",
+        description: `${validCount}건 로드됨${invalidCount > 0 ? ` (${invalidCount}건 누락항목)` : ""}`,
+      });
+    } catch (error) {
+      toast({
+        title: "업로드 실패",
+        description: "엑셀 파일을 확인해 주세요",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRegisterTracking = async () => {
+    if (uploadedTracking.size === 0) {
+      toast({ title: "등록할 운송장이 없습니다", description: "먼저 운송장 파일을 업로드해 주세요", variant: "destructive" });
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      const trackingData = Array.from(uploadedTracking.values());
+      const res = await fetch("/api/partner/orders/tracking/bulk-register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ trackingData }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "등록 실패");
+      }
+
+      const result = await res.json();
+      setUploadedTracking(new Map());
+
+      toast({
+        title: "운송장 등록 완료",
+        description: `성공 ${result.success}건${result.failed > 0 ? `, 실패 ${result.failed}건` : ""}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/partner/orders"] });
+    } catch (error: any) {
+      toast({ title: "운송장 등록 실패", description: error.message, variant: "destructive" });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const orders = data?.orders || [];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 50);
+
+  const getTrackingDisplay = (order: any) => {
+    const uploaded = uploadedTracking.get(order.customOrderNumber);
+    if (uploaded) return { trackingNumber: uploaded.trackingNumber, courierCompany: uploaded.courierCompany, isUploaded: true };
+    return { trackingNumber: order.trackingNumber || "", courierCompany: order.courierCompany || "", isUploaded: false };
+  };
 
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
@@ -99,18 +202,43 @@ export default function PartnerOrders() {
                 <Input placeholder="상품명/수취인명/주문번호" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="input-search" />
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={handleDownload} data-testid="button-download">
-              <Download className="h-4 w-4 mr-1" />엑셀
-            </Button>
           </div>
-          {data?.statusCounts && (
-            <div className="flex gap-2 flex-wrap text-xs text-muted-foreground">
-              <span>총 {total}건</span>
-              {Object.entries(data.statusCounts).map(([s, c]) => (
-                <span key={s}>| {s}: {c}건</span>
-              ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {data?.statusCounts && (
+              <div className="flex gap-2 flex-wrap text-xs text-muted-foreground">
+                <span>총 {total}건</span>
+                {Object.entries(data.statusCounts).map(([s, c]) => (
+                  <span key={s}>| {s}: {c}건</span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleDownload} data-testid="button-download-orders">
+                <Download className="h-4 w-4 mr-1" />주문 다운로드
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleTrackingUpload}
+                data-testid="input-tracking-upload"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                data-testid="button-upload-tracking"
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                운송장 업로드
+              </Button>
+              {uploadedTracking.size > 0 && (
+                <Badge variant="secondary">{uploadedTracking.size}건 로드됨</Badge>
+              )}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -148,8 +276,9 @@ export default function PartnerOrders() {
                   <tbody>
                     {orders.map((o: any) => {
                       const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                      const tracking = getTrackingDisplay(o);
                       return (
-                        <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
+                        <tr key={o.id} className={`border-b ${tracking.isUploaded ? "bg-blue-50 dark:bg-blue-950/30" : ""}`} data-testid={`row-order-${o.id}`}>
                           <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.ordererPhone)}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererAddress || ""}</td>
@@ -162,8 +291,8 @@ export default function PartnerOrders() {
                           <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                           <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
                           <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.customOrderNumber || ""}</td>
-                          <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
-                          <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
+                          <td className={`py-2 px-2 font-mono text-xs whitespace-nowrap ${tracking.isUploaded ? "text-blue-600 dark:text-blue-400 font-semibold" : ""}`}>{tracking.trackingNumber}</td>
+                          <td className={`py-2 px-2 text-xs whitespace-nowrap ${tracking.isUploaded ? "text-blue-600 dark:text-blue-400 font-semibold" : ""}`}>{tracking.courierCompany}</td>
                           <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
                         </tr>
                       );
@@ -174,8 +303,9 @@ export default function PartnerOrders() {
           <div className="md:hidden space-y-2 p-3">
             {orders.map((o: any) => {
               const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+              const tracking = getTrackingDisplay(o);
               return (
-                <Card key={o.id} data-testid={`card-order-${o.id}`}>
+                <Card key={o.id} data-testid={`card-order-${o.id}`} className={tracking.isUploaded ? "border-blue-300 dark:border-blue-700" : ""}>
                   <CardContent className="p-3 space-y-1">
                     <div className="flex justify-between items-start gap-2">
                       <span className="font-mono text-xs text-muted-foreground">{o.customOrderNumber}</span>
@@ -187,13 +317,37 @@ export default function PartnerOrders() {
                     <div className="text-xs">수령자: {o.recipientName} {formatPhone(o.recipientMobile)}</div>
                     <div className="text-xs text-muted-foreground">{o.recipientAddress}</div>
                     {cleanDeliveryMessage(o.deliveryMessage) && <div className="text-xs text-muted-foreground">배송메시지: {cleanDeliveryMessage(o.deliveryMessage)}</div>}
-                    {o.trackingNumber && <div className="text-xs">운송장: {o.courierCompany} {o.trackingNumber}</div>}
+                    {(tracking.trackingNumber) && (
+                      <div className={`text-xs ${tracking.isUploaded ? "text-blue-600 dark:text-blue-400 font-semibold" : ""}`}>
+                        운송장: {tracking.courierCompany} {tracking.trackingNumber}
+                        {tracking.isUploaded && " (업로드됨)"}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         </>
+      )}
+
+      {uploadedTracking.size > 0 && (
+        <div className="flex justify-center py-4">
+          <Button
+            size="lg"
+            onClick={handleRegisterTracking}
+            disabled={isRegistering}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+            data-testid="button-register-tracking"
+          >
+            {isRegistering ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            )}
+            운송장 등록 ({uploadedTracking.size}건)
+          </Button>
+        </div>
       )}
 
       {totalPages > 1 && (

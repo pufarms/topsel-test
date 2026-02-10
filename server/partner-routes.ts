@@ -246,7 +246,7 @@ router.get("/allocations", partnerAuth, async (req: Request, res: Response) => {
 router.put("/allocations/:id/respond", partnerAuth, async (req: Request, res: Response) => {
   try {
     const vendorId = req.partner!.vendorId;
-    const detailId = parseInt(req.params.id);
+    const detailId = parseInt(req.params.id as string);
     const { availableQuantity, memo } = req.body;
 
     if (availableQuantity === undefined || availableQuantity === null) {
@@ -413,7 +413,7 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
       "배송메시지": (o.deliveryMessage || "").replace(/\[주소확인필요:[^\]]*\]/g, "").trim(),
       "상품코드": o.productCode || "",
       "상품명": o.productName || "",
-      "수량": o.quantity || 1,
+      "수량": (o as any).quantity || 1,
       "주문번호": o.customOrderNumber || "",
       "운송장번호": o.trackingNumber || "",
       "택배사": o.courierCompany || "",
@@ -440,14 +440,14 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
 router.put("/orders/:id/tracking", partnerAuth, async (req: Request, res: Response) => {
   try {
     const vendorId = req.partner!.vendorId;
-    const orderId = req.params.id;
+    const orderId = req.params.id as string;
     const { trackingNumber, courierCompany } = req.body;
 
     if (!trackingNumber || !courierCompany) {
       return res.status(400).json({ message: "택배사와 운송장 번호를 입력해 주세요" });
     }
 
-    const [order] = await db.select().from(pendingOrders).where(eq(pendingOrders.id, orderId)).limit(1);
+    const [order] = await db.select().from(pendingOrders).where(sql`${pendingOrders.id} = ${orderId}`).limit(1);
     if (!order) return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
     if (order.vendorId !== vendorId) return res.status(403).json({ message: "권한이 없습니다" });
 
@@ -457,7 +457,7 @@ router.put("/orders/:id/tracking", partnerAuth, async (req: Request, res: Respon
         courierCompany,
         updatedAt: new Date(),
       })
-      .where(eq(pendingOrders.id, orderId));
+      .where(sql`${pendingOrders.id} = ${orderId}`);
 
     sseManager.sendToAdmins("pending-orders-updated", { type: "tracking-registered" });
     if (order.memberId) {
@@ -530,6 +530,56 @@ router.post("/orders/tracking/bulk", partnerAuth, async (req: Request, res: Resp
   }
 });
 
+router.post("/orders/tracking/bulk-register", partnerAuth, async (req: Request, res: Response) => {
+  try {
+    const vendorId = req.partner!.vendorId;
+    const { trackingData } = req.body;
+
+    if (!Array.isArray(trackingData) || trackingData.length === 0) {
+      return res.status(400).json({ message: "등록할 운송장 데이터가 없습니다" });
+    }
+
+    const results = { success: 0, failed: 0, failedList: [] as { customOrderNumber: string; reason: string }[] };
+
+    for (const item of trackingData) {
+      const { customOrderNumber, courierCompany, trackingNumber } = item;
+
+      if (!customOrderNumber || !courierCompany || !trackingNumber) {
+        results.failed++;
+        results.failedList.push({ customOrderNumber: customOrderNumber || "", reason: "필수 항목 누락" });
+        continue;
+      }
+
+      const [order] = await db.select().from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.customOrderNumber, String(customOrderNumber)),
+          eq(pendingOrders.vendorId, vendorId),
+        ))
+        .limit(1);
+
+      if (!order) {
+        results.failed++;
+        results.failedList.push({ customOrderNumber, reason: "주문번호 불일치" });
+        continue;
+      }
+
+      await db.update(pendingOrders)
+        .set({ trackingNumber: String(trackingNumber), courierCompany: String(courierCompany), updatedAt: new Date() })
+        .where(eq(pendingOrders.id, order.id));
+      results.success++;
+    }
+
+    if (results.success > 0) {
+      sseManager.sendToAdmins("pending-orders-updated", { type: "bulk-tracking-registered", count: results.success });
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    console.error("Bulk tracking register error:", error);
+    res.status(500).json({ message: "운송장 일괄 등록 실패" });
+  }
+});
+
 router.get("/orders/tracking/template", partnerAuth, async (req: Request, res: Response) => {
   try {
     const XLSX = await import("xlsx");
@@ -537,6 +587,7 @@ router.get("/orders/tracking/template", partnerAuth, async (req: Request, res: R
 
     const unregistered = await db.select({
       id: pendingOrders.id,
+      customOrderNumber: pendingOrders.customOrderNumber,
       recipientName: pendingOrders.recipientName,
       productName: pendingOrders.productName,
     })
