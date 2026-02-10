@@ -82,7 +82,7 @@ export default function PartnerOrders() {
             <div className="space-y-1 flex-1 min-w-[120px]">
               <label className="text-xs text-muted-foreground">검색</label>
               <div className="flex gap-1">
-                <Input placeholder="상품명/수취인명" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="input-search" />
+                <Input placeholder="상품명/수취인명/주문번호" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="input-search" />
               </div>
             </div>
             <Button size="sm" variant="outline" onClick={handleDownload} data-testid="button-download">
@@ -113,31 +113,47 @@ export default function PartnerOrders() {
           <CardContent className="p-0">
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="border-b bg-muted/30">
-                    <th className="text-left py-2 px-3">주문번호</th>
-                    <th className="text-left py-2 px-3">수취인</th>
-                    <th className="text-left py-2 px-3">연락처</th>
-                    <th className="text-left py-2 px-3">주소</th>
-                    <th className="text-left py-2 px-3">상품명</th>
-                    <th className="text-right py-2 px-3">수량</th>
-                    <th className="text-center py-2 px-3">상태</th>
-                    <th className="text-left py-2 px-3">주문일</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">주문번호</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">주문자명</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">주문자 전화번호</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">주문자 주소</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">수령자명</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">수령자 휴대폰번호</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">수령자 전화번호</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">수령자 주소</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">배송메시지</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">상품코드</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">상품명</th>
+                    <th className="text-right py-2 px-2 whitespace-nowrap">수량</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">운송장번호</th>
+                    <th className="text-left py-2 px-2 whitespace-nowrap">택배사</th>
+                    <th className="text-center py-2 px-2 whitespace-nowrap">상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((o: any) => {
                     const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                    const fullAddress = [o.address, o.addressDetail].filter(Boolean).join(" ");
+                    const ordererFullAddress = o.ordererAddress || "";
                     return (
                       <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
-                        <td className="py-2 px-3 font-mono text-xs">{o.id}</td>
-                        <td className="py-2 px-3">{o.recipientName}</td>
-                        <td className="py-2 px-3 text-xs">{o.recipientPhone}</td>
-                        <td className="py-2 px-3 text-xs max-w-[200px] truncate">{o.address} {o.addressDetail}</td>
-                        <td className="py-2 px-3">{o.productName}</td>
-                        <td className="py-2 px-3 text-right">{o.quantity || 1}</td>
-                        <td className="py-2 px-3 text-center"><Badge variant={sb.variant}>{sb.label}</Badge></td>
-                        <td className="py-2 px-3 text-xs">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ko-KR") : ""}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.id}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererPhone || ""}</td>
+                        <td className="py-2 px-2 text-xs max-w-[150px] truncate" title={ordererFullAddress}>{ordererFullAddress}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">{o.recipientName || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientPhone || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientPhone2 || ""}</td>
+                        <td className="py-2 px-2 text-xs max-w-[180px] truncate" title={fullAddress}>{fullAddress}</td>
+                        <td className="py-2 px-2 text-xs max-w-[120px] truncate" title={o.deliveryMessage || ""}>{o.deliveryMessage || ""}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
+                        <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
+                        <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
+                        <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
                       </tr>
                     );
                   })}
@@ -147,16 +163,21 @@ export default function PartnerOrders() {
             <div className="md:hidden space-y-2 p-3">
               {orders.map((o: any) => {
                 const sb = statusBadge[o.status] || { label: o.status, variant: "secondary" as const };
+                const fullAddress = [o.address, o.addressDetail].filter(Boolean).join(" ");
                 return (
                   <Card key={o.id} data-testid={`card-order-${o.id}`}>
                     <CardContent className="p-3 space-y-1">
-                      <div className="flex justify-between items-start">
+                      <div className="flex justify-between items-start gap-2">
                         <span className="font-mono text-xs text-muted-foreground">{o.id}</span>
                         <Badge variant={sb.variant}>{sb.label}</Badge>
                       </div>
                       <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>
-                      <div className="text-xs">{o.recipientName} | {o.recipientPhone}</div>
-                      <div className="text-xs text-muted-foreground">{o.address} {o.addressDetail}</div>
+                      <div className="text-xs text-muted-foreground">{o.productCode}</div>
+                      <div className="text-xs">주문자: {o.ordererName} {o.ordererPhone}</div>
+                      <div className="text-xs">수령자: {o.recipientName} {o.recipientPhone}</div>
+                      <div className="text-xs text-muted-foreground">{fullAddress}</div>
+                      {o.deliveryMessage && <div className="text-xs text-muted-foreground">배송메시지: {o.deliveryMessage}</div>}
+                      {o.trackingNumber && <div className="text-xs">운송장: {o.courierCompany} {o.trackingNumber}</div>}
                     </CardContent>
                   </Card>
                 );

@@ -403,17 +403,20 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
       .orderBy(desc(pendingOrders.createdAt));
 
     const data = orders.map(o => ({
-      "주문번호": o.id,
       "주문자명": o.ordererName || "",
-      "수취인명": o.recipientName || "",
-      "수취인 연락처": o.recipientPhone || "",
-      "우편번호": o.postalCode || "",
-      "기본주소": o.address || "",
-      "상세주소": o.addressDetail || "",
+      "주문자 전화번호": o.ordererPhone || "",
+      "주문자 주소": o.ordererAddress || "",
+      "수령자명": o.recipientName || "",
+      "수령자휴대폰번호": o.recipientPhone || "",
+      "수령자 전화번호": o.recipientPhone2 || "",
+      "수령자 주소": [o.address, o.addressDetail].filter(Boolean).join(" "),
+      "배송메시지": o.deliveryMessage || "",
+      "상품코드": o.productCode || "",
       "상품명": o.productName || "",
       "수량": o.quantity || 1,
-      "주문일": o.createdAt ? new Date(o.createdAt).toLocaleDateString("ko-KR") : "",
-      "메모": o.memo || "",
+      "주문번호": o.id,
+      "운송장번호": o.trackingNumber || "",
+      "택배사": o.courierCompany || "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
