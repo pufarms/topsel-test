@@ -410,7 +410,7 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
       "수령자휴대폰번호": o.recipientMobile || "",
       "수령자 전화번호": o.recipientPhone || "",
       "수령자 주소": o.recipientAddress || "",
-      "배송메시지": o.deliveryMessage || "",
+      "배송메시지": (o.deliveryMessage || "").replace(/\[주소확인필요:[^\]]*\]/g, "").trim(),
       "상품코드": o.productCode || "",
       "상품명": o.productName || "",
       "수량": o.quantity || 1,

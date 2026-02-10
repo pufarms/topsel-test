@@ -14,6 +14,11 @@ interface OrdersResponse {
   statusCounts: Record<string, number>;
 }
 
+function cleanDeliveryMessage(msg: string | null | undefined): string {
+  if (!msg) return "";
+  return msg.replace(/\[주소확인필요:[^\]]*\]/g, "").trim();
+}
+
 function formatPhone(phone: string | null | undefined): string {
   if (!phone) return "";
   const cleaned = phone.replace(/[^0-9-]/g, "");
@@ -152,7 +157,7 @@ export default function PartnerOrders() {
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientMobile)}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientPhone)}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientAddress || ""}</td>
-                          <td className="py-2 px-2 text-xs whitespace-nowrap">{o.deliveryMessage || ""}</td>
+                          <td className="py-2 px-2 text-xs whitespace-nowrap">{cleanDeliveryMessage(o.deliveryMessage)}</td>
                           <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                           <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                           <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
@@ -181,7 +186,7 @@ export default function PartnerOrders() {
                     <div className="text-xs">주문자: {o.ordererName} {formatPhone(o.ordererPhone)}</div>
                     <div className="text-xs">수령자: {o.recipientName} {formatPhone(o.recipientMobile)}</div>
                     <div className="text-xs text-muted-foreground">{o.recipientAddress}</div>
-                    {o.deliveryMessage && <div className="text-xs text-muted-foreground">배송메시지: {o.deliveryMessage}</div>}
+                    {cleanDeliveryMessage(o.deliveryMessage) && <div className="text-xs text-muted-foreground">배송메시지: {cleanDeliveryMessage(o.deliveryMessage)}</div>}
                     {o.trackingNumber && <div className="text-xs">운송장: {o.courierCompany} {o.trackingNumber}</div>}
                   </CardContent>
                 </Card>
