@@ -331,24 +331,22 @@ export default function PartnerOrders() {
         </>
       )}
 
-      {uploadedTracking.size > 0 && (
-        <div className="flex justify-center py-4">
-          <Button
-            size="lg"
-            onClick={handleRegisterTracking}
-            disabled={isRegistering}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-            data-testid="button-register-tracking"
-          >
-            {isRegistering ? (
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            ) : (
-              <CheckCircle className="h-5 w-5 mr-2" />
-            )}
-            운송장 등록 ({uploadedTracking.size}건)
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-center py-4">
+        <Button
+          size="lg"
+          onClick={handleRegisterTracking}
+          disabled={isRegistering || uploadedTracking.size === 0}
+          className="bg-blue-600 text-white px-8"
+          data-testid="button-register-tracking"
+        >
+          {isRegistering ? (
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+          ) : (
+            <CheckCircle className="h-5 w-5 mr-2" />
+          )}
+          운송장 등록{uploadedTracking.size > 0 ? ` (${uploadedTracking.size}건)` : ""}
+        </Button>
+      </div>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
