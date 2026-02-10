@@ -9513,10 +9513,22 @@ export async function registerRoutes(
         await db.update(pendingOrders)
           .set({ 
             status: "주문조정",
+            fulfillmentType: "vendor",
             updatedAt: new Date()
           })
           .where(eq(pendingOrders.id, order.id));
         cancelledOrderIds.push(order.id);
+      }
+
+      // 유지 주문도 외주 상품이므로 fulfillmentType을 vendor로 설정
+      const ordersToKeep = ordersForDistribution.filter(o => o.keepOrder);
+      for (const order of ordersToKeep) {
+        await db.update(pendingOrders)
+          .set({ 
+            fulfillmentType: "vendor",
+            updatedAt: new Date()
+          })
+          .where(eq(pendingOrders.id, order.id));
       }
 
       // 배분 확정 수량을 실제 유지 수량으로 갱신
@@ -9767,15 +9779,45 @@ export async function registerRoutes(
         });
       }
 
-      // 주문 상태 업데이트
+      // 외주 상품 코드 조회 (product_vendors에 등록된 상품)
+      const uniqueProductCodes = Array.from(new Set(ordersToTransfer.map(o => o.productCode).filter(Boolean))) as string[];
+      let vendorProductCodes: string[] = [];
+      if (uniqueProductCodes.length > 0) {
+        const vendorProducts = await db.select({ productCode: productVendors.productCode })
+          .from(productVendors)
+          .where(and(
+            inArray(productVendors.productCode, uniqueProductCodes),
+            eq(productVendors.isActive, true)
+          ));
+        vendorProductCodes = vendorProducts.map(vp => vp.productCode);
+      }
+
+      // 자체 주문과 외주 주문 분리
+      const selfOrderIds = ordersToTransfer.filter(o => !vendorProductCodes.includes(o.productCode || '')).map(o => o.id);
+      const vendorOrderIds = ordersToTransfer.filter(o => vendorProductCodes.includes(o.productCode || '')).map(o => o.id);
+
+      // 자체 주문 상태 업데이트
+      if (selfOrderIds.length > 0) {
+        await db.update(pendingOrders)
+          .set({ 
+            status: "상품준비중",
+            updatedAt: new Date()
+          })
+          .where(inArray(pendingOrders.id, selfOrderIds));
+      }
+
+      // 외주 주문 상태 업데이트 (fulfillmentType = vendor)
+      if (vendorOrderIds.length > 0) {
+        await db.update(pendingOrders)
+          .set({ 
+            status: "상품준비중",
+            fulfillmentType: "vendor",
+            updatedAt: new Date()
+          })
+          .where(inArray(pendingOrders.id, vendorOrderIds));
+      }
+
       const orderIds = ordersToTransfer.map(o => o.id);
-      
-      await db.update(pendingOrders)
-        .set({ 
-          status: "상품준비중",
-          updatedAt: new Date()
-        })
-        .where(inArray(pendingOrders.id, orderIds));
 
       // 원재료 재고 차감 로직
       // 1. 상품코드별 주문 수량 계산
