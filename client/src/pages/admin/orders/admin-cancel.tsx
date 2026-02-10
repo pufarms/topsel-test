@@ -651,7 +651,7 @@ export default function OrdersAdminCancelPage() {
               <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   {isStockOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                  <CardTitle className="text-lg">주문조정(직권취소)</CardTitle>
+                  <CardTitle className="text-lg">주문조정(직권취소) 등록</CardTitle>
                 </div>
             <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1 border rounded-md p-0.5" data-testid="stock-filter-group">
