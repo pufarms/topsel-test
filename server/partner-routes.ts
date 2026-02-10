@@ -146,7 +146,7 @@ router.get("/dashboard", partnerAuth, async (req: Request, res: Response) => {
       .from(pendingOrders)
       .where(and(
         eq(pendingOrders.vendorId, vendorId),
-        inArray(pendingOrders.status, ["대기", "상품준비중"]),
+        eq(pendingOrders.status, "상품준비중"),
         isNull(pendingOrders.trackingNumber)
       ));
 
@@ -305,7 +305,12 @@ router.get("/orders", partnerAuth, async (req: Request, res: Response) => {
     const vendorId = req.partner!.vendorId;
     const { startDate, endDate, status, search, page = "1", limit = "50" } = req.query;
 
-    const conditions = [eq(pendingOrders.vendorId, vendorId)];
+    const VENDOR_VISIBLE_STATUSES = ["상품준비중", "배송준비중", "배송중"];
+
+    const conditions = [
+      eq(pendingOrders.vendorId, vendorId),
+      inArray(pendingOrders.status, VENDOR_VISIBLE_STATUSES),
+    ];
 
     if (startDate) {
       const start = new Date(startDate as string);
@@ -317,7 +322,7 @@ router.get("/orders", partnerAuth, async (req: Request, res: Response) => {
       end.setHours(23, 59, 59, 999);
       conditions.push(lte(pendingOrders.createdAt, end));
     }
-    if (status && status !== "all") {
+    if (status && status !== "all" && VENDOR_VISIBLE_STATUSES.includes(status as string)) {
       conditions.push(eq(pendingOrders.status, status as string));
     }
     if (search) {
@@ -349,7 +354,10 @@ router.get("/orders", partnerAuth, async (req: Request, res: Response) => {
       count: sql<number>`count(*)::int`,
     })
       .from(pendingOrders)
-      .where(eq(pendingOrders.vendorId, vendorId))
+      .where(and(
+        eq(pendingOrders.vendorId, vendorId),
+        inArray(pendingOrders.status, VENDOR_VISIBLE_STATUSES)
+      ))
       .groupBy(pendingOrders.status);
 
     res.json({
@@ -370,7 +378,11 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
     const vendorId = req.partner!.vendorId;
     const { startDate, endDate, status } = req.query;
 
-    const conditions = [eq(pendingOrders.vendorId, vendorId)];
+    const VENDOR_VISIBLE_STATUSES = ["상품준비중", "배송준비중", "배송중"];
+    const conditions = [
+      eq(pendingOrders.vendorId, vendorId),
+      inArray(pendingOrders.status, VENDOR_VISIBLE_STATUSES),
+    ];
     if (startDate) {
       const start = new Date(startDate as string);
       start.setHours(0, 0, 0, 0);
@@ -381,7 +393,7 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
       end.setHours(23, 59, 59, 999);
       conditions.push(lte(pendingOrders.createdAt, end));
     }
-    if (status && status !== "all") {
+    if (status && status !== "all" && VENDOR_VISIBLE_STATUSES.includes(status as string)) {
       conditions.push(eq(pendingOrders.status, status as string));
     }
 
@@ -531,8 +543,7 @@ router.get("/orders/tracking/template", partnerAuth, async (req: Request, res: R
         isNull(pendingOrders.trackingNumber),
         or(
           eq(pendingOrders.status, "상품준비중"),
-          eq(pendingOrders.status, "배송준비중"),
-          eq(pendingOrders.status, "대기")
+          eq(pendingOrders.status, "배송준비중")
         )
       ))
       .orderBy(pendingOrders.createdAt);

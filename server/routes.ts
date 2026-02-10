@@ -9530,7 +9530,6 @@ export async function registerRoutes(
           .set({ 
             status: "주문조정",
             fulfillmentType: "vendor",
-            vendorId: primaryVendorId,
             updatedAt: new Date()
           })
           .where(eq(pendingOrders.id, order.id));

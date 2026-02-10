@@ -15,11 +15,9 @@ interface OrdersResponse {
 }
 
 const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  "대기": { label: "신규배정", variant: "default" },
   "상품준비중": { label: "상품준비중", variant: "outline" },
   "배송준비중": { label: "배송준비중", variant: "secondary" },
   "배송중": { label: "배송중", variant: "default" },
-  "배송완료": { label: "배송완료", variant: "default" },
 };
 
 export default function PartnerOrders() {
@@ -76,7 +74,6 @@ export default function PartnerOrders() {
                 data-testid="select-status"
               >
                 <option value="all">전체</option>
-                <option value="대기">신규배정</option>
                 <option value="상품준비중">상품준비중</option>
                 <option value="배송준비중">배송준비중</option>
                 <option value="배송중">배송중</option>
