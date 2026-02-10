@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "./db";
-import { vendors, allocationDetails, orderAllocations, pendingOrders } from "@shared/schema";
+import { vendors, allocationDetails, orderAllocations, pendingOrders, productVendors } from "@shared/schema";
 import { eq, and, desc, asc, gte, lte, or, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import { sseManager } from "./sse-manager";
 
@@ -461,11 +461,24 @@ router.put("/orders/:id/tracking", partnerAuth, async (req: Request, res: Respon
     if (!order) return res.status(404).json({ message: "주문을 찾을 수 없습니다" });
     if (order.vendorId !== vendorId) return res.status(403).json({ message: "권한이 없습니다" });
 
+    let capturedVendorPrice = order.vendorPrice;
+    if (!capturedVendorPrice && order.productCode) {
+      const [pv] = await db.select().from(productVendors)
+        .where(and(
+          eq(productVendors.productCode, order.productCode),
+          eq(productVendors.vendorId, vendorId),
+        ))
+        .limit(1);
+      if (pv) capturedVendorPrice = pv.vendorPrice;
+    }
+
     await db.update(pendingOrders)
       .set({
         trackingNumber,
         courierCompany,
         status: "배송준비중",
+        vendorPrice: capturedVendorPrice,
+        trackingRegisteredAt: new Date(),
         updatedAt: new Date(),
       })
       .where(sql`${pendingOrders.id} = ${orderId}`);
@@ -574,11 +587,24 @@ router.post("/orders/tracking/bulk-register", partnerAuth, async (req: Request, 
         continue;
       }
 
+      let capturedVendorPrice = order.vendorPrice;
+      if (!capturedVendorPrice && order.productCode) {
+        const [pv] = await db.select().from(productVendors)
+          .where(and(
+            eq(productVendors.productCode, order.productCode),
+            eq(productVendors.vendorId, vendorId),
+          ))
+          .limit(1);
+        if (pv) capturedVendorPrice = pv.vendorPrice;
+      }
+
       await db.update(pendingOrders)
         .set({
           trackingNumber: String(trackingNumber),
           courierCompany: String(courierCompany),
           status: "배송준비중",
+          vendorPrice: capturedVendorPrice,
+          trackingRegisteredAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(pendingOrders.id, order.id));
@@ -748,6 +774,69 @@ router.get("/delivery/summary", partnerAuth, async (req: Request, res: Response)
     });
   } catch (error: any) {
     res.status(500).json({ message: "배송 통계 조회 실패" });
+  }
+});
+
+router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
+  try {
+    const vendorId = req.partner!.vendorId;
+    const { startDate, endDate } = req.query;
+
+    const conditions = [
+      eq(pendingOrders.vendorId, vendorId),
+      isNotNull(pendingOrders.trackingNumber),
+      isNotNull(pendingOrders.trackingRegisteredAt),
+    ];
+
+    if (startDate) {
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      conditions.push(gte(pendingOrders.trackingRegisteredAt, start));
+    }
+    if (endDate) {
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(pendingOrders.trackingRegisteredAt, end));
+    }
+
+    const rows = await db.select({
+      trackingDate: sql<string>`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+      productName: pendingOrders.productName,
+      productCode: pendingOrders.productCode,
+      vendorPrice: pendingOrders.vendorPrice,
+      quantity: sql<number>`COUNT(*)::int`,
+    })
+      .from(pendingOrders)
+      .where(and(...conditions))
+      .groupBy(
+        sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+        pendingOrders.productName,
+        pendingOrders.productCode,
+        pendingOrders.vendorPrice,
+      )
+      .orderBy(
+        sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') ASC`,
+        sql`${pendingOrders.productName} ASC`,
+      );
+
+    const settlementRows = rows.map((row) => ({
+      date: row.trackingDate,
+      productName: row.productName,
+      productCode: row.productCode,
+      quantity: row.quantity,
+      unitPrice: row.vendorPrice || 0,
+      subtotal: (row.vendorPrice || 0) * row.quantity,
+    }));
+
+    const totalAmount = settlementRows.reduce((sum, r) => sum + r.subtotal, 0);
+
+    res.json({
+      items: settlementRows,
+      totalAmount,
+    });
+  } catch (error: any) {
+    console.error("Settlement query error:", error);
+    res.status(500).json({ message: "정산 현황 조회 실패" });
   }
 });
 

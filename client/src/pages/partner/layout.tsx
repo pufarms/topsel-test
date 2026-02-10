@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import { usePartnerAuth } from "@/lib/partner-auth";
 import { usePartnerSSE } from "@/hooks/use-partner-sse";
 import { Button } from "@/components/ui/button";
-import { Loader2, LayoutDashboard, MessageSquareReply, ClipboardList, ScanBarcode, Truck, LogOut, Menu, X, Building2 } from "lucide-react";
+import { Loader2, LayoutDashboard, MessageSquareReply, ClipboardList, ScanBarcode, Calculator, LogOut, Menu, X, Building2 } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -10,7 +10,7 @@ const navItems = [
   { title: "예상수량 응답", path: "/partner/allocations", icon: MessageSquareReply },
   { title: "주문 현황", path: "/partner/orders", icon: ClipboardList },
   { title: "운송장 등록 리스트", path: "/partner/tracking", icon: ScanBarcode },
-  { title: "배송 현황", path: "/partner/delivery", icon: Truck },
+  { title: "정산현황", path: "/partner/delivery", icon: Calculator },
 ];
 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {

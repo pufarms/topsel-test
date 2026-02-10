@@ -1287,6 +1287,7 @@ export const pendingOrders = pgTable("pending_orders", {
   vendorId: integer("vendor_id"),
   fulfillmentType: varchar("fulfillment_type", { length: 10 }).default("self"),
   vendorPrice: integer("vendor_price"),
+  trackingRegisteredAt: timestamp("tracking_registered_at"),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
