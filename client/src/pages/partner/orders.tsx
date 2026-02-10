@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, Download, Upload, Search, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -52,6 +56,7 @@ export default function PartnerOrders() {
   const [uploadedTracking, setUploadedTracking] = useState<Map<string, TrackingEntry>>(new Map());
   const [isUploading, setIsUploading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; totalCount: number; registerCount: number; skipCount: number }>({ open: false, totalCount: 0, registerCount: 0, skipCount: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -120,15 +125,35 @@ export default function PartnerOrders() {
     }
   };
 
-  const handleRegisterTracking = async () => {
+  const handleRegisterClick = () => {
     if (uploadedTracking.size === 0) {
       toast({ title: "등록할 운송장이 없습니다", description: "먼저 운송장 파일을 업로드해 주세요", variant: "destructive" });
       return;
     }
 
+    const allEntries = Array.from(uploadedTracking.values());
+    const withTracking = allEntries.filter(e => e.trackingNumber && e.courierCompany);
+    const withoutTracking = allEntries.length - withTracking.length;
+
+    setConfirmDialog({
+      open: true,
+      totalCount: allEntries.length,
+      registerCount: withTracking.length,
+      skipCount: withoutTracking,
+    });
+  };
+
+  const handleRegisterConfirm = async () => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
     setIsRegistering(true);
     try {
-      const trackingData = Array.from(uploadedTracking.values());
+      const trackingData = Array.from(uploadedTracking.values()).filter(e => e.trackingNumber && e.courierCompany);
+
+      if (trackingData.length === 0) {
+        toast({ title: "등록할 운송장이 없습니다", description: "운송장번호와 택배사가 입력된 건이 없습니다", variant: "destructive" });
+        return;
+      }
+
       const res = await fetch("/api/partner/orders/tracking/bulk-register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -334,7 +359,7 @@ export default function PartnerOrders() {
       <div className="flex justify-center py-4">
         <Button
           size="lg"
-          onClick={handleRegisterTracking}
+          onClick={handleRegisterClick}
           disabled={isRegistering || uploadedTracking.size === 0}
           className="bg-blue-600 text-white px-8"
           data-testid="button-register-tracking"
@@ -347,6 +372,33 @@ export default function PartnerOrders() {
           운송장 등록{uploadedTracking.size > 0 ? ` (${uploadedTracking.size}건)` : ""}
         </Button>
       </div>
+
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>운송장 등록 확인</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-muted-foreground">총 수량</span>
+                  <span className="font-medium text-right">{confirmDialog.totalCount}건</span>
+                  <span className="text-muted-foreground">등록건</span>
+                  <span className="font-medium text-right text-blue-600">{confirmDialog.registerCount}건</span>
+                  <span className="text-muted-foreground">미등록건</span>
+                  <span className="font-medium text-right text-red-500">{confirmDialog.skipCount}건</span>
+                </div>
+                {confirmDialog.skipCount > 0 && (
+                  <p className="text-xs text-muted-foreground">운송장번호 또는 택배사가 없는 {confirmDialog.skipCount}건은 제외됩니다.</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-register">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRegisterConfirm} data-testid="button-confirm-register">확인</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
