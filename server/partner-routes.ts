@@ -303,7 +303,7 @@ router.put("/allocations/:id/respond", partnerAuth, async (req: Request, res: Re
 router.get("/orders", partnerAuth, async (req: Request, res: Response) => {
   try {
     const vendorId = req.partner!.vendorId;
-    const { startDate, endDate, status, search, page = "1", limit = "50" } = req.query;
+    const { startDate, endDate, status, search, searchType, page = "1", limit = "50" } = req.query;
 
     const VENDOR_VISIBLE_STATUSES = ["상품준비중", "배송준비중", "배송중"];
 
@@ -327,11 +327,21 @@ router.get("/orders", partnerAuth, async (req: Request, res: Response) => {
     }
     if (search) {
       const s = `%${search}%`;
-      conditions.push(or(
-        sql`${pendingOrders.productName} ILIKE ${s}`,
-        sql`${pendingOrders.recipientName} ILIKE ${s}`,
-        sql`CAST(${pendingOrders.id} AS TEXT) ILIKE ${s}`
-      )!);
+      if (searchType === "productName") {
+        conditions.push(sql`${pendingOrders.productName} ILIKE ${s}`);
+      } else if (searchType === "recipientName") {
+        conditions.push(sql`${pendingOrders.recipientName} ILIKE ${s}`);
+      } else if (searchType === "trackingNumber") {
+        conditions.push(sql`${pendingOrders.trackingNumber} ILIKE ${s}`);
+      } else if (searchType === "orderNumber") {
+        conditions.push(sql`${pendingOrders.customOrderNumber} ILIKE ${s}`);
+      } else {
+        conditions.push(or(
+          sql`${pendingOrders.productName} ILIKE ${s}`,
+          sql`${pendingOrders.recipientName} ILIKE ${s}`,
+          sql`CAST(${pendingOrders.id} AS TEXT) ILIKE ${s}`
+        )!);
+      }
     }
 
     const pageNum = parseInt(page as string) || 1;
