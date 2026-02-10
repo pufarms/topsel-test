@@ -119,8 +119,8 @@ export default function PartnerOrders() {
         </Card>
       ) : (
         <>
-          <div className="hidden md:block border rounded-md overflow-x-auto">
-                <table className="w-full text-sm min-w-[1200px]">
+          <div className="hidden md:block border rounded-md overflow-x-auto" style={{ maxWidth: "100%" }}>
+                <table className="text-sm" style={{ minWidth: "1800px", width: "1800px" }}>
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b bg-muted/30">
                       <th className="text-left py-2 px-2 whitespace-nowrap">주문자명</th>
@@ -147,12 +147,12 @@ export default function PartnerOrders() {
                         <tr key={o.id} className="border-b" data-testid={`row-order-${o.id}`}>
                           <td className="py-2 px-2 whitespace-nowrap">{o.ordererName || ""}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.ordererPhone)}</td>
-                          <td className="py-2 px-2 text-xs max-w-[150px] truncate" title={o.ordererAddress || ""}>{o.ordererAddress || ""}</td>
+                          <td className="py-2 px-2 text-xs whitespace-nowrap">{o.ordererAddress || ""}</td>
                           <td className="py-2 px-2 whitespace-nowrap">{o.recipientName || ""}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientMobile)}</td>
                           <td className="py-2 px-2 text-xs whitespace-nowrap">{formatPhone(o.recipientPhone)}</td>
-                          <td className="py-2 px-2 text-xs max-w-[180px] truncate" title={o.recipientAddress || ""}>{o.recipientAddress || ""}</td>
-                          <td className="py-2 px-2 text-xs max-w-[120px] truncate" title={o.deliveryMessage || ""}>{o.deliveryMessage || ""}</td>
+                          <td className="py-2 px-2 text-xs whitespace-nowrap">{o.recipientAddress || ""}</td>
+                          <td className="py-2 px-2 text-xs whitespace-nowrap">{o.deliveryMessage || ""}</td>
                           <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                           <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                           <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
