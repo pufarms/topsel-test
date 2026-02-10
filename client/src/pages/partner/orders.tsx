@@ -159,7 +159,7 @@ export default function PartnerOrders() {
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.productCode || ""}</td>
                         <td className="py-2 px-2 whitespace-nowrap">{o.productName || ""}</td>
                         <td className="py-2 px-2 text-right whitespace-nowrap">{o.quantity || 1}</td>
-                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.orderNumber || ""}</td>
+                        <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.customOrderNumber || ""}</td>
                         <td className="py-2 px-2 font-mono text-xs whitespace-nowrap">{o.trackingNumber || ""}</td>
                         <td className="py-2 px-2 text-xs whitespace-nowrap">{o.courierCompany || ""}</td>
                         <td className="py-2 px-2 text-center whitespace-nowrap"><Badge variant={sb.variant}>{sb.label}</Badge></td>
@@ -177,7 +177,7 @@ export default function PartnerOrders() {
                   <Card key={o.id} data-testid={`card-order-${o.id}`}>
                     <CardContent className="p-3 space-y-1">
                       <div className="flex justify-between items-start gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{o.orderNumber}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{o.customOrderNumber}</span>
                         <Badge variant={sb.variant}>{sb.label}</Badge>
                       </div>
                       <div className="font-medium text-sm">{o.productName} x{o.quantity || 1}</div>

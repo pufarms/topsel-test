@@ -414,7 +414,7 @@ router.get("/orders/download", partnerAuth, async (req: Request, res: Response) 
       "상품코드": o.productCode || "",
       "상품명": o.productName || "",
       "수량": o.quantity || 1,
-      "주문번호": o.id,
+      "주문번호": o.customOrderNumber || "",
       "운송장번호": o.trackingNumber || "",
       "택배사": o.courierCompany || "",
     }));
@@ -552,7 +552,7 @@ router.get("/orders/tracking/template", partnerAuth, async (req: Request, res: R
       .orderBy(pendingOrders.createdAt);
 
     const data = unregistered.map(o => ({
-      "주문번호": o.id,
+      "주문번호": o.customOrderNumber || "",
       "수취인명": o.recipientName || "",
       "상품명": o.productName || "",
       "택배사": "",
