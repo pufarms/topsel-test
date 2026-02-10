@@ -9,7 +9,7 @@ const navItems = [
   { title: "대시보드", path: "/partner", icon: LayoutDashboard },
   { title: "예상수량 응답", path: "/partner/allocations", icon: MessageSquareReply },
   { title: "주문 현황", path: "/partner/orders", icon: ClipboardList },
-  { title: "운송장 등록", path: "/partner/tracking", icon: ScanBarcode },
+  { title: "운송장 등록 리스트", path: "/partner/tracking", icon: ScanBarcode },
   { title: "배송 현황", path: "/partner/delivery", icon: Truck },
 ];
 
