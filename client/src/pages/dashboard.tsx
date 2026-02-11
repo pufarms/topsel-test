@@ -800,7 +800,7 @@ export default function Dashboard() {
       />
       <SidebarItem
         icon={<Wallet className="h-4 w-4" />}
-        label="예치금충전"
+        label="정산 관리"
         tab="deposit"
         activeTab={activeTab}
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
