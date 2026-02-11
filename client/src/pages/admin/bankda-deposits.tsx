@@ -179,13 +179,21 @@ export default function BankdaDeposits() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/bankda/sync", { useDummy: true });
+      const res = await apiRequest("POST", "/api/admin/bankda/sync");
       return res.json();
     },
     onSuccess: (data) => {
+      if (data.success === false) {
+        toast({
+          title: data.rateLimited ? "조회 제한" : "동기화 실패",
+          description: data.error,
+          variant: data.rateLimited ? "default" : "destructive",
+        });
+        return;
+      }
       toast({
         title: "동기화 완료",
-        description: `처리: ${data.processed}건, 매칭: ${data.matched}건, 미매칭: ${data.unmatched}건`,
+        description: `처리: ${data.processed}건, 매칭: ${data.matched}건, 미매칭: ${data.unmatched}건, 건너뜀: ${data.skipped}건`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bankda/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bankda/transactions"] });
@@ -330,14 +338,14 @@ export default function BankdaDeposits() {
             <Button
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
-              data-testid="button-sync-dummy"
+              data-testid="button-sync-bankda"
             >
               {syncMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              더미 데이터로 동기화
+              지금 동기화
             </Button>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>

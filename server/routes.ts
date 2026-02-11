@@ -11553,95 +11553,59 @@ export async function registerRoutes(
   // 뱅크다 입금 자동충전 API
   // ========================================
 
-  async function generateDummyBankdaData() {
-    const now = new Date();
-    const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const timeStr = kstDate.toISOString().slice(11, 19).replace(/:/g, '');
-    const ts = Date.now().toString().slice(-6);
+  let lastBankdaSyncTime: number = 0;
+  const BANKDA_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
-    const realMembers = await db.select({ id: members.id, memberName: members.memberName, companyName: members.companyName })
-      .from(members)
-      .where(and(
-        inArray(members.grade, ['START', 'DRIVING', 'TOP']),
-        isNotNull(members.memberName),
-        sql`${members.memberName} != ''`
-      ));
-
-    const entries: any[] = [];
-    let idx = 0;
-
-    const makeBk = (name: string, amount: number) => {
-      const entry = {
-        bkcode: `DUMMY${dateStr}${ts}${String(idx).padStart(3, '0')}`,
-        accountnum: '3520000000001',
-        bkname: '농협',
-        bkdate: dateStr,
-        bktime: timeStr,
-        bkjukyo: name,
-        bkcontent: '타행이체',
-        bketc: '인터넷뱅킹',
-        bkinput: amount,
-        bkoutput: 0,
-        bkjango: 10000000 + amount,
-      };
-      idx++;
-      return entry;
-    };
-
-    if (realMembers.length > 0) {
-      const uniqueName = realMembers[0].memberName!;
-      entries.push(makeBk(uniqueName, 50000));
+  async function syncBankdaTransactions() {
+    if (process.env.BANKDA_ENABLED !== 'true' || !process.env.BANKDA_ACCESS_TOKEN) {
+      return { success: false, error: '뱅크다 API가 설정되지 않았습니다. 환경변수(BANKDA_ENABLED, BANKDA_ACCESS_TOKEN)를 확인해주세요.', processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
     }
 
-    const duplicateTestName = '테스트동명';
-    entries.push(makeBk(duplicateTestName, 30000));
-
-    entries.push(makeBk('존재하지않는사람', 20000));
-
-    const otherNames = ['김철수', '이영희', '박지민'];
-    for (let i = 0; i < 2; i++) {
-      entries.push(makeBk(otherNames[i % otherNames.length], (Math.floor(Math.random() * 30) + 1) * 10000));
+    const now = Date.now();
+    if (lastBankdaSyncTime > 0 && (now - lastBankdaSyncTime) < BANKDA_SYNC_INTERVAL_MS) {
+      const remainingSec = Math.ceil((BANKDA_SYNC_INTERVAL_MS - (now - lastBankdaSyncTime)) / 1000);
+      return { success: false, error: `API 조회 제한: ${remainingSec}초 후 다시 시도해주세요 (5분 간격 제한)`, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0, rateLimited: true, retryAfterSeconds: remainingSec };
     }
 
-    return entries;
-  }
-
-  async function syncBankdaTransactions(useDummy: boolean = false) {
     let bankEntries: any[] = [];
 
-    if (!useDummy && process.env.BANKDA_ENABLED === 'true' && process.env.BANKDA_ACCESS_TOKEN) {
-      try {
-        const now = new Date();
-        const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-        const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
+    try {
+      const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const dateStr = kstNow.toISOString().slice(0, 10).replace(/-/g, '');
 
-        const params = new URLSearchParams({
-          datefrom: dateStr,
-          dateto: dateStr,
-          datatype: 'json',
-          charset: 'utf8',
-        });
-        if (process.env.BANKDA_ACCOUNT_NUM) {
-          params.set('accountnum', process.env.BANKDA_ACCOUNT_NUM);
-        }
-
-        const response = await fetch(process.env.BANKDA_API_URL || 'https://a.bankda.com/dtsvc/bank_tr.php', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.BANKDA_ACCESS_TOKEN}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: params.toString(),
-        });
-        const data = await response.json();
-        bankEntries = data?.response?.bank || [];
-      } catch (err: any) {
-        console.error('뱅크다 API 호출 실패:', err.message);
-        return { success: false, error: err.message, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
+      const params = new URLSearchParams({
+        datefrom: dateStr,
+        dateto: dateStr,
+        datatype: 'json',
+        charset: 'utf8',
+      });
+      if (process.env.BANKDA_ACCOUNT_NUM) {
+        params.set('accountnum', process.env.BANKDA_ACCOUNT_NUM);
       }
-    } else {
-      bankEntries = await generateDummyBankdaData();
+
+      const apiUrl = process.env.BANKDA_API_URL || 'https://a.bankda.com/dtsvc/bank_tr.php';
+      console.log(`[뱅크다] API 호출: ${apiUrl}, 조회기간: ${dateStr}`);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.BANKDA_ACCESS_TOKEN}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[뱅크다] API 응답 수신, 거래건수: ${data?.response?.bank?.length || 0}`);
+      bankEntries = data?.response?.bank || [];
+      lastBankdaSyncTime = Date.now();
+    } catch (err: any) {
+      console.error('[뱅크다] API 호출 실패:', err.message);
+      return { success: false, error: `뱅크다 API 호출 실패: ${err.message}`, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
     }
 
     const depositEntries = bankEntries.filter((e: any) => parseInt(e.bkinput) > 0);
@@ -11872,8 +11836,7 @@ export async function registerRoutes(
     }
 
     try {
-      const useDummy = req.body?.useDummy === true || process.env.BANKDA_ENABLED !== 'true';
-      const result = await syncBankdaTransactions(useDummy);
+      const result = await syncBankdaTransactions();
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
