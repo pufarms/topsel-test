@@ -55,6 +55,16 @@ function formatDateShort(dateStr: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function parseDepositDescription(description: string | null, type: string): string {
+  if (!description) return "-";
+  const depositorMatch = description.match(/입금자:\s*([^,)]+)/);
+  const depositorName = depositorMatch ? depositorMatch[1].trim() : "";
+  if (description.includes("뱅크다")) {
+    return depositorName || "-";
+  }
+  return description;
+}
+
 const depositTypeLabels: Record<string, string> = {
   charge: "입금/예치금 충전",
   deduct: "정산 차감",
@@ -151,7 +161,7 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                         <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {isCredit ? `+${formatCurrency(record.amount)}` : `-${formatCurrency(record.amount)}`}
                         </td>
-                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{record.description || "-"}</td>
+                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{parseDepositDescription(record.description, record.type)}</td>
                         <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(record.balanceAfter)}</td>
                       </tr>
                     );
@@ -194,7 +204,7 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                         </span>
                       </div>
                       {record.description && (
-                        <div className="text-xs text-muted-foreground">{record.description}</div>
+                        <div className="text-xs text-muted-foreground">{parseDepositDescription(record.description, record.type)}</div>
                       )}
                     </CardContent>
                   </Card>
