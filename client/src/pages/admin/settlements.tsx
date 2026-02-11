@@ -31,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, Receipt, TrendingUp, DollarSign, Settings } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, Receipt, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import VendorManagementTab from "./accounting/vendor-management-tab";
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
@@ -104,6 +104,8 @@ const typeLabels: Record<string, string> = {
   manual: "수동정산",
 };
 
+const ITEMS_PER_PAGE = 30;
+
 function MemberSettlementTab() {
   const { toast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState("members");
@@ -112,48 +114,70 @@ function MemberSettlementTab() {
   const [actionAmount, setActionAmount] = useState("");
   const [actionDescription, setActionDescription] = useState("");
   const [memberFilter, setMemberFilter] = useState("");
+  const [memberGradeFilter, setMemberGradeFilter] = useState("all");
 
   const settlementDateRange = useDateRange("month");
   const depositDateRange = useDateRange("month");
   const pointerDateRange = useDateRange("month");
 
+  const [settlementMemberFilter, setSettlementMemberFilter] = useState("");
+  const [settlementTypeFilter, setSettlementTypeFilter] = useState("all");
+  const [settlementPage, setSettlementPage] = useState(1);
+
+  const [depositMemberFilter, setDepositMemberFilter] = useState("");
+  const [depositTypeFilter, setDepositTypeFilter] = useState("all");
+  const [depositPage, setDepositPage] = useState(1);
+
+  const [pointerMemberFilter, setPointerMemberFilter] = useState("");
+  const [pointerTypeFilter, setPointerTypeFilter] = useState("all");
+  const [pointerPage, setPointerPage] = useState(1);
+
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
   });
 
-  const { data: settlements } = useQuery<{ records: SettlementRecord[]; total: number }>({
-    queryKey: ["/api/admin/settlements", settlementDateRange.dateRange.startDate, settlementDateRange.dateRange.endDate],
+  const { data: settlements, isLoading: settlementsLoading } = useQuery<{ records: SettlementRecord[]; total: number; page: number; limit: number }>({
+    queryKey: ["/api/admin/settlements", settlementDateRange.dateRange.startDate, settlementDateRange.dateRange.endDate, settlementMemberFilter, settlementTypeFilter, settlementPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (settlementDateRange.dateRange.startDate) params.set("startDate", settlementDateRange.dateRange.startDate);
       if (settlementDateRange.dateRange.endDate) params.set("endDate", settlementDateRange.dateRange.endDate);
-      params.set("limit", "100");
+      if (settlementMemberFilter) params.set("memberId", settlementMemberFilter);
+      if (settlementTypeFilter !== "all") params.set("type", settlementTypeFilter);
+      params.set("page", String(settlementPage));
+      params.set("limit", String(ITEMS_PER_PAGE));
       const res = await fetch(`/api/admin/settlements?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
   });
 
-  const { data: depositRecords } = useQuery<{ records: DepositRecord[]; total: number }>({
-    queryKey: ["/api/admin/deposit-history", depositDateRange.dateRange.startDate, depositDateRange.dateRange.endDate],
+  const { data: depositRecords, isLoading: depositsLoading } = useQuery<{ records: DepositRecord[]; total: number; page: number; limit: number }>({
+    queryKey: ["/api/admin/deposit-history", depositDateRange.dateRange.startDate, depositDateRange.dateRange.endDate, depositMemberFilter, depositTypeFilter, depositPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (depositDateRange.dateRange.startDate) params.set("startDate", depositDateRange.dateRange.startDate);
       if (depositDateRange.dateRange.endDate) params.set("endDate", depositDateRange.dateRange.endDate);
-      params.set("limit", "100");
+      if (depositMemberFilter) params.set("memberId", depositMemberFilter);
+      if (depositTypeFilter !== "all") params.set("type", depositTypeFilter);
+      params.set("page", String(depositPage));
+      params.set("limit", String(ITEMS_PER_PAGE));
       const res = await fetch(`/api/admin/deposit-history?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
   });
 
-  const { data: pointerRecords } = useQuery<{ records: PointerRecord[]; total: number }>({
-    queryKey: ["/api/admin/pointer-history", pointerDateRange.dateRange.startDate, pointerDateRange.dateRange.endDate],
+  const { data: pointerRecords, isLoading: pointersLoading } = useQuery<{ records: PointerRecord[]; total: number; page: number; limit: number }>({
+    queryKey: ["/api/admin/pointer-history", pointerDateRange.dateRange.startDate, pointerDateRange.dateRange.endDate, pointerMemberFilter, pointerTypeFilter, pointerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (pointerDateRange.dateRange.startDate) params.set("startDate", pointerDateRange.dateRange.startDate);
       if (pointerDateRange.dateRange.endDate) params.set("endDate", pointerDateRange.dateRange.endDate);
-      params.set("limit", "100");
+      if (pointerMemberFilter) params.set("memberId", pointerMemberFilter);
+      if (pointerTypeFilter !== "all") params.set("type", pointerTypeFilter);
+      params.set("page", String(pointerPage));
+      params.set("limit", String(ITEMS_PER_PAGE));
       const res = await fetch(`/api/admin/pointer-history?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
@@ -231,10 +255,17 @@ function MemberSettlementTab() {
   };
 
   const filteredMembers = memberList.filter(m => {
+    if (memberGradeFilter !== "all" && m.grade !== memberGradeFilter) return false;
     if (!memberFilter) return true;
     const term = memberFilter.toLowerCase();
     return m.companyName.toLowerCase().includes(term) || m.username.toLowerCase().includes(term);
   });
+
+  const memberOptions = memberList.map(m => ({ id: m.id, label: `${m.companyName} (${m.username})` }));
+
+  const settlementTotalPages = Math.max(1, Math.ceil((settlements?.total || 0) / ITEMS_PER_PAGE));
+  const depositTotalPages = Math.max(1, Math.ceil((depositRecords?.total || 0) / ITEMS_PER_PAGE));
+  const pointerTotalPages = Math.max(1, Math.ceil((pointerRecords?.total || 0) / ITEMS_PER_PAGE));
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -260,7 +291,18 @@ function MemberSettlementTab() {
                   <Wallet className="h-5 w-5" />
                   회원별 잔액 현황
                 </CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={memberGradeFilter} onValueChange={setMemberGradeFilter}>
+                    <SelectTrigger className="w-[120px]" data-testid="select-member-grade">
+                      <SelectValue placeholder="등급" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 등급</SelectItem>
+                      <SelectItem value="START">스타트</SelectItem>
+                      <SelectItem value="DRIVING">드라이빙</SelectItem>
+                      <SelectItem value="TOP">탑</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -271,6 +313,7 @@ function MemberSettlementTab() {
                       data-testid="input-member-filter"
                     />
                   </div>
+                  <span className="text-sm text-muted-foreground">{filteredMembers.length}명</span>
                 </div>
               </div>
             </CardHeader>
@@ -340,55 +383,99 @@ function MemberSettlementTab() {
         <TabsContent value="settlements">
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ArrowUpDown className="h-5 w-5" />정산 이력
-                </CardTitle>
-                <DateRangeFilter onChange={settlementDateRange.setDateRange} defaultPreset="month" />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ArrowUpDown className="h-5 w-5" />정산 이력
+                  </CardTitle>
+                  <DateRangeFilter onChange={(range) => { settlementDateRange.setDateRange(range); setSettlementPage(1); }} defaultPreset="month" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={settlementMemberFilter || "all"} onValueChange={(v) => { setSettlementMemberFilter(v === "all" ? "" : v); setSettlementPage(1); }}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-settlement-member">
+                      <SelectValue placeholder="회원 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 회원</SelectItem>
+                      {memberOptions.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={settlementTypeFilter} onValueChange={(v) => { setSettlementTypeFilter(v); setSettlementPage(1); }}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-settlement-type">
+                      <SelectValue placeholder="유형" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 유형</SelectItem>
+                      <SelectItem value="auto">자동정산</SelectItem>
+                      <SelectItem value="manual">수동정산</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden">
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[1000px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>상호명</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">포인터 차감</TableHead>
-                      <TableHead className="text-right">예치금 차감</TableHead>
-                      <TableHead className="text-right">총액</TableHead>
-                      <TableHead className="text-right">포인터 잔액</TableHead>
-                      <TableHead className="text-right">예치금 잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!settlements?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 이력이 없습니다</TableCell>
-                      </TableRow>
-                    ) : (
-                      settlements.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="no-default-active-elevate">{typeLabels[record.settlementType] || record.settlementType}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{record.pointerAmount.toLocaleString()}P</TableCell>
-                          <TableCell className="text-right">{record.depositAmount.toLocaleString()}원</TableCell>
-                          <TableCell className="text-right font-medium">{record.totalAmount.toLocaleString()}원</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.pointerBalance.toLocaleString()}P</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.depositBalance.toLocaleString()}원</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{record.description || "-"}</TableCell>
+              {settlementsLoading ? (
+                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : (
+                <>
+                  <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                    <Table className="min-w-[1000px]">
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead>일시</TableHead>
+                          <TableHead>상호명</TableHead>
+                          <TableHead>유형</TableHead>
+                          <TableHead className="text-right">포인터 차감</TableHead>
+                          <TableHead className="text-right">예치금 차감</TableHead>
+                          <TableHead className="text-right">총액</TableHead>
+                          <TableHead className="text-right">포인터 잔액</TableHead>
+                          <TableHead className="text-right">예치금 잔액</TableHead>
+                          <TableHead>설명</TableHead>
                         </TableRow>
-                      ))
+                      </TableHeader>
+                      <TableBody>
+                        {!settlements?.records?.length ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 이력이 없습니다</TableCell>
+                          </TableRow>
+                        ) : (
+                          settlements.records.map((record) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="no-default-active-elevate">{typeLabels[record.settlementType] || record.settlementType}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{record.pointerAmount.toLocaleString()}P</TableCell>
+                              <TableCell className="text-right">{record.depositAmount.toLocaleString()}원</TableCell>
+                              <TableCell className="text-right font-medium">{record.totalAmount.toLocaleString()}원</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{record.pointerBalance.toLocaleString()}P</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{record.depositBalance.toLocaleString()}원</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{record.description || "-"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                    <p className="text-sm text-muted-foreground">총 {settlements?.total || 0}건</p>
+                    {settlementTotalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={settlementPage <= 1} onClick={() => setSettlementPage(p => p - 1)} data-testid="button-settlement-prev">
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm px-2">{settlementPage} / {settlementTotalPages}</span>
+                        <Button size="sm" variant="outline" disabled={settlementPage >= settlementTotalPages} onClick={() => setSettlementPage(p => p + 1)} data-testid="button-settlement-next">
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
-              {settlements && <p className="text-sm text-muted-foreground mt-2">총 {settlements.total}건</p>}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -396,63 +483,108 @@ function MemberSettlementTab() {
         <TabsContent value="deposits">
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />예치금 이력
-                </CardTitle>
-                <DateRangeFilter onChange={depositDateRange.setDateRange} defaultPreset="month" />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />예치금 이력
+                  </CardTitle>
+                  <DateRangeFilter onChange={(range) => { depositDateRange.setDateRange(range); setDepositPage(1); }} defaultPreset="month" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={depositMemberFilter || "all"} onValueChange={(v) => { setDepositMemberFilter(v === "all" ? "" : v); setDepositPage(1); }}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-deposit-member">
+                      <SelectValue placeholder="회원 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 회원</SelectItem>
+                      {memberOptions.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={depositTypeFilter} onValueChange={(v) => { setDepositTypeFilter(v); setDepositPage(1); }}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-deposit-type">
+                      <SelectValue placeholder="유형" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 유형</SelectItem>
+                      <SelectItem value="charge">충전</SelectItem>
+                      <SelectItem value="refund">환급</SelectItem>
+                      <SelectItem value="deduct">차감</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden space-y-3">
-              {depositRecords?.records?.length ? (
-                <div className="flex flex-wrap gap-4 items-center text-sm">
-                  <span className="text-muted-foreground">총 {depositRecords.total}건</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
-                  </span>
-                  <span className="font-semibold text-red-600 dark:text-red-400">
-                    차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
-                  </span>
-                </div>
-              ) : null}
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[900px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>상호명</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">금액</TableHead>
-                      <TableHead className="text-right">잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!depositRecords?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 예치금 이력이 없습니다</TableCell>
-                      </TableRow>
-                    ) : (
-                      depositRecords.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant={record.type === "charge" ? "default" : record.type === "deduct" ? "destructive" : "secondary"} className="no-default-active-elevate">
-                              {typeLabels[record.type] || record.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${record.type === "charge" ? "text-emerald-600" : record.type === "deduct" || record.type === "refund" ? "text-red-600" : ""}`}>
-                            {record.type === "charge" ? "+" : "-"}{record.amount.toLocaleString()}원
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}원</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
+              {depositsLoading ? (
+                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : (
+                <>
+                  {depositRecords?.records?.length ? (
+                    <div className="flex flex-wrap gap-4 items-center text-sm">
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                      </span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                    <Table className="min-w-[900px]">
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead>일시</TableHead>
+                          <TableHead>상호명</TableHead>
+                          <TableHead>유형</TableHead>
+                          <TableHead className="text-right">금액</TableHead>
+                          <TableHead className="text-right">잔액</TableHead>
+                          <TableHead>설명</TableHead>
                         </TableRow>
-                      ))
+                      </TableHeader>
+                      <TableBody>
+                        {!depositRecords?.records?.length ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 예치금 이력이 없습니다</TableCell>
+                          </TableRow>
+                        ) : (
+                          depositRecords.records.map((record) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant={record.type === "charge" ? "default" : record.type === "deduct" ? "destructive" : "secondary"} className="no-default-active-elevate">
+                                  {typeLabels[record.type] || record.type}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${record.type === "charge" ? "text-emerald-600" : record.type === "deduct" || record.type === "refund" ? "text-red-600" : ""}`}>
+                                {record.type === "charge" ? "+" : "-"}{record.amount.toLocaleString()}원
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}원</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                    <p className="text-sm text-muted-foreground">총 {depositRecords?.total || 0}건</p>
+                    {depositTotalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={depositPage <= 1} onClick={() => setDepositPage(p => p - 1)} data-testid="button-deposit-prev">
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm px-2">{depositPage} / {depositTotalPages}</span>
+                        <Button size="sm" variant="outline" disabled={depositPage >= depositTotalPages} onClick={() => setDepositPage(p => p + 1)} data-testid="button-deposit-next">
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -460,63 +592,107 @@ function MemberSettlementTab() {
         <TabsContent value="pointers">
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Gift className="h-5 w-5" />포인터 이력
-                </CardTitle>
-                <DateRangeFilter onChange={pointerDateRange.setDateRange} defaultPreset="month" />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Gift className="h-5 w-5" />포인터 이력
+                  </CardTitle>
+                  <DateRangeFilter onChange={(range) => { pointerDateRange.setDateRange(range); setPointerPage(1); }} defaultPreset="month" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={pointerMemberFilter || "all"} onValueChange={(v) => { setPointerMemberFilter(v === "all" ? "" : v); setPointerPage(1); }}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-pointer-member">
+                      <SelectValue placeholder="회원 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 회원</SelectItem>
+                      {memberOptions.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={pointerTypeFilter} onValueChange={(v) => { setPointerTypeFilter(v); setPointerPage(1); }}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-pointer-type">
+                      <SelectValue placeholder="유형" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체 유형</SelectItem>
+                      <SelectItem value="grant">지급</SelectItem>
+                      <SelectItem value="deduct">차감</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden space-y-3">
-              {pointerRecords?.records?.length ? (
-                <div className="flex flex-wrap gap-4 items-center text-sm">
-                  <span className="text-muted-foreground">총 {pointerRecords.total}건</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
-                  </span>
-                  <span className="font-semibold text-red-600 dark:text-red-400">
-                    차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
-                  </span>
-                </div>
-              ) : null}
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[900px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>상호명</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">금액</TableHead>
-                      <TableHead className="text-right">잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!pointerRecords?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 포인터 이력이 없습니다</TableCell>
-                      </TableRow>
-                    ) : (
-                      pointerRecords.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant={record.type === "grant" ? "default" : "destructive"} className="no-default-active-elevate">
-                              {typeLabels[record.type] || record.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${record.type === "grant" ? "text-emerald-600" : "text-red-600"}`}>
-                            {record.type === "grant" ? "+" : "-"}{record.amount.toLocaleString()}P
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}P</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
+              {pointersLoading ? (
+                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : (
+                <>
+                  {pointerRecords?.records?.length ? (
+                    <div className="flex flex-wrap gap-4 items-center text-sm">
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                      </span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                    <Table className="min-w-[900px]">
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead>일시</TableHead>
+                          <TableHead>상호명</TableHead>
+                          <TableHead>유형</TableHead>
+                          <TableHead className="text-right">금액</TableHead>
+                          <TableHead className="text-right">잔액</TableHead>
+                          <TableHead>설명</TableHead>
                         </TableRow>
-                      ))
+                      </TableHeader>
+                      <TableBody>
+                        {!pointerRecords?.records?.length ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 포인터 이력이 없습니다</TableCell>
+                          </TableRow>
+                        ) : (
+                          pointerRecords.records.map((record) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant={record.type === "grant" ? "default" : "destructive"} className="no-default-active-elevate">
+                                  {typeLabels[record.type] || record.type}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${record.type === "grant" ? "text-emerald-600" : "text-red-600"}`}>
+                                {record.type === "grant" ? "+" : "-"}{record.amount.toLocaleString()}P
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}P</TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                    <p className="text-sm text-muted-foreground">총 {pointerRecords?.total || 0}건</p>
+                    {pointerTotalPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={pointerPage <= 1} onClick={() => setPointerPage(p => p - 1)} data-testid="button-pointer-prev">
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm px-2">{pointerPage} / {pointerTotalPages}</span>
+                        <Button size="sm" variant="outline" disabled={pointerPage >= pointerTotalPages} onClick={() => setPointerPage(p => p + 1)} data-testid="button-pointer-next">
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
