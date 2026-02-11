@@ -81,8 +81,7 @@ type SidebarTab =
   | "order-list"
   | "address-tool"
   | "deposit"
-  | "purchase-stats"
-  | "settlement-stats"
+  | "member-stats"
   | "inquiry"
   | "guide";
 
@@ -807,15 +806,8 @@ export default function Dashboard() {
       />
       <SidebarItem
         icon={<BarChart3 className="h-4 w-4" />}
-        label="상품매입통계"
-        tab="purchase-stats"
-        activeTab={activeTab}
-        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
-      />
-      <SidebarItem
-        icon={<Calculator className="h-4 w-4" />}
-        label="정산통계"
-        tab="settlement-stats"
+        label="통계관리"
+        tab="member-stats"
         activeTab={activeTab}
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
       />
