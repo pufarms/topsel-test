@@ -99,14 +99,18 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
     },
   });
 
-  const rawRecords = [...(data?.records || [])].reverse();
+  const rawRecords = [...(data?.records || [])].sort((a, b) => {
+    const dateCompare = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (dateCompare !== 0) return dateCompare;
+    return b.balanceAfter - a.balanceAfter;
+  });
 
   const groupedDeposit: DepositRecord[] = [];
   for (const rec of rawRecords) {
     const prev = groupedDeposit[groupedDeposit.length - 1];
     if (prev && prev.type === rec.type && prev.createdAt === rec.createdAt && rec.type === "deduct") {
       prev.amount += rec.amount;
-      prev.balanceAfter = rec.balanceAfter;
+      prev.balanceAfter = Math.min(prev.balanceAfter, rec.balanceAfter);
     } else {
       groupedDeposit.push({ ...rec });
     }
@@ -283,17 +287,18 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
     },
   });
 
-  const rawRecords = [...(data?.records || [])].reverse();
+  const rawRecords = [...(data?.records || [])].sort((a, b) => {
+    const dateCompare = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (dateCompare !== 0) return dateCompare;
+    return b.balanceAfter - a.balanceAfter;
+  });
 
   const groupedRecords: PointerRecord[] = [];
   for (const rec of rawRecords) {
     const prev = groupedRecords[groupedRecords.length - 1];
     if (prev && prev.type === rec.type && prev.createdAt === rec.createdAt && rec.type === "deduct") {
       prev.amount += rec.amount;
-      prev.balanceAfter = rec.balanceAfter;
-      if (prev.description && rec.description && prev.description !== rec.description) {
-        prev.description = prev.description;
-      }
+      prev.balanceAfter = Math.min(prev.balanceAfter, rec.balanceAfter);
     } else {
       groupedRecords.push({ ...rec });
     }
