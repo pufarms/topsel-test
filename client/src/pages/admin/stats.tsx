@@ -1042,9 +1042,15 @@ export default function AdminStatsPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-stats-page">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <BarChart3 className="h-6 w-6" />
         <h1 className="text-2xl font-bold">매출 통계</h1>
+        <a href="/docs/sales-statistics-guide.md" download="매출통계_사용설명서.md">
+          <Button variant="outline" size="sm" data-testid="button-download-guide">
+            <FileText className="h-4 w-4 mr-1.5" />
+            사용 설명서
+          </Button>
+        </a>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
