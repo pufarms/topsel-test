@@ -1502,6 +1502,9 @@ export const vendors = pgTable("vendors", {
   bankHolder: varchar("bank_holder", { length: 50 }),
   isActive: boolean("is_active").default(true),
   memo: text("memo"),
+  supplyType: text("supply_type").array().default(sql`'{}'::text[]`),
+  businessNumber: varchar("business_number", { length: 20 }),
+  address: text("address"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1643,3 +1646,51 @@ export const insertBankdaTransactionSchema = createInsertSchema(bankdaTransactio
 });
 export type BankdaTransaction = typeof bankdaTransactions.$inferSelect;
 export type NewBankdaTransaction = z.infer<typeof insertBankdaTransactionSchema>;
+
+// ========================================
+// 회계장부 시스템 - 매입 관리
+// ========================================
+export const purchases = pgTable("purchases", {
+  id: serial("id").primaryKey(),
+  purchaseDate: date("purchase_date").notNull(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  materialType: varchar("material_type", { length: 20 }).notNull(),
+  productName: varchar("product_name", { length: 200 }).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unit: varchar("unit", { length: 20 }).notNull(),
+  unitPrice: integer("unit_price").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPurchaseSchema = createInsertSchema(purchases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Purchase = typeof purchases.$inferSelect;
+export type NewPurchase = z.infer<typeof insertPurchaseSchema>;
+
+// ========================================
+// 회계장부 시스템 - 직접 매출
+// ========================================
+export const directSales = pgTable("direct_sales", {
+  id: serial("id").primaryKey(),
+  saleDate: date("sale_date").notNull(),
+  clientName: varchar("client_name", { length: 200 }).notNull(),
+  description: text("description").notNull(),
+  amount: integer("amount").notNull(),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDirectSaleSchema = createInsertSchema(directSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type DirectSale = typeof directSales.$inferSelect;
+export type NewDirectSale = z.infer<typeof insertDirectSaleSchema>;
