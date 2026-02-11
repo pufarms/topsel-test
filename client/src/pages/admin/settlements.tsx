@@ -143,7 +143,7 @@ function MemberSettlementTab() {
       if (settlementDateRange.dateRange.startDate) params.set("startDate", settlementDateRange.dateRange.startDate);
       if (settlementDateRange.dateRange.endDate) params.set("endDate", settlementDateRange.dateRange.endDate);
       if (settlementMemberFilter) params.set("memberId", settlementMemberFilter);
-      if (settlementTypeFilter !== "all") params.set("type", settlementTypeFilter);
+      if (settlementTypeFilter !== "all") params.set("paymentMethod", settlementTypeFilter);
       params.set("page", String(settlementPage));
       params.set("limit", String(ITEMS_PER_PAGE));
       const res = await fetch(`/api/admin/settlements?${params.toString()}`, { credentials: "include" });
@@ -407,9 +407,9 @@ function MemberSettlementTab() {
                       <SelectValue placeholder="유형" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체 유형</SelectItem>
-                      <SelectItem value="auto">자동정산</SelectItem>
-                      <SelectItem value="manual">수동정산</SelectItem>
+                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="deposit">예치금</SelectItem>
+                      <SelectItem value="pointer">포인터</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

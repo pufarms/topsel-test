@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt, gt } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
 
@@ -10146,11 +10146,13 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { memberId, startDate, endDate, type, page = '1', limit = '30' } = req.query as any;
+      const { memberId, startDate, endDate, type, paymentMethod, page = '1', limit = '30' } = req.query as any;
       const conditions: any[] = [];
 
       if (memberId) conditions.push(eq(settlementHistory.memberId, memberId));
       if (type) conditions.push(eq(settlementHistory.settlementType, type));
+      if (paymentMethod === 'deposit') conditions.push(gt(settlementHistory.depositAmount, 0));
+      if (paymentMethod === 'pointer') conditions.push(gt(settlementHistory.pointerAmount, 0));
       if (startDate && endDate) {
         const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
         conditions.push(gte(settlementHistory.createdAt, startUTC));
