@@ -10375,6 +10375,9 @@ export async function registerRoutes(
       const memberId = req.session.userId;
       const { startDate, endDate } = req.query as any;
 
+      let startUTC: Date | undefined;
+      let endUTC: Date | undefined;
+
       const orderConditions: any[] = [
         eq(pendingOrders.memberId, memberId),
         eq(pendingOrders.status, '배송중'),
@@ -10392,7 +10395,9 @@ export async function registerRoutes(
       ];
 
       if (startDate && endDate) {
-        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        const parsed = parseDateRangeKST(startDate, endDate);
+        startUTC = parsed.startUTC;
+        endUTC = parsed.endUTC;
         orderConditions.push(gte(pendingOrders.updatedAt, startUTC));
         orderConditions.push(lte(pendingOrders.updatedAt, endUTC));
         depositConditions.push(gte(depositHistory.createdAt, startUTC));
@@ -10401,7 +10406,12 @@ export async function registerRoutes(
         pointerConditions.push(lte(pointerHistory.createdAt, endUTC));
       }
 
-      const [orderRows, depositRows, pointerRows] = await Promise.all([
+      const memberResult = await db.select({ deposit: members.deposit, point: members.point })
+        .from(members).where(eq(members.id, memberId)).limit(1);
+      const currentDeposit = memberResult[0]?.deposit ?? 0;
+      const currentPointer = memberResult[0]?.point ?? 0;
+
+      const [orderRows, depositRows, pointerRows, depositNetSinceStart, pointerNetSinceStart] = await Promise.all([
         db.select({
           orderDate: sql<string>`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
           productName: pendingOrders.productName,
@@ -10435,7 +10445,31 @@ export async function registerRoutes(
         })
           .from(pointerHistory)
           .where(and(...pointerConditions)),
+        startUTC
+          ? db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(depositHistory).where(and(
+              eq(depositHistory.memberId, memberId),
+              gte(depositHistory.createdAt, startUTC),
+            ))
+          : db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(depositHistory).where(eq(depositHistory.memberId, memberId)),
+        startUTC
+          ? db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(pointerHistory).where(and(
+              eq(pointerHistory.memberId, memberId),
+              gte(pointerHistory.createdAt, startUTC),
+            ))
+          : db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(pointerHistory).where(eq(pointerHistory.memberId, memberId)),
       ]);
+
+      const depositNetChange = (depositNetSinceStart as any)?.[0]?.netChange ?? 0;
+      const pointerNetChange = (pointerNetSinceStart as any)?.[0]?.netChange ?? 0;
+      const startingBalance = (currentDeposit - depositNetChange) + (currentPointer - pointerNetChange);
 
       type SettlementRow = {
         type: "order" | "deposit" | "pointer";
@@ -10448,6 +10482,7 @@ export async function registerRoutes(
         depositAmount: number;
         pointerAmount: number;
         description?: string;
+        balance: number;
       };
 
       const items: SettlementRow[] = [];
@@ -10464,6 +10499,7 @@ export async function registerRoutes(
           subtotal: price * row.quantity,
           depositAmount: 0,
           pointerAmount: 0,
+          balance: 0,
         });
       }
 
@@ -10480,6 +10516,7 @@ export async function registerRoutes(
           depositAmount: signedAmount,
           pointerAmount: 0,
           description: row.description || (row.type === 'charge' ? '예치금 충전' : '예치금 환급'),
+          balance: 0,
         });
       }
 
@@ -10495,6 +10532,7 @@ export async function registerRoutes(
           depositAmount: 0,
           pointerAmount: row.amount,
           description: row.description || '포인터 지급',
+          balance: 0,
         });
       }
 
@@ -10506,16 +10544,29 @@ export async function registerRoutes(
         return (a.productName || "").localeCompare(b.productName || "");
       });
 
+      let runningBalance = startingBalance;
+      for (const item of items) {
+        if (item.type === "order") {
+          runningBalance -= item.subtotal;
+        } else if (item.type === "deposit") {
+          runningBalance += item.depositAmount;
+        } else if (item.type === "pointer") {
+          runningBalance += item.pointerAmount;
+        }
+        item.balance = runningBalance;
+      }
+
       const totalOrderAmount = items.filter(i => i.type === "order").reduce((s, i) => s + i.subtotal, 0);
       const totalDeposit = items.filter(i => i.type === "deposit").reduce((s, i) => s + i.depositAmount, 0);
       const totalPointer = items.filter(i => i.type === "pointer").reduce((s, i) => s + i.pointerAmount, 0);
 
       res.json({
         items,
+        startingBalance,
         totalOrderAmount,
         totalDeposit,
         totalPointer,
-        totalBalance: (totalDeposit + totalPointer) - totalOrderAmount,
+        totalBalance: runningBalance,
       });
     } catch (error: any) {
       console.error("Member settlement view error:", error);

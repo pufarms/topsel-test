@@ -35,10 +35,12 @@ interface SettlementViewItem {
   depositAmount: number;
   pointerAmount: number;
   description?: string;
+  balance: number;
 }
 
 interface SettlementViewResponse {
   items: SettlementViewItem[];
+  startingBalance: number;
   totalOrderAmount: number;
   totalDeposit: number;
   totalPointer: number;
@@ -497,21 +499,10 @@ export default function MemberSettlementTab() {
   const totalOrderAmount = settlementView?.totalOrderAmount || 0;
   const totalDeposit = settlementView?.totalDeposit || 0;
   const totalPointer = settlementView?.totalPointer || 0;
-  const totalBalance = settlementView?.totalBalance || 0;
+  const lastBalance = allItems.length > 0 ? allItems[allItems.length - 1].balance : (settlementView?.startingBalance || 0);
 
-  let runningOrderTotal = 0;
-  let runningCreditTotal = 0;
-  const itemsWithBalance = allItems.map((item) => {
-    if (item.type === "order") {
-      runningOrderTotal += item.subtotal;
-    } else {
-      runningCreditTotal += (item.depositAmount + item.pointerAmount);
-    }
-    return { ...item, balance: runningCreditTotal - runningOrderTotal };
-  });
-
-  const totalPages = Math.ceil(itemsWithBalance.length / ITEMS_PER_PAGE);
-  const pagedItems = itemsWithBalance.slice((settlementPage - 1) * ITEMS_PER_PAGE, settlementPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(allItems.length / ITEMS_PER_PAGE);
+  const pagedItems = allItems.slice((settlementPage - 1) * ITEMS_PER_PAGE, settlementPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -596,7 +587,7 @@ export default function MemberSettlementTab() {
                 <span className="text-muted-foreground">총 {allItems.length}건</span>
                 <span className="font-semibold">주문합계: {formatCurrency(totalOrderAmount)}</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금합계: {formatCurrency(totalDeposit + totalPointer)}</span>
-                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</span>
+                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency(lastBalance)}</span>
               </div>
 
               {settlementViewLoading ? (
@@ -665,7 +656,7 @@ export default function MemberSettlementTab() {
                           <td className="py-2 px-3"></td>
                           <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
                           <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalDeposit + totalPointer)}</td>
-                          <td className="py-2 px-3 text-right">{formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</td>
+                          <td className="py-2 px-3 text-right">{formatCurrency(lastBalance)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -718,7 +709,7 @@ export default function MemberSettlementTab() {
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-1">
                             <span>예치금+포인터 잔액</span>
-                            <span>{formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</span>
+                            <span>{formatCurrency(lastBalance)}</span>
                           </div>
                         </div>
                       </CardContent>
