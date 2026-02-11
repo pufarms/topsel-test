@@ -11798,7 +11798,7 @@ export async function registerRoutes(
                 type: 'charge',
                 amount: inputAmount,
                 balanceAfter: newDeposit,
-                description: `뱅크다 자동입금 (${entry.bkname ? entry.bkname + ' ' : ''}${entry.bkjukyo})`,
+                description: `뱅크다 자동입금 (${entry.bketc ? entry.bketc.split(/\s+/)[0] + ' ' : ''}${entry.bkjukyo})`,
               }).returning();
 
               await tx.insert(bankdaTransactions).values({
@@ -12025,7 +12025,7 @@ export async function registerRoutes(
           type: 'charge',
           amount: inputAmount,
           balanceAfter: newDeposit,
-          description: `뱅크다 수동매칭 입금 (${txn.bkname ? txn.bkname + ' ' : ''}${txn.bkjukyo})`,
+          description: `뱅크다 수동매칭 입금 (${txn.bketc ? txn.bketc.split(/\s+/)[0] + ' ' : ''}${txn.bkjukyo})`,
           adminId: req.session.userId,
         }).returning();
 
