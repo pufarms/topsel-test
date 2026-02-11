@@ -316,8 +316,10 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground invisible">검색</label>
+          <div className="relative min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="상품명 또는 상품코드 검색"
@@ -326,6 +328,7 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
             className="pl-9"
             data-testid="member-product-search"
           />
+          </div>
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">대분류</label>
@@ -369,12 +372,15 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
             </SelectContent>
           </Select>
         </div>
-        <a href={`/api/member/statistics/by-product/export?${queryParams.toString()}`} download>
-          <Button size="sm" variant="outline" data-testid="button-export-member-products">
-            <Download className="h-4 w-4 mr-1" />
-            엑셀 다운로드
-          </Button>
-        </a>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground invisible">다운</label>
+          <a href={`/api/member/statistics/by-product/export?${queryParams.toString()}`} download>
+            <Button size="sm" variant="outline" data-testid="button-export-member-products">
+              <Download className="h-4 w-4 mr-1" />
+              엑셀 다운로드
+            </Button>
+          </a>
+        </div>
       </div>
 
       {isLoading ? (
