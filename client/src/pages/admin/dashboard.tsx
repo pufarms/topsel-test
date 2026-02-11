@@ -187,6 +187,8 @@ export default function AdminDashboard() {
     lastMonthSales: number;
     thisMonthSales: number;
     trendPercent: number | null;
+    confirmed: { today: number; yesterday: number; lastMonth: number; thisMonth: number };
+    projected: { today: number; yesterday: number; lastMonth: number; thisMonth: number };
   }>({
     queryKey: ["/api/admin/sales-stats"],
   });
@@ -321,32 +323,69 @@ export default function AdminDashboard() {
             <CardTitle className="text-base">매출 현황</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard
-              title="금일 총매출"
-              value={`${(salesStats?.todaySales || 0).toLocaleString("ko-KR")}원`}
-              icon={<TrendingUp className="h-4 w-4" />}
-              variant="success"
-              trend={salesStats?.trendPercent != null ? (salesStats.trendPercent >= 0 ? "up" : "down") : undefined}
-              trendValue={salesStats?.trendPercent != null ? `${salesStats.trendPercent >= 0 ? "+" : ""}${salesStats.trendPercent}%` : undefined}
-            />
-            <StatCard
-              title="전일 총매출"
-              value={`${(salesStats?.yesterdaySales || 0).toLocaleString("ko-KR")}원`}
-              icon={<Clock className="h-4 w-4" />}
-            />
-            <StatCard
-              title="전월 총매출"
-              value={`${(salesStats?.lastMonthSales || 0).toLocaleString("ko-KR")}원`}
-              icon={<Calendar className="h-4 w-4" />}
-            />
-            <StatCard
-              title="이번달 총매출"
-              value={`${(salesStats?.thisMonthSales || 0).toLocaleString("ko-KR")}원`}
-              icon={<TrendingUp className="h-4 w-4" />}
-              variant="primary"
-            />
+        <CardContent className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">확정매출</span>
+              <span className="text-xs text-muted-foreground">(배송중 전환 완료)</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard
+                title="금일 확정매출"
+                value={`${(salesStats?.confirmed?.today || 0).toLocaleString("ko-KR")}원`}
+                icon={<TrendingUp className="h-4 w-4" />}
+                variant="success"
+                trend={salesStats?.trendPercent != null ? (salesStats.trendPercent >= 0 ? "up" : "down") : undefined}
+                trendValue={salesStats?.trendPercent != null ? `${salesStats.trendPercent >= 0 ? "+" : ""}${salesStats.trendPercent}%` : undefined}
+              />
+              <StatCard
+                title="전일 확정매출"
+                value={`${(salesStats?.confirmed?.yesterday || 0).toLocaleString("ko-KR")}원`}
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <StatCard
+                title="전월 확정매출"
+                value={`${(salesStats?.confirmed?.lastMonth || 0).toLocaleString("ko-KR")}원`}
+                icon={<Calendar className="h-4 w-4" />}
+              />
+              <StatCard
+                title="이번달 확정매출"
+                value={`${(salesStats?.confirmed?.thisMonth || 0).toLocaleString("ko-KR")}원`}
+                icon={<TrendingUp className="h-4 w-4" />}
+                variant="primary"
+              />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">예상매출</span>
+              <span className="text-xs text-muted-foreground">(대기~배송준비중, 정산 전)</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard
+                title="금일 예상매출"
+                value={`${(salesStats?.projected?.today || 0).toLocaleString("ko-KR")}원`}
+                icon={<TrendingUp className="h-4 w-4" />}
+                variant="warning"
+              />
+              <StatCard
+                title="전일 예상매출"
+                value={`${(salesStats?.projected?.yesterday || 0).toLocaleString("ko-KR")}원`}
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <StatCard
+                title="전월 예상매출"
+                value={`${(salesStats?.projected?.lastMonth || 0).toLocaleString("ko-KR")}원`}
+                icon={<Calendar className="h-4 w-4" />}
+              />
+              <StatCard
+                title="이번달 예상매출"
+                value={`${(salesStats?.projected?.thisMonth || 0).toLocaleString("ko-KR")}원`}
+                icon={<TrendingUp className="h-4 w-4" />}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

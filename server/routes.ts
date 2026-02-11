@@ -6055,7 +6055,7 @@ export async function registerRoutes(
     };
   }
 
-  // 관리자 매출 현황 API (금일/전일/전월/이번달 매출)
+  // 관리자 매출 현황 API (금일/전일/전월/이번달 - 확정매출/예상매출 분리)
   app.get('/api/admin/sales-stats', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "user") {
       return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
@@ -6069,10 +6069,10 @@ export async function registerRoutes(
 
       const ranges = getKSTDateRanges();
       
-      // 정상 주문만 매출에 포함 (취소, 회원취소, 주문조정 제외)
       const excludeStatuses = ['취소', '회원취소', '주문조정'];
+      const projectedStatuses = ['대기', '상품준비중', '배송준비중'];
       
-      const calcSales = async (start: Date, end: Date) => {
+      const calcSales = async (start: Date, end: Date): Promise<{ confirmed: number; projected: number }> => {
         const confirmedResult = await db.select({
           total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
         })
@@ -6081,9 +6081,21 @@ export async function registerRoutes(
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
           eq(pendingOrders.priceConfirmed, true),
-          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+          eq(pendingOrders.status, '배송중')
         ));
-        const confirmedTotal = parseInt(confirmedResult[0]?.total || '0', 10);
+        const confirmed = parseInt(confirmedResult[0]?.total || '0', 10);
+
+        const projectedConfirmedResult = await db.select({
+          total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
+        })
+        .from(pendingOrders)
+        .where(and(
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, true),
+          inArray(pendingOrders.status, projectedStatuses)
+        ));
+        let projectedTotal = parseInt(projectedConfirmedResult[0]?.total || '0', 10);
 
         const unconfirmedRows = await db.select({
           memberId: pendingOrders.memberId,
@@ -6094,10 +6106,9 @@ export async function registerRoutes(
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
           eq(pendingOrders.priceConfirmed, false),
-          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+          inArray(pendingOrders.status, projectedStatuses)
         ));
 
-        let unconfirmedTotal = 0;
         if (unconfirmedRows.length > 0) {
           const mIds = Array.from(new Set(unconfirmedRows.map(r => r.memberId)));
           const pCodes = Array.from(new Set(unconfirmedRows.map(r => r.productCode)));
@@ -6109,33 +6120,46 @@ export async function registerRoutes(
             const grade = mMap.get(row.memberId) || 'START';
             const product = pMap.get(row.productCode);
             if (product) {
-              unconfirmedTotal += getSupplyPriceByGrade(product, grade);
+              projectedTotal += getSupplyPriceByGrade(product, grade);
             }
           }
         }
 
-        return confirmedTotal + unconfirmedTotal;
+        return { confirmed, projected: projectedTotal };
       };
 
-      const [todaySales, yesterdaySales, lastMonthSales, thisMonthSales] = await Promise.all([
+      const [today, yesterday, lastMonth, thisMonth] = await Promise.all([
         calcSales(ranges.today.start, ranges.today.end),
         calcSales(ranges.yesterday.start, ranges.yesterday.end),
         calcSales(ranges.lastMonth.start, ranges.lastMonth.end),
         calcSales(ranges.thisMonth.start, ranges.thisMonth.end),
       ]);
       
-      // 전일 대비 금일 증감률 계산
       let trendPercent: number | null = null;
-      if (yesterdaySales > 0) {
-        trendPercent = Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 1000) / 10;
+      const yesterdayTotal = yesterday.confirmed + yesterday.projected;
+      const todayTotal = today.confirmed + today.projected;
+      if (yesterdayTotal > 0) {
+        trendPercent = Math.round(((todayTotal - yesterdayTotal) / yesterdayTotal) * 1000) / 10;
       }
 
       res.json({
-        todaySales,
-        yesterdaySales,
-        lastMonthSales,
-        thisMonthSales,
+        todaySales: today.confirmed + today.projected,
+        yesterdaySales: yesterday.confirmed + yesterday.projected,
+        lastMonthSales: lastMonth.confirmed + lastMonth.projected,
+        thisMonthSales: thisMonth.confirmed + thisMonth.projected,
         trendPercent,
+        confirmed: {
+          today: today.confirmed,
+          yesterday: yesterday.confirmed,
+          lastMonth: lastMonth.confirmed,
+          thisMonth: thisMonth.confirmed,
+        },
+        projected: {
+          today: today.projected,
+          yesterday: yesterday.projected,
+          lastMonth: lastMonth.projected,
+          thisMonth: thisMonth.projected,
+        },
       });
     } catch (error: any) {
       console.error("Sales stats error:", error);
@@ -6143,7 +6167,7 @@ export async function registerRoutes(
     }
   });
 
-  // 회원 매입 현황 API (지난달/이번달 매입 총액)
+  // 회원 매입 현황 API (지난달/이번달 - 확정매입/예상매입 분리)
   app.get('/api/member/purchase-stats', async (req, res) => {
     if (!req.session.userId || req.session.userType !== "member") {
       return res.status(401).json({ message: "회원 로그인이 필요합니다" });
@@ -6153,13 +6177,12 @@ export async function registerRoutes(
       const ranges = getKSTDateRanges();
       const memberId = req.session.userId;
       
-      // 정상 주문만 매입에 포함 (취소, 회원취소, 주문조정 제외)
-      const excludeStatuses = ['취소', '회원취소', '주문조정'];
+      const projectedStatuses = ['대기', '상품준비중', '배송준비중'];
       
       const memberData = await db.select({ grade: members.grade }).from(members).where(eq(members.id, memberId));
       const memberGrade = memberData[0]?.grade || 'START';
 
-      const calcPurchase = async (start: Date, end: Date) => {
+      const calcPurchase = async (start: Date, end: Date): Promise<{ confirmed: number; projected: number }> => {
         const confirmedResult = await db.select({
           total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
         })
@@ -6169,9 +6192,22 @@ export async function registerRoutes(
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
           eq(pendingOrders.priceConfirmed, true),
-          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+          eq(pendingOrders.status, '배송중')
         ));
-        const confirmedTotal = parseInt(confirmedResult[0]?.total || '0', 10);
+        const confirmed = parseInt(confirmedResult[0]?.total || '0', 10);
+
+        const projectedConfirmedResult = await db.select({
+          total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
+        })
+        .from(pendingOrders)
+        .where(and(
+          eq(pendingOrders.memberId, memberId),
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          eq(pendingOrders.priceConfirmed, true),
+          inArray(pendingOrders.status, projectedStatuses)
+        ));
+        let projectedTotal = parseInt(projectedConfirmedResult[0]?.total || '0', 10);
 
         const unconfirmedRows = await db.select({
           productCode: pendingOrders.productCode,
@@ -6182,10 +6218,9 @@ export async function registerRoutes(
           gte(pendingOrders.createdAt, start),
           lt(pendingOrders.createdAt, end),
           eq(pendingOrders.priceConfirmed, false),
-          sql`${pendingOrders.status} NOT IN (${sql.join(excludeStatuses.map(s => sql`${s}`), sql`, `)})`
+          inArray(pendingOrders.status, projectedStatuses)
         ));
 
-        let unconfirmedTotal = 0;
         if (unconfirmedRows.length > 0) {
           const pCodes = Array.from(new Set(unconfirmedRows.map(r => r.productCode)));
           const pList = await db.select().from(currentProducts).where(inArray(currentProducts.productCode, pCodes));
@@ -6193,22 +6228,30 @@ export async function registerRoutes(
           for (const row of unconfirmedRows) {
             const product = pMap.get(row.productCode);
             if (product) {
-              unconfirmedTotal += getSupplyPriceByGrade(product, memberGrade);
+              projectedTotal += getSupplyPriceByGrade(product, memberGrade);
             }
           }
         }
 
-        return confirmedTotal + unconfirmedTotal;
+        return { confirmed, projected: projectedTotal };
       };
 
-      const [lastMonthTotal, thisMonthTotal] = await Promise.all([
+      const [lastMonth, thisMonth] = await Promise.all([
         calcPurchase(ranges.lastMonth.start, ranges.lastMonth.end),
         calcPurchase(ranges.thisMonth.start, ranges.thisMonth.end),
       ]);
 
       res.json({
-        lastMonthTotal,
-        thisMonthTotal,
+        lastMonthTotal: lastMonth.confirmed + lastMonth.projected,
+        thisMonthTotal: thisMonth.confirmed + thisMonth.projected,
+        confirmed: {
+          lastMonth: lastMonth.confirmed,
+          thisMonth: thisMonth.confirmed,
+        },
+        projected: {
+          lastMonth: lastMonth.projected,
+          thisMonth: thisMonth.projected,
+        },
       });
     } catch (error: any) {
       console.error("Purchase stats error:", error);

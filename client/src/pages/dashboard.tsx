@@ -275,6 +275,8 @@ export default function Dashboard() {
   const { data: purchaseStats } = useQuery<{
     lastMonthTotal: number;
     thisMonthTotal: number;
+    confirmed: { lastMonth: number; thisMonth: number };
+    projected: { lastMonth: number; thisMonth: number };
   }>({
     queryKey: ["/api/member/purchase-stats"],
     enabled: !!user && (isMember || isPreviewMode),
@@ -891,29 +893,67 @@ export default function Dashboard() {
                     <CardTitle className="text-base">매입 현황</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg border p-4 bg-card transition-all hover:shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-muted-foreground font-medium">지난 달 매입 총액</span>
-                        <div className="p-2 rounded-lg bg-background/50 text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                        </div>
-                      </div>
-                      <span className="text-2xl font-bold tracking-tight" data-testid="text-last-month-purchase">
-                        {(purchaseStats?.lastMonthTotal || 0).toLocaleString("ko-KR")}원
-                      </span>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">확정매입</span>
+                      <span className="text-xs text-muted-foreground">(배송중 전환 완료)</span>
                     </div>
-                    <div className="rounded-lg border p-4 bg-primary/5 border-primary/20 transition-all hover:shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-muted-foreground font-medium">이번 달 매입 총액</span>
-                        <div className="p-2 rounded-lg bg-background/50 text-primary">
-                          <TrendingUp className="h-4 w-4" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 transition-all hover:shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-muted-foreground font-medium">지난 달 확정매입</span>
+                          <div className="p-2 rounded-lg bg-background/50 text-emerald-600 dark:text-emerald-400">
+                            <Calendar className="h-4 w-4" />
+                          </div>
                         </div>
+                        <span className="text-2xl font-bold tracking-tight" data-testid="text-last-month-confirmed-purchase">
+                          {(purchaseStats?.confirmed?.lastMonth || 0).toLocaleString("ko-KR")}원
+                        </span>
                       </div>
-                      <span className="text-2xl font-bold tracking-tight" data-testid="text-this-month-purchase">
-                        {(purchaseStats?.thisMonthTotal || 0).toLocaleString("ko-KR")}원
-                      </span>
+                      <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 transition-all hover:shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-muted-foreground font-medium">이번 달 확정매입</span>
+                          <div className="p-2 rounded-lg bg-background/50 text-emerald-600 dark:text-emerald-400">
+                            <TrendingUp className="h-4 w-4" />
+                          </div>
+                        </div>
+                        <span className="text-2xl font-bold tracking-tight" data-testid="text-this-month-confirmed-purchase">
+                          {(purchaseStats?.confirmed?.thisMonth || 0).toLocaleString("ko-KR")}원
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">예상매입</span>
+                      <span className="text-xs text-muted-foreground">(대기~배송준비중, 정산 전)</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 transition-all hover:shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-muted-foreground font-medium">지난 달 예상매입</span>
+                          <div className="p-2 rounded-lg bg-background/50 text-amber-600 dark:text-amber-400">
+                            <Calendar className="h-4 w-4" />
+                          </div>
+                        </div>
+                        <span className="text-2xl font-bold tracking-tight" data-testid="text-last-month-projected-purchase">
+                          {(purchaseStats?.projected?.lastMonth || 0).toLocaleString("ko-KR")}원
+                        </span>
+                      </div>
+                      <div className="rounded-lg border p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 transition-all hover:shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-muted-foreground font-medium">이번 달 예상매입</span>
+                          <div className="p-2 rounded-lg bg-background/50 text-amber-600 dark:text-amber-400">
+                            <TrendingUp className="h-4 w-4" />
+                          </div>
+                        </div>
+                        <span className="text-2xl font-bold tracking-tight" data-testid="text-this-month-projected-purchase">
+                          {(purchaseStats?.projected?.thisMonth || 0).toLocaleString("ko-KR")}원
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

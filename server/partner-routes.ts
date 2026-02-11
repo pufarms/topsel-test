@@ -784,6 +784,7 @@ router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
 
     const orderConditions = [
       eq(pendingOrders.vendorId, vendorId),
+      eq(pendingOrders.status, '배송중'),
       isNotNull(pendingOrders.trackingNumber),
       isNotNull(pendingOrders.trackingRegisteredAt),
     ];
