@@ -1,16 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Wallet, CreditCard, Gift, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
@@ -54,15 +45,366 @@ interface SettlementViewResponse {
   totalBalance: number;
 }
 
-const typeLabels: Record<string, string> = {
-  charge: "충전",
-  refund: "환급",
-  deduct: "정산 차감",
-  grant: "지급",
-};
 
 function formatCurrency(n: number): string {
   return n.toLocaleString("ko-KR") + "원";
+}
+
+function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const depositTypeLabels: Record<string, string> = {
+  charge: "입금/예치금 충전",
+  deduct: "정산 차감",
+  refund: "환급/예치금 환급",
+};
+
+const pointerTypeLabels: Record<string, string> = {
+  grant: "포인터 충전",
+  deduct: "정산 차감",
+  expire: "포인터 만료",
+};
+
+function DepositHistoryTab({ dateRange }: { dateRange: any }) {
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 50;
+
+  const { data, isLoading } = useQuery<{ records: DepositRecord[]; total: number }>({
+    queryKey: ["/api/member/my-deposit-history", dateRange.dateRange.startDate, dateRange.dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.dateRange.startDate) params.set("startDate", dateRange.dateRange.startDate);
+      if (dateRange.dateRange.endDate) params.set("endDate", dateRange.dateRange.endDate);
+      params.set("limit", "500");
+      const res = await fetch(`/api/member/my-deposit-history?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("조회 실패");
+      return res.json();
+    },
+  });
+
+  const allRecords = [...(data?.records || [])].reverse();
+  const totalCharge = allRecords.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0);
+  const totalDeduct = allRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
+  const totalRefund = allRecords.filter(r => r.type === "refund").reduce((s, r) => s + r.amount, 0);
+  const lastBalance = allRecords.length > 0 ? allRecords[allRecords.length - 1].balanceAfter : 0;
+
+  const totalPages = Math.ceil(allRecords.length / PER_PAGE);
+  const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            예치금 이력
+          </CardTitle>
+          <DateRangeFilter
+            onChange={(range) => { dateRange.setDateRange(range); setPage(1); }}
+            defaultPreset="month"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="overflow-hidden space-y-3">
+        <div className="flex flex-wrap gap-4 items-center text-sm">
+          <span className="text-muted-foreground">총 {allRecords.length}건</span>
+          <span className="font-semibold text-emerald-600 dark:text-emerald-400">충전합계: {formatCurrency(totalCharge)}</span>
+          <span className="font-semibold text-red-600 dark:text-red-400">차감합계: {formatCurrency(totalDeduct + totalRefund)}</span>
+          <span className="font-semibold">예치금 잔액: {formatCurrency(lastBalance)}</span>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : allRecords.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">조회된 예치금 이력이 없습니다.</div>
+        ) : (
+          <>
+            <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-center py-2 px-3 whitespace-nowrap">적용날짜</th>
+                    <th className="text-left py-2 px-3 whitespace-nowrap">구분</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">금액</th>
+                    <th className="text-left py-2 px-3 whitespace-nowrap">적요</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">예치금 잔액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRecords.map((record, idx) => {
+                    const isCredit = record.type === "charge";
+                    const isRefund = record.type === "refund";
+                    return (
+                      <tr
+                        key={record.id}
+                        className={`border-b ${isCredit ? "bg-emerald-50 dark:bg-emerald-950/30" : ""}`}
+                        data-testid={`row-deposit-${idx}`}
+                      >
+                        <td className="py-2 px-3 text-center whitespace-nowrap">{formatDateShort(record.createdAt)}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">
+                          <span className={isCredit ? "text-emerald-600 dark:text-emerald-400 font-medium" : isRefund ? "text-red-600 dark:text-red-400 font-medium" : "font-medium"}>
+                            {depositTypeLabels[record.type] || record.type}
+                          </span>
+                        </td>
+                        <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                          {isCredit ? `+${formatCurrency(record.amount)}` : `-${formatCurrency(record.amount)}`}
+                        </td>
+                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{record.description || "-"}</td>
+                        <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(record.balanceAfter)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/20 font-semibold">
+                    <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
+                    <td className="py-2 px-3 text-right">
+                      <span className="text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalCharge)}</span>
+                      {" / "}
+                      <span className="text-red-600 dark:text-red-400">-{formatCurrency(totalDeduct + totalRefund)}</span>
+                    </td>
+                    <td className="py-2 px-3"></td>
+                    <td className="py-2 px-3 text-right">{formatCurrency(lastBalance)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="md:hidden space-y-2">
+              {pagedRecords.map((record, idx) => {
+                const isCredit = record.type === "charge";
+                const isRefund = record.type === "refund";
+                return (
+                  <Card
+                    key={record.id}
+                    className={isCredit ? "border-emerald-200 dark:border-emerald-800" : ""}
+                    data-testid={`card-deposit-${idx}`}
+                  >
+                    <CardContent className="p-3 space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs text-muted-foreground">{formatDateShort(record.createdAt)}</span>
+                        <span className="text-xs font-medium">잔액: {formatCurrency(record.balanceAfter)}</span>
+                      </div>
+                      <div className={`font-medium text-sm ${isCredit ? "text-emerald-600 dark:text-emerald-400" : isRefund ? "text-red-600 dark:text-red-400" : ""}`}>
+                        {depositTypeLabels[record.type] || record.type}
+                        <span className="ml-2">
+                          {isCredit ? `+${formatCurrency(record.amount)}` : `-${formatCurrency(record.amount)}`}
+                        </span>
+                      </div>
+                      {record.description && (
+                        <div className="text-xs text-muted-foreground">{record.description}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex flex-col gap-1 text-sm">
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>충전합계</span>
+                      <span>+{formatCurrency(totalCharge)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                      <span>차감합계</span>
+                      <span>-{formatCurrency(totalDeduct + totalRefund)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t pt-1">
+                      <span>예치금 잔액</span>
+                      <span>{formatCurrency(lastBalance)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-deposit-prev">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">{page} / {totalPages}</span>
+            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-deposit-next">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PointerHistoryTab({ dateRange }: { dateRange: any }) {
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 50;
+
+  const { data, isLoading } = useQuery<{ records: PointerRecord[]; total: number }>({
+    queryKey: ["/api/member/my-pointer-history", dateRange.dateRange.startDate, dateRange.dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateRange.dateRange.startDate) params.set("startDate", dateRange.dateRange.startDate);
+      if (dateRange.dateRange.endDate) params.set("endDate", dateRange.dateRange.endDate);
+      params.set("limit", "500");
+      const res = await fetch(`/api/member/my-pointer-history?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("조회 실패");
+      return res.json();
+    },
+  });
+
+  const allRecords = [...(data?.records || [])].reverse();
+  const totalGrant = allRecords.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0);
+  const totalDeduct = allRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
+  const totalExpire = allRecords.filter(r => r.type === "expire").reduce((s, r) => s + r.amount, 0);
+  const lastBalance = allRecords.length > 0 ? allRecords[allRecords.length - 1].balanceAfter : 0;
+
+  const totalPages = Math.ceil(allRecords.length / PER_PAGE);
+  const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            포인터 이력
+          </CardTitle>
+          <DateRangeFilter
+            onChange={(range) => { dateRange.setDateRange(range); setPage(1); }}
+            defaultPreset="month"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="overflow-hidden space-y-3">
+        <div className="flex flex-wrap gap-4 items-center text-sm">
+          <span className="text-muted-foreground">총 {allRecords.length}건</span>
+          <span className="font-semibold text-amber-600 dark:text-amber-400">충전합계: {totalGrant.toLocaleString()}P</span>
+          <span className="font-semibold text-red-600 dark:text-red-400">차감합계: {(totalDeduct + totalExpire).toLocaleString()}P</span>
+          <span className="font-semibold">포인터 잔액: {lastBalance.toLocaleString()}P</span>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : allRecords.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">조회된 포인터 이력이 없습니다.</div>
+        ) : (
+          <>
+            <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-center py-2 px-3 whitespace-nowrap">적용날짜</th>
+                    <th className="text-left py-2 px-3 whitespace-nowrap">구분</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">금액</th>
+                    <th className="text-left py-2 px-3 whitespace-nowrap">적요</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">포인터 잔액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRecords.map((record, idx) => {
+                    const isCredit = record.type === "grant";
+                    return (
+                      <tr
+                        key={record.id}
+                        className={`border-b ${isCredit ? "bg-amber-50 dark:bg-amber-950/30" : ""}`}
+                        data-testid={`row-pointer-${idx}`}
+                      >
+                        <td className="py-2 px-3 text-center whitespace-nowrap">{formatDateShort(record.createdAt)}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">
+                          <span className={isCredit ? "text-amber-600 dark:text-amber-400 font-medium" : "font-medium"}>
+                            {pointerTypeLabels[record.type] || record.type}
+                          </span>
+                        </td>
+                        <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${isCredit ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                          {isCredit ? `+${record.amount.toLocaleString()}P` : `-${record.amount.toLocaleString()}P`}
+                        </td>
+                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{record.description || "-"}</td>
+                        <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{record.balanceAfter.toLocaleString()}P</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/20 font-semibold">
+                    <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
+                    <td className="py-2 px-3 text-right">
+                      <span className="text-amber-600 dark:text-amber-400">+{totalGrant.toLocaleString()}P</span>
+                      {" / "}
+                      <span className="text-red-600 dark:text-red-400">-{(totalDeduct + totalExpire).toLocaleString()}P</span>
+                    </td>
+                    <td className="py-2 px-3"></td>
+                    <td className="py-2 px-3 text-right">{lastBalance.toLocaleString()}P</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="md:hidden space-y-2">
+              {pagedRecords.map((record, idx) => {
+                const isCredit = record.type === "grant";
+                return (
+                  <Card
+                    key={record.id}
+                    className={isCredit ? "border-amber-200 dark:border-amber-800" : ""}
+                    data-testid={`card-pointer-${idx}`}
+                  >
+                    <CardContent className="p-3 space-y-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs text-muted-foreground">{formatDateShort(record.createdAt)}</span>
+                        <span className="text-xs font-medium">잔액: {record.balanceAfter.toLocaleString()}P</span>
+                      </div>
+                      <div className={`font-medium text-sm ${isCredit ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+                        {pointerTypeLabels[record.type] || record.type}
+                        <span className="ml-2">
+                          {isCredit ? `+${record.amount.toLocaleString()}P` : `-${record.amount.toLocaleString()}P`}
+                        </span>
+                      </div>
+                      {record.description && (
+                        <div className="text-xs text-muted-foreground">{record.description}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex flex-col gap-1 text-sm">
+                    <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                      <span>충전합계</span>
+                      <span>+{totalGrant.toLocaleString()}P</span>
+                    </div>
+                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                      <span>차감합계</span>
+                      <span>-{(totalDeduct + totalExpire).toLocaleString()}P</span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t pt-1">
+                      <span>포인터 잔액</span>
+                      <span>{lastBalance.toLocaleString()}P</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-pointer-prev">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">{page} / {totalPages}</span>
+            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-pointer-next">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function MemberSettlementTab() {
@@ -96,31 +438,6 @@ export default function MemberSettlementTab() {
     },
   });
 
-  const { data: depositRecords } = useQuery<{ records: DepositRecord[]; total: number }>({
-    queryKey: ["/api/member/my-deposit-history", depositDateRange.dateRange.startDate, depositDateRange.dateRange.endDate],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (depositDateRange.dateRange.startDate) params.set("startDate", depositDateRange.dateRange.startDate);
-      if (depositDateRange.dateRange.endDate) params.set("endDate", depositDateRange.dateRange.endDate);
-      params.set("limit", "100");
-      const res = await fetch(`/api/member/my-deposit-history?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) throw new Error("조회 실패");
-      return res.json();
-    },
-  });
-
-  const { data: pointerRecords } = useQuery<{ records: PointerRecord[]; total: number }>({
-    queryKey: ["/api/member/my-pointer-history", pointerDateRange.dateRange.startDate, pointerDateRange.dateRange.endDate],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (pointerDateRange.dateRange.startDate) params.set("startDate", pointerDateRange.dateRange.startDate);
-      if (pointerDateRange.dateRange.endDate) params.set("endDate", pointerDateRange.dateRange.endDate);
-      params.set("limit", "100");
-      const res = await fetch(`/api/member/my-pointer-history?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) throw new Error("조회 실패");
-      return res.json();
-    },
-  });
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -377,134 +694,11 @@ export default function MemberSettlementTab() {
         </TabsContent>
 
         <TabsContent value="deposit-history">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  예치금 이력
-                </CardTitle>
-                <DateRangeFilter
-                  onChange={depositDateRange.setDateRange}
-                  defaultPreset="month"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="overflow-hidden">
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[700px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">금액</TableHead>
-                      <TableHead className="text-right">잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!depositRecords?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          예치금 이력이 없습니다
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      depositRecords.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={record.type === "charge" ? "default" : "destructive"}
-                              className="no-default-active-elevate"
-                            >
-                              {typeLabels[record.type] || record.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${record.type === "charge" ? "text-emerald-600" : "text-red-600"}`}>
-                            {record.type === "charge" ? "+" : "-"}{record.amount.toLocaleString()}원
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}원</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">
-                            {record.description?.includes('뱅크다') ? (
-                              <span className="flex items-center gap-1">
-                                <Badge variant="outline" className="no-default-active-elevate text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-600">
-                                  {record.description?.includes('수동매칭') ? '수동매칭' : '자동입금'}
-                                </Badge>
-                                <span className="truncate">{record.description}</span>
-                              </span>
-                            ) : (record.description || "-")}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {depositRecords && <p className="text-sm text-muted-foreground mt-2">총 {depositRecords.total}건</p>}
-            </CardContent>
-          </Card>
+          <DepositHistoryTab dateRange={depositDateRange} />
         </TabsContent>
 
         <TabsContent value="pointer-history">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Gift className="h-5 w-5" />
-                  포인터 이력
-                </CardTitle>
-                <DateRangeFilter
-                  onChange={pointerDateRange.setDateRange}
-                  defaultPreset="month"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="overflow-hidden">
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[700px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">금액</TableHead>
-                      <TableHead className="text-right">잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!pointerRecords?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          포인터 이력이 없습니다
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      pointerRecords.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={record.type === "grant" ? "default" : "destructive"}
-                              className="no-default-active-elevate"
-                            >
-                              {typeLabels[record.type] || record.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${record.type === "grant" ? "text-emerald-600" : "text-red-600"}`}>
-                            {record.type === "grant" ? "+" : "-"}{record.amount.toLocaleString()}P
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}P</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {pointerRecords && <p className="text-sm text-muted-foreground mt-2">총 {pointerRecords.total}건</p>}
-            </CardContent>
-          </Card>
+          <PointerHistoryTab dateRange={pointerDateRange} />
         </TabsContent>
       </Tabs>
     </div>
