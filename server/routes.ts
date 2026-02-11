@@ -12383,6 +12383,7 @@ export async function registerRoutes(
       const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
       const XLSX = await import('xlsx');
       const wsData = [
+        [`조회기간: ${startDate || '전체'} ~ ${endDate || '전체'}`],
         ['순위', '회원ID', '업체명', '거래시작일', '거래종료일', '주문건수', '매출액', '평균주문금액', '매출비중(%)'],
         ...rows.map((r, i) => {
           const rev = Number(r.revenue || 0);
@@ -12613,6 +12614,7 @@ export async function registerRoutes(
       const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
       const XLSX = await import('xlsx');
       const wsData = [
+        [`조회기간: ${startDate || '전체'} ~ ${endDate || '전체'}`],
         ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '공급처', '판매수량', '매출액', '매출비중(%)'],
         ...rows.map((r, i) => {
           const rev = Number(r.revenue || 0);
@@ -13096,6 +13098,7 @@ export async function registerRoutes(
       const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
       const XLSX = await import('xlsx');
       const wsData = [
+        [`조회기간: ${startDate || '전체'} ~ ${endDate || '전체'}`],
         ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '구매수량', '매입금액', '매입비중(%)'],
         ...rows.map((r, i) => {
           const rev = Number(r.revenue || 0);
