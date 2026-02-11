@@ -1003,7 +1003,7 @@ export default function AdminStatsPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-stats-page">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <BarChart3 className="h-6 w-6" />
           <h1 className="text-2xl font-bold">매출 통계</h1>
