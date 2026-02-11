@@ -396,7 +396,7 @@ export default function AdminSettlements() {
                     {!settlements?.records?.length ? (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          정산 이력이 없습니다
+                          선택한 기간에 정산 이력이 없습니다
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -440,7 +440,18 @@ export default function AdminSettlements() {
                 />
               </div>
             </CardHeader>
-            <CardContent className="overflow-hidden">
+            <CardContent className="overflow-hidden space-y-3">
+              {depositRecords?.records?.length ? (
+                <div className="flex flex-wrap gap-4 items-center text-sm">
+                  <span className="text-muted-foreground">총 {depositRecords.total}건</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                  </span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                  </span>
+                </div>
+              ) : null}
               <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
                 <Table className="min-w-[900px]">
                   <TableHeader className="sticky top-0 z-10 bg-background">
@@ -457,7 +468,7 @@ export default function AdminSettlements() {
                     {!depositRecords?.records?.length ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          예치금 이력이 없습니다
+                          선택한 기간에 예치금 이력이 없습니다
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -493,7 +504,6 @@ export default function AdminSettlements() {
                   </TableBody>
                 </Table>
               </div>
-              {depositRecords && <p className="text-sm text-muted-foreground mt-2">총 {depositRecords.total}건</p>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -512,7 +522,18 @@ export default function AdminSettlements() {
                 />
               </div>
             </CardHeader>
-            <CardContent className="overflow-hidden">
+            <CardContent className="overflow-hidden space-y-3">
+              {pointerRecords?.records?.length ? (
+                <div className="flex flex-wrap gap-4 items-center text-sm">
+                  <span className="text-muted-foreground">총 {pointerRecords.total}건</span>
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">
+                    지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                  </span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                  </span>
+                </div>
+              ) : null}
               <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
                 <Table className="min-w-[900px]">
                   <TableHeader className="sticky top-0 z-10 bg-background">
@@ -529,7 +550,7 @@ export default function AdminSettlements() {
                     {!pointerRecords?.records?.length ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          포인터 이력이 없습니다
+                          선택한 기간에 포인터 이력이 없습니다
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -556,7 +577,6 @@ export default function AdminSettlements() {
                   </TableBody>
                 </Table>
               </div>
-              {pointerRecords && <p className="text-sm text-muted-foreground mt-2">총 {pointerRecords.total}건</p>}
             </CardContent>
           </Card>
         </TabsContent>
