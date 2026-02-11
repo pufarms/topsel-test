@@ -10181,7 +10181,7 @@ export async function registerRoutes(
           .from(settlementHistory)
           .leftJoin(members, eq(settlementHistory.memberId, members.id))
           .where(whereClause)
-          .orderBy(desc(settlementHistory.createdAt))
+          .orderBy(asc(settlementHistory.createdAt))
           .limit(limitNum)
           .offset(offset),
         db.select({ count: sql<number>`count(*)` })
