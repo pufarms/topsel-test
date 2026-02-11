@@ -230,7 +230,7 @@ export default function MemberSettlementTab() {
                 <span className="text-muted-foreground">총 {allItems.length}건</span>
                 <span className="font-semibold">주문합계: {formatCurrency(totalOrderAmount)}</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금합계: {formatCurrency(totalDeposit + totalPointer)}</span>
-                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency((balanceData?.deposit || 0) + (balanceData?.point || 0))}</span>
+                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</span>
               </div>
 
               {settlementViewLoading ? (
