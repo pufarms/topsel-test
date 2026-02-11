@@ -6072,7 +6072,7 @@ export async function registerRoutes(
       const excludeStatuses = ['취소', '회원취소', '주문조정'];
       const projectedStatuses = ['대기', '상품준비중', '배송준비중'];
       
-      const calcSales = async (start: Date, end: Date): Promise<{ confirmed: number; projected: number }> => {
+      const calcSales = async (start: Date, end: Date): Promise<{ confirmed: number; projected: number; statusCounts: { pending: number; preparing: number; readyToShip: number } }> => {
         const confirmedResult = await db.select({
           total: sql<string>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`
         })
@@ -6096,6 +6096,25 @@ export async function registerRoutes(
           inArray(pendingOrders.status, projectedStatuses)
         ));
         let projectedTotal = parseInt(projectedConfirmedResult[0]?.total || '0', 10);
+
+        const statusCountResult = await db.select({
+          status: pendingOrders.status,
+          count: sql<string>`COUNT(*)`
+        })
+        .from(pendingOrders)
+        .where(and(
+          gte(pendingOrders.createdAt, start),
+          lt(pendingOrders.createdAt, end),
+          inArray(pendingOrders.status, projectedStatuses)
+        ))
+        .groupBy(pendingOrders.status);
+
+        const statusCounts = { pending: 0, preparing: 0, readyToShip: 0 };
+        for (const row of statusCountResult) {
+          if (row.status === '대기') statusCounts.pending = parseInt(row.count || '0', 10);
+          else if (row.status === '상품준비중') statusCounts.preparing = parseInt(row.count || '0', 10);
+          else if (row.status === '배송준비중') statusCounts.readyToShip = parseInt(row.count || '0', 10);
+        }
 
         const unconfirmedRows = await db.select({
           memberId: pendingOrders.memberId,
@@ -6125,7 +6144,7 @@ export async function registerRoutes(
           }
         }
 
-        return { confirmed, projected: projectedTotal };
+        return { confirmed, projected: projectedTotal, statusCounts };
       };
 
       const [today, yesterday, lastMonth, thisMonth] = await Promise.all([
@@ -6159,6 +6178,12 @@ export async function registerRoutes(
           yesterday: yesterday.projected,
           lastMonth: lastMonth.projected,
           thisMonth: thisMonth.projected,
+        },
+        projectedStatusCounts: {
+          today: today.statusCounts,
+          yesterday: yesterday.statusCounts,
+          lastMonth: lastMonth.statusCounts,
+          thisMonth: thisMonth.statusCounts,
         },
       });
     } catch (error: any) {

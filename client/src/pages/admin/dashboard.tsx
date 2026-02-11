@@ -56,9 +56,10 @@ interface StatCardProps {
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
   variant?: "default" | "primary" | "success" | "warning" | "danger";
+  subMessage?: string;
 }
 
-function StatCard({ title, value, icon, trend, trendValue, variant = "default" }: StatCardProps) {
+function StatCard({ title, value, icon, trend, trendValue, variant = "default", subMessage }: StatCardProps) {
   const variantStyles = {
     default: "bg-card border",
     primary: "bg-primary/5 border-primary/20",
@@ -95,6 +96,12 @@ function StatCard({ title, value, icon, trend, trendValue, variant = "default" }
           </div>
         )}
       </div>
+      {subMessage && (
+        <div className="mt-2 flex items-start gap-1">
+          <AlertCircle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
+          <span className="text-xs text-amber-600 dark:text-amber-400 leading-tight">{subMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -189,6 +196,12 @@ export default function AdminDashboard() {
     trendPercent: number | null;
     confirmed: { today: number; yesterday: number; lastMonth: number; thisMonth: number };
     projected: { today: number; yesterday: number; lastMonth: number; thisMonth: number };
+    projectedStatusCounts: {
+      today: { pending: number; preparing: number; readyToShip: number };
+      yesterday: { pending: number; preparing: number; readyToShip: number };
+      lastMonth: { pending: number; preparing: number; readyToShip: number };
+      thisMonth: { pending: number; preparing: number; readyToShip: number };
+    };
   }>({
     queryKey: ["/api/admin/sales-stats"],
   });
@@ -357,36 +370,67 @@ export default function AdminDashboard() {
               />
             </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">예상매출</span>
-              <span className="text-xs text-muted-foreground">(대기~배송준비중, 정산 전)</span>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard
-                title="금일 예상매출"
-                value={`${(salesStats?.projected?.today || 0).toLocaleString("ko-KR")}원`}
-                icon={<TrendingUp className="h-4 w-4" />}
-                variant="warning"
-              />
-              <StatCard
-                title="전일 예상매출"
-                value={`${(salesStats?.projected?.yesterday || 0).toLocaleString("ko-KR")}원`}
-                icon={<Clock className="h-4 w-4" />}
-              />
-              <StatCard
-                title="전월 예상매출"
-                value={`${(salesStats?.projected?.lastMonth || 0).toLocaleString("ko-KR")}원`}
-                icon={<Calendar className="h-4 w-4" />}
-              />
-              <StatCard
-                title="이번달 예상매출"
-                value={`${(salesStats?.projected?.thisMonth || 0).toLocaleString("ko-KR")}원`}
-                icon={<TrendingUp className="h-4 w-4" />}
-              />
-            </div>
-          </div>
+          {(() => {
+            const buildStatusMessage = (counts: { pending: number; preparing: number; readyToShip: number } | undefined, timeLabel: string): string | undefined => {
+              if (!counts) return undefined;
+              const parts: string[] = [];
+              if (counts.preparing > 0) parts.push(`상품준비중 ${counts.preparing}건`);
+              if (counts.readyToShip > 0) parts.push(`배송준비중 ${counts.readyToShip}건`);
+              if (counts.pending > 0) parts.push(`대기 ${counts.pending}건`);
+              if (parts.length === 0) return undefined;
+              return `${timeLabel} ${parts.join(', ')}이 남아있습니다`;
+            };
+
+            const todayMsg = (salesStats?.projected?.today || 0) > 0
+              ? buildStatusMessage(salesStats?.projectedStatusCounts?.today, '오늘')
+              : undefined;
+            const yesterdayMsg = (salesStats?.projected?.yesterday || 0) > 0
+              ? buildStatusMessage(salesStats?.projectedStatusCounts?.yesterday, '어제')
+              : undefined;
+            const lastMonthMsg = (salesStats?.projected?.lastMonth || 0) > 0
+              ? buildStatusMessage(salesStats?.projectedStatusCounts?.lastMonth, '전월')
+              : undefined;
+            const thisMonthMsg = (salesStats?.projected?.thisMonth || 0) > 0
+              ? buildStatusMessage(salesStats?.projectedStatusCounts?.thisMonth, '이번달')
+              : undefined;
+
+            return (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">예상매출</span>
+                  <span className="text-xs text-muted-foreground">(대기~배송준비중, 정산 전)</span>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <StatCard
+                    title="금일 예상매출"
+                    value={`${(salesStats?.projected?.today || 0).toLocaleString("ko-KR")}원`}
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    variant="warning"
+                    subMessage={todayMsg}
+                  />
+                  <StatCard
+                    title="전일 예상매출"
+                    value={`${(salesStats?.projected?.yesterday || 0).toLocaleString("ko-KR")}원`}
+                    icon={<Clock className="h-4 w-4" />}
+                    subMessage={yesterdayMsg}
+                  />
+                  <StatCard
+                    title="전월 예상매출"
+                    value={`${(salesStats?.projected?.lastMonth || 0).toLocaleString("ko-KR")}원`}
+                    icon={<Calendar className="h-4 w-4" />}
+                    subMessage={lastMonthMsg}
+                  />
+                  <StatCard
+                    title="이번달 예상매출"
+                    value={`${(salesStats?.projected?.thisMonth || 0).toLocaleString("ko-KR")}원`}
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    subMessage={thisMonthMsg}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
