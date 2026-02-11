@@ -6439,7 +6439,12 @@ export async function registerRoutes(
         };
       });
       const contentHash = crypto.createHash('sha256').update(JSON.stringify(dataForHash)).digest('hex');
-      const fileName = req.file.originalname || 'unknown.xlsx';
+      let fileName = 'unknown.xlsx';
+      try {
+        fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+      } catch {
+        fileName = req.file.originalname || 'unknown.xlsx';
+      }
       
       if (!confirmDuplicate) {
         // 중복 확인: 동일한 해시가 이미 존재하는지 검사
