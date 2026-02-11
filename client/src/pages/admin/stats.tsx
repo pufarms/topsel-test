@@ -36,6 +36,7 @@ import {
   TrendingDown,
   Search,
   Loader2,
+  CalendarIcon,
   Download,
   ChevronUp,
   ChevronDown,
@@ -62,6 +63,17 @@ import {
 } from "recharts";
 
 const CHART_COLORS = ["#5D7AF2", "#FF6B00", "#10B981", "#8B5CF6", "#F59E0B", "#94A3B8"];
+
+function DateRangeLabel({ startDate, endDate }: { startDate: string; endDate: string }) {
+  if (!startDate && !endDate) return null;
+  const label = startDate === endDate ? startDate : `${startDate} ~ ${endDate}`;
+  return (
+    <Badge variant="secondary" className="text-sm py-1 px-3" data-testid="date-range-label">
+      <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+      {label}
+    </Badge>
+  );
+}
 
 function formatRevenue(n: number): string {
   return n.toLocaleString() + "원";
@@ -1003,22 +1015,23 @@ export default function AdminStatsPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-stats-page">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <BarChart3 className="h-6 w-6" />
           <h1 className="text-2xl font-bold">매출 통계</h1>
         </div>
-        <div className="mr-4">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="month" />
-        </div>
+        <DateRangeFilter onChange={setDateRange} defaultPreset="month" showLabel={false} />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList data-testid="stats-tabs">
-          <TabsTrigger value="overview" data-testid="tab-overview">매출 개요</TabsTrigger>
-          <TabsTrigger value="by-member" data-testid="tab-by-member">회원별 매출</TabsTrigger>
-          <TabsTrigger value="by-product" data-testid="tab-by-product">상품별 매출</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList data-testid="stats-tabs">
+            <TabsTrigger value="overview" data-testid="tab-overview">매출 개요</TabsTrigger>
+            <TabsTrigger value="by-member" data-testid="tab-by-member">회원별 매출</TabsTrigger>
+            <TabsTrigger value="by-product" data-testid="tab-by-product">상품별 매출</TabsTrigger>
+          </TabsList>
+          <DateRangeLabel startDate={dateRange.startDate} endDate={dateRange.endDate} />
+        </div>
 
         <TabsContent value="overview" className="mt-4">
           <OverviewTab startDate={dateRange.startDate} endDate={dateRange.endDate} />

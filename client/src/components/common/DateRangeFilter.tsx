@@ -21,6 +21,7 @@ interface DateRangeFilterProps {
   onChange: (range: DateRangeState) => void;
   defaultPreset?: DatePreset;
   showAllOption?: boolean;
+  showLabel?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function DateRangeFilter({
   onChange,
   defaultPreset = "today",
   showAllOption = false,
+  showLabel = true,
   className,
 }: DateRangeFilterProps) {
   const [activePreset, setActivePreset] = useState<DatePreset>(defaultPreset);
@@ -129,7 +131,7 @@ export function DateRangeFilter({
         </div>
       </div>
 
-      {(activePreset === "custom" || getCurrentLabel()) && (
+      {(activePreset === "custom" || (showLabel && getCurrentLabel())) && (
         <div className="flex flex-wrap items-center gap-2 pl-0.5">
           {activePreset === "custom" && (
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -182,7 +184,7 @@ export function DateRangeFilter({
               </Popover>
             </div>
           )}
-          {getCurrentLabel() && (
+          {showLabel && getCurrentLabel() && (
             <Badge variant="secondary" className="text-sm py-1 px-3" data-testid="date-range-label">
               <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
               {getCurrentLabel()}
