@@ -427,6 +427,9 @@ export default function BankdaDeposits() {
                             <span className="font-medium" data-testid={`text-tx-name-${tx.id}`}>
                               {tx.bkjukyo}
                             </span>
+                            {tx.bketc && (
+                              <span className="ml-1 text-xs text-muted-foreground">({tx.bketc.split(/\s+/)[0]})</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-medium" data-testid={`text-tx-amount-${tx.id}`}>
                             {tx.bkinput.toLocaleString("ko-KR")}원
@@ -522,7 +525,10 @@ export default function BankdaDeposits() {
               <div className="rounded-lg border p-3 space-y-1">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm text-muted-foreground">입금자명</span>
-                  <span className="font-medium" data-testid="text-dialog-depositor">{manualMatchTx.bkjukyo}</span>
+                  <span className="font-medium" data-testid="text-dialog-depositor">
+                    {manualMatchTx.bkjukyo}
+                    {manualMatchTx.bketc && <span className="ml-1 text-xs text-muted-foreground">({manualMatchTx.bketc.split(/\s+/)[0]})</span>}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-sm text-muted-foreground">입금액</span>
