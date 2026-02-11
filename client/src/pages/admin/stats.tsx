@@ -1003,12 +1003,14 @@ export default function AdminStatsPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-stats-page">
-      <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <BarChart3 className="h-6 w-6" />
           <h1 className="text-2xl font-bold">매출 통계</h1>
         </div>
-        <DateRangeFilter onChange={setDateRange} defaultPreset="month" />
+        <div className="mr-4">
+          <DateRangeFilter onChange={setDateRange} defaultPreset="month" />
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
