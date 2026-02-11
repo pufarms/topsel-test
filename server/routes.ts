@@ -12306,6 +12306,8 @@ export async function registerRoutes(
         companyName: pendingOrders.memberCompanyName,
         orderCount: sql<number>`COUNT(*)`.as('order_count'),
         revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+        firstOrderDate: sql<string>`TO_CHAR(MIN(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'), 'YYYY-MM-DD')`.as('first_order_date'),
+        lastOrderDate: sql<string>`TO_CHAR(MAX(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'), 'YYYY-MM-DD')`.as('last_order_date'),
       }).from(pendingOrders)
         .where(and(...conditions))
         .groupBy(pendingOrders.memberId, pendingOrders.memberCompanyName)
@@ -12333,6 +12335,8 @@ export async function registerRoutes(
           orderCount: Number(m.orderCount),
           revenue: Number(m.revenue),
           avgOrderAmount: Number(m.orderCount) > 0 ? Math.round(Number(m.revenue) / Number(m.orderCount)) : 0,
+          firstOrderDate: m.firstOrderDate || '',
+          lastOrderDate: m.lastOrderDate || '',
         })),
         totalRevenue,
       });

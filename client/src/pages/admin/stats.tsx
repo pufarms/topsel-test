@@ -450,12 +450,16 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                       평균 주문금액 <SortIcon field="avgOrderAmount" />
                     </TableHead>
                     <TableHead className="text-right">매출 비중</TableHead>
+                    <TableHead className="text-center">거래 기간</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {members.map((m: any, idx: number) => {
                     const share = totalRevenue > 0 ? ((m.revenue / totalRevenue) * 100).toFixed(1) + "%" : "0%";
                     const isExpanded = expandedId === m.memberId;
+                    const dateRange = m.firstOrderDate === m.lastOrderDate
+                      ? m.firstOrderDate || "-"
+                      : `${m.firstOrderDate || ""} ~ ${m.lastOrderDate || ""}`;
                     return (
                       <>
                         <TableRow
@@ -475,10 +479,11 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                           <TableCell className="text-right font-medium">{formatRevenue(m.revenue || 0)}</TableCell>
                           <TableCell className="text-right">{formatRevenue(Math.round(m.avgOrderAmount || 0))}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground whitespace-nowrap" data-testid={`date-range-${m.memberId}`}>{dateRange}</TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow key={`detail-${m.memberId}`}>
-                            <TableCell colSpan={6} className="p-0">
+                            <TableCell colSpan={7} className="p-0">
                               <MemberDrillDown memberId={m.memberId} startDate={startDate} endDate={endDate} />
                             </TableCell>
                           </TableRow>
