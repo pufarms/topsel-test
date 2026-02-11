@@ -230,7 +230,7 @@ export default function MemberSettlementTab() {
                 <span className="text-muted-foreground">총 {allItems.length}건</span>
                 <span className="font-semibold">주문합계: {formatCurrency(totalOrderAmount)}</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금합계: {formatCurrency(totalDeposit + totalPointer)}</span>
-                <span className="font-semibold">잔액: {formatCurrency(totalBalance)}</span>
+                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency(totalBalance)}</span>
               </div>
 
               {settlementViewLoading ? (
@@ -251,7 +251,7 @@ export default function MemberSettlementTab() {
                           <th className="text-right py-2 px-3 whitespace-nowrap">공급단가</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">합계</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">입금</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap">잔액</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">예치금+포인터 잔액</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -265,11 +265,11 @@ export default function MemberSettlementTab() {
                             <td className="py-2 px-3 whitespace-nowrap">
                               {item.type === "deposit" ? (
                                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                  {item.description || "예치금 충전"}
+                                  {item.depositAmount < 0 ? "환급/예치금 환급" : "입금/예치금 충전"}
                                 </span>
                               ) : item.type === "pointer" ? (
                                 <span className="text-amber-600 dark:text-amber-400 font-medium">
-                                  {item.description || "포인터 지급"}
+                                  포인터 지급
                                 </span>
                               ) : item.productName}
                             </td>
@@ -319,8 +319,7 @@ export default function MemberSettlementTab() {
                           </div>
                           {item.type === "deposit" ? (
                             <div className={`font-medium text-sm ${item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {item.depositAmount < 0 ? `환급: -${formatCurrency(Math.abs(item.depositAmount))}` : `입금: ${formatCurrency(item.depositAmount)}`}
-                              {item.description && <span className="text-xs text-muted-foreground ml-1">({item.description})</span>}
+                              {item.depositAmount < 0 ? `환급/예치금 환급: -${formatCurrency(Math.abs(item.depositAmount))}` : `입금/예치금 충전: ${formatCurrency(item.depositAmount)}`}
                             </div>
                           ) : item.type === "pointer" ? (
                             <div className="font-medium text-sm text-amber-600 dark:text-amber-400">
@@ -351,7 +350,7 @@ export default function MemberSettlementTab() {
                             <span>{formatCurrency(totalDeposit + totalPointer)}</span>
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-1">
-                            <span>잔액</span>
+                            <span>예치금+포인터 잔액</span>
                             <span>{formatCurrency(totalBalance)}</span>
                           </div>
                         </div>
