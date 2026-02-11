@@ -10368,6 +10368,161 @@ export async function registerRoutes(
     }
   });
 
+  // 회원: 정산 현황 (협력업체 정산과 동일한 구조 - 주문행 + 입금행 시간순 머지)
+  app.get('/api/member/my-settlement-view', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const memberId = req.session.userId;
+      const { startDate, endDate } = req.query as any;
+
+      const orderConditions: any[] = [
+        eq(pendingOrders.memberId, memberId),
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+      ];
+
+      const depositConditions: any[] = [
+        eq(depositHistory.memberId, memberId),
+        inArray(depositHistory.type, ['charge', 'refund']),
+      ];
+
+      const pointerConditions: any[] = [
+        eq(pointerHistory.memberId, memberId),
+        eq(pointerHistory.type, 'grant'),
+      ];
+
+      if (startDate && endDate) {
+        const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+        orderConditions.push(gte(pendingOrders.updatedAt, startUTC));
+        orderConditions.push(lte(pendingOrders.updatedAt, endUTC));
+        depositConditions.push(gte(depositHistory.createdAt, startUTC));
+        depositConditions.push(lte(depositHistory.createdAt, endUTC));
+        pointerConditions.push(gte(pointerHistory.createdAt, startUTC));
+        pointerConditions.push(lte(pointerHistory.createdAt, endUTC));
+      }
+
+      const [orderRows, depositRows, pointerRows] = await Promise.all([
+        db.select({
+          orderDate: sql<string>`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          productName: pendingOrders.productName,
+          productCode: pendingOrders.productCode,
+          supplyPrice: pendingOrders.supplyPrice,
+          quantity: sql<number>`COUNT(*)::int`,
+        })
+          .from(pendingOrders)
+          .where(and(...orderConditions))
+          .groupBy(
+            sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+            pendingOrders.productName,
+            pendingOrders.productCode,
+            pendingOrders.supplyPrice,
+          ),
+        db.select({
+          id: depositHistory.id,
+          date: sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          type: depositHistory.type,
+          amount: depositHistory.amount,
+          description: depositHistory.description,
+        })
+          .from(depositHistory)
+          .where(and(...depositConditions)),
+        db.select({
+          id: pointerHistory.id,
+          date: sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          type: pointerHistory.type,
+          amount: pointerHistory.amount,
+          description: pointerHistory.description,
+        })
+          .from(pointerHistory)
+          .where(and(...pointerConditions)),
+      ]);
+
+      type SettlementRow = {
+        type: "order" | "deposit" | "pointer";
+        date: string;
+        productName: string;
+        productCode: string;
+        quantity: number;
+        unitPrice: number;
+        subtotal: number;
+        depositAmount: number;
+        pointerAmount: number;
+        description?: string;
+      };
+
+      const items: SettlementRow[] = [];
+
+      for (const row of orderRows) {
+        const price = row.supplyPrice || 0;
+        items.push({
+          type: "order",
+          date: row.orderDate,
+          productName: row.productName || "",
+          productCode: row.productCode || "",
+          quantity: row.quantity,
+          unitPrice: price,
+          subtotal: price * row.quantity,
+          depositAmount: 0,
+          pointerAmount: 0,
+        });
+      }
+
+      for (const row of depositRows) {
+        const signedAmount = row.type === 'refund' ? -row.amount : row.amount;
+        items.push({
+          type: "deposit",
+          date: row.date,
+          productName: "",
+          productCode: "",
+          quantity: 0,
+          unitPrice: 0,
+          subtotal: 0,
+          depositAmount: signedAmount,
+          pointerAmount: 0,
+          description: row.description || (row.type === 'charge' ? '예치금 충전' : '예치금 환급'),
+        });
+      }
+
+      for (const row of pointerRows) {
+        items.push({
+          type: "pointer",
+          date: row.date,
+          productName: "",
+          productCode: "",
+          quantity: 0,
+          unitPrice: 0,
+          subtotal: 0,
+          depositAmount: 0,
+          pointerAmount: row.amount,
+          description: row.description || '포인터 지급',
+        });
+      }
+
+      items.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        if (a.type === "deposit" || a.type === "pointer") return -1;
+        if (b.type === "deposit" || b.type === "pointer") return 1;
+        return (a.productName || "").localeCompare(b.productName || "");
+      });
+
+      const totalOrderAmount = items.filter(i => i.type === "order").reduce((s, i) => s + i.subtotal, 0);
+      const totalDeposit = items.filter(i => i.type === "deposit").reduce((s, i) => s + i.depositAmount, 0);
+      const totalPointer = items.filter(i => i.type === "pointer").reduce((s, i) => s + i.pointerAmount, 0);
+
+      res.json({
+        items,
+        totalOrderAmount,
+        totalDeposit,
+        totalPointer,
+        totalBalance: (totalDeposit + totalPointer) - totalOrderAmount,
+      });
+    } catch (error: any) {
+      console.error("Member settlement view error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // 회원: 내 정산 이력 조회
   app.get('/api/member/my-settlements', async (req, res) => {
     try {

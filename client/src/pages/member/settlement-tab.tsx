@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,22 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Wallet, CreditCard, Gift, ArrowUpDown } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
-
-interface SettlementRecord {
-  id: number;
-  memberId: string;
-  orderId: number | null;
-  settlementType: string;
-  pointerAmount: number;
-  depositAmount: number;
-  totalAmount: number;
-  pointerBalance: number;
-  depositBalance: number;
-  description: string | null;
-  createdAt: string;
-}
 
 interface DepositRecord {
   id: number;
@@ -46,14 +33,37 @@ interface PointerRecord {
   createdAt: string;
 }
 
+interface SettlementViewItem {
+  type: "order" | "deposit" | "pointer";
+  date: string;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  depositAmount: number;
+  pointerAmount: number;
+  description?: string;
+}
+
+interface SettlementViewResponse {
+  items: SettlementViewItem[];
+  totalOrderAmount: number;
+  totalDeposit: number;
+  totalPointer: number;
+  totalBalance: number;
+}
+
 const typeLabels: Record<string, string> = {
   charge: "충전",
   refund: "환급",
   deduct: "정산 차감",
   grant: "지급",
-  auto: "자동정산",
-  manual: "수동정산",
 };
+
+function formatCurrency(n: number): string {
+  return n.toLocaleString("ko-KR") + "원";
+}
 
 export default function MemberSettlementTab() {
   const [subTab, setSubTab] = useState("balance");
@@ -61,6 +71,9 @@ export default function MemberSettlementTab() {
   const settlementDateRange = useDateRange("month");
   const depositDateRange = useDateRange("month");
   const pointerDateRange = useDateRange("month");
+
+  const ITEMS_PER_PAGE = 50;
+  const [settlementPage, setSettlementPage] = useState(1);
 
   const { data: balanceData, isLoading: balanceLoading } = useQuery<{
     deposit: number;
@@ -71,14 +84,13 @@ export default function MemberSettlementTab() {
     queryKey: ["/api/member/my-balance"],
   });
 
-  const { data: settlements } = useQuery<{ records: SettlementRecord[]; total: number }>({
-    queryKey: ["/api/member/my-settlements", settlementDateRange.dateRange.startDate, settlementDateRange.dateRange.endDate],
+  const { data: settlementView, isLoading: settlementViewLoading } = useQuery<SettlementViewResponse>({
+    queryKey: ["/api/member/my-settlement-view", settlementDateRange.dateRange.startDate, settlementDateRange.dateRange.endDate],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (settlementDateRange.dateRange.startDate) params.set("startDate", settlementDateRange.dateRange.startDate);
       if (settlementDateRange.dateRange.endDate) params.set("endDate", settlementDateRange.dateRange.endDate);
-      params.set("limit", "100");
-      const res = await fetch(`/api/member/my-settlements?${params.toString()}`, { credentials: "include" });
+      const res = await fetch(`/api/member/my-settlement-view?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
@@ -114,6 +126,26 @@ export default function MemberSettlementTab() {
     const d = new Date(dateStr);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
+
+  const allItems = settlementView?.items || [];
+  const totalOrderAmount = settlementView?.totalOrderAmount || 0;
+  const totalDeposit = settlementView?.totalDeposit || 0;
+  const totalPointer = settlementView?.totalPointer || 0;
+  const totalBalance = settlementView?.totalBalance || 0;
+
+  let runningOrderTotal = 0;
+  let runningCreditTotal = 0;
+  const itemsWithBalance = allItems.map((item) => {
+    if (item.type === "order") {
+      runningOrderTotal += item.subtotal;
+    } else {
+      runningCreditTotal += (item.depositAmount + item.pointerAmount);
+    }
+    return { ...item, balance: runningCreditTotal - runningOrderTotal };
+  });
+
+  const totalPages = Math.ceil(itemsWithBalance.length / ITEMS_PER_PAGE);
+  const pagedItems = itemsWithBalance.slice((settlementPage - 1) * ITEMS_PER_PAGE, settlementPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -188,55 +220,158 @@ export default function MemberSettlementTab() {
                   정산 이력
                 </CardTitle>
                 <DateRangeFilter
-                  onChange={settlementDateRange.setDateRange}
+                  onChange={(range) => { settlementDateRange.setDateRange(range); setSettlementPage(1); }}
                   defaultPreset="month"
                 />
               </div>
             </CardHeader>
-            <CardContent className="overflow-hidden">
-              <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                <Table className="min-w-[800px]">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>일시</TableHead>
-                      <TableHead>유형</TableHead>
-                      <TableHead className="text-right">포인터 차감</TableHead>
-                      <TableHead className="text-right">예치금 차감</TableHead>
-                      <TableHead className="text-right">총액</TableHead>
-                      <TableHead className="text-right">포인터 잔액</TableHead>
-                      <TableHead className="text-right">예치금 잔액</TableHead>
-                      <TableHead>설명</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!settlements?.records?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          정산 이력이 없습니다
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      settlements.records.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="no-default-active-elevate">
-                              {typeLabels[record.settlementType] || record.settlementType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{record.pointerAmount.toLocaleString()}P</TableCell>
-                          <TableCell className="text-right">{record.depositAmount.toLocaleString()}원</TableCell>
-                          <TableCell className="text-right font-medium">{record.totalAmount.toLocaleString()}원</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.pointerBalance.toLocaleString()}P</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{record.depositBalance.toLocaleString()}원</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{record.description || "-"}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+            <CardContent className="overflow-hidden space-y-3">
+              <div className="flex flex-wrap gap-4 items-center text-sm">
+                <span className="text-muted-foreground">총 {allItems.length}건</span>
+                <span className="font-semibold">주문합계: {formatCurrency(totalOrderAmount)}</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금합계: {formatCurrency(totalDeposit + totalPointer)}</span>
+                <span className="font-semibold">잔액: {formatCurrency(totalBalance)}</span>
               </div>
-              {settlements && <p className="text-sm text-muted-foreground mt-2">총 {settlements.total}건</p>}
+
+              {settlementViewLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : allItems.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  조회된 정산 데이터가 없습니다.
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b bg-muted/30">
+                          <th className="text-center py-2 px-3 whitespace-nowrap">적용날짜</th>
+                          <th className="text-left py-2 px-3 whitespace-nowrap">상품명</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">수량</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">공급단가</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">합계</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">입금</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">잔액</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedItems.map((item, idx) => (
+                          <tr
+                            key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
+                            className={`border-b ${item.type !== "order" ? "bg-emerald-50 dark:bg-emerald-950/30" : ""}`}
+                            data-testid={`row-settlement-${idx}`}
+                          >
+                            <td className="py-2 px-3 text-center whitespace-nowrap">{item.date}</td>
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              {item.type === "deposit" ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                  {item.description || "예치금 충전"}
+                                </span>
+                              ) : item.type === "pointer" ? (
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                  {item.description || "포인터 지급"}
+                                </span>
+                              ) : item.productName}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap">
+                              {item.type === "order" ? item.quantity : ""}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap">
+                              {item.type === "order" ? formatCurrency(item.unitPrice) : ""}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
+                              {item.type === "order" ? formatCurrency(item.subtotal) : ""}
+                            </td>
+                            <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {item.type === "deposit" && item.depositAmount !== 0 ? (item.depositAmount < 0 ? `-${formatCurrency(Math.abs(item.depositAmount))}` : formatCurrency(item.depositAmount)) : ""}
+                              {item.type === "pointer" && item.pointerAmount > 0 ? `${item.pointerAmount.toLocaleString()}P` : ""}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/20 font-semibold">
+                          <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
+                          <td className="py-2 px-3 text-right">
+                            {allItems.filter(i => i.type === "order").reduce((s, i) => s + i.quantity, 0)}
+                          </td>
+                          <td className="py-2 px-3"></td>
+                          <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
+                          <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(totalDeposit + totalPointer)}</td>
+                          <td className="py-2 px-3 text-right">{formatCurrency(totalBalance)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <div className="md:hidden space-y-2">
+                    {pagedItems.map((item, idx) => (
+                      <Card
+                        key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
+                        className={item.type !== "order" ? "border-emerald-200 dark:border-emerald-800" : ""}
+                        data-testid={`card-settlement-${idx}`}
+                      >
+                        <CardContent className="p-3 space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs text-muted-foreground">{item.date}</span>
+                            <span className="text-xs font-medium">잔액: {formatCurrency(item.balance)}</span>
+                          </div>
+                          {item.type === "deposit" ? (
+                            <div className={`font-medium text-sm ${item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {item.depositAmount < 0 ? `환급: -${formatCurrency(Math.abs(item.depositAmount))}` : `입금: ${formatCurrency(item.depositAmount)}`}
+                              {item.description && <span className="text-xs text-muted-foreground ml-1">({item.description})</span>}
+                            </div>
+                          ) : item.type === "pointer" ? (
+                            <div className="font-medium text-sm text-amber-600 dark:text-amber-400">
+                              포인터: {item.pointerAmount.toLocaleString()}P
+                              {item.description && <span className="text-xs text-muted-foreground ml-1">({item.description})</span>}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="font-medium text-sm">{item.productName}</div>
+                              <div className="flex justify-between text-xs">
+                                <span>{item.quantity}개 x {formatCurrency(item.unitPrice)}</span>
+                                <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+                              </div>
+                            </>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                    <Card>
+                      <CardContent className="p-3">
+                        <div className="flex flex-col gap-1 text-sm">
+                          <div className="flex justify-between font-semibold">
+                            <span>주문합계</span>
+                            <span>{formatCurrency(totalOrderAmount)}</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                            <span>입금합계</span>
+                            <span>{formatCurrency(totalDeposit + totalPointer)}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold border-t pt-1">
+                            <span>잔액</span>
+                            <span>{formatCurrency(totalBalance)}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2">
+                  <Button size="sm" variant="outline" disabled={settlementPage <= 1} onClick={() => setSettlementPage(p => p - 1)} data-testid="button-settlement-prev">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm">{settlementPage} / {totalPages}</span>
+                  <Button size="sm" variant="outline" disabled={settlementPage >= totalPages} onClick={() => setSettlementPage(p => p + 1)} data-testid="button-settlement-next">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
