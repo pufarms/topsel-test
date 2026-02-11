@@ -23,6 +23,7 @@ import TermAgreementsPage from "@/pages/admin/term-agreements";
 import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
 import AdminSettlements from "@/pages/admin/settlements";
+import BankdaDeposits from "@/pages/admin/bankda-deposits";
 import SettlementDocs from "@/pages/admin/settlement-docs";
 import CategoryManagement from "@/pages/admin/products/categories";
 import ProductRegistrationPage from "@/pages/admin/products/registration";
@@ -182,6 +183,9 @@ function Router() {
       </Route>
       <Route path="/admin/settlements">
         <AdminRoute><AdminSettlements /></AdminRoute>
+      </Route>
+      <Route path="/admin/bankda-deposits">
+        <AdminRoute><BankdaDeposits /></AdminRoute>
       </Route>
       <Route path="/admin/settlement-docs">
         <AdminRoute><SettlementDocs /></AdminRoute>

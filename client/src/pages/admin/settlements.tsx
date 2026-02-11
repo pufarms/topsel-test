@@ -476,7 +476,16 @@ export default function AdminSettlements() {
                             {record.type === "charge" ? "+" : "-"}{record.amount.toLocaleString()}원
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}원</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">
+                            {record.description?.includes('뱅크다') ? (
+                              <span className="flex items-center gap-1">
+                                <Badge variant="outline" className="no-default-active-elevate text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-600">
+                                  {record.description?.includes('수동매칭') ? '수동매칭' : '자동입금'}
+                                </Badge>
+                                <span className="truncate">{record.description}</span>
+                              </span>
+                            ) : (record.description || "-")}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

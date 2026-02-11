@@ -1599,3 +1599,46 @@ export const insertVendorPaymentSchema = createInsertSchema(vendorPayments).omit
 });
 export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type NewVendorPayment = z.infer<typeof insertVendorPaymentSchema>;
+
+// ========================================
+// 뱅크다 입금 자동충전 시스템
+// ========================================
+
+export const bankdaMatchStatuses = ["pending", "matched", "unmatched", "duplicate_name", "manual", "ignored"] as const;
+
+export const bankdaTransactions = pgTable("bankda_transactions", {
+  id: serial("id").primaryKey(),
+  bkcode: varchar("bkcode", { length: 50 }).unique().notNull(),
+  accountnum: varchar("accountnum", { length: 30 }),
+  bkname: varchar("bkname", { length: 50 }),
+  bkdate: varchar("bkdate", { length: 8 }),
+  bktime: varchar("bktime", { length: 6 }),
+  bkjukyo: varchar("bkjukyo", { length: 100 }),
+  bkcontent: varchar("bkcontent", { length: 200 }),
+  bketc: varchar("bketc", { length: 200 }),
+  bkinput: integer("bkinput").default(0),
+  bkoutput: integer("bkoutput").default(0),
+  bkjango: integer("bkjango").default(0),
+  matchStatus: text("match_status").notNull().default("pending"),
+  matchedMemberId: varchar("matched_member_id").references(() => members.id),
+  matchedAt: timestamp("matched_at"),
+  depositCharged: boolean("deposit_charged").default(false),
+  depositHistoryId: varchar("deposit_history_id"),
+  chargeError: text("charge_error"),
+  adminMemo: text("admin_memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  bkcodeIdx: index("idx_bankda_bkcode").on(table.bkcode),
+  matchStatusIdx: index("idx_bankda_match_status").on(table.matchStatus),
+  bkdateIdx: index("idx_bankda_bkdate").on(table.bkdate),
+  bkjukyoIdx: index("idx_bankda_bkjukyo").on(table.bkjukyo),
+}));
+
+export const insertBankdaTransactionSchema = createInsertSchema(bankdaTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BankdaTransaction = typeof bankdaTransactions.$inferSelect;
+export type NewBankdaTransaction = z.infer<typeof insertBankdaTransactionSchema>;

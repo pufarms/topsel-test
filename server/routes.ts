@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -11542,6 +11542,429 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("주문 배정 실패:", error);
       res.status(500).json({ message: error.message || "주문 배정 실패" });
+    }
+  });
+
+  // ========================================
+  // 뱅크다 입금 자동충전 API
+  // ========================================
+
+  function generateDummyBankdaData() {
+    const now = new Date();
+    const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const timeStr = kstDate.toISOString().slice(11, 19).replace(/:/g, '');
+    
+    const dummyNames = ['홍길동', '김철수', '이영희', '박지민', '최수현'];
+    const entries = [];
+    for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+      const amount = (Math.floor(Math.random() * 50) + 1) * 10000;
+      entries.push({
+        bkcode: `DUMMY${dateStr}${timeStr}${String(i).padStart(3, '0')}`,
+        accountnum: '3520000000001',
+        bkname: '농협',
+        bkdate: dateStr,
+        bktime: timeStr,
+        bkjukyo: dummyNames[Math.floor(Math.random() * dummyNames.length)],
+        bkcontent: '타행이체',
+        bketc: '인터넷뱅킹',
+        bkinput: amount,
+        bkoutput: 0,
+        bkjango: 10000000 + amount,
+      });
+    }
+    return entries;
+  }
+
+  async function syncBankdaTransactions(useDummy: boolean = false) {
+    let bankEntries: any[] = [];
+
+    if (!useDummy && process.env.BANKDA_ENABLED === 'true' && process.env.BANKDA_ACCESS_TOKEN) {
+      try {
+        const now = new Date();
+        const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
+
+        const params = new URLSearchParams({
+          datefrom: dateStr,
+          dateto: dateStr,
+          datatype: 'json',
+          charset: 'utf8',
+        });
+        if (process.env.BANKDA_ACCOUNT_NUM) {
+          params.set('accountnum', process.env.BANKDA_ACCOUNT_NUM);
+        }
+
+        const response = await fetch(process.env.BANKDA_API_URL || 'https://a.bankda.com/dtsvc/bank_tr.php', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.BANKDA_ACCESS_TOKEN}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+        const data = await response.json();
+        bankEntries = data?.response?.bank || [];
+      } catch (err: any) {
+        console.error('뱅크다 API 호출 실패:', err.message);
+        return { success: false, error: err.message, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
+      }
+    } else {
+      bankEntries = generateDummyBankdaData();
+    }
+
+    const depositEntries = bankEntries.filter((e: any) => parseInt(e.bkinput) > 0);
+
+    let processed = 0, matched = 0, unmatched = 0, duplicateNames = 0, skipped = 0;
+
+    for (const entry of depositEntries) {
+      try {
+        const existing = await db.select({ id: bankdaTransactions.id })
+          .from(bankdaTransactions)
+          .where(eq(bankdaTransactions.bkcode, entry.bkcode));
+
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        const depositorName = (entry.bkjukyo || '').replace(/\s/g, '');
+        const matchingMembers = await db.select({ id: members.id, memberName: members.memberName, deposit: members.deposit })
+          .from(members)
+          .where(sql`REPLACE(${members.memberName}, ' ', '') = ${depositorName}`);
+
+        let matchStatus = 'pending';
+        let matchedMemberId: string | null = null;
+
+        if (matchingMembers.length === 1) {
+          matchStatus = 'matched';
+          matchedMemberId = matchingMembers[0].id;
+
+          const inputAmount = parseInt(entry.bkinput);
+          try {
+            await db.transaction(async (tx) => {
+              const [lockedMember] = await tx.select().from(members).where(eq(members.id, matchedMemberId!)).for('update');
+              if (!lockedMember) throw new Error('회원 없음');
+
+              const newDeposit = lockedMember.deposit + inputAmount;
+              await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, matchedMemberId!));
+              const [dh] = await tx.insert(depositHistory).values({
+                memberId: matchedMemberId!,
+                type: 'charge',
+                amount: inputAmount,
+                balanceAfter: newDeposit,
+                description: `뱅크다 자동입금 (입금자: ${entry.bkjukyo})`,
+              }).returning();
+
+              await tx.insert(bankdaTransactions).values({
+                bkcode: entry.bkcode,
+                accountnum: entry.accountnum || null,
+                bkname: entry.bkname || null,
+                bkdate: entry.bkdate || null,
+                bktime: entry.bktime || null,
+                bkjukyo: entry.bkjukyo || null,
+                bkcontent: entry.bkcontent || null,
+                bketc: entry.bketc || null,
+                bkinput: inputAmount,
+                bkoutput: parseInt(entry.bkoutput) || 0,
+                bkjango: parseInt(entry.bkjango) || 0,
+                matchStatus: 'matched',
+                matchedMemberId,
+                matchedAt: new Date(),
+                depositCharged: true,
+                depositHistoryId: dh.id,
+              });
+            });
+            matched++;
+          } catch (chargeErr: any) {
+            await db.insert(bankdaTransactions).values({
+              bkcode: entry.bkcode,
+              accountnum: entry.accountnum || null,
+              bkname: entry.bkname || null,
+              bkdate: entry.bkdate || null,
+              bktime: entry.bktime || null,
+              bkjukyo: entry.bkjukyo || null,
+              bkcontent: entry.bkcontent || null,
+              bketc: entry.bketc || null,
+              bkinput: parseInt(entry.bkinput),
+              bkoutput: parseInt(entry.bkoutput) || 0,
+              bkjango: parseInt(entry.bkjango) || 0,
+              matchStatus: 'matched',
+              matchedMemberId,
+              matchedAt: new Date(),
+              depositCharged: false,
+              chargeError: chargeErr.message,
+            }).onConflictDoNothing();
+            matched++;
+          }
+          processed++;
+          continue;
+        } else if (matchingMembers.length === 0) {
+          matchStatus = 'unmatched';
+          unmatched++;
+        } else {
+          matchStatus = 'duplicate_name';
+          duplicateNames++;
+        }
+
+        await db.insert(bankdaTransactions).values({
+          bkcode: entry.bkcode,
+          accountnum: entry.accountnum || null,
+          bkname: entry.bkname || null,
+          bkdate: entry.bkdate || null,
+          bktime: entry.bktime || null,
+          bkjukyo: entry.bkjukyo || null,
+          bkcontent: entry.bkcontent || null,
+          bketc: entry.bketc || null,
+          bkinput: parseInt(entry.bkinput),
+          bkoutput: parseInt(entry.bkoutput) || 0,
+          bkjango: parseInt(entry.bkjango) || 0,
+          matchStatus,
+          matchedMemberId,
+          matchedAt: matchedMemberId ? new Date() : null,
+        }).onConflictDoNothing();
+        processed++;
+      } catch (err: any) {
+        console.error(`뱅크다 거래 처리 오류 (bkcode: ${entry.bkcode}):`, err.message);
+      }
+    }
+
+    return { success: true, processed, matched, unmatched, duplicateNames, skipped, total: depositEntries.length };
+  }
+
+  // 관리자: 뱅크다 입금 내역 조회
+  app.get('/api/admin/bankda/transactions', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const { status, startDate, endDate } = req.query;
+      const conditions: any[] = [];
+
+      if (status && status !== 'all') {
+        conditions.push(eq(bankdaTransactions.matchStatus, status as string));
+      }
+      if (startDate) {
+        conditions.push(gte(bankdaTransactions.bkdate, (startDate as string).replace(/-/g, '')));
+      }
+      if (endDate) {
+        conditions.push(lte(bankdaTransactions.bkdate, (endDate as string).replace(/-/g, '')));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const txns = await db.select().from(bankdaTransactions)
+        .where(whereClause)
+        .orderBy(desc(bankdaTransactions.createdAt));
+
+      const memberIds = txns.filter(t => t.matchedMemberId).map(t => t.matchedMemberId!);
+      let memberMap = new Map<string, { memberName: string | null; companyName: string }>();
+      if (memberIds.length > 0) {
+        const memberList = await db.select({ id: members.id, memberName: members.memberName, companyName: members.companyName })
+          .from(members)
+          .where(inArray(members.id, memberIds));
+        memberMap = new Map(memberList.map(m => [m.id, { memberName: m.memberName, companyName: m.companyName }]));
+      }
+
+      const result = txns.map(t => ({
+        ...t,
+        matchedMember: t.matchedMemberId ? memberMap.get(t.matchedMemberId) || null : null,
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 뱅크다 요약
+  app.get('/api/admin/bankda/summary', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const now = new Date();
+      const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const todayStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
+
+      const todayTxns = await db.select({
+        count: sql<string>`COUNT(*)`,
+        totalAmount: sql<string>`COALESCE(SUM(${bankdaTransactions.bkinput}), 0)`
+      }).from(bankdaTransactions).where(eq(bankdaTransactions.bkdate, todayStr));
+
+      const matchedCount = await db.select({ count: sql<string>`COUNT(*)` })
+        .from(bankdaTransactions)
+        .where(and(eq(bankdaTransactions.bkdate, todayStr), eq(bankdaTransactions.matchStatus, 'matched')));
+
+      const unmatchedCount = await db.select({ count: sql<string>`COUNT(*)` })
+        .from(bankdaTransactions)
+        .where(and(
+          eq(bankdaTransactions.bkdate, todayStr),
+          inArray(bankdaTransactions.matchStatus, ['unmatched', 'duplicate_name', 'pending'])
+        ));
+
+      const lastSync = await db.select({ createdAt: bankdaTransactions.createdAt })
+        .from(bankdaTransactions)
+        .orderBy(desc(bankdaTransactions.createdAt))
+        .limit(1);
+
+      res.json({
+        todayCount: parseInt(todayTxns[0]?.count || '0'),
+        todayAmount: parseInt(todayTxns[0]?.totalAmount || '0'),
+        matchedCount: parseInt(matchedCount[0]?.count || '0'),
+        unmatchedCount: parseInt(unmatchedCount[0]?.count || '0'),
+        lastSyncAt: lastSync[0]?.createdAt || null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 수동 동기화
+  app.post('/api/admin/bankda/sync', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const useDummy = req.body?.useDummy === true || process.env.BANKDA_ENABLED !== 'true';
+      const result = await syncBankdaTransactions(useDummy);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 수동 매칭
+  app.post('/api/admin/bankda/transactions/:id/manual-match', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const txnId = parseInt(req.params.id);
+      const { memberId } = req.body;
+      if (!memberId) return res.status(400).json({ message: "회원 ID가 필요합니다" });
+
+      const [txn] = await db.select().from(bankdaTransactions).where(eq(bankdaTransactions.id, txnId));
+      if (!txn) return res.status(404).json({ message: "거래를 찾을 수 없습니다" });
+      if (txn.depositCharged) return res.status(400).json({ message: "이미 충전된 거래입니다" });
+
+      const inputAmount = txn.bkinput || 0;
+
+      await db.transaction(async (tx) => {
+        const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
+        if (!lockedMember) throw new Error('회원을 찾을 수 없습니다');
+
+        const newDeposit = lockedMember.deposit + inputAmount;
+        await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+        const [dh] = await tx.insert(depositHistory).values({
+          memberId,
+          type: 'charge',
+          amount: inputAmount,
+          balanceAfter: newDeposit,
+          description: `뱅크다 수동매칭 입금 (입금자: ${txn.bkjukyo}, 관리자: ${user.name})`,
+          adminId: req.session.userId,
+        }).returning();
+
+        await tx.update(bankdaTransactions).set({
+          matchStatus: 'manual',
+          matchedMemberId: memberId,
+          matchedAt: new Date(),
+          depositCharged: true,
+          depositHistoryId: dh.id,
+          updatedAt: new Date(),
+        }).where(eq(bankdaTransactions.id, txnId));
+      });
+
+      res.json({ success: true, message: `${inputAmount.toLocaleString()}원 수동 매칭 충전 완료` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 무시 처리
+  app.post('/api/admin/bankda/transactions/:id/ignore', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const txnId = parseInt(req.params.id);
+      const { memo } = req.body;
+
+      const [txn] = await db.select().from(bankdaTransactions).where(eq(bankdaTransactions.id, txnId));
+      if (!txn) return res.status(404).json({ message: "거래를 찾을 수 없습니다" });
+      if (txn.depositCharged) return res.status(400).json({ message: "이미 충전된 거래는 무시할 수 없습니다" });
+
+      await db.update(bankdaTransactions).set({
+        matchStatus: 'ignored',
+        adminMemo: memo || '관리자 무시 처리',
+        updatedAt: new Date(),
+      }).where(eq(bankdaTransactions.id, txnId));
+
+      res.json({ success: true, message: "무시 처리 완료" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 회원 검색 (뱅크다 수동매칭용)
+  app.get('/api/admin/bankda/search-members', async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "user") {
+      return res.status(401).json({ message: "관리자 로그인이 필요합니다" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ message: "접근 권한이 없습니다" });
+    }
+
+    try {
+      const { q } = req.query;
+      if (!q) return res.json([]);
+
+      const searchTerm = `%${q}%`;
+      const result = await db.select({
+        id: members.id,
+        memberName: members.memberName,
+        companyName: members.companyName,
+        phone: members.phone,
+        deposit: members.deposit,
+        grade: members.grade,
+      })
+      .from(members)
+      .where(or(
+        sql`${members.memberName} ILIKE ${searchTerm}`,
+        sql`${members.companyName} ILIKE ${searchTerm}`,
+        sql`${members.phone} ILIKE ${searchTerm}`,
+      ))
+      .limit(20);
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
