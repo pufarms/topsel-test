@@ -13221,12 +13221,17 @@ export async function registerRoutes(
   // 회계장부 API - Accounting System
   // ========================================
 
+  const requireAccountingAdmin = async (req: any, res: any): Promise<boolean> => {
+    if (!req.session.userId) { res.status(401).json({ message: "Not authenticated" }); return false; }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) { res.status(403).json({ message: "권한이 없습니다" }); return false; }
+    return true;
+  };
+
   // GET /api/admin/accounting/vendors - 회계용 업체 목록 (잔액 포함)
   app.get('/api/admin/accounting/vendors', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
 
       const vendorList = await db.select().from(vendors).orderBy(asc(vendors.companyName));
 
@@ -13259,9 +13264,7 @@ export async function registerRoutes(
   // GET /api/admin/accounting/vendors/options - 업체 select 옵션용
   app.get('/api/admin/accounting/vendors/options', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const vendorList = await db.select({
         id: vendors.id,
         companyName: vendors.companyName,
@@ -13276,9 +13279,7 @@ export async function registerRoutes(
   // PUT /api/admin/accounting/vendors/:id - 회계 추가정보 업데이트
   app.put('/api/admin/accounting/vendors/:id', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const vendorId = parseInt(req.params.id);
       const { supplyType, businessNumber, address } = req.body;
 
@@ -13298,9 +13299,7 @@ export async function registerRoutes(
   // GET /api/admin/purchases - 매입 목록 조회
   app.get('/api/admin/purchases', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const { startDate, endDate } = req.query;
 
       const conditions: any[] = [];
@@ -13367,25 +13366,32 @@ export async function registerRoutes(
   // POST /api/admin/purchases - 매입 등록
   app.post('/api/admin/purchases', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const { purchaseDate, vendorId, memo, items } = req.body;
       if (!purchaseDate || !vendorId || !items?.length) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
       }
 
-      const insertRows = items.map((item: any) => ({
-        purchaseDate,
-        vendorId: parseInt(vendorId),
-        materialType: item.materialType || "etc",
-        productName: item.productName,
-        quantity: String(item.quantity),
-        unit: item.unit,
-        unitPrice: parseInt(item.unitPrice),
-        totalAmount: parseInt(item.totalAmount),
-        memo: memo || null,
-      }));
+      const validMaterialTypes = ["raw", "semi", "subsidiary", "etc"];
+      const insertRows = items.map((item: any) => {
+        const qty = parseFloat(item.quantity);
+        const price = parseInt(item.unitPrice);
+        const total = parseInt(item.totalAmount);
+        if (!item.productName || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0 || isNaN(total)) {
+          throw new Error("품목 데이터가 올바르지 않습니다");
+        }
+        return {
+          purchaseDate,
+          vendorId: parseInt(vendorId),
+          materialType: validMaterialTypes.includes(item.materialType) ? item.materialType : "etc",
+          productName: String(item.productName).trim(),
+          quantity: String(qty),
+          unit: item.unit || "개",
+          unitPrice: price,
+          totalAmount: total,
+          memo: memo || null,
+        };
+      });
 
       await db.insert(purchases).values(insertRows);
       res.json({ success: true, count: insertRows.length });
@@ -13397,9 +13403,7 @@ export async function registerRoutes(
   // POST /api/admin/purchases/batch-delete - 매입 일괄 삭제
   app.post('/api/admin/purchases/batch-delete', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const { ids } = req.body;
       if (!ids?.length) return res.status(400).json({ message: "삭제할 항목을 선택해주세요" });
 
@@ -13413,9 +13417,7 @@ export async function registerRoutes(
   // GET /api/admin/accounting/vendor-balances - 업체별 외상 현황 (매입 정산)
   app.get('/api/admin/accounting/vendor-balances', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
 
       const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName })
         .from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
@@ -13450,9 +13452,7 @@ export async function registerRoutes(
   // GET /api/admin/accounting/vendors/:id/transactions - 업체별 거래 내역 (시간순)
   app.get('/api/admin/accounting/vendors/:id/transactions', async (req, res) => {
     try {
-      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
+      if (!(await requireAccountingAdmin(req, res))) return;
       const vendorId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
 

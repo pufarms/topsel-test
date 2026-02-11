@@ -48,7 +48,7 @@ export default function PurchaseSettlementTab() {
   });
 
   const { data: transactions = [] } = useQuery<TransactionRecord[]>({
-    queryKey: ["/api/admin/accounting/vendor-transactions", selectedVendor?.id, detailDateRange.dateRange.startDate, detailDateRange.dateRange.endDate],
+    queryKey: ["/api/admin/accounting/vendors/transactions", selectedVendor?.id, detailDateRange.dateRange.startDate, detailDateRange.dateRange.endDate],
     queryFn: async () => {
       if (!selectedVendor) return [];
       const params = new URLSearchParams();
@@ -69,7 +69,7 @@ export default function PurchaseSettlementTab() {
     onSuccess: () => {
       toast({ title: "입금 등록 완료" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
       setShowPaymentDialog(false);
       setPaymentDate(new Date().toISOString().slice(0, 10));
