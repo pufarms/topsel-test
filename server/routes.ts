@@ -12734,5 +12734,294 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Member Statistics API Endpoints =====
+
+  app.get('/api/member/statistics/overview', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      }
+      const memberId = req.session.userId;
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+
+      const baseConditions = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+
+      const [summaryResult] = await db.select({
+        totalRevenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
+        totalOrders: sql<number>`COUNT(*)`,
+        productCount: sql<number>`COUNT(DISTINCT ${pendingOrders.productCode})`,
+      }).from(pendingOrders).where(and(...baseConditions));
+
+      const totalRevenue = Number(summaryResult.totalRevenue);
+      const totalOrders = Number(summaryResult.totalOrders);
+      const avgOrderAmount = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+      const productCount = Number(summaryResult.productCount);
+
+      const duration = endUTC.getTime() - startUTC.getTime();
+      const prevStart = new Date(startUTC.getTime() - duration);
+      const prevEnd = startUTC;
+
+      const prevConditions = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, prevStart),
+        lte(pendingOrders.updatedAt, prevEnd),
+      ];
+
+      const [prevResult] = await db.select({
+        prevRevenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
+        prevOrders: sql<number>`COUNT(*)`,
+      }).from(pendingOrders).where(and(...prevConditions));
+
+      const prevRevenue = Number(prevResult.prevRevenue);
+      const prevOrders = Number(prevResult.prevOrders);
+      const revenueGrowth = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 10000) / 100 : 0;
+      const ordersGrowth = prevOrders > 0 ? Math.round(((totalOrders - prevOrders) / prevOrders) * 10000) / 100 : 0;
+
+      const daysDiff = Math.ceil(duration / (1000 * 60 * 60 * 24));
+      let dateBucket: ReturnType<typeof sql>;
+      if (daysDiff <= 31) {
+        dateBucket = sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+      } else if (daysDiff <= 90) {
+        dateBucket = sql`TO_CHAR(DATE_TRUNC('week', ${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'), 'YYYY-MM-DD')`;
+      } else {
+        dateBucket = sql`TO_CHAR(DATE_TRUNC('month', ${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul'), 'YYYY-MM-DD')`;
+      }
+
+      const trend = await db.select({
+        date: dateBucket.as('date'),
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+        orders: sql<number>`COUNT(*)`.as('orders'),
+      }).from(pendingOrders)
+        .where(and(...baseConditions))
+        .groupBy(dateBucket)
+        .orderBy(dateBucket);
+
+      const topProducts = await db.select({
+        productName: pendingOrders.productName,
+        productCode: pendingOrders.productCode,
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+        quantity: sql<number>`COUNT(*)`.as('quantity'),
+      }).from(pendingOrders)
+        .where(and(...baseConditions))
+        .groupBy(pendingOrders.productCode, pendingOrders.productName)
+        .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`))
+        .limit(10);
+
+      res.json({
+        summary: {
+          totalRevenue,
+          totalOrders,
+          avgOrderAmount,
+          productCount,
+          prevRevenue,
+          prevOrders,
+          revenueGrowth,
+          ordersGrowth,
+        },
+        trend: trend.map(t => ({ date: t.date, revenue: Number(t.revenue), orders: Number(t.orders) })),
+        topProducts: topProducts.map(p => ({ productName: p.productName, productCode: p.productCode, revenue: Number(p.revenue), quantity: Number(p.quantity) })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/member/statistics/by-product', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      }
+      const memberId = req.session.userId;
+      const { startDate, endDate, categoryLarge, categoryMedium, categorySmall, search } = req.query as {
+        startDate?: string; endDate?: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; search?: string;
+      };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+
+      const conditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+
+      if (categoryLarge && categoryLarge.trim()) conditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) conditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
+      if (categorySmall && categorySmall.trim()) conditions.push(eq(pendingOrders.categorySmall, categorySmall.trim()));
+      if (search && search.trim()) {
+        conditions.push(or(
+          ilike(pendingOrders.productName, `%${search.trim()}%`),
+          ilike(pendingOrders.productCode, `%${search.trim()}%`),
+        ));
+      }
+
+      const products = await db.select({
+        productCode: pendingOrders.productCode,
+        productName: pendingOrders.productName,
+        categoryLarge: pendingOrders.categoryLarge,
+        categoryMedium: pendingOrders.categoryMedium,
+        categorySmall: pendingOrders.categorySmall,
+        quantity: sql<number>`COUNT(*)`.as('quantity'),
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+      }).from(pendingOrders)
+        .where(and(...conditions))
+        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall)
+        .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`));
+
+      const totalRevenue = products.reduce((sum, p) => sum + Number(p.revenue), 0);
+
+      const baseCatConditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+
+      const largeCategories = await db.selectDistinct({ value: pendingOrders.categoryLarge })
+        .from(pendingOrders)
+        .where(and(...baseCatConditions, isNotNull(pendingOrders.categoryLarge)));
+
+      const mediumConditions = [...baseCatConditions, isNotNull(pendingOrders.categoryMedium)];
+      if (categoryLarge && categoryLarge.trim()) mediumConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
+      const mediumCategories = await db.selectDistinct({ value: pendingOrders.categoryMedium })
+        .from(pendingOrders)
+        .where(and(...mediumConditions));
+
+      const smallConditions = [...baseCatConditions, isNotNull(pendingOrders.categorySmall)];
+      if (categoryLarge && categoryLarge.trim()) smallConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) smallConditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
+      const smallCategories = await db.selectDistinct({ value: pendingOrders.categorySmall })
+        .from(pendingOrders)
+        .where(and(...smallConditions));
+
+      res.json({
+        products: products.map(p => ({
+          productCode: p.productCode,
+          productName: p.productName,
+          categoryLarge: p.categoryLarge || '',
+          categoryMedium: p.categoryMedium || '',
+          categorySmall: p.categorySmall || '',
+          quantity: Number(p.quantity),
+          revenue: Number(p.revenue),
+        })),
+        totalRevenue,
+        categories: {
+          large: largeCategories.map(c => c.value).filter(Boolean) as string[],
+          medium: mediumCategories.map(c => c.value).filter(Boolean) as string[],
+          small: smallCategories.map(c => c.value).filter(Boolean) as string[],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/member/statistics/by-product/:productCode', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      }
+      const memberId = req.session.userId;
+      const { productCode } = req.params;
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+
+      const baseConditions = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        eq(pendingOrders.productCode, productCode),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+
+      const dateBucket = sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+
+      const trend = await db.select({
+        date: dateBucket.as('date'),
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+        orders: sql<number>`COUNT(*)`.as('orders'),
+      }).from(pendingOrders)
+        .where(and(...baseConditions))
+        .groupBy(dateBucket)
+        .orderBy(dateBucket);
+
+      res.json({
+        trend: trend.map(t => ({ date: t.date, revenue: Number(t.revenue), orders: Number(t.orders) })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/member/statistics/orders', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      }
+      const memberId = req.session.userId;
+      const { startDate, endDate, productCode, page: pageStr, limit: limitStr } = req.query as {
+        startDate?: string; endDate?: string; productCode?: string; page?: string; limit?: string;
+      };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+
+      const conditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+
+      if (productCode && productCode.trim()) conditions.push(eq(pendingOrders.productCode, productCode.trim()));
+
+      const page = Math.max(1, parseInt(pageStr || '1') || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(limitStr || '20') || 20));
+      const offset = (page - 1) * limit;
+
+      const whereClause = and(...conditions);
+
+      const [orderRows, countResult] = await Promise.all([
+        db.select({
+          id: pendingOrders.id,
+          orderNumber: pendingOrders.orderNumber,
+          productName: pendingOrders.productName,
+          productCode: pendingOrders.productCode,
+          supplyPrice: pendingOrders.supplyPrice,
+          recipientName: pendingOrders.recipientName,
+          recipientAddress: pendingOrders.recipientAddress,
+          trackingNumber: pendingOrders.trackingNumber,
+          courierCompany: pendingOrders.courierCompany,
+          updatedAt: pendingOrders.updatedAt,
+          createdAt: pendingOrders.createdAt,
+        }).from(pendingOrders)
+          .where(whereClause)
+          .orderBy(desc(pendingOrders.updatedAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` }).from(pendingOrders).where(whereClause),
+      ]);
+
+      res.json({
+        orders: orderRows,
+        total: Number(countResult[0].count),
+        page,
+        limit,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }

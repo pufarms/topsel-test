@@ -69,6 +69,7 @@ import MemberOrderCancel from "@/pages/member/order-cancel";
 import MemberOrderList from "@/pages/member/order-list";
 import MemberProductList from "@/pages/member/product-list";
 import MemberSettlementTab from "@/pages/member/settlement-tab";
+import MemberStatsTab from "@/pages/member/member-stats-tab";
 
 type SidebarTab = 
   | "dashboard" 
@@ -1801,6 +1802,10 @@ export default function Dashboard() {
               {/* 예치금충전/정산이력 탭 */}
               {activeTab === "deposit" && (
                 <MemberSettlementTab />
+              )}
+
+              {activeTab === "member-stats" && (
+                <MemberStatsTab />
               )}
           </main>
         </div>
