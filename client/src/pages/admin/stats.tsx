@@ -723,7 +723,11 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
                           <TableCell>{idx + 1}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
                           <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">{categoryStr}</TableCell>
-                          <TableCell className="text-sm">{p.vendorName || '탑셀러'}</TableCell>
+                          <TableCell>
+                            <Badge variant={(!p.vendorName || p.vendorName === '탑셀러') ? 'secondary' : 'outline'} className={(!p.vendorName || p.vendorName === '탑셀러') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-800'}>
+                              {p.vendorName || '탑셀러'}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-right">{(p.quantity || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-right font-medium">{formatRevenue(p.revenue || 0)}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
