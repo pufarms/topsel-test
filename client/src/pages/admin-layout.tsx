@@ -95,7 +95,7 @@ const menuItems: MenuItem[] = [
       { id: "inventory-history", label: "재고 이력", path: "/admin/inventory/history" },
     ]
   },
-  { id: "settlements", label: "정산관리", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
+  { id: "settlements", label: "회계장부", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "bankda-deposits", label: "입금관리", icon: <Landmark className="h-5 w-5" />, path: "/admin/bankda-deposits" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
