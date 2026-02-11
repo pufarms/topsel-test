@@ -428,6 +428,7 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                   <TableRow>
                     <TableHead className="w-16">순위</TableHead>
                     <TableHead>회원명(업체명)</TableHead>
+                    <TableHead className="text-center">거래 기간</TableHead>
                     <TableHead
                       className="text-right cursor-pointer select-none"
                       onClick={() => handleSort("orderCount")}
@@ -450,7 +451,6 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                       평균 주문금액 <SortIcon field="avgOrderAmount" />
                     </TableHead>
                     <TableHead className="text-right">매출 비중</TableHead>
-                    <TableHead className="text-center">거래 기간</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -475,11 +475,11 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                               <span className="text-muted-foreground text-xs ml-1">({m.memberName})</span>
                             )}
                           </TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground whitespace-nowrap" data-testid={`date-range-${m.memberId}`}>{dateRange}</TableCell>
                           <TableCell className="text-right">{formatCount(m.orderCount || 0)}</TableCell>
                           <TableCell className="text-right font-medium">{formatRevenue(m.revenue || 0)}</TableCell>
                           <TableCell className="text-right">{formatRevenue(Math.round(m.avgOrderAmount || 0))}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
-                          <TableCell className="text-center text-sm text-muted-foreground whitespace-nowrap" data-testid={`date-range-${m.memberId}`}>{dateRange}</TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow key={`detail-${m.memberId}`}>
