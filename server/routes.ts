@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -13212,6 +13212,288 @@ export async function registerRoutes(
         page,
         limit,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========================================
+  // 회계장부 API - Accounting System
+  // ========================================
+
+  // GET /api/admin/accounting/vendors - 회계용 업체 목록 (잔액 포함)
+  app.get('/api/admin/accounting/vendors', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const vendorList = await db.select().from(vendors).orderBy(asc(vendors.companyName));
+
+      const result = await Promise.all(vendorList.map(async (v) => {
+        const [purchaseSum] = await db.select({
+          total: sql<number>`COALESCE(SUM(total_amount), 0)`
+        }).from(purchases).where(eq(purchases.vendorId, v.id));
+
+        const [paymentSum] = await db.select({
+          total: sql<number>`COALESCE(SUM(amount), 0)`
+        }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
+
+        const totalPurchases = Number(purchaseSum.total);
+        const totalPayments = Number(paymentSum.total);
+
+        return {
+          ...v,
+          totalPurchases,
+          totalPayments,
+          outstandingBalance: totalPurchases - totalPayments,
+        };
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendors/options - 업체 select 옵션용
+  app.get('/api/admin/accounting/vendors/options', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const vendorList = await db.select({
+        id: vendors.id,
+        companyName: vendors.companyName,
+        supplyType: vendors.supplyType,
+      }).from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
+      res.json(vendorList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/vendors/:id - 회계 추가정보 업데이트
+  app.put('/api/admin/accounting/vendors/:id', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const vendorId = parseInt(req.params.id);
+      const { supplyType, businessNumber, address } = req.body;
+
+      await db.update(vendors).set({
+        supplyType: supplyType || [],
+        businessNumber: businessNumber || null,
+        address: address || null,
+        updatedAt: new Date(),
+      }).where(eq(vendors.id, vendorId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/purchases - 매입 목록 조회
+  app.get('/api/admin/purchases', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const { startDate, endDate } = req.query;
+
+      const conditions: any[] = [];
+      if (startDate) conditions.push(gte(purchases.purchaseDate, String(startDate)));
+      if (endDate) conditions.push(lte(purchases.purchaseDate, String(endDate)));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const purchaseList = await db.select({
+        id: purchases.id,
+        purchaseDate: purchases.purchaseDate,
+        vendorId: purchases.vendorId,
+        materialType: purchases.materialType,
+        productName: purchases.productName,
+        quantity: purchases.quantity,
+        unit: purchases.unit,
+        unitPrice: purchases.unitPrice,
+        totalAmount: purchases.totalAmount,
+        memo: purchases.memo,
+      }).from(purchases)
+        .where(whereClause)
+        .orderBy(desc(purchases.purchaseDate), desc(purchases.id));
+
+      const vendorMap = new Map<number, string>();
+      const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
+      vendorList.forEach(v => vendorMap.set(v.id, v.companyName));
+
+      const enriched = purchaseList.map(p => ({
+        ...p,
+        vendorName: vendorMap.get(p.vendorId) || "알 수 없음",
+        source: "direct" as const,
+      }));
+
+      const totalAmount = enriched.reduce((s, p) => s + p.totalAmount, 0);
+      const directCount = enriched.length;
+      const directAmount = totalAmount;
+
+      const byTypeMap = new Map<string, number>();
+      enriched.forEach(p => {
+        byTypeMap.set(p.materialType, (byTypeMap.get(p.materialType) || 0) + p.totalAmount);
+      });
+      const byType = Array.from(byTypeMap.entries()).map(([type, amount]) => ({
+        type,
+        amount,
+        percentage: totalAmount > 0 ? Math.round(amount / totalAmount * 100) : 0,
+      }));
+
+      res.json({
+        purchases: enriched,
+        summary: {
+          totalAmount,
+          directAmount,
+          siteAmount: 0,
+          directCount,
+          siteCount: 0,
+          byType,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/purchases - 매입 등록
+  app.post('/api/admin/purchases', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const { purchaseDate, vendorId, memo, items } = req.body;
+      if (!purchaseDate || !vendorId || !items?.length) {
+        return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
+      }
+
+      const insertRows = items.map((item: any) => ({
+        purchaseDate,
+        vendorId: parseInt(vendorId),
+        materialType: item.materialType || "etc",
+        productName: item.productName,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        unitPrice: parseInt(item.unitPrice),
+        totalAmount: parseInt(item.totalAmount),
+        memo: memo || null,
+      }));
+
+      await db.insert(purchases).values(insertRows);
+      res.json({ success: true, count: insertRows.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/purchases/batch-delete - 매입 일괄 삭제
+  app.post('/api/admin/purchases/batch-delete', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const { ids } = req.body;
+      if (!ids?.length) return res.status(400).json({ message: "삭제할 항목을 선택해주세요" });
+
+      await db.delete(purchases).where(inArray(purchases.id, ids));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendor-balances - 업체별 외상 현황 (매입 정산)
+  app.get('/api/admin/accounting/vendor-balances', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName })
+        .from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
+
+      const result = await Promise.all(vendorList.map(async (v) => {
+        const [purchaseSum] = await db.select({
+          total: sql<number>`COALESCE(SUM(total_amount), 0)`
+        }).from(purchases).where(eq(purchases.vendorId, v.id));
+
+        const [paymentSum] = await db.select({
+          total: sql<number>`COALESCE(SUM(amount), 0)`
+        }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
+
+        const totalPurchases = Number(purchaseSum.total);
+        const totalPayments = Number(paymentSum.total);
+
+        return {
+          id: v.id,
+          companyName: v.companyName,
+          totalPurchases,
+          totalPayments,
+          outstandingBalance: totalPurchases - totalPayments,
+        };
+      }));
+
+      res.json(result.filter(v => v.totalPurchases > 0 || v.totalPayments > 0));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendors/:id/transactions - 업체별 거래 내역 (시간순)
+  app.get('/api/admin/accounting/vendors/:id/transactions', async (req, res) => {
+    try {
+      if (!req.session?.user || !['SUPER_ADMIN', 'ADMIN'].includes(req.session.user.tier)) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const vendorId = parseInt(req.params.id);
+      const { startDate, endDate } = req.query;
+
+      const purchaseConditions: any[] = [eq(purchases.vendorId, vendorId)];
+      if (startDate) purchaseConditions.push(gte(purchases.purchaseDate, String(startDate)));
+      if (endDate) purchaseConditions.push(lte(purchases.purchaseDate, String(endDate)));
+
+      const paymentConditions: any[] = [eq(vendorPayments.vendorId, vendorId)];
+      if (startDate) paymentConditions.push(gte(vendorPayments.paymentDate, String(startDate)));
+      if (endDate) paymentConditions.push(lte(vendorPayments.paymentDate, String(endDate)));
+
+      const [purchaseRows, paymentRows] = await Promise.all([
+        db.select({
+          id: purchases.id,
+          date: purchases.purchaseDate,
+          description: purchases.productName,
+          amount: purchases.totalAmount,
+        }).from(purchases).where(and(...purchaseConditions)),
+        db.select({
+          id: vendorPayments.id,
+          date: vendorPayments.paymentDate,
+          memo: vendorPayments.memo,
+          amount: vendorPayments.amount,
+        }).from(vendorPayments).where(and(...paymentConditions)),
+      ]);
+
+      const allRecords: any[] = [
+        ...purchaseRows.map(p => ({ id: p.id, date: p.date, type: "purchase", description: p.description, amount: p.amount })),
+        ...paymentRows.map(p => ({ id: p.id, date: p.date, type: "payment", description: p.memo || "입금", amount: p.amount })),
+      ];
+
+      allRecords.sort((a, b) => a.date.localeCompare(b.date) || (a.type === "purchase" ? -1 : 1));
+
+      let runningBalance = 0;
+      allRecords.forEach(r => {
+        if (r.type === "purchase") runningBalance += r.amount;
+        else runningBalance -= r.amount;
+        r.runningBalance = runningBalance;
+      });
+
+      res.json(allRecords);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
