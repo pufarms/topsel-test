@@ -99,11 +99,24 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
     },
   });
 
-  const allRecords = [...(data?.records || [])].reverse();
-  const totalCharge = allRecords.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0);
-  const totalDeduct = allRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
-  const totalRefund = allRecords.filter(r => r.type === "refund").reduce((s, r) => s + r.amount, 0);
-  const lastBalance = allRecords.length > 0 ? allRecords[allRecords.length - 1].balanceAfter : 0;
+  const rawRecords = [...(data?.records || [])].reverse();
+
+  const groupedDeposit: DepositRecord[] = [];
+  for (const rec of rawRecords) {
+    const prev = groupedDeposit[groupedDeposit.length - 1];
+    if (prev && prev.type === rec.type && prev.createdAt === rec.createdAt && rec.type === "deduct") {
+      prev.amount += rec.amount;
+      prev.balanceAfter = rec.balanceAfter;
+    } else {
+      groupedDeposit.push({ ...rec });
+    }
+  }
+
+  const allRecords = groupedDeposit;
+  const totalCharge = rawRecords.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0);
+  const totalDeduct = rawRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
+  const totalRefund = rawRecords.filter(r => r.type === "refund").reduce((s, r) => s + r.amount, 0);
+  const lastBalance = rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].balanceAfter : 0;
 
   const totalPages = Math.ceil(allRecords.length / PER_PAGE);
   const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -270,11 +283,27 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
     },
   });
 
-  const allRecords = [...(data?.records || [])].reverse();
-  const totalGrant = allRecords.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0);
-  const totalDeduct = allRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
-  const totalExpire = allRecords.filter(r => r.type === "expire").reduce((s, r) => s + r.amount, 0);
-  const lastBalance = allRecords.length > 0 ? allRecords[allRecords.length - 1].balanceAfter : 0;
+  const rawRecords = [...(data?.records || [])].reverse();
+
+  const groupedRecords: PointerRecord[] = [];
+  for (const rec of rawRecords) {
+    const prev = groupedRecords[groupedRecords.length - 1];
+    if (prev && prev.type === rec.type && prev.createdAt === rec.createdAt && rec.type === "deduct") {
+      prev.amount += rec.amount;
+      prev.balanceAfter = rec.balanceAfter;
+      if (prev.description && rec.description && prev.description !== rec.description) {
+        prev.description = prev.description;
+      }
+    } else {
+      groupedRecords.push({ ...rec });
+    }
+  }
+
+  const allRecords = groupedRecords;
+  const totalGrant = rawRecords.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0);
+  const totalDeduct = rawRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
+  const totalExpire = rawRecords.filter(r => r.type === "expire").reduce((s, r) => s + r.amount, 0);
+  const lastBalance = rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].balanceAfter : 0;
 
   const totalPages = Math.ceil(allRecords.length / PER_PAGE);
   const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
