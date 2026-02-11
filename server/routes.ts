@@ -10164,7 +10164,7 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const dateExpr = sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+      const dateExpr = sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
 
       const [records, countResult] = await Promise.all([
         db.select({
@@ -10233,7 +10233,7 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const depDateExpr = sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+      const depDateExpr = sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
 
       const [records, countResult] = await Promise.all([
         db.select({
@@ -10302,7 +10302,7 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const ptrDateExpr = sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+      const ptrDateExpr = sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
 
       const [records, countResult] = await Promise.all([
         db.select({
