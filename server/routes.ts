@@ -12441,7 +12441,10 @@ export async function registerRoutes(
         categorySmall: pendingOrders.categorySmall,
         quantity: sql<number>`COUNT(*)`.as('quantity'),
         revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
+        vendorName: sql<string>`MAX(${vendors.companyName})`.as('vendor_name'),
       }).from(pendingOrders)
+        .leftJoin(productVendors, and(eq(pendingOrders.productCode, productVendors.productCode), eq(productVendors.isActive, true)))
+        .leftJoin(vendors, eq(productVendors.vendorId, vendors.id))
         .where(and(...conditions))
         .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall)
         .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`));
@@ -12481,6 +12484,7 @@ export async function registerRoutes(
           categorySmall: p.categorySmall || '',
           quantity: Number(p.quantity),
           revenue: Number(p.revenue),
+          vendorName: p.vendorName || '탑셀러',
         })),
         totalRevenue,
         categories: {

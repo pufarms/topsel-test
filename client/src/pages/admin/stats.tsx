@@ -701,6 +701,7 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
                     <TableHead className="w-16">순위</TableHead>
                     <TableHead>상품명</TableHead>
                     <TableHead>분류</TableHead>
+                    <TableHead>공급처</TableHead>
                     <TableHead className="text-right">판매 수량</TableHead>
                     <TableHead className="text-right">매출액</TableHead>
                     <TableHead className="text-right">매출 비중</TableHead>
@@ -722,13 +723,14 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
                           <TableCell>{idx + 1}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
                           <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">{categoryStr}</TableCell>
+                          <TableCell className="text-sm">{p.vendorName || '탑셀러'}</TableCell>
                           <TableCell className="text-right">{(p.quantity || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-right font-medium">{formatRevenue(p.revenue || 0)}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow key={`detail-${p.productCode}`}>
-                            <TableCell colSpan={6} className="p-0">
+                            <TableCell colSpan={7} className="p-0">
                               <ProductDrillDown productCode={p.productCode} startDate={startDate} endDate={endDate} />
                             </TableCell>
                           </TableRow>
