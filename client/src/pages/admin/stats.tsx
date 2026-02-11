@@ -1027,7 +1027,7 @@ export default function AdminStatsPage() {
             <TabsTrigger value="by-member" data-testid="tab-by-member">회원별 매출</TabsTrigger>
             <TabsTrigger value="by-product" data-testid="tab-by-product">상품별 매출</TabsTrigger>
           </TabsList>
-          <DateRangeFilter onChange={setDateRange} defaultPreset="month" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="month" className="mr-8" />
         </div>
 
         <TabsContent value="overview" className="mt-4">
