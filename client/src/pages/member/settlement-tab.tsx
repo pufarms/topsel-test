@@ -250,7 +250,7 @@ export default function MemberSettlementTab() {
                           <th className="text-right py-2 px-3 whitespace-nowrap">수량</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">공급단가</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">합계</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap">입금</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">적요</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">예치금+포인터 잔액</th>
                         </tr>
                       </thead>
@@ -269,7 +269,7 @@ export default function MemberSettlementTab() {
                                 </span>
                               ) : item.type === "pointer" ? (
                                 <span className="text-amber-600 dark:text-amber-400 font-medium">
-                                  포인터 지급
+                                  포인터 충전
                                 </span>
                               ) : item.productName}
                             </td>
@@ -282,9 +282,9 @@ export default function MemberSettlementTab() {
                             <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
                               {item.type === "order" ? formatCurrency(item.subtotal) : ""}
                             </td>
-                            <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {item.type === "deposit" && item.depositAmount !== 0 ? (item.depositAmount < 0 ? `-${formatCurrency(Math.abs(item.depositAmount))}` : formatCurrency(item.depositAmount)) : ""}
-                              {item.type === "pointer" && item.pointerAmount > 0 ? `${item.pointerAmount.toLocaleString()}P` : ""}
+                            <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.type === "deposit" && item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : item.type !== "order" ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
+                              {item.type === "deposit" && item.depositAmount !== 0 ? (item.depositAmount < 0 ? `-${formatCurrency(Math.abs(item.depositAmount))}` : `+${formatCurrency(item.depositAmount)}`) : ""}
+                              {item.type === "pointer" && item.pointerAmount > 0 ? `+${item.pointerAmount.toLocaleString()}P` : ""}
                             </td>
                             <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
                           </tr>
@@ -298,8 +298,8 @@ export default function MemberSettlementTab() {
                           </td>
                           <td className="py-2 px-3"></td>
                           <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
-                          <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(totalDeposit + totalPointer)}</td>
-                          <td className="py-2 px-3 text-right">{formatCurrency(totalBalance)}</td>
+                          <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalDeposit + totalPointer)}</td>
+                          <td className="py-2 px-3 text-right">{formatCurrency((balanceData?.deposit || 0) + (balanceData?.point || 0))}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -319,12 +319,13 @@ export default function MemberSettlementTab() {
                           </div>
                           {item.type === "deposit" ? (
                             <div className={`font-medium text-sm ${item.depositAmount < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {item.depositAmount < 0 ? `환급/예치금 환급: -${formatCurrency(Math.abs(item.depositAmount))}` : `입금/예치금 충전: ${formatCurrency(item.depositAmount)}`}
+                              {item.depositAmount < 0 ? `환급/예치금 환급` : `입금/예치금 충전`}
+                              <span className="ml-2">{item.depositAmount < 0 ? `-${formatCurrency(Math.abs(item.depositAmount))}` : `+${formatCurrency(item.depositAmount)}`}</span>
                             </div>
                           ) : item.type === "pointer" ? (
                             <div className="font-medium text-sm text-amber-600 dark:text-amber-400">
-                              포인터: {item.pointerAmount.toLocaleString()}P
-                              {item.description && <span className="text-xs text-muted-foreground ml-1">({item.description})</span>}
+                              포인터 충전
+                              <span className="ml-2">+{item.pointerAmount.toLocaleString()}P</span>
                             </div>
                           ) : (
                             <>
