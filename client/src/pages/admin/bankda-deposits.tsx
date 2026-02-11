@@ -104,14 +104,16 @@ const matchStatusConfig: Record<string, { label: string; variant: "default" | "s
   pending: { label: "대기", variant: "secondary" },
 };
 
-function formatBkDate(bkdate: string): string {
+function formatBkDate(bkdate: string | null | undefined): string {
+  if (!bkdate) return '-';
   if (bkdate.length === 8) {
     return `${bkdate.slice(0, 4)}-${bkdate.slice(4, 6)}-${bkdate.slice(6, 8)}`;
   }
   return bkdate;
 }
 
-function formatBkTime(bktime: string): string {
+function formatBkTime(bktime: string | null | undefined): string {
+  if (!bktime) return '-';
   if (bktime.length === 6) {
     return `${bktime.slice(0, 2)}:${bktime.slice(2, 4)}:${bktime.slice(4, 6)}`;
   }
