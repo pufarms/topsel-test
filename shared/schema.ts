@@ -297,6 +297,7 @@ export const insertMemberSchema = createInsertSchema(members).omit({
 export const memberFormSchema = z.object({
   username: z.string().min(4, "아이디는 4자 이상이어야 합니다"),
   password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다").optional().or(z.literal("")),
+  memberName: z.string().optional().or(z.literal("")),
   grade: z.enum(memberGrades),
   companyName: z.string().min(1, "상호명을 입력해주세요"),
   businessNumber: z.string().regex(/^\d{3}-\d{2}-\d{5}$/, "사업자번호 형식: 000-00-00000"),

@@ -1704,6 +1704,10 @@ export async function registerRoutes(
       const updateData: any = {};
       const changes: string[] = [];
       
+      if (data.memberName !== undefined && data.memberName !== (targetMember.memberName || '')) {
+        updateData.memberName = data.memberName;
+        changes.push(`회원명: ${targetMember.memberName || '(없음)'} → ${data.memberName || '(없음)'}`);
+      }
       if (data.grade && data.grade !== targetMember.grade) {
         updateData.grade = data.grade;
         changes.push(`등급: ${targetMember.grade} → ${data.grade}`);

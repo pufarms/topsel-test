@@ -57,6 +57,7 @@ export default function MemberDetailPage() {
   const [formData, setFormData] = useState<{
     grade: string;
     representative: string;
+    memberName: string;
     businessAddress: string;
     phone: string;
     managerName: string;
@@ -75,6 +76,7 @@ export default function MemberDetailPage() {
   }>({
     grade: "",
     representative: "",
+    memberName: "",
     businessAddress: "",
     phone: "",
     managerName: "",
@@ -160,6 +162,7 @@ export default function MemberDetailPage() {
     const updateData: any = {};
     
     if (formData.grade && formData.grade !== member.grade) updateData.grade = formData.grade;
+    if (formData.memberName !== "" && formData.memberName !== (member.memberName || "")) updateData.memberName = formData.memberName;
     if (formData.representative && formData.representative !== member.representative) updateData.representative = formData.representative;
     if (formData.businessAddress !== (member.businessAddress || "")) updateData.businessAddress = formData.businessAddress;
     if (formData.phone && formData.phone !== member.phone) updateData.phone = formData.phone;
@@ -252,7 +255,12 @@ export default function MemberDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">회원명</Label>
-                  <Input value={member.memberName || "-"} disabled className="bg-muted" />
+                  <Input 
+                    value={formData.memberName !== "" ? formData.memberName : (member.memberName || "")}
+                    onChange={(e) => setFormData({...formData, memberName: e.target.value})}
+                    placeholder="회원명 (뱅크다 입금자명 매칭용)"
+                    data-testid="input-member-name"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">사업자번호</Label>
