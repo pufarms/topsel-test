@@ -588,6 +588,7 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
   const [categoryLarge, setCategoryLarge] = useState("");
   const [categoryMedium, setCategoryMedium] = useState("");
   const [categorySmall, setCategorySmall] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("");
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
 
   const params = new URLSearchParams({
@@ -597,6 +598,7 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
     ...(categoryLarge && { categoryLarge }),
     ...(categoryMedium && { categoryMedium }),
     ...(categorySmall && { categorySmall }),
+    ...(vendorFilter && { vendorFilter }),
   });
 
   const { data, isLoading } = useQuery<any>({
@@ -607,6 +609,7 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
   const products = data?.products || [];
   const totalRevenue = data?.totalRevenue || 0;
   const categories = data?.categories || { large: [], medium: [], small: [] };
+  const vendorList = data?.vendorList || [];
 
   return (
     <div className="space-y-4">
@@ -665,6 +668,24 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
               <SelectItem value="__all__">전체</SelectItem>
               {(categories.small || []).map((c: string) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">공급처</label>
+          <Select
+            value={vendorFilter || "__all__"}
+            onValueChange={(v) => setVendorFilter(v === "__all__" ? "" : v)}
+          >
+            <SelectTrigger className="w-[140px]" data-testid="select-vendor-filter">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">전체</SelectItem>
+              <SelectItem value="self">탑셀러</SelectItem>
+              {vendorList.map((v: any) => (
+                <SelectItem key={v.id} value={String(v.id)}>{v.companyName}</SelectItem>
               ))}
             </SelectContent>
           </Select>

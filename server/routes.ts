@@ -12411,8 +12411,8 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { startDate, endDate, categoryLarge, categoryMedium, categorySmall, search } = req.query as {
-        startDate?: string; endDate?: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; search?: string;
+      const { startDate, endDate, categoryLarge, categoryMedium, categorySmall, search, vendorFilter } = req.query as {
+        startDate?: string; endDate?: string; categoryLarge?: string; categoryMedium?: string; categorySmall?: string; search?: string; vendorFilter?: string;
       };
       const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
 
@@ -12431,6 +12431,11 @@ export async function registerRoutes(
           ilike(pendingOrders.productName, `%${search.trim()}%`),
           ilike(pendingOrders.productCode, `%${search.trim()}%`),
         ));
+      }
+      if (vendorFilter === 'self') {
+        conditions.push(sql`${vendors.id} IS NULL`);
+      } else if (vendorFilter && vendorFilter !== '' && vendorFilter !== 'all') {
+        conditions.push(eq(vendors.id, parseInt(vendorFilter)));
       }
 
       const products = await db.select({
@@ -12492,6 +12497,7 @@ export async function registerRoutes(
           medium: mediumCategories.map(c => c.value).filter(Boolean) as string[],
           small: smallCategories.map(c => c.value).filter(Boolean) as string[],
         },
+        vendorList: await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors).where(eq(vendors.isActive, true)).orderBy(vendors.companyName),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
