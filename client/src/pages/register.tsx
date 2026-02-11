@@ -379,7 +379,7 @@ export default function Register() {
                 <h3 className="text-lg font-semibold border-b pb-2">{sections.business_info?.title || "사업자 정보"}</h3>
                 <div className="grid gap-4">
                   <div>
-                    <Label htmlFor="biz_name">{labels.biz_name || "상호명"} <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="biz_name">{labels.biz_name || "상호명"} <span className="text-destructive">*</span> <span className="text-xs text-destructive font-normal ml-1">입금자명이 아닙니다, 입금자명=회원명</span></Label>
                     <Input id="biz_name" name="biz_name" required placeholder={placeholders.biz_name || "사업자 상호명"} data-testid="input-biz-name" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
