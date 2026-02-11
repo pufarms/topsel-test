@@ -22,6 +22,7 @@ import MemberManagement from "@/pages/admin/members";
 import TermAgreementsPage from "@/pages/admin/term-agreements";
 import MemberDetail from "@/pages/admin/member-detail";
 import PlaceholderPage from "@/pages/admin/placeholder";
+import AdminStatsPage from "@/pages/admin/stats";
 import AdminSettlements from "@/pages/admin/settlements";
 import BankdaDeposits from "@/pages/admin/bankda-deposits";
 import SettlementDocs from "@/pages/admin/settlement-docs";
@@ -191,7 +192,7 @@ function Router() {
         <AdminRoute><SettlementDocs /></AdminRoute>
       </Route>
       <Route path="/admin/stats">
-        <AdminRoute><PlaceholderPage title="통계관리" description="통계 데이터를 확인합니다" /></AdminRoute>
+        <AdminRoute><AdminStatsPage /></AdminRoute>
       </Route>
       <Route path="/admin/coupons">
         <AdminRoute><PlaceholderPage title="쿠폰관리" description="쿠폰을 관리합니다" /></AdminRoute>
