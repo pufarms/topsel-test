@@ -183,8 +183,8 @@ export function DateRangeFilter({
             </div>
           )}
           {getCurrentLabel() && (
-            <Badge variant="secondary" data-testid="date-range-label">
-              <CalendarIcon className="mr-1.5 h-3 w-3" />
+            <Badge variant="secondary" className="text-sm py-1 px-3" data-testid="date-range-label">
+              <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
               {getCurrentLabel()}
             </Badge>
           )}
