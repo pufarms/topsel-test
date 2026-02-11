@@ -806,7 +806,7 @@ router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
     }
 
     const orderRows = await db.select({
-      trackingDate: sql<string>`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+      trackingDate: sql<string>`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
       productName: pendingOrders.productName,
       productCode: pendingOrders.productCode,
       vendorPrice: pendingOrders.vendorPrice,
@@ -815,7 +815,7 @@ router.get("/settlement", partnerAuth, async (req: Request, res: Response) => {
       .from(pendingOrders)
       .where(and(...orderConditions))
       .groupBy(
-        sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+        sql`TO_CHAR(${pendingOrders.trackingRegisteredAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
         pendingOrders.productName,
         pendingOrders.productCode,
         pendingOrders.vendorPrice,

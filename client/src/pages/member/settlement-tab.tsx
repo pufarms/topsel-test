@@ -55,7 +55,8 @@ function formatCurrency(n: number): string {
 
 function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")} ${String(kst.getUTCHours()).padStart(2, "0")}:${String(kst.getUTCMinutes()).padStart(2, "0")}:${String(kst.getUTCSeconds()).padStart(2, "0")}`;
 }
 
 function parseDepositDescription(description: string | null): string {
@@ -124,6 +125,12 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
   const totalDeduct = rawRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
   const totalRefund = rawRecords.filter(r => r.type === "refund").reduce((s, r) => s + r.amount, 0);
   const lastBalance = rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].balanceAfter : 0;
+  const periodStartBalance = rawRecords.length > 0
+    ? rawRecords[0].type === "charge" 
+      ? rawRecords[0].balanceAfter - rawRecords[0].amount
+      : rawRecords[0].balanceAfter + rawRecords[0].amount
+    : 0;
+  const periodEndBalance = lastBalance;
 
   const totalPages = Math.ceil(allRecords.length / PER_PAGE);
   const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -149,11 +156,19 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
           <span className="font-semibold text-red-600 dark:text-red-400">차감합계: {formatCurrency(totalDeduct + totalRefund)}</span>
           <span className="font-semibold">예치금 잔액: {formatCurrency(lastBalance)}</span>
         </div>
+        <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
+          <span className="text-muted-foreground">기간 시작 잔액:</span>
+          <span className="font-semibold" data-testid="text-deposit-period-start">{formatCurrency(periodStartBalance)}</span>
+          <span className="text-muted-foreground ml-2">기간 종료 잔액:</span>
+          <span className="font-semibold" data-testid="text-deposit-period-end">{formatCurrency(periodEndBalance)}</span>
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : allRecords.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">조회된 예치금 이력이 없습니다.</div>
+          <div className="py-8 text-center text-muted-foreground">
+            <p>선택한 기간에 예치금 이력이 없습니다.</p>
+          </div>
         ) : (
           <>
             <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
@@ -168,6 +183,14 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                   </tr>
                 </thead>
                 <tbody>
+                  {page === 1 && (
+                    <tr className="border-b bg-blue-50 dark:bg-blue-950/30">
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
+                      <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={2}>기간 시작 잔액</td>
+                      <td className="py-2 px-3"></td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(periodStartBalance)}</td>
+                    </tr>
+                  )}
                   {pagedRecords.map((record, idx) => {
                     const isCredit = record.type === "charge";
                     const isRefund = record.type === "refund";
@@ -193,6 +216,14 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                   })}
                 </tbody>
                 <tfoot>
+                  {(page >= totalPages || totalPages <= 1) && (
+                    <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold border-b">
+                      <td className="py-2 px-3 text-center text-muted-foreground">-</td>
+                      <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={2}>기간 종료 잔액</td>
+                      <td className="py-2 px-3"></td>
+                      <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</td>
+                    </tr>
+                  )}
                   <tr className="bg-muted/20 font-semibold">
                     <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
                     <td className="py-2 px-3 text-right">
@@ -208,6 +239,16 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
             </div>
 
             <div className="md:hidden space-y-2">
+              {page === 1 && (
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 시작 잔액</span>
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{formatCurrency(periodStartBalance)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {pagedRecords.map((record, idx) => {
                 const isCredit = record.type === "charge";
                 const isRefund = record.type === "refund";
@@ -235,6 +276,16 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                   </Card>
                 );
               })}
+              {(page >= totalPages || totalPages <= 1) && (
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 종료 잔액</span>
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardContent className="p-3">
                   <div className="flex flex-col gap-1 text-sm">
@@ -312,6 +363,12 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
   const totalDeduct = rawRecords.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0);
   const totalExpire = rawRecords.filter(r => r.type === "expire").reduce((s, r) => s + r.amount, 0);
   const lastBalance = rawRecords.length > 0 ? rawRecords[rawRecords.length - 1].balanceAfter : 0;
+  const periodStartBalance = rawRecords.length > 0
+    ? rawRecords[0].type === "grant"
+      ? rawRecords[0].balanceAfter - rawRecords[0].amount
+      : rawRecords[0].balanceAfter + rawRecords[0].amount
+    : 0;
+  const periodEndBalance = lastBalance;
 
   const totalPages = Math.ceil(allRecords.length / PER_PAGE);
   const pagedRecords = allRecords.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -337,11 +394,19 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
           <span className="font-semibold text-red-600 dark:text-red-400">차감합계: {(totalDeduct + totalExpire).toLocaleString()}P</span>
           <span className="font-semibold">포인터 잔액: {lastBalance.toLocaleString()}P</span>
         </div>
+        <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
+          <span className="text-muted-foreground">기간 시작 잔액:</span>
+          <span className="font-semibold" data-testid="text-pointer-period-start">{periodStartBalance.toLocaleString()}P</span>
+          <span className="text-muted-foreground ml-2">기간 종료 잔액:</span>
+          <span className="font-semibold" data-testid="text-pointer-period-end">{periodEndBalance.toLocaleString()}P</span>
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : allRecords.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">조회된 포인터 이력이 없습니다.</div>
+          <div className="py-8 text-center text-muted-foreground">
+            <p>선택한 기간에 포인터 이력이 없습니다.</p>
+          </div>
         ) : (
           <>
             <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
@@ -356,6 +421,14 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
                   </tr>
                 </thead>
                 <tbody>
+                  {page === 1 && (
+                    <tr className="border-b bg-blue-50 dark:bg-blue-950/30">
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
+                      <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={2}>기간 시작 잔액</td>
+                      <td className="py-2 px-3"></td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400">{periodStartBalance.toLocaleString()}P</td>
+                    </tr>
+                  )}
                   {pagedRecords.map((record, idx) => {
                     const isCredit = record.type === "grant";
                     return (
@@ -380,6 +453,14 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
                   })}
                 </tbody>
                 <tfoot>
+                  {(page >= totalPages || totalPages <= 1) && (
+                    <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold border-b">
+                      <td className="py-2 px-3 text-center text-muted-foreground">-</td>
+                      <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={2}>기간 종료 잔액</td>
+                      <td className="py-2 px-3"></td>
+                      <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{periodEndBalance.toLocaleString()}P</td>
+                    </tr>
+                  )}
                   <tr className="bg-muted/20 font-semibold">
                     <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
                     <td className="py-2 px-3 text-right">
@@ -395,6 +476,16 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
             </div>
 
             <div className="md:hidden space-y-2">
+              {page === 1 && (
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 시작 잔액</span>
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{periodStartBalance.toLocaleString()}P</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {pagedRecords.map((record, idx) => {
                 const isCredit = record.type === "grant";
                 return (
@@ -421,6 +512,16 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
                   </Card>
                 );
               })}
+              {(page >= totalPages || totalPages <= 1) && (
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 종료 잔액</span>
+                      <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{periodEndBalance.toLocaleString()}P</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardContent className="p-3">
                   <div className="flex flex-col gap-1 text-sm">
