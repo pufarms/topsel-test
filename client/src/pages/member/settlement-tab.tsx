@@ -299,7 +299,7 @@ export default function MemberSettlementTab() {
                           <td className="py-2 px-3"></td>
                           <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
                           <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalDeposit + totalPointer)}</td>
-                          <td className="py-2 px-3 text-right">{formatCurrency((balanceData?.deposit || 0) + (balanceData?.point || 0))}</td>
+                          <td className="py-2 px-3 text-right">{formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -352,7 +352,7 @@ export default function MemberSettlementTab() {
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-1">
                             <span>예치금+포인터 잔액</span>
-                            <span>{formatCurrency((balanceData?.deposit || 0) + (balanceData?.point || 0))}</span>
+                            <span>{formatCurrency(itemsWithBalance.length > 0 ? itemsWithBalance[itemsWithBalance.length - 1].balance : 0)}</span>
                           </div>
                         </div>
                       </CardContent>
