@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
@@ -110,78 +111,84 @@ export function DateRangeFilter({
     : ["today", "yesterday", "week", "month", "custom"];
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)} data-testid="date-range-filter">
-      <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">기간:</span>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {presets.map((preset) => (
-          <Button
-            key={preset}
-            size="sm"
-            variant={activePreset === preset ? "default" : "outline"}
-            onClick={() => handlePresetClick(preset)}
-            data-testid={`date-preset-${preset}`}
-          >
-            {presetLabel(preset)}
-          </Button>
-        ))}
+    <div className={cn("flex flex-col gap-2", className)} data-testid="date-range-filter">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">기간:</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {presets.map((preset) => (
+            <Button
+              key={preset}
+              size="sm"
+              variant={activePreset === preset ? "default" : "outline"}
+              onClick={() => handlePresetClick(preset)}
+              data-testid={`date-preset-${preset}`}
+            >
+              {presetLabel(preset)}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      {activePreset === "custom" && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Popover open={showStartPicker} onOpenChange={setShowStartPicker}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn("justify-start text-left font-normal min-w-[130px]",
-                  !customStart && "text-muted-foreground"
-                )}
-                data-testid="date-custom-start"
-              >
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {customStart ? formatDateToYYYYMMDD(customStart) : "시작일"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={customStart}
-                onSelect={handleCustomStartSelect}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <span className="text-sm text-muted-foreground">~</span>
-          <Popover open={showEndPicker} onOpenChange={setShowEndPicker}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn("justify-start text-left font-normal min-w-[130px]",
-                  !customEnd && "text-muted-foreground"
-                )}
-                data-testid="date-custom-end"
-              >
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {customEnd ? formatDateToYYYYMMDD(customEnd) : "종료일"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={customEnd}
-                onSelect={handleCustomEndSelect}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+      {(activePreset === "custom" || getCurrentLabel()) && (
+        <div className="flex flex-wrap items-center gap-2 pl-0.5">
+          {activePreset === "custom" && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Popover open={showStartPicker} onOpenChange={setShowStartPicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn("justify-start text-left font-normal min-w-[130px]",
+                      !customStart && "text-muted-foreground"
+                    )}
+                    data-testid="date-custom-start"
+                  >
+                    <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                    {customStart ? formatDateToYYYYMMDD(customStart) : "시작일"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customStart}
+                    onSelect={handleCustomStartSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <span className="text-sm text-muted-foreground">~</span>
+              <Popover open={showEndPicker} onOpenChange={setShowEndPicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn("justify-start text-left font-normal min-w-[130px]",
+                      !customEnd && "text-muted-foreground"
+                    )}
+                    data-testid="date-custom-end"
+                  >
+                    <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                    {customEnd ? formatDateToYYYYMMDD(customEnd) : "종료일"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={customEnd}
+                    onSelect={handleCustomEndSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+          {getCurrentLabel() && (
+            <Badge variant="secondary" data-testid="date-range-label">
+              <CalendarIcon className="mr-1.5 h-3 w-3" />
+              {getCurrentLabel()}
+            </Badge>
+          )}
         </div>
-      )}
-
-      {getCurrentLabel() && (
-        <span className="text-xs text-muted-foreground ml-1" data-testid="date-range-label">
-          ({getCurrentLabel()})
-        </span>
       )}
     </div>
   );
