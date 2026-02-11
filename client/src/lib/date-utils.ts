@@ -38,7 +38,26 @@ export function getThisMonthRange(): { start: string; end: string } {
   return { start: formatDateToYYYYMMDD(start), end: formatDateToYYYYMMDD(end) };
 }
 
-export type DatePreset = "today" | "yesterday" | "week" | "month" | "all" | "custom";
+export function getLastWeekRange(): { start: string; end: string } {
+  const kst = getKSTDate();
+  const day = kst.getDay();
+  const thisMon = new Date(kst);
+  thisMon.setDate(kst.getDate() - (day === 0 ? 6 : day - 1));
+  const lastMon = new Date(thisMon);
+  lastMon.setDate(thisMon.getDate() - 7);
+  const lastSun = new Date(lastMon);
+  lastSun.setDate(lastMon.getDate() + 6);
+  return { start: formatDateToYYYYMMDD(lastMon), end: formatDateToYYYYMMDD(lastSun) };
+}
+
+export function getLastMonthRange(): { start: string; end: string } {
+  const kst = getKSTDate();
+  const start = new Date(kst.getFullYear(), kst.getMonth() - 1, 1);
+  const end = new Date(kst.getFullYear(), kst.getMonth(), 0);
+  return { start: formatDateToYYYYMMDD(start), end: formatDateToYYYYMMDD(end) };
+}
+
+export type DatePreset = "today" | "yesterday" | "week" | "lastWeek" | "month" | "lastMonth" | "all" | "custom";
 
 export function getDateRangeFromPreset(preset: DatePreset): { startDate: string; endDate: string } | null {
   switch (preset) {
@@ -54,8 +73,16 @@ export function getDateRangeFromPreset(preset: DatePreset): { startDate: string;
       const range = getThisWeekRange();
       return { startDate: range.start, endDate: range.end };
     }
+    case "lastWeek": {
+      const range = getLastWeekRange();
+      return { startDate: range.start, endDate: range.end };
+    }
     case "month": {
       const range = getThisMonthRange();
+      return { startDate: range.start, endDate: range.end };
+    }
+    case "lastMonth": {
+      const range = getLastMonthRange();
       return { startDate: range.start, endDate: range.end };
     }
     case "all":

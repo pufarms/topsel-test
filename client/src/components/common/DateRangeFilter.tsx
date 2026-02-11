@@ -87,7 +87,9 @@ export function DateRangeFilter({
       case "today": return "오늘";
       case "yesterday": return "어제";
       case "week": return "이번 주";
+      case "lastWeek": return "지난주";
       case "month": return "이번 달";
+      case "lastMonth": return "지난달";
       case "all": return "전체";
       case "custom": return "직접 선택";
     }
@@ -109,8 +111,8 @@ export function DateRangeFilter({
   };
 
   const presets: DatePreset[] = showAllOption
-    ? ["today", "yesterday", "week", "month", "all", "custom"]
-    : ["today", "yesterday", "week", "month", "custom"];
+    ? ["today", "yesterday", "week", "lastWeek", "month", "lastMonth", "all", "custom"]
+    : ["today", "yesterday", "week", "lastWeek", "month", "lastMonth", "custom"];
 
   return (
     <div className={cn("flex flex-col gap-2", className)} data-testid="date-range-filter">
