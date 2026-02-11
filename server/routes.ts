@@ -7989,6 +7989,7 @@ export async function registerRoutes(
         id: pendingOrders.id,
         memberId: pendingOrders.memberId,
         productCode: pendingOrders.productCode,
+        fulfillmentType: pendingOrders.fulfillmentType,
       }).from(pendingOrders).where(and(...targetConditions));
 
       if (targetOrders.length === 0) {
@@ -8157,21 +8158,18 @@ export async function registerRoutes(
         }
       }
 
-      if (mode === "all") {
+      const remainingReady = await db.select({ count: sql<string>`COUNT(*)` })
+        .from(pendingOrders)
+        .where(eq(pendingOrders.status, "배송준비중"));
+      const remainingCount = parseInt(remainingReady[0]?.count || '0');
+
+      if (remainingCount === 0) {
         const waybillExists = await db.select().from(siteSettings)
           .where(eq(siteSettings.settingKey, "waybill_delivered")).limit(1);
         if (waybillExists.length > 0) {
           await db.update(siteSettings)
             .set({ settingValue: "false", updatedAt: new Date() })
             .where(eq(siteSettings.settingKey, "waybill_delivered"));
-        } else {
-          await db.insert(siteSettings).values({
-            settingKey: "waybill_delivered",
-            settingValue: "false",
-            settingType: "boolean",
-            category: "order",
-            description: "운송장 전달 상태",
-          });
         }
         const cancelExists = await db.select().from(siteSettings)
           .where(eq(siteSettings.settingKey, "cancel_deadline_closed")).limit(1);
@@ -8179,14 +8177,6 @@ export async function registerRoutes(
           await db.update(siteSettings)
             .set({ settingValue: "false", updatedAt: new Date() })
             .where(eq(siteSettings.settingKey, "cancel_deadline_closed"));
-        } else {
-          await db.insert(siteSettings).values({
-            settingKey: "cancel_deadline_closed",
-            settingValue: "false",
-            settingType: "boolean",
-            category: "order",
-            description: "회원취소 마감 상태",
-          });
         }
       }
 
