@@ -408,17 +408,27 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3 ml-1 inline" /> : <ChevronDown className="h-3 w-3 ml-1 inline" />;
   };
 
+  const memberExportUrl = `/api/admin/statistics/by-member/export?startDate=${startDate}&endDate=${endDate}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="회원명 / 업체명 검색"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-          data-testid="input-member-search"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="회원명 / 업체명 검색"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+            data-testid="input-member-search"
+          />
+        </div>
+        <a href={memberExportUrl} download>
+          <Button size="sm" variant="outline" data-testid="button-export-member-sales">
+            <Download className="h-4 w-4 mr-1" />
+            엑셀 다운로드
+          </Button>
+        </a>
       </div>
 
       {isLoading ? (
@@ -700,6 +710,12 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
             data-testid="input-product-search"
           />
         </div>
+        <a href={`/api/admin/statistics/by-product/export?${params.toString()}`} download>
+          <Button size="sm" variant="outline" data-testid="button-export-product-sales">
+            <Download className="h-4 w-4 mr-1" />
+            엑셀 다운로드
+          </Button>
+        </a>
       </div>
 
       {isLoading ? (

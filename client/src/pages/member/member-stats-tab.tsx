@@ -43,6 +43,7 @@ import {
   ArrowUpDown,
   ShoppingCart,
   Package,
+  Download,
 } from "lucide-react";
 import {
   BarChart,
@@ -359,6 +360,12 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
             ))}
           </SelectContent>
         </Select>
+        <a href={`/api/member/statistics/by-product/export?${queryParams.toString()}`} download>
+          <Button size="sm" variant="outline" data-testid="button-export-member-products">
+            <Download className="h-4 w-4 mr-1" />
+            엑셀 다운로드
+          </Button>
+        </a>
       </div>
 
       {isLoading ? (
