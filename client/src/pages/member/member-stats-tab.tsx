@@ -327,39 +327,48 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
             data-testid="member-product-search"
           />
         </div>
-        <Select value={catLarge || "__all__"} onValueChange={(v) => { setCatLarge(v === "__all__" ? "" : v); setCatMedium(""); setCatSmall(""); }}>
-          <SelectTrigger className="w-[140px]" data-testid="member-cat-large">
-            <SelectValue placeholder="대분류" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">전체</SelectItem>
-            {data?.categories?.large?.map((c: string) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={catMedium || "__all__"} onValueChange={(v) => { setCatMedium(v === "__all__" ? "" : v); setCatSmall(""); }}>
-          <SelectTrigger className="w-[140px]" data-testid="member-cat-medium">
-            <SelectValue placeholder="중분류" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">전체</SelectItem>
-            {data?.categories?.medium?.map((c: string) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={catSmall || "__all__"} onValueChange={(v) => setCatSmall(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[140px]" data-testid="member-cat-small">
-            <SelectValue placeholder="소분류" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">전체</SelectItem>
-            {data?.categories?.small?.map((c: string) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">대분류</label>
+          <Select value={catLarge || "__all__"} onValueChange={(v) => { setCatLarge(v === "__all__" ? "" : v); setCatMedium(""); setCatSmall(""); }}>
+            <SelectTrigger className="w-[140px]" data-testid="member-cat-large">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">전체</SelectItem>
+              {data?.categories?.large?.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">중분류</label>
+          <Select value={catMedium || "__all__"} onValueChange={(v) => { setCatMedium(v === "__all__" ? "" : v); setCatSmall(""); }}>
+            <SelectTrigger className="w-[140px]" data-testid="member-cat-medium">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">전체</SelectItem>
+              {data?.categories?.medium?.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">소분류</label>
+          <Select value={catSmall || "__all__"} onValueChange={(v) => setCatSmall(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px]" data-testid="member-cat-small">
+              <SelectValue placeholder="전체" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">전체</SelectItem>
+              {data?.categories?.small?.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <a href={`/api/member/statistics/by-product/export?${queryParams.toString()}`} download>
           <Button size="sm" variant="outline" data-testid="button-export-member-products">
             <Download className="h-4 w-4 mr-1" />
