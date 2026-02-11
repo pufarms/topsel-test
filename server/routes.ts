@@ -11558,8 +11558,9 @@ export async function registerRoutes(
     const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
     const timeStr = kstDate.toISOString().slice(11, 19).replace(/:/g, '');
+    const ts = Date.now().toString().slice(-6);
 
-    const realMembers = await db.select({ memberName: members.memberName, companyName: members.companyName })
+    const realMembers = await db.select({ id: members.id, memberName: members.memberName, companyName: members.companyName })
       .from(members)
       .where(and(
         inArray(members.grade, ['START', 'DRIVING', 'TOP']),
@@ -11567,28 +11568,42 @@ export async function registerRoutes(
         sql`${members.memberName} != ''`
       ));
 
-    const otherNames = ['김철수', '이영희', '박지민', '최수현'];
-    const realName = realMembers.length > 0 ? realMembers[0].memberName : null;
+    const entries: any[] = [];
+    let idx = 0;
 
-    const entries = [];
-    const totalCount = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < totalCount; i++) {
-      const amount = (Math.floor(Math.random() * 50) + 1) * 10000;
-      const isRealMember = i === 0 && realName;
-      entries.push({
-        bkcode: `DUMMY${dateStr}${timeStr}${String(i).padStart(3, '0')}`,
+    const makeBk = (name: string, amount: number) => {
+      const entry = {
+        bkcode: `DUMMY${dateStr}${ts}${String(idx).padStart(3, '0')}`,
         accountnum: '3520000000001',
         bkname: '농협',
         bkdate: dateStr,
         bktime: timeStr,
-        bkjukyo: isRealMember ? realName : otherNames[Math.floor(Math.random() * otherNames.length)],
+        bkjukyo: name,
         bkcontent: '타행이체',
         bketc: '인터넷뱅킹',
         bkinput: amount,
         bkoutput: 0,
         bkjango: 10000000 + amount,
-      });
+      };
+      idx++;
+      return entry;
+    };
+
+    if (realMembers.length > 0) {
+      const uniqueName = realMembers[0].memberName!;
+      entries.push(makeBk(uniqueName, 50000));
     }
+
+    const duplicateTestName = '테스트동명';
+    entries.push(makeBk(duplicateTestName, 30000));
+
+    entries.push(makeBk('존재하지않는사람', 20000));
+
+    const otherNames = ['김철수', '이영희', '박지민'];
+    for (let i = 0; i < 2; i++) {
+      entries.push(makeBk(otherNames[i % otherNames.length], (Math.floor(Math.random() * 30) + 1) * 10000));
+    }
+
     return entries;
   }
 
