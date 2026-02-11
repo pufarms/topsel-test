@@ -552,7 +552,7 @@ function OrderListDialog({
                         ) : "-"}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {o.updatedAt ? new Date(o.updatedAt).toLocaleDateString("ko-KR") : "-"}
+                        {o.updatedAt ? new Date(o.updatedAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

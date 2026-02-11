@@ -48,7 +48,7 @@ const statusBadge: Record<string, { label: string; variant: "default" | "seconda
 };
 
 export default function PartnerOrders() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [search, setSearch] = useState("");

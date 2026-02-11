@@ -324,7 +324,7 @@ export default function BankdaDeposits() {
             ) : (
               <div className="text-lg font-semibold" data-testid="text-last-sync">
                 {summary?.lastSyncAt
-                  ? new Date(summary.lastSyncAt).toLocaleString("ko-KR")
+                  ? new Date(summary.lastSyncAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
                   : "동기화 기록 없음"}
               </div>
             )}

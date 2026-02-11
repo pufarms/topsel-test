@@ -175,7 +175,7 @@ export default function OrdersCompletedPage() {
                         <Badge className="bg-green-500">완료</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
+                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

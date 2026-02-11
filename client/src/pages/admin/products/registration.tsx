@@ -1851,7 +1851,7 @@ export default function ProductRegistrationPage() {
               <span className="text-sm text-green-600">저장됨</span>
               {lastSavedAt && (
                 <span className="text-xs text-muted-foreground">
-                  ({lastSavedAt.toLocaleTimeString()})
+                  ({lastSavedAt.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" })})
                 </span>
               )}
             </>

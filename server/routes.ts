@@ -4673,7 +4673,7 @@ export async function registerRoutes(
       "출처": h.source === "manual" ? "수동" : h.source === "order" ? "주문연동" : h.source,
       "주문ID": h.orderId || "",
       "담당자": h.adminId,
-      "일시": h.createdAt ? new Date(h.createdAt).toLocaleString("ko-KR") : "",
+      "일시": h.createdAt ? new Date(h.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "",
     }));
     
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -4681,7 +4681,7 @@ export async function registerRoutes(
     
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
     res.setHeader("Content-Disposition", `attachment; filename=stock_history_${today}.xlsx`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     return res.send(buffer);
@@ -5354,9 +5354,8 @@ export async function registerRoutes(
       const totalCost = templates.reduce((sum, t) => sum + (t.totalCost || 0), 0);
 
       // 이번 달 통계
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+      const startOfMonth = new Date(kstNow.getFullYear(), kstNow.getMonth(), 1);
 
       const monthlyHistory = await db.select().from(alimtalkHistory).where(
         sql`${alimtalkHistory.sentAt} >= ${startOfMonth}`
@@ -5827,7 +5826,7 @@ export async function registerRoutes(
   // Generate unique order number
   function generateOrderNumber(): string {
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = now.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }).replace(/-/g, '');
     const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `ORD-${dateStr}-${randomStr}`;
   }
@@ -6346,9 +6345,11 @@ export async function registerRoutes(
   // Uses MAX to find highest existing sequence and increments, avoiding race conditions
   async function generateSequenceNumber(memberId: string): Promise<string> {
     const now = new Date();
-    const year = String(now.getFullYear()).slice(-2); // Last 2 digits of year
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    const kstStr = now.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+    const [y, m, d] = kstStr.split("-");
+    const year = y.slice(-2);
+    const month = m;
+    const day = d;
     const datePrefix = `${memberId}${year}${month}${day}`;
     
     // Find the maximum sequence number with this prefix using MAX
@@ -6457,6 +6458,7 @@ export async function registerRoutes(
         if (existingUpload.length > 0) {
           const previous = existingUpload[0];
           const previousDate = new Date(previous.uploadedAt).toLocaleString('ko-KR', { 
+            timeZone: "Asia/Seoul",
             year: 'numeric', month: '2-digit', day: '2-digit', 
             hour: '2-digit', minute: '2-digit' 
           });
@@ -7220,7 +7222,7 @@ export async function registerRoutes(
       const formatName = format === "postoffice" ? "postoffice" : format === "lotte" ? "lotte" : "default";
       const koreanFormatName = format === "postoffice" ? "우체국" : format === "lotte" ? "롯데" : "기본";
       const fileExt = format === "postoffice" ? "xls" : "xlsx";
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const dateStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
       const asciiFilename = `preparing_orders_${formatName}_${dateStr}.${fileExt}`;
       const koreanFilename = `상품준비중_${koreanFormatName}_${dateStr}.${fileExt}`;
       

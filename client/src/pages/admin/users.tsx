@@ -41,18 +41,19 @@ export default function AdminUsers() {
       이름: u.name,
       이메일: u.email,
       등급: u.tier,
-      가입일: new Date(u.createdAt).toLocaleDateString("ko-KR"),
+      가입일: new Date(u.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }),
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "사용자목록");
-    XLSX.writeFile(wb, `users_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `users_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);
     toast({ title: "내보내기 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
 
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString("ko-KR", {
+      timeZone: "Asia/Seoul",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

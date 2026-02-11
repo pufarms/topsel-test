@@ -226,6 +226,7 @@ export default function VendorManagement() {
   const formatDate = (date: Date | string | null) => {
     if (!date) return "-";
     return new Date(date).toLocaleDateString("ko-KR", {
+      timeZone: "Asia/Seoul",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

@@ -669,7 +669,7 @@ export default function AlimtalkPage() {
                       history.map((item) => (
                         <tr key={item.id} className="border-b" data-testid={`history-row-${item.id}`}>
                           <td className="p-2">
-                            {new Date(item.sentAt).toLocaleString('ko-KR')}
+                            {new Date(item.sentAt).toLocaleString('ko-KR', { timeZone: "Asia/Seoul" })}
                           </td>
                           <td className="p-2">{item.templateName}</td>
                           <td className="text-right p-2">

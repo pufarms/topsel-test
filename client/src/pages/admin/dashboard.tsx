@@ -228,6 +228,7 @@ export default function AdminDashboard() {
 
   const today = new Date();
   const formattedDate = today.toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "long",
     day: "numeric",

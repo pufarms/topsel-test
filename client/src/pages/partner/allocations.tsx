@@ -228,7 +228,7 @@ export default function PartnerAllocations() {
                               <Badge variant={st.variant}>{st.label}</Badge>
                             </td>
                             <td className="py-2 px-2 text-xs text-muted-foreground">
-                              {item.respondedAt ? new Date(item.respondedAt).toLocaleString("ko-KR") : "-"}
+                              {item.respondedAt ? new Date(item.respondedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-"}
                             </td>
                           </tr>
                         );

@@ -65,7 +65,7 @@ const gradeColors: Record<string, string> = {
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "-";
-  return new Date(date).toLocaleDateString("ko-KR");
+  return new Date(date).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 function formatNumber(num: number): string {
@@ -282,7 +282,7 @@ export default function MembersPage() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "회원목록");
-    XLSX.writeFile(wb, `회원목록_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `회원목록_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);
   };
 
   const columns: Column<MemberWithoutPassword>[] = [

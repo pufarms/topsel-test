@@ -37,12 +37,12 @@ const gradeColors: Record<string, string> = {
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "-";
-  return new Date(date).toLocaleDateString("ko-KR");
+  return new Date(date).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 function formatDateTime(date: Date | string | null): string {
   if (!date) return "-";
-  return new Date(date).toLocaleString("ko-KR");
+  return new Date(date).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 export default function MemberDetailPage() {

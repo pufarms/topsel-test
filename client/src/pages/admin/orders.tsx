@@ -89,11 +89,11 @@ export default function AdminOrders() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "주문목록");
-    XLSX.writeFile(wb, `orders_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `orders_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);
     toast({ title: "내보내기 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
 
-  const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR");
+  const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
   const formatPrice = (price: number) => price.toLocaleString("ko-KR") + "원";
 
   // Use real stats from API

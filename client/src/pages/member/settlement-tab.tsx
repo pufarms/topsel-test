@@ -55,8 +55,7 @@ function formatCurrency(n: number): string {
 
 function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr);
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")} ${String(kst.getUTCHours()).padStart(2, "0")}:${String(kst.getUTCMinutes()).padStart(2, "0")}:${String(kst.getUTCSeconds()).padStart(2, "0")}`;
+  return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
 function parseDepositDescription(description: string | null): string {

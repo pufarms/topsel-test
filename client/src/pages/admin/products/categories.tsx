@@ -203,7 +203,7 @@ export default function CategoryManagement() {
     }
   };
 
-  const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR");
+  const formatDate = (date: Date | string) => new Date(date).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 
   const getLevelLabel = (level: string) => {
     switch (level) {

@@ -219,7 +219,7 @@ export default function OrdersCancelledPage() {
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap px-3 text-sm text-muted-foreground">
-                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
+                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

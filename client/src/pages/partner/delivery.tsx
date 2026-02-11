@@ -36,7 +36,7 @@ const periodOptions: { key: PeriodKey; label: string }[] = [
 
 function getDateRange(period: PeriodKey): { start: string; end: string } {
   const now = new Date();
-  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  const fmt = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 
   switch (period) {
     case "today":

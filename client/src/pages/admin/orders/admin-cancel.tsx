@@ -678,7 +678,7 @@ export default function OrdersAdminCancelPage() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "주문조정 재고표");
-    XLSX.writeFile(wb, `주문조정_재고표_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `주문조정_재고표_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);
     
     toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
@@ -709,7 +709,7 @@ export default function OrdersAdminCancelPage() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "주문조정 내역");
-    XLSX.writeFile(wb, `주문조정_직권취소_내역_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `주문조정_직권취소_내역_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);
     
     toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
   };
@@ -1359,7 +1359,7 @@ export default function OrdersAdminCancelPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR") : "-"}
+                        {order.updatedAt ? new Date(order.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-"}
                       </TableCell>
                     </TableRow>
                   ))

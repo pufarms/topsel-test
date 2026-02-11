@@ -99,8 +99,8 @@ export function MemberOrderFilter({
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - days);
-    setDateStart(start.toISOString().split('T')[0]);
-    setDateEnd(end.toISOString().split('T')[0]);
+    setDateStart(start.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }));
+    setDateEnd(end.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }));
   };
 
   return (

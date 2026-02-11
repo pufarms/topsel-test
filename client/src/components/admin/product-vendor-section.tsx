@@ -317,7 +317,7 @@ export function ProductVendorDialog({
                             )}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {new Date(m.updatedAt).toLocaleDateString("ko-KR")}
+                            {new Date(m.updatedAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-center gap-1">

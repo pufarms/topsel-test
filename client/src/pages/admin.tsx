@@ -115,7 +115,7 @@ export default function Admin() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `orders_${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `orders_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 

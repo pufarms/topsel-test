@@ -86,7 +86,7 @@ const detailStatusConfig: Record<string, { label: string; variant: "default" | "
 
 export default function OrdersAllocationsPage() {
   const { toast } = useToast();
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedAllocation, setSelectedAllocation] = useState<Allocation | null>(null);
 
