@@ -12433,9 +12433,9 @@ export async function registerRoutes(
         ));
       }
       if (vendorFilter === 'self') {
-        conditions.push(sql`${vendors.id} IS NULL`);
+        conditions.push(or(eq(pendingOrders.fulfillmentType, 'self'), sql`${pendingOrders.vendorId} IS NULL`));
       } else if (vendorFilter && vendorFilter !== '' && vendorFilter !== 'all') {
-        conditions.push(eq(vendors.id, parseInt(vendorFilter)));
+        conditions.push(eq(pendingOrders.vendorId, parseInt(vendorFilter)));
       }
 
       const products = await db.select({
@@ -12447,11 +12447,11 @@ export async function registerRoutes(
         quantity: sql<number>`COUNT(*)`.as('quantity'),
         revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`.as('revenue'),
         vendorName: sql<string>`MAX(${vendors.companyName})`.as('vendor_name'),
+        fulfillmentType: pendingOrders.fulfillmentType,
       }).from(pendingOrders)
-        .leftJoin(productVendors, and(eq(pendingOrders.productCode, productVendors.productCode), eq(productVendors.isActive, true)))
-        .leftJoin(vendors, eq(productVendors.vendorId, vendors.id))
+        .leftJoin(vendors, eq(pendingOrders.vendorId, vendors.id))
         .where(and(...conditions))
-        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall)
+        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall, pendingOrders.fulfillmentType)
         .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`));
 
       const totalRevenue = products.reduce((sum, p) => sum + Number(p.revenue), 0);
@@ -12489,7 +12489,7 @@ export async function registerRoutes(
           categorySmall: p.categorySmall || '',
           quantity: Number(p.quantity),
           revenue: Number(p.revenue),
-          vendorName: p.vendorName || '탑셀러',
+          vendorName: (p.fulfillmentType === 'vendor' && p.vendorName) ? p.vendorName : '탑셀러',
         })),
         totalRevenue,
         categories: {
