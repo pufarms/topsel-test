@@ -1015,22 +1015,19 @@ export default function AdminStatsPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-stats-page">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <BarChart3 className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">매출 통계</h1>
-        </div>
-        <DateRangeFilter onChange={setDateRange} defaultPreset="month" showLabel={false} />
+      <div className="flex items-center gap-3">
+        <BarChart3 className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">매출 통계</h1>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <TabsList data-testid="stats-tabs">
             <TabsTrigger value="overview" data-testid="tab-overview">매출 개요</TabsTrigger>
             <TabsTrigger value="by-member" data-testid="tab-by-member">회원별 매출</TabsTrigger>
             <TabsTrigger value="by-product" data-testid="tab-by-product">상품별 매출</TabsTrigger>
           </TabsList>
-          <DateRangeLabel startDate={dateRange.startDate} endDate={dateRange.endDate} />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="month" />
         </div>
 
         <TabsContent value="overview" className="mt-4">
