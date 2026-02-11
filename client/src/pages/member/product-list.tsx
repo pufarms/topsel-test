@@ -185,18 +185,18 @@ export default function MemberProductList() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => { setActiveSubTab(v as "current" | "next-week"); setCurrentPage(1); }}>
-            <TabsList data-testid="tabs-product-type">
+            <TabsList className="grid w-full grid-cols-2 h-11" data-testid="tabs-product-type">
               <TabsTrigger
                 value="current"
                 data-testid="tab-current-products"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                className="text-sm font-medium bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 현재공급가
               </TabsTrigger>
               <TabsTrigger
                 value="next-week"
                 data-testid="tab-next-week-products"
-                className="data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                className="text-sm font-medium bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300 data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-sm"
               >
                 차주예상공급가
               </TabsTrigger>
