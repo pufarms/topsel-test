@@ -12345,6 +12345,67 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/statistics/by-member/export', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const { startDate, endDate, search } = req.query as { startDate?: string; endDate?: string; search?: string };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+      const conditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+      if (search && search.trim()) {
+        conditions.push(
+          or(
+            sql`${pendingOrders.memberCompanyName} ILIKE ${'%' + search.trim() + '%'}`,
+            sql`${pendingOrders.memberId} ILIKE ${'%' + search.trim() + '%'}`
+          )!
+        );
+      }
+      const rows = await db.select({
+        memberId: pendingOrders.memberId,
+        memberCompanyName: pendingOrders.memberCompanyName,
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
+        orderCount: sql<number>`COUNT(*)`,
+        firstOrderDate: sql<string>`MIN((${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date)::text`,
+        lastOrderDate: sql<string>`MAX((${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date)::text`,
+      }).from(pendingOrders)
+        .where(and(...conditions))
+        .groupBy(pendingOrders.memberId, pendingOrders.memberCompanyName)
+        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
+
+      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['순위', '회원ID', '업체명', '거래시작일', '거래종료일', '주문건수', '매출액', '평균주문금액', '매출비중(%)'],
+        ...rows.map((r, i) => {
+          const rev = Number(r.revenue || 0);
+          const cnt = Number(r.orderCount || 0);
+          const avg = cnt > 0 ? Math.round(rev / cnt) : 0;
+          const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
+          return [i + 1, r.memberId, r.memberCompanyName || '', r.firstOrderDate || '', r.lastOrderDate || '', cnt, rev, avg, share];
+        }),
+      ];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '회원별매출');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const koreanFileName = `회원별매출_${startDate || '전체'}_${endDate || '전체'}.xlsx`;
+      const encodedFileName = encodeURIComponent(koreanFileName);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get('/api/admin/statistics/by-member/:memberId', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
@@ -12504,6 +12565,76 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/statistics/by-product/export', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+      const { startDate, endDate, search, categoryLarge, categoryMedium, categorySmall, vendorFilter } = req.query as {
+        startDate?: string; endDate?: string; search?: string;
+        categoryLarge?: string; categoryMedium?: string; categorySmall?: string; vendorFilter?: string;
+      };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+      const conditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+      if (categoryLarge && categoryLarge.trim()) conditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) conditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
+      if (categorySmall && categorySmall.trim()) conditions.push(eq(pendingOrders.categorySmall, categorySmall.trim()));
+      if (search && search.trim()) {
+        conditions.push(sql`${pendingOrders.productName} ILIKE ${'%' + search.trim() + '%'}`);
+      }
+      if (vendorFilter === 'self') {
+        conditions.push(or(sql`${pendingOrders.fulfillmentType} = 'self'`, sql`${pendingOrders.fulfillmentType} IS NULL`)!);
+      } else if (vendorFilter && vendorFilter.trim()) {
+        conditions.push(eq(pendingOrders.vendorId, parseInt(vendorFilter)));
+      }
+      const rows = await db.select({
+        productCode: pendingOrders.productCode,
+        productName: pendingOrders.productName,
+        categoryLarge: pendingOrders.categoryLarge,
+        categoryMedium: pendingOrders.categoryMedium,
+        categorySmall: pendingOrders.categorySmall,
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
+        quantity: sql<number>`COUNT(*)`,
+        vendorId: pendingOrders.vendorId,
+        fulfillmentType: pendingOrders.fulfillmentType,
+      }).from(pendingOrders)
+        .where(and(...conditions))
+        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall, pendingOrders.vendorId, pendingOrders.fulfillmentType)
+        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
+      const allVendors = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
+      const vendorMap = new Map(allVendors.map(v => [v.id, v.companyName]));
+      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '공급처', '판매수량', '매출액', '매출비중(%)'],
+        ...rows.map((r, i) => {
+          const rev = Number(r.revenue || 0);
+          const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
+          const vName = (!r.fulfillmentType || r.fulfillmentType === 'self') ? '탑셀러' : (r.vendorId ? (vendorMap.get(r.vendorId) || '외부') : '탑셀러');
+          return [i + 1, r.productCode || '', r.productName || '', r.categoryLarge || '', r.categoryMedium || '', r.categorySmall || '', vName, Number(r.quantity || 0), rev, share];
+        }),
+      ];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '상품별매출');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const koreanFileName = `상품별매출_${startDate || '전체'}_${endDate || '전체'}.xlsx`;
+      const encodedFileName = encodeURIComponent(koreanFileName);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get('/api/admin/statistics/by-product/:productCode', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
@@ -12638,149 +12769,6 @@ export async function registerRoutes(
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename=statistics_orders.csv');
         res.send('\uFEFF' + csvRows.join('\n'));
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get('/api/admin/statistics/by-member/export', async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
-      const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
-      const { startDate, endDate, search } = req.query as { startDate?: string; endDate?: string; search?: string };
-      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
-      const conditions: any[] = [
-        eq(pendingOrders.status, '배송중'),
-        eq(pendingOrders.priceConfirmed, true),
-        gte(pendingOrders.updatedAt, startUTC),
-        lte(pendingOrders.updatedAt, endUTC),
-      ];
-      if (search && search.trim()) {
-        conditions.push(
-          or(
-            sql`${pendingOrders.memberCompanyName} ILIKE ${'%' + search.trim() + '%'}`,
-            sql`${pendingOrders.memberId} ILIKE ${'%' + search.trim() + '%'}`
-          )!
-        );
-      }
-      const rows = await db.select({
-        memberId: pendingOrders.memberId,
-        memberCompanyName: pendingOrders.memberCompanyName,
-        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
-        orderCount: sql<number>`COUNT(*)`,
-        firstOrderDate: sql<string>`MIN((${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date)::text`,
-        lastOrderDate: sql<string>`MAX((${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul')::date)::text`,
-      }).from(pendingOrders)
-        .where(and(...conditions))
-        .groupBy(pendingOrders.memberId, pendingOrders.memberCompanyName)
-        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
-
-      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
-      try {
-        const XLSX = await import('xlsx');
-        const wsData = [
-          ['순위', '회원ID', '업체명', '거래시작일', '거래종료일', '주문건수', '매출액', '평균주문금액', '매출비중(%)'],
-          ...rows.map((r, i) => {
-            const rev = Number(r.revenue || 0);
-            const cnt = Number(r.orderCount || 0);
-            const avg = cnt > 0 ? Math.round(rev / cnt) : 0;
-            const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
-            return [i + 1, r.memberId, r.memberCompanyName || '', r.firstOrderDate || '', r.lastOrderDate || '', cnt, rev, avg, share];
-          }),
-        ];
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, '회원별매출');
-        const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=member_sales_${startDate || 'all'}_${endDate || 'all'}.xlsx`);
-        res.send(buf);
-      } catch {
-        res.status(500).json({ message: "엑셀 생성 실패" });
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get('/api/admin/statistics/by-product/export', async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
-      const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-        return res.status(403).json({ message: "권한이 없습니다" });
-      }
-      const { startDate, endDate, search, categoryLarge, categoryMedium, categorySmall, vendorFilter } = req.query as {
-        startDate?: string; endDate?: string; search?: string;
-        categoryLarge?: string; categoryMedium?: string; categorySmall?: string; vendorFilter?: string;
-      };
-      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
-      const conditions: any[] = [
-        eq(pendingOrders.status, '배송중'),
-        eq(pendingOrders.priceConfirmed, true),
-        gte(pendingOrders.updatedAt, startUTC),
-        lte(pendingOrders.updatedAt, endUTC),
-      ];
-      if (categoryLarge && categoryLarge.trim()) conditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
-      if (categoryMedium && categoryMedium.trim()) conditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
-      if (categorySmall && categorySmall.trim()) conditions.push(eq(pendingOrders.categorySmall, categorySmall.trim()));
-      if (search && search.trim()) {
-        conditions.push(sql`${pendingOrders.productName} ILIKE ${'%' + search.trim() + '%'}`);
-      }
-      if (vendorFilter === 'self') {
-        conditions.push(
-          or(
-            sql`${pendingOrders.fulfillmentType} = 'self'`,
-            sql`${pendingOrders.fulfillmentType} IS NULL`
-          )!
-        );
-      } else if (vendorFilter && vendorFilter.trim()) {
-        conditions.push(eq(pendingOrders.vendorId, parseInt(vendorFilter)));
-      }
-
-      const rows = await db.select({
-        productCode: pendingOrders.productCode,
-        productName: pendingOrders.productName,
-        categoryLarge: pendingOrders.categoryLarge,
-        categoryMedium: pendingOrders.categoryMedium,
-        categorySmall: pendingOrders.categorySmall,
-        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
-        quantity: sql<number>`COUNT(*)`,
-        vendorId: pendingOrders.vendorId,
-        fulfillmentType: pendingOrders.fulfillmentType,
-      }).from(pendingOrders)
-        .where(and(...conditions))
-        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall, pendingOrders.vendorId, pendingOrders.fulfillmentType)
-        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
-
-      const allVendors = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
-      const vendorMap = new Map(allVendors.map(v => [v.id, v.companyName]));
-
-      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
-      try {
-        const XLSX = await import('xlsx');
-        const wsData = [
-          ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '공급처', '판매수량', '매출액', '매출비중(%)'],
-          ...rows.map((r, i) => {
-            const rev = Number(r.revenue || 0);
-            const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
-            const vName = (!r.fulfillmentType || r.fulfillmentType === 'self') ? '탑셀러' : (r.vendorId ? (vendorMap.get(r.vendorId) || '외부') : '탑셀러');
-            return [i + 1, r.productCode || '', r.productName || '', r.categoryLarge || '', r.categoryMedium || '', r.categorySmall || '', vName, Number(r.quantity || 0), rev, share];
-          }),
-        ];
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, '상품별매출');
-        const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=product_sales_${startDate || 'all'}_${endDate || 'all'}.xlsx`);
-        res.send(buf);
-      } catch {
-        res.status(500).json({ message: "엑셀 생성 실패" });
       }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -13069,6 +13057,66 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/member/statistics/by-product/export', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      }
+      const memberId = req.session.userId;
+      const { startDate, endDate, search, categoryLarge, categoryMedium, categorySmall } = req.query as {
+        startDate?: string; endDate?: string; search?: string;
+        categoryLarge?: string; categoryMedium?: string; categorySmall?: string;
+      };
+      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
+      const conditions: any[] = [
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        eq(pendingOrders.memberId, memberId),
+        gte(pendingOrders.updatedAt, startUTC),
+        lte(pendingOrders.updatedAt, endUTC),
+      ];
+      if (categoryLarge && categoryLarge.trim()) conditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) conditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
+      if (categorySmall && categorySmall.trim()) conditions.push(eq(pendingOrders.categorySmall, categorySmall.trim()));
+      if (search && search.trim()) {
+        conditions.push(sql`${pendingOrders.productName} ILIKE ${'%' + search.trim() + '%'}`);
+      }
+      const rows = await db.select({
+        productCode: pendingOrders.productCode,
+        productName: pendingOrders.productName,
+        categoryLarge: pendingOrders.categoryLarge,
+        categoryMedium: pendingOrders.categoryMedium,
+        categorySmall: pendingOrders.categorySmall,
+        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
+        quantity: sql<number>`COUNT(*)`,
+      }).from(pendingOrders)
+        .where(and(...conditions))
+        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall)
+        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
+      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '구매수량', '매입금액', '매입비중(%)'],
+        ...rows.map((r, i) => {
+          const rev = Number(r.revenue || 0);
+          const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
+          return [i + 1, r.productCode || '', r.productName || '', r.categoryLarge || '', r.categoryMedium || '', r.categorySmall || '', Number(r.quantity || 0), rev, share];
+        }),
+      ];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '상품별매입');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const koreanFileName = `상품별매입_${startDate || '전체'}_${endDate || '전체'}.xlsx`;
+      const encodedFileName = encodeURIComponent(koreanFileName);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get('/api/member/statistics/by-product/:productCode', async (req, res) => {
     try {
       if (!req.session.userId || req.session.userType !== "member") {
@@ -13161,70 +13209,6 @@ export async function registerRoutes(
         page,
         limit,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get('/api/member/statistics/by-product/export', async (req, res) => {
-    try {
-      if (!req.session.userId || req.session.userType !== "member") {
-        return res.status(401).json({ message: "회원 로그인이 필요합니다" });
-      }
-      const memberId = req.session.userId;
-      const { startDate, endDate, search, categoryLarge, categoryMedium, categorySmall } = req.query as {
-        startDate?: string; endDate?: string; search?: string;
-        categoryLarge?: string; categoryMedium?: string; categorySmall?: string;
-      };
-      const { startUTC, endUTC } = parseDateRangeKST(startDate, endDate);
-      const conditions: any[] = [
-        eq(pendingOrders.status, '배송중'),
-        eq(pendingOrders.priceConfirmed, true),
-        eq(pendingOrders.memberId, memberId),
-        gte(pendingOrders.updatedAt, startUTC),
-        lte(pendingOrders.updatedAt, endUTC),
-      ];
-      if (categoryLarge && categoryLarge.trim()) conditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
-      if (categoryMedium && categoryMedium.trim()) conditions.push(eq(pendingOrders.categoryMedium, categoryMedium.trim()));
-      if (categorySmall && categorySmall.trim()) conditions.push(eq(pendingOrders.categorySmall, categorySmall.trim()));
-      if (search && search.trim()) {
-        conditions.push(sql`${pendingOrders.productName} ILIKE ${'%' + search.trim() + '%'}`);
-      }
-
-      const rows = await db.select({
-        productCode: pendingOrders.productCode,
-        productName: pendingOrders.productName,
-        categoryLarge: pendingOrders.categoryLarge,
-        categoryMedium: pendingOrders.categoryMedium,
-        categorySmall: pendingOrders.categorySmall,
-        revenue: sql<number>`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`,
-        quantity: sql<number>`COUNT(*)`,
-      }).from(pendingOrders)
-        .where(and(...conditions))
-        .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall)
-        .orderBy(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0) DESC`);
-
-      const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
-      try {
-        const XLSX = await import('xlsx');
-        const wsData = [
-          ['순위', '상품코드', '상품명', '대분류', '중분류', '소분류', '구매수량', '매입금액', '매입비중(%)'],
-          ...rows.map((r, i) => {
-            const rev = Number(r.revenue || 0);
-            const share = totalRevenue > 0 ? Number(((rev / totalRevenue) * 100).toFixed(1)) : 0;
-            return [i + 1, r.productCode || '', r.productName || '', r.categoryLarge || '', r.categoryMedium || '', r.categorySmall || '', Number(r.quantity || 0), rev, share];
-          }),
-        ];
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, '상품별매입');
-        const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=product_purchase_${startDate || 'all'}_${endDate || 'all'}.xlsx`);
-        res.send(buf);
-      } catch {
-        res.status(500).json({ message: "엑셀 생성 실패" });
-      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
