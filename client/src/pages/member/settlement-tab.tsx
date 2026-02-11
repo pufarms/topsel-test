@@ -41,6 +41,7 @@ interface SettlementViewItem {
 interface SettlementViewResponse {
   items: SettlementViewItem[];
   startingBalance: number;
+  endingBalance: number;
   totalOrderAmount: number;
   totalDeposit: number;
   totalPointer: number;
@@ -499,10 +500,13 @@ export default function MemberSettlementTab() {
   const totalOrderAmount = settlementView?.totalOrderAmount || 0;
   const totalDeposit = settlementView?.totalDeposit || 0;
   const totalPointer = settlementView?.totalPointer || 0;
-  const lastBalance = allItems.length > 0 ? allItems[allItems.length - 1].balance : (settlementView?.startingBalance || 0);
+  const periodStartBalance = settlementView?.startingBalance ?? 0;
+  const periodEndBalance = settlementView?.endingBalance ?? periodStartBalance;
 
   const totalPages = Math.ceil(allItems.length / ITEMS_PER_PAGE);
   const pagedItems = allItems.slice((settlementPage - 1) * ITEMS_PER_PAGE, settlementPage * ITEMS_PER_PAGE);
+  const isFirstPage = settlementPage === 1;
+  const isLastPage = settlementPage >= totalPages || totalPages <= 1;
 
   return (
     <div className="space-y-6">
@@ -587,14 +591,20 @@ export default function MemberSettlementTab() {
                 <span className="text-muted-foreground">총 {allItems.length}건</span>
                 <span className="font-semibold">주문합계: {formatCurrency(totalOrderAmount)}</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금합계: {formatCurrency(totalDeposit + totalPointer)}</span>
-                <span className="font-semibold">예치금+포인터 잔액: {formatCurrency(lastBalance)}</span>
+              </div>
+              <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
+                <span className="text-muted-foreground">기간 시작 잔액:</span>
+                <span className="font-semibold" data-testid="text-period-start-balance">{formatCurrency(periodStartBalance)}</span>
+                <span className="text-muted-foreground ml-2">기간 종료 잔액:</span>
+                <span className="font-semibold" data-testid="text-period-end-balance">{formatCurrency(periodEndBalance)}</span>
               </div>
 
               {settlementViewLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : allItems.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
-                  조회된 정산 데이터가 없습니다.
+                  <p>선택한 기간에 정산 내역이 없습니다.</p>
+                  <p className="mt-2 text-sm">해당 기간의 잔액: <span className="font-semibold">{formatCurrency(periodStartBalance)}</span></p>
                 </div>
               ) : (
                 <>
@@ -612,6 +622,14 @@ export default function MemberSettlementTab() {
                         </tr>
                       </thead>
                       <tbody>
+                        {isFirstPage && (
+                          <tr className="border-b bg-blue-50 dark:bg-blue-950/30" data-testid="row-starting-balance">
+                            <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={4}>기간 시작 잔액</td>
+                            <td className="py-2 px-3"></td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(periodStartBalance)}</td>
+                          </tr>
+                        )}
                         {pagedItems.map((item, idx) => (
                           <tr
                             key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
@@ -648,6 +666,14 @@ export default function MemberSettlementTab() {
                         ))}
                       </tbody>
                       <tfoot>
+                        {isLastPage && (
+                          <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold border-b" data-testid="row-ending-balance">
+                            <td className="py-2 px-3 text-center text-muted-foreground">-</td>
+                            <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={4}>기간 종료 잔액</td>
+                            <td className="py-2 px-3"></td>
+                            <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</td>
+                          </tr>
+                        )}
                         <tr className="bg-muted/20 font-semibold">
                           <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
                           <td className="py-2 px-3 text-right">
@@ -656,13 +682,23 @@ export default function MemberSettlementTab() {
                           <td className="py-2 px-3"></td>
                           <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
                           <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalDeposit + totalPointer)}</td>
-                          <td className="py-2 px-3 text-right">{formatCurrency(lastBalance)}</td>
+                          <td className="py-2 px-3 text-right">{formatCurrency(periodEndBalance)}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
 
                   <div className="md:hidden space-y-2">
+                    {isFirstPage && (
+                      <Card className="border-blue-200 dark:border-blue-800" data-testid="card-starting-balance">
+                        <CardContent className="p-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 시작 잔액</span>
+                            <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{formatCurrency(periodStartBalance)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                     {pagedItems.map((item, idx) => (
                       <Card
                         key={`${item.type}-${item.date}-${item.productCode}-${item.unitPrice}-${idx}`}
@@ -696,6 +732,16 @@ export default function MemberSettlementTab() {
                         </CardContent>
                       </Card>
                     ))}
+                    {isLastPage && (
+                      <Card className="border-blue-200 dark:border-blue-800" data-testid="card-ending-balance">
+                        <CardContent className="p-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">기간 종료 잔액</span>
+                            <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                     <Card>
                       <CardContent className="p-3">
                         <div className="flex flex-col gap-1 text-sm">
@@ -708,8 +754,8 @@ export default function MemberSettlementTab() {
                             <span>{formatCurrency(totalDeposit + totalPointer)}</span>
                           </div>
                           <div className="flex justify-between font-semibold border-t pt-1">
-                            <span>예치금+포인터 잔액</span>
-                            <span>{formatCurrency(lastBalance)}</span>
+                            <span>기간 종료 잔액</span>
+                            <span>{formatCurrency(periodEndBalance)}</span>
                           </div>
                         </div>
                       </CardContent>
