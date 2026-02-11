@@ -55,12 +55,17 @@ function formatDateShort(dateStr: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function parseDepositDescription(description: string | null, type: string): string {
+function parseDepositDescription(description: string | null): string {
   if (!description) return "-";
-  const depositorMatch = description.match(/입금자:\s*([^,)]+)/);
-  const depositorName = depositorMatch ? depositorMatch[1].trim() : "";
   if (description.includes("뱅크다")) {
-    return depositorName || "-";
+    const parenMatch = description.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+      const inner = parenMatch[1].trim();
+      const oldFormatMatch = inner.match(/입금자:\s*([^,]+)/);
+      if (oldFormatMatch) return oldFormatMatch[1].trim();
+      return inner;
+    }
+    return "-";
   }
   return description;
 }
@@ -161,7 +166,7 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                         <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {isCredit ? `+${formatCurrency(record.amount)}` : `-${formatCurrency(record.amount)}`}
                         </td>
-                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{parseDepositDescription(record.description, record.type)}</td>
+                        <td className="py-2 px-3 whitespace-nowrap text-sm text-muted-foreground">{parseDepositDescription(record.description)}</td>
                         <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(record.balanceAfter)}</td>
                       </tr>
                     );
@@ -204,7 +209,7 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                         </span>
                       </div>
                       {record.description && (
-                        <div className="text-xs text-muted-foreground">{parseDepositDescription(record.description, record.type)}</div>
+                        <div className="text-xs text-muted-foreground">{parseDepositDescription(record.description)}</div>
                       )}
                     </CardContent>
                   </Card>
