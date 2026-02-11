@@ -11549,23 +11549,35 @@ export async function registerRoutes(
   // 뱅크다 입금 자동충전 API
   // ========================================
 
-  function generateDummyBankdaData() {
+  async function generateDummyBankdaData() {
     const now = new Date();
     const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const dateStr = kstDate.toISOString().slice(0, 10).replace(/-/g, '');
     const timeStr = kstDate.toISOString().slice(11, 19).replace(/:/g, '');
-    
-    const dummyNames = ['홍길동', '김철수', '이영희', '박지민', '최수현'];
+
+    const realMembers = await db.select({ memberName: members.memberName, companyName: members.companyName })
+      .from(members)
+      .where(and(
+        inArray(members.grade, ['START', 'DRIVING', 'TOP']),
+        isNotNull(members.memberName),
+        sql`${members.memberName} != ''`
+      ));
+
+    const otherNames = ['김철수', '이영희', '박지민', '최수현'];
+    const realName = realMembers.length > 0 ? realMembers[0].memberName : null;
+
     const entries = [];
-    for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+    const totalCount = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < totalCount; i++) {
       const amount = (Math.floor(Math.random() * 50) + 1) * 10000;
+      const isRealMember = i === 0 && realName;
       entries.push({
         bkcode: `DUMMY${dateStr}${timeStr}${String(i).padStart(3, '0')}`,
         accountnum: '3520000000001',
         bkname: '농협',
         bkdate: dateStr,
         bktime: timeStr,
-        bkjukyo: dummyNames[Math.floor(Math.random() * dummyNames.length)],
+        bkjukyo: isRealMember ? realName : otherNames[Math.floor(Math.random() * otherNames.length)],
         bkcontent: '타행이체',
         bketc: '인터넷뱅킹',
         bkinput: amount,
@@ -11610,7 +11622,7 @@ export async function registerRoutes(
         return { success: false, error: err.message, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
       }
     } else {
-      bankEntries = generateDummyBankdaData();
+      bankEntries = await generateDummyBankdaData();
     }
 
     const depositEntries = bankEntries.filter((e: any) => parseInt(e.bkinput) > 0);
