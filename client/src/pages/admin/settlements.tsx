@@ -49,44 +49,31 @@ interface MemberBalance {
 }
 
 interface SettlementRecord {
-  id: number;
+  settlementDate: string;
   memberId: string;
-  orderId: number | null;
-  settlementType: string;
-  pointerAmount: number;
-  depositAmount: number;
-  totalAmount: number;
-  pointerBalance: number;
-  depositBalance: number;
-  description: string | null;
-  createdAt: string;
   memberCompanyName: string | null;
+  totalPointerAmount: number;
+  totalDepositAmount: number;
+  totalAmount: number;
+  orderCount: number;
 }
 
 interface DepositRecord {
-  id: number;
+  historyDate: string;
   memberId: string;
-  type: string;
-  amount: number;
-  balanceAfter: number;
-  description: string | null;
-  relatedOrderId: number | null;
-  adminId: string | null;
-  createdAt: string;
   memberCompanyName: string | null;
+  type: string;
+  totalAmount: number;
+  txCount: number;
 }
 
 interface PointerRecord {
-  id: number;
+  historyDate: string;
   memberId: string;
-  type: string;
-  amount: number;
-  balanceAfter: number;
-  description: string | null;
-  relatedOrderId: number | null;
-  adminId: string | null;
-  createdAt: string;
   memberCompanyName: string | null;
+  type: string;
+  totalAmount: number;
+  txCount: number;
 }
 
 const gradeLabels: Record<string, string> = {
@@ -267,12 +254,6 @@ function MemberSettlementTab() {
   const depositTotalPages = Math.max(1, Math.ceil((depositRecords?.total || 0) / ITEMS_PER_PAGE));
   const pointerTotalPages = Math.max(1, Math.ceil((pointerRecords?.total || 0) / ITEMS_PER_PAGE));
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-    return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")} ${String(kst.getUTCHours()).padStart(2, "0")}:${String(kst.getUTCMinutes()).padStart(2, "0")}:${String(kst.getUTCSeconds()).padStart(2, "0")}`;
-  };
-
   return (
     <div className="space-y-4">
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
@@ -421,39 +402,31 @@ function MemberSettlementTab() {
               ) : (
                 <>
                   <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[1000px]">
+                    <Table className="min-w-[800px]">
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
-                          <TableHead>일시</TableHead>
+                          <TableHead>날짜</TableHead>
                           <TableHead>상호명</TableHead>
-                          <TableHead>유형</TableHead>
+                          <TableHead className="text-right">주문 건수</TableHead>
                           <TableHead className="text-right">포인터 차감</TableHead>
                           <TableHead className="text-right">예치금 차감</TableHead>
-                          <TableHead className="text-right">총액</TableHead>
-                          <TableHead className="text-right">포인터 잔액</TableHead>
-                          <TableHead className="text-right">예치금 잔액</TableHead>
-                          <TableHead>설명</TableHead>
+                          <TableHead className="text-right">총 정산액</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {!settlements?.records?.length ? (
                           <TableRow>
-                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 이력이 없습니다</TableCell>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 이력이 없습니다</TableCell>
                           </TableRow>
                         ) : (
-                          settlements.records.map((record) => (
-                            <TableRow key={record.id}>
-                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                          settlements.records.map((record, idx) => (
+                            <TableRow key={`${record.settlementDate}-${record.memberId}-${idx}`}>
+                              <TableCell className="whitespace-nowrap">{record.settlementDate}</TableCell>
                               <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="no-default-active-elevate">{typeLabels[record.settlementType] || record.settlementType}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right">{record.pointerAmount.toLocaleString()}P</TableCell>
-                              <TableCell className="text-right">{record.depositAmount.toLocaleString()}원</TableCell>
-                              <TableCell className="text-right font-medium">{record.totalAmount.toLocaleString()}원</TableCell>
-                              <TableCell className="text-right text-muted-foreground">{record.pointerBalance.toLocaleString()}P</TableCell>
-                              <TableCell className="text-right text-muted-foreground">{record.depositBalance.toLocaleString()}원</TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{record.description || "-"}</TableCell>
+                              <TableCell className="text-right">{Number(record.orderCount).toLocaleString()}건</TableCell>
+                              <TableCell className="text-right">{Number(record.totalPointerAmount).toLocaleString()}P</TableCell>
+                              <TableCell className="text-right">{Number(record.totalDepositAmount).toLocaleString()}원</TableCell>
+                              <TableCell className="text-right font-medium">{Number(record.totalAmount).toLocaleString()}원</TableCell>
                             </TableRow>
                           ))
                         )}
@@ -524,45 +497,43 @@ function MemberSettlementTab() {
                   {depositRecords?.records?.length ? (
                     <div className="flex flex-wrap gap-4 items-center text-sm">
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                        충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}원
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
-                        차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + r.amount, 0).toLocaleString()}원
+                        차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}원
                       </span>
                     </div>
                   ) : null}
                   <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[900px]">
+                    <Table className="min-w-[800px]">
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
-                          <TableHead>일시</TableHead>
+                          <TableHead>날짜</TableHead>
                           <TableHead>상호명</TableHead>
                           <TableHead>유형</TableHead>
-                          <TableHead className="text-right">금액</TableHead>
-                          <TableHead className="text-right">잔액</TableHead>
-                          <TableHead>설명</TableHead>
+                          <TableHead className="text-right">건수</TableHead>
+                          <TableHead className="text-right">합계 금액</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {!depositRecords?.records?.length ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 예치금 이력이 없습니다</TableCell>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">선택한 기간에 예치금 이력이 없습니다</TableCell>
                           </TableRow>
                         ) : (
-                          depositRecords.records.map((record) => (
-                            <TableRow key={record.id}>
-                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                          depositRecords.records.map((record, idx) => (
+                            <TableRow key={`${record.historyDate}-${record.memberId}-${record.type}-${idx}`}>
+                              <TableCell className="whitespace-nowrap">{record.historyDate}</TableCell>
                               <TableCell>{record.memberCompanyName || "-"}</TableCell>
                               <TableCell>
                                 <Badge variant={record.type === "charge" ? "default" : record.type === "deduct" ? "destructive" : "secondary"} className="no-default-active-elevate">
                                   {typeLabels[record.type] || record.type}
                                 </Badge>
                               </TableCell>
+                              <TableCell className="text-right">{Number(record.txCount).toLocaleString()}건</TableCell>
                               <TableCell className={`text-right font-medium ${record.type === "charge" ? "text-emerald-600" : record.type === "deduct" || record.type === "refund" ? "text-red-600" : ""}`}>
-                                {record.type === "charge" ? "+" : "-"}{record.amount.toLocaleString()}원
+                                {record.type === "charge" ? "+" : "-"}{Number(record.totalAmount).toLocaleString()}원
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}원</TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
                             </TableRow>
                           ))
                         )}
@@ -632,45 +603,43 @@ function MemberSettlementTab() {
                   {pointerRecords?.records?.length ? (
                     <div className="flex flex-wrap gap-4 items-center text-sm">
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                        지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}P
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
-                        차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + r.amount, 0).toLocaleString()}P
+                        차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}P
                       </span>
                     </div>
                   ) : null}
                   <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[900px]">
+                    <Table className="min-w-[800px]">
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
-                          <TableHead>일시</TableHead>
+                          <TableHead>날짜</TableHead>
                           <TableHead>상호명</TableHead>
                           <TableHead>유형</TableHead>
-                          <TableHead className="text-right">금액</TableHead>
-                          <TableHead className="text-right">잔액</TableHead>
-                          <TableHead>설명</TableHead>
+                          <TableHead className="text-right">건수</TableHead>
+                          <TableHead className="text-right">합계 금액</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {!pointerRecords?.records?.length ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 포인터 이력이 없습니다</TableCell>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">선택한 기간에 포인터 이력이 없습니다</TableCell>
                           </TableRow>
                         ) : (
-                          pointerRecords.records.map((record) => (
-                            <TableRow key={record.id}>
-                              <TableCell className="whitespace-nowrap">{formatDate(record.createdAt)}</TableCell>
+                          pointerRecords.records.map((record, idx) => (
+                            <TableRow key={`${record.historyDate}-${record.memberId}-${record.type}-${idx}`}>
+                              <TableCell className="whitespace-nowrap">{record.historyDate}</TableCell>
                               <TableCell>{record.memberCompanyName || "-"}</TableCell>
                               <TableCell>
                                 <Badge variant={record.type === "grant" ? "default" : "destructive"} className="no-default-active-elevate">
                                   {typeLabels[record.type] || record.type}
                                 </Badge>
                               </TableCell>
+                              <TableCell className="text-right">{Number(record.txCount).toLocaleString()}건</TableCell>
                               <TableCell className={`text-right font-medium ${record.type === "grant" ? "text-emerald-600" : "text-red-600"}`}>
-                                {record.type === "grant" ? "+" : "-"}{record.amount.toLocaleString()}P
+                                {record.type === "grant" ? "+" : "-"}{Number(record.totalAmount).toLocaleString()}P
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">{record.balanceAfter.toLocaleString()}P</TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[250px] truncate">{record.description || "-"}</TableCell>
                             </TableRow>
                           ))
                         )}

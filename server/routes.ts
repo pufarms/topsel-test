@@ -10162,33 +10162,39 @@ export async function registerRoutes(
       const pageNum = parseInt(page);
       const limitNum = parseInt(limit);
       const offset = (pageNum - 1) * limitNum;
-
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const dateExpr = sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
 
       const [records, countResult] = await Promise.all([
         db.select({
-          id: settlementHistory.id,
+          settlementDate: dateExpr.as('settlementDate'),
           memberId: settlementHistory.memberId,
-          orderId: settlementHistory.orderId,
-          settlementType: settlementHistory.settlementType,
-          pointerAmount: settlementHistory.pointerAmount,
-          depositAmount: settlementHistory.depositAmount,
-          totalAmount: settlementHistory.totalAmount,
-          pointerBalance: settlementHistory.pointerBalance,
-          depositBalance: settlementHistory.depositBalance,
-          description: settlementHistory.description,
-          createdAt: settlementHistory.createdAt,
           memberCompanyName: members.companyName,
+          totalPointerAmount: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)`.as('totalPointerAmount'),
+          totalDepositAmount: sql<number>`COALESCE(SUM(${settlementHistory.depositAmount}), 0)`.as('totalDepositAmount'),
+          totalAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)`.as('totalAmount'),
+          orderCount: sql<number>`COUNT(*)`.as('orderCount'),
         })
           .from(settlementHistory)
           .leftJoin(members, eq(settlementHistory.memberId, members.id))
           .where(whereClause)
-          .orderBy(asc(settlementHistory.createdAt))
+          .groupBy(dateExpr, settlementHistory.memberId, members.companyName)
+          .orderBy(desc(dateExpr))
           .limit(limitNum)
           .offset(offset),
-        db.select({ count: sql<number>`count(*)` })
-          .from(settlementHistory)
-          .where(whereClause),
+        db.select({
+          count: sql<number>`COUNT(*)`,
+        }).from(
+          db.select({
+            d: dateExpr.as('d'),
+            m: settlementHistory.memberId,
+          })
+            .from(settlementHistory)
+            .where(whereClause)
+            .groupBy(dateExpr, settlementHistory.memberId)
+            .as('grouped')
+        ),
       ]);
 
       res.json({
@@ -10227,28 +10233,37 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+      const depDateExpr = sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+
       const [records, countResult] = await Promise.all([
         db.select({
-          id: depositHistory.id,
+          historyDate: depDateExpr.as('historyDate'),
           memberId: depositHistory.memberId,
-          type: depositHistory.type,
-          amount: depositHistory.amount,
-          balanceAfter: depositHistory.balanceAfter,
-          description: depositHistory.description,
-          relatedOrderId: depositHistory.relatedOrderId,
-          adminId: depositHistory.adminId,
-          createdAt: depositHistory.createdAt,
           memberCompanyName: members.companyName,
+          type: depositHistory.type,
+          totalAmount: sql<number>`COALESCE(SUM(${depositHistory.amount}), 0)`.as('totalAmount'),
+          txCount: sql<number>`COUNT(*)`.as('txCount'),
         })
           .from(depositHistory)
           .leftJoin(members, eq(depositHistory.memberId, members.id))
           .where(whereClause)
-          .orderBy(desc(depositHistory.createdAt))
+          .groupBy(depDateExpr, depositHistory.memberId, members.companyName, depositHistory.type)
+          .orderBy(desc(depDateExpr))
           .limit(limitNum)
           .offset(offset),
-        db.select({ count: sql<number>`count(*)` })
-          .from(depositHistory)
-          .where(whereClause),
+        db.select({
+          count: sql<number>`COUNT(*)`,
+        }).from(
+          db.select({
+            d: depDateExpr.as('d'),
+            m: depositHistory.memberId,
+            t: depositHistory.type,
+          })
+            .from(depositHistory)
+            .where(whereClause)
+            .groupBy(depDateExpr, depositHistory.memberId, depositHistory.type)
+            .as('grouped')
+        ),
       ]);
 
       res.json({
@@ -10287,28 +10302,37 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+      const ptrDateExpr = sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`;
+
       const [records, countResult] = await Promise.all([
         db.select({
-          id: pointerHistory.id,
+          historyDate: ptrDateExpr.as('historyDate'),
           memberId: pointerHistory.memberId,
-          type: pointerHistory.type,
-          amount: pointerHistory.amount,
-          balanceAfter: pointerHistory.balanceAfter,
-          description: pointerHistory.description,
-          relatedOrderId: pointerHistory.relatedOrderId,
-          adminId: pointerHistory.adminId,
-          createdAt: pointerHistory.createdAt,
           memberCompanyName: members.companyName,
+          type: pointerHistory.type,
+          totalAmount: sql<number>`COALESCE(SUM(${pointerHistory.amount}), 0)`.as('totalAmount'),
+          txCount: sql<number>`COUNT(*)`.as('txCount'),
         })
           .from(pointerHistory)
           .leftJoin(members, eq(pointerHistory.memberId, members.id))
           .where(whereClause)
-          .orderBy(desc(pointerHistory.createdAt))
+          .groupBy(ptrDateExpr, pointerHistory.memberId, members.companyName, pointerHistory.type)
+          .orderBy(desc(ptrDateExpr))
           .limit(limitNum)
           .offset(offset),
-        db.select({ count: sql<number>`count(*)` })
-          .from(pointerHistory)
-          .where(whereClause),
+        db.select({
+          count: sql<number>`COUNT(*)`,
+        }).from(
+          db.select({
+            d: ptrDateExpr.as('d'),
+            m: pointerHistory.memberId,
+            t: pointerHistory.type,
+          })
+            .from(pointerHistory)
+            .where(whereClause)
+            .groupBy(ptrDateExpr, pointerHistory.memberId, pointerHistory.type)
+            .as('grouped')
+        ),
       ]);
 
       res.json({
