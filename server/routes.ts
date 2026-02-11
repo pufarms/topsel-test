@@ -10413,7 +10413,7 @@ export async function registerRoutes(
 
       const [orderRows, depositRows, pointerRows, depositNetSinceStart, pointerNetSinceStart] = await Promise.all([
         db.select({
-          orderDate: sql<string>`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          orderDate: sql<string>`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
           productName: pendingOrders.productName,
           productCode: pendingOrders.productCode,
           supplyPrice: pendingOrders.supplyPrice,
@@ -10422,14 +10422,14 @@ export async function registerRoutes(
           .from(pendingOrders)
           .where(and(...orderConditions))
           .groupBy(
-            sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+            sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
             pendingOrders.productName,
             pendingOrders.productCode,
             pendingOrders.supplyPrice,
           ),
         db.select({
           id: depositHistory.id,
-          date: sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          date: sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
           type: depositHistory.type,
           amount: depositHistory.amount,
           description: depositHistory.description,
@@ -10438,7 +10438,7 @@ export async function registerRoutes(
           .where(and(...depositConditions)),
         db.select({
           id: pointerHistory.id,
-          date: sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          date: sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
           type: pointerHistory.type,
           amount: pointerHistory.amount,
           description: pointerHistory.description,
