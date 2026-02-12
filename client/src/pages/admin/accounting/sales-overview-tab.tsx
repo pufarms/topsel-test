@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake,
+  BarChart3, ShoppingCart, Handshake, Search, X,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
@@ -173,6 +173,7 @@ function MonthlySalesSummary() {
   const [selectedYear, setSelectedYear] = useState(kstNow.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(kstNow.getMonth() + 1);
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState("");
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
   const nextM = selectedMonth === 12 ? 1 : selectedMonth + 1;
@@ -305,9 +306,32 @@ function MonthlySalesSummary() {
         </div>
 
         <div className="border-t border-border bg-muted/20 px-5 py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h4 className="text-sm font-semibold text-foreground">회원별 계산서 / 세금계산서 내역</h4>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <h4 className="text-sm font-semibold text-foreground">회원별 계산서 / 세금계산서 내역</h4>
+            </div>
+            {monthlyData && monthlyData.members.length > 0 && (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="업체명 검색"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  className="pl-8 pr-8 w-[200px]"
+                  data-testid="input-member-search"
+                />
+                {memberSearch && (
+                  <button
+                    onClick={() => setMemberSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    data-testid="button-clear-member-search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {monthlyLoading ? (
@@ -337,7 +361,17 @@ function MonthlySalesSummary() {
                     </tr>
                   </thead>
                   <tbody>
-                    {monthlyData.members.map((m) => (
+                    {monthlyData.members
+                      .filter((m) => {
+                        if (!memberSearch.trim()) return true;
+                        const q = memberSearch.trim().toLowerCase();
+                        return (
+                          m.businessName?.toLowerCase().includes(q) ||
+                          m.memberName?.toLowerCase().includes(q) ||
+                          m.businessNumber?.includes(q)
+                        );
+                      })
+                      .map((m) => (
                       <tr
                         key={m.memberId}
                         className="border-b hover-elevate cursor-pointer"
