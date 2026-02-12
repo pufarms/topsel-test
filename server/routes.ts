@@ -11160,7 +11160,9 @@ export async function registerRoutes(
       const payments = await db.select({
         id: vendorPayments.id,
         vendorId: vendorPayments.vendorId,
+        supplierId: vendorPayments.supplierId,
         vendorName: vendors.companyName,
+        supplierName: suppliers.name,
         amount: vendorPayments.amount,
         paymentDate: vendorPayments.paymentDate,
         memo: vendorPayments.memo,
@@ -11168,7 +11170,8 @@ export async function registerRoutes(
         createdAt: vendorPayments.createdAt,
       })
         .from(vendorPayments)
-        .innerJoin(vendors, eq(vendorPayments.vendorId, vendors.id))
+        .leftJoin(vendors, eq(vendorPayments.vendorId, vendors.id))
+        .leftJoin(suppliers, eq(vendorPayments.supplierId, suppliers.id))
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(vendorPayments.createdAt));
 
