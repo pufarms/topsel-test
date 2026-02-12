@@ -166,7 +166,7 @@ function MonthlySalesSummary() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `세금계산서_${selectedYear}년${selectedMonth}월.xlsx`;
+      a.download = `계산서_면세_${selectedYear}년${selectedMonth}월.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
       toast({ title: "다운로드 완료" });
@@ -194,7 +194,7 @@ function MonthlySalesSummary() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              월별 매출 요약 (세금계산서 기준)
+              월별 매출 요약 (계산서 기준 - 면세)
             </CardTitle>
             <div className="flex items-center gap-2">
               <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
@@ -269,7 +269,7 @@ function MonthlySalesSummary() {
           ) : monthlyData && monthlyData.members.length > 0 ? (
             <>
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200">
-                포인터 사용분은 세금계산서 발행 대상에서 제외됩니다. 발행대상액 = 총주문액 - 포인터사용액
+                농산물은 부가세 면세 품목으로 계산서(면세)를 발행합니다. 포인터 사용분은 발행 대상에서 제외됩니다. 발행대상액 = 총주문액 - 포인터사용액
               </div>
               <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[500px]">
                 <table className="w-full text-sm min-w-[900px]">
@@ -280,9 +280,9 @@ function MonthlySalesSummary() {
                       <th className="text-right py-2 px-3 whitespace-nowrap">주문건수</th>
                       <th className="text-right py-2 px-3 whitespace-nowrap">총주문액</th>
                       <th className="text-right py-2 px-3 whitespace-nowrap">포인터사용</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap">발행대상액</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap">공급가액</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap">부가세</th>
+                      <th className="text-right py-2 px-3 whitespace-nowrap">계산서발행액</th>
+                      <th className="text-right py-2 px-3 whitespace-nowrap">공급가액(면세)</th>
+                      <th className="text-right py-2 px-3 whitespace-nowrap">구분</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -300,7 +300,7 @@ function MonthlySalesSummary() {
                         <td className="py-2 px-3 text-right whitespace-nowrap text-amber-600 dark:text-amber-400">-{formatCurrency(m.pointerUsed)}</td>
                         <td className="py-2 px-3 text-right whitespace-nowrap font-semibold">{formatCurrency(m.taxInvoiceAmount)}</td>
                         <td className="py-2 px-3 text-right whitespace-nowrap">{formatCurrency(m.supplyAmount)}</td>
-                        <td className="py-2 px-3 text-right whitespace-nowrap">{formatCurrency(m.vatAmount)}</td>
+                        <td className="py-2 px-3 text-center whitespace-nowrap"><Badge variant="secondary">면세</Badge></td>
                       </tr>
                     ))}
                   </tbody>
@@ -312,20 +312,20 @@ function MonthlySalesSummary() {
                       <td className="py-2 px-3 text-right text-amber-600 dark:text-amber-400">-{formatCurrency(monthlyData.totals.pointerUsed)}</td>
                       <td className="py-2 px-3 text-right">{formatCurrency(monthlyData.totals.taxInvoiceAmount)}</td>
                       <td className="py-2 px-3 text-right">{formatCurrency(monthlyData.totals.supplyAmount)}</td>
-                      <td className="py-2 px-3 text-right">{formatCurrency(monthlyData.totals.vatAmount)}</td>
+                      <td className="py-2 px-3 text-center">-</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
               <div className="flex justify-end">
                 <Button variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-tax-excel">
-                  <Download className="h-4 w-4" />세금계산서용 엑셀 다운로드
+                  <Download className="h-4 w-4" />계산서(면세) 엑셀 다운로드
                 </Button>
               </div>
             </>
           ) : (
             <div className="py-6 text-center text-muted-foreground text-sm">
-              해당 월에 세금계산서 대상 데이터가 없습니다.
+              해당 월에 계산서 발행 대상 데이터가 없습니다.
             </div>
           )}
         </CardContent>
@@ -384,16 +384,12 @@ function MonthlySalesSummary() {
                   <span>-{formatCurrency(memberDetail.summary.pointerUsed)}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between text-sm font-semibold">
-                  <span>세금계산서 발행액</span>
+                  <span>계산서 발행액 (면세)</span>
                   <span>{formatCurrency(memberDetail.summary.taxInvoiceAmount)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>공급가액</span>
+                  <span>공급가액 (= 발행액, 면세)</span>
                   <span>{formatCurrency(memberDetail.summary.supplyAmount)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>부가세</span>
-                  <span>{formatCurrency(memberDetail.summary.vatAmount)}</span>
                 </div>
               </div>
             </div>

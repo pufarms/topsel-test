@@ -13871,7 +13871,7 @@ export async function registerRoutes(
     }
   });
 
-  // 1-3. 회원별 월간 세금계산서 발행액
+  // 1-3. 회원별 월간 계산서(면세) 발행액
   app.get('/api/admin/accounting/sales/monthly-by-member', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
@@ -13915,9 +13915,9 @@ export async function registerRoutes(
         .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
 
       const memberData = memberRows.map(r => {
-        const taxInvoiceAmount = r.depositUsed;
-        const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
-        const vatAmount = taxInvoiceAmount - supplyAmount;
+        const invoiceAmount = r.depositUsed;
+        const supplyAmount = invoiceAmount;
+        const vatAmount = 0;
         return {
           memberId: r.memberId,
           memberName: r.memberName,
@@ -13927,7 +13927,7 @@ export async function registerRoutes(
           orderCount: r.orderCount,
           totalOrderAmount: r.totalOrderAmount,
           pointerUsed: r.pointerUsed,
-          taxInvoiceAmount,
+          taxInvoiceAmount: invoiceAmount,
           supplyAmount,
           vatAmount,
         };
@@ -14023,8 +14023,8 @@ export async function registerRoutes(
       const totalOrderAmount = orderRows.reduce((s, r) => s + (r.totalAmount || 0), 0);
       const pointerUsed = orderRows.reduce((s, r) => s + (r.pointerUsed || 0), 0);
       const taxInvoiceAmount = totalOrderAmount - pointerUsed;
-      const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
-      const vatAmount = taxInvoiceAmount - supplyAmount;
+      const supplyAmount = taxInvoiceAmount;
+      const vatAmount = 0;
 
       const mi = memberInfo[0];
       res.json({
@@ -14054,7 +14054,7 @@ export async function registerRoutes(
     }
   });
 
-  // 1-5. 세금계산서용 엑셀 다운로드
+  // 1-5. 계산서(면세)용 엑셀 다운로드
   app.get('/api/admin/accounting/sales/tax-invoice-export', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
@@ -14091,9 +14091,7 @@ export async function registerRoutes(
 
       const XLSX = await import('xlsx');
       const data = memberRows.map(r => {
-        const taxInvoiceAmount = r.depositUsed;
-        const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
-        const vatAmount = taxInvoiceAmount - supplyAmount;
+        const invoiceAmount = r.depositUsed;
         return {
           '공급받는자(상호)': r.companyName || '',
           '사업자번호': r.businessNumber || '',
@@ -14101,18 +14099,18 @@ export async function registerRoutes(
           '주문건수': r.orderCount,
           '총주문액': r.totalOrderAmount,
           '포인터사용': r.pointerUsed,
-          '발행대상액': taxInvoiceAmount,
-          '공급가액': supplyAmount,
-          '부가세': vatAmount,
+          '계산서발행액(면세)': invoiceAmount,
+          '공급가액': invoiceAmount,
+          '비고': '면세(농산물)',
         };
       });
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '세금계산서');
+      XLSX.utils.book_append_sheet(wb, ws, '계산서(면세)');
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-      const filename = encodeURIComponent(`세금계산서_${year}년${month}월.xlsx`);
+      const filename = encodeURIComponent(`계산서_면세_${year}년${month}월.xlsx`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
       res.send(buf);
