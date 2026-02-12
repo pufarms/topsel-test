@@ -223,16 +223,6 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
                       <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</td>
                     </tr>
                   )}
-                  <tr className="bg-muted/20 font-semibold">
-                    <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
-                    <td className="py-2 px-3 text-right">
-                      <span className="text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalCharge)}</span>
-                      {" / "}
-                      <span className="text-red-600 dark:text-red-400">-{formatCurrency(totalDeduct + totalRefund)}</span>
-                    </td>
-                    <td className="py-2 px-3"></td>
-                    <td className="py-2 px-3 text-right">{formatCurrency(lastBalance)}</td>
-                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -460,16 +450,6 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
                       <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{periodEndBalance.toLocaleString()}P</td>
                     </tr>
                   )}
-                  <tr className="bg-muted/20 font-semibold">
-                    <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
-                    <td className="py-2 px-3 text-right">
-                      <span className="text-amber-600 dark:text-amber-400">+{totalGrant.toLocaleString()}P</span>
-                      {" / "}
-                      <span className="text-red-600 dark:text-red-400">-{(totalDeduct + totalExpire).toLocaleString()}P</span>
-                    </td>
-                    <td className="py-2 px-3"></td>
-                    <td className="py-2 px-3 text-right">{lastBalance.toLocaleString()}P</td>
-                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -774,16 +754,6 @@ export default function MemberSettlementTab() {
                             <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(periodEndBalance)}</td>
                           </tr>
                         )}
-                        <tr className="bg-muted/20 font-semibold">
-                          <td className="py-2 px-3 text-center" colSpan={2}>합계</td>
-                          <td className="py-2 px-3 text-right">
-                            {allItems.filter(i => i.type === "order").reduce((s, i) => s + i.quantity, 0)}
-                          </td>
-                          <td className="py-2 px-3"></td>
-                          <td className="py-2 px-3 text-right">{formatCurrency(totalOrderAmount)}</td>
-                          <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">+{formatCurrency(totalDeposit + totalPointer)}</td>
-                          <td className="py-2 px-3 text-right">{formatCurrency(periodEndBalance)}</td>
-                        </tr>
                       </tfoot>
                     </table>
                   </div>
