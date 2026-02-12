@@ -14,11 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, AlertTriangle, Download } from "lucide-react";
+import { Loader2, Plus, AlertTriangle, Link as LinkIcon, Pencil } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 interface VendorBalance {
-  id: number;
+  id: string;
+  source: "vendor" | "supplier" | "both";
+  vendorId: number | null;
+  supplierId: number | null;
   companyName: string;
   totalPurchases: number;
   totalPayments: number;
@@ -26,7 +29,7 @@ interface VendorBalance {
 }
 
 interface TransactionRecord {
-  id: number;
+  id: string;
   date: string;
   type: "purchase" | "payment";
   description: string;
@@ -88,17 +91,26 @@ export default function PurchaseSettlementTab() {
     if (amount > (selectedVendor.outstandingBalance || 0)) {
       toast({ title: "경고", description: `외상 잔액(${selectedVendor.outstandingBalance.toLocaleString()}원)보다 큰 금액입니다. 선급금으로 처리됩니다.` });
     }
-    paymentMutation.mutate({
-      vendorId: selectedVendor.id,
-      paymentDate,
-      amount,
-      memo: paymentMemo || null,
-    });
+
+    const body: any = { paymentDate, amount, memo: paymentMemo || null };
+    if (selectedVendor.vendorId) body.vendorId = selectedVendor.vendorId;
+    if (selectedVendor.supplierId) body.supplierId = selectedVendor.supplierId;
+
+    paymentMutation.mutate(body);
   };
 
   const totalOutstanding = vendorBalances.reduce((s, v) => s + (v.outstandingBalance || 0), 0);
   const totalPurchases = vendorBalances.reduce((s, v) => s + (v.totalPurchases || 0), 0);
   const totalPayments = vendorBalances.reduce((s, v) => s + (v.totalPayments || 0), 0);
+
+  const sourceBadge = (source: string) => {
+    switch (source) {
+      case "vendor": return <Badge variant="outline" className="no-default-active-elevate text-xs text-blue-600 border-blue-300"><LinkIcon className="h-3 w-3 mr-1" />외주</Badge>;
+      case "supplier": return <Badge variant="outline" className="no-default-active-elevate text-xs text-emerald-600 border-emerald-300"><Pencil className="h-3 w-3 mr-1" />직접</Badge>;
+      case "both": return <Badge variant="outline" className="no-default-active-elevate text-xs text-purple-600 border-purple-300"><LinkIcon className="h-3 w-3 mr-1" />외주+공급</Badge>;
+      default: return null;
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -109,9 +121,10 @@ export default function PurchaseSettlementTab() {
             <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
             <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[400px]">
-              <Table className="min-w-[700px]">
+              <Table className="min-w-[800px]">
                 <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
+                    <TableHead>출처</TableHead>
                     <TableHead>업체명</TableHead>
                     <TableHead className="text-right">총 매입액</TableHead>
                     <TableHead className="text-right">총 입금액</TableHead>
@@ -122,7 +135,7 @@ export default function PurchaseSettlementTab() {
                 <TableBody>
                   {vendorBalances.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">데이터가 없습니다</TableCell>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">데이터가 없습니다</TableCell>
                     </TableRow>
                   ) : (
                     <>
@@ -133,6 +146,7 @@ export default function PurchaseSettlementTab() {
                           onClick={() => setSelectedVendor(v)}
                           data-testid={`row-vendor-balance-${v.id}`}
                         >
+                          <TableCell>{sourceBadge(v.source)}</TableCell>
                           <TableCell className="font-medium">{v.companyName}</TableCell>
                           <TableCell className="text-right">{(v.totalPurchases || 0).toLocaleString()}원</TableCell>
                           <TableCell className="text-right">{(v.totalPayments || 0).toLocaleString()}원</TableCell>
@@ -145,6 +159,7 @@ export default function PurchaseSettlementTab() {
                         </TableRow>
                       ))}
                       <TableRow className="font-semibold bg-muted/30">
+                        <TableCell></TableCell>
                         <TableCell>합계</TableCell>
                         <TableCell className="text-right">{totalPurchases.toLocaleString()}원</TableCell>
                         <TableCell className="text-right">{totalPayments.toLocaleString()}원</TableCell>
@@ -157,7 +172,7 @@ export default function PurchaseSettlementTab() {
               </Table>
             </div>
           )}
-          <p className="text-xs text-muted-foreground mt-2">⚠️ = 외상 잔액 100만원 이상</p>
+          <p className="text-xs text-muted-foreground mt-2">업체를 클릭하면 거래 내역을 볼 수 있습니다</p>
         </CardContent>
       </Card>
 
@@ -165,7 +180,10 @@ export default function PurchaseSettlementTab() {
         <Card>
           <CardContent className="pt-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-semibold">{selectedVendor.companyName} 거래 내역</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">{selectedVendor.companyName} 거래 내역</h3>
+                {sourceBadge(selectedVendor.source)}
+              </div>
               <div className="flex items-center gap-2">
                 <DateRangeFilter onChange={detailDateRange.setDateRange} defaultPreset="3months" />
                 <Button size="sm" onClick={() => setShowPaymentDialog(true)} data-testid="button-add-payment">
@@ -191,7 +209,7 @@ export default function PurchaseSettlementTab() {
                     </TableRow>
                   ) : (
                     transactions.map((t, idx) => (
-                      <TableRow key={`${t.type}-${t.id}-${idx}`} className={t.type === "payment" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}>
+                      <TableRow key={`${t.id}-${idx}`} className={t.type === "payment" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}>
                         <TableCell className="whitespace-nowrap">{t.date}</TableCell>
                         <TableCell>
                           <Badge variant={t.type === "payment" ? "default" : "outline"} className="no-default-active-elevate text-xs">

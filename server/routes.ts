@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -11184,8 +11184,8 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
 
     try {
-      const { vendorId, amount, paymentDate, memo } = req.body;
-      if (!vendorId || amount === undefined || amount === null || !paymentDate) {
+      const { vendorId, supplierId, amount, paymentDate, memo } = req.body;
+      if ((!vendorId && !supplierId) || amount === undefined || amount === null || !paymentDate) {
         return res.status(400).json({ message: "업체, 금액, 결재일은 필수입니다" });
       }
       const parsedAmount = parseInt(amount);
@@ -11195,14 +11195,18 @@ export async function registerRoutes(
       if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
         return res.status(400).json({ message: "결재일 형식이 올바르지 않습니다 (YYYY-MM-DD)" });
       }
-      const parsedVendorId = parseInt(vendorId);
-      const vendor = await storage.getVendor(parsedVendorId);
-      if (!vendor) {
-        return res.status(404).json({ message: "업체를 찾을 수 없습니다" });
+
+      if (vendorId && !supplierId) {
+        const parsedVendorId = parseInt(vendorId);
+        const vendor = await storage.getVendor(parsedVendorId);
+        if (!vendor) {
+          return res.status(404).json({ message: "업체를 찾을 수 없습니다" });
+        }
       }
 
       const [payment] = await db.insert(vendorPayments).values({
-        vendorId: parsedVendorId,
+        vendorId: vendorId ? parseInt(vendorId) : null,
+        supplierId: supplierId ? parseInt(supplierId) : null,
         amount: parsedAmount,
         paymentDate,
         memo: memo || null,
@@ -13498,40 +13502,266 @@ export async function registerRoutes(
     return true;
   };
 
-  // GET /api/admin/accounting/vendors - 회계용 업체 목록 (잔액 포함)
-  app.get('/api/admin/accounting/vendors', async (req, res) => {
+  // ========================================
+  // 공급업체 통합 관리 APIs (외주업체 + 직접 공급업체)
+  // ========================================
+
+  // POST /api/admin/accounting/suppliers - 직접 공급업체 등록
+  app.post('/api/admin/accounting/suppliers', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
+      const { name, representative, businessNumber, phone, email, address, supplyType, supplyItems, paymentMethod, bankName, accountNumber, accountHolder, memo, linkedVendorId } = req.body;
 
-      const vendorList = await db.select().from(vendors).orderBy(asc(vendors.companyName));
+      if (!name || !name.trim()) return res.status(400).json({ message: "업체명은 필수입니다" });
+      if (!supplyType || !Array.isArray(supplyType) || supplyType.length === 0) return res.status(400).json({ message: "공급 유형을 1개 이상 선택해주세요" });
 
-      const result = await Promise.all(vendorList.map(async (v) => {
-        const [purchaseSum] = await db.select({
-          total: sql<number>`COALESCE(SUM(total_amount), 0)`
-        }).from(purchases).where(eq(purchases.vendorId, v.id));
+      if (linkedVendorId) {
+        const existing = await db.select({ id: suppliers.id }).from(suppliers).where(and(eq(suppliers.linkedVendorId, linkedVendorId), eq(suppliers.isActive, true)));
+        if (existing.length > 0) return res.status(400).json({ message: "이미 다른 공급업체에 연결된 외주업체입니다" });
+      }
 
-        const [paymentSum] = await db.select({
-          total: sql<number>`COALESCE(SUM(amount), 0)`
-        }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
+      const [created] = await db.insert(suppliers).values({
+        name: name.trim(),
+        representative: representative || null,
+        businessNumber: businessNumber || null,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        supplyType: supplyType,
+        supplyItems: supplyItems || null,
+        paymentMethod: paymentMethod || null,
+        bankName: bankName || null,
+        accountNumber: accountNumber || null,
+        accountHolder: accountHolder || null,
+        memo: memo || null,
+        linkedVendorId: linkedVendorId || null,
+      }).returning();
 
-        const totalPurchases = Number(purchaseSum.total);
-        const totalPayments = Number(paymentSum.total);
-
-        return {
-          ...v,
-          totalPurchases,
-          totalPayments,
-          outstandingBalance: totalPurchases - totalPayments,
-        };
-      }));
-
-      res.json(result);
+      res.json(created);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // GET /api/admin/accounting/vendors/options - 업체 select 옵션용
+  // PUT /api/admin/accounting/suppliers/:id - 직접 공급업체 수정
+  app.put('/api/admin/accounting/suppliers/:id', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+      const supplierId = parseInt(req.params.id);
+      const { name, representative, businessNumber, phone, email, address, supplyType, supplyItems, paymentMethod, bankName, accountNumber, accountHolder, memo, linkedVendorId } = req.body;
+
+      if (!name || !name.trim()) return res.status(400).json({ message: "업체명은 필수입니다" });
+      if (!supplyType || !Array.isArray(supplyType) || supplyType.length === 0) return res.status(400).json({ message: "공급 유형을 1개 이상 선택해주세요" });
+
+      if (linkedVendorId) {
+        const existing = await db.select({ id: suppliers.id }).from(suppliers).where(and(eq(suppliers.linkedVendorId, linkedVendorId), eq(suppliers.isActive, true), sql`${suppliers.id} != ${supplierId}`));
+        if (existing.length > 0) return res.status(400).json({ message: "이미 다른 공급업체에 연결된 외주업체입니다" });
+      }
+
+      await db.update(suppliers).set({
+        name: name.trim(),
+        representative: representative || null,
+        businessNumber: businessNumber || null,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        supplyType: supplyType,
+        supplyItems: supplyItems || null,
+        paymentMethod: paymentMethod || null,
+        bankName: bankName || null,
+        accountNumber: accountNumber || null,
+        accountHolder: accountHolder || null,
+        memo: memo || null,
+        linkedVendorId: linkedVendorId || null,
+        updatedAt: new Date(),
+      }).where(eq(suppliers.id, supplierId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/suppliers/:id - 직접 공급업체 삭제/비활성화
+  app.delete('/api/admin/accounting/suppliers/:id', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+      const supplierId = parseInt(req.params.id);
+
+      const [hasPurchases] = await db.select({ count: sql<number>`COUNT(*)` }).from(purchases).where(eq(purchases.supplierId, supplierId));
+      const [hasPayments] = await db.select({ count: sql<number>`COUNT(*)` }).from(vendorPayments).where(eq(vendorPayments.supplierId, supplierId));
+
+      if (Number(hasPurchases.count) > 0 || Number(hasPayments.count) > 0) {
+        await db.update(suppliers).set({ isActive: false, updatedAt: new Date() }).where(eq(suppliers.id, supplierId));
+        res.json({ success: true, action: "deactivated" });
+      } else {
+        await db.delete(suppliers).where(eq(suppliers.id, supplierId));
+        res.json({ success: true, action: "deleted" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/vendors/:id/settings - 외주업체 회계 설정
+  app.put('/api/admin/accounting/vendors/:id/settings', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+      const vendorId = parseInt(req.params.id);
+      const { supplyType, businessNumber, address } = req.body;
+
+      await db.update(vendors).set({
+        supplyType: supplyType || [],
+        businessNumber: businessNumber || null,
+        address: address || null,
+        updatedAt: new Date(),
+      }).where(eq(vendors.id, vendorId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendors - 통합 공급업체 목록 (외주+직접+겸업)
+  app.get('/api/admin/accounting/vendors', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+
+      const supplierList = await db.select().from(suppliers).where(eq(suppliers.isActive, true));
+      const linkedVendorIds = new Set(supplierList.filter(s => s.linkedVendorId).map(s => s.linkedVendorId!));
+
+      const vendorList = await db.select().from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
+
+      const result: any[] = [];
+
+      for (const s of supplierList) {
+        let source = s.linkedVendorId ? "both" : "supplier";
+        let totalPurchases = 0;
+        let totalPayments = 0;
+
+        const [supplierPurchaseSum] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.supplierId, s.id));
+        const [supplierPaymentSum] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.supplierId, s.id));
+        totalPurchases += Number(supplierPurchaseSum.total);
+        totalPayments += Number(supplierPaymentSum.total);
+
+        if (s.linkedVendorId) {
+          const [vendorPurchaseSum] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.vendorId, s.linkedVendorId));
+          const [vendorPaymentSum] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.vendorId, s.linkedVendorId));
+          totalPurchases += Number(vendorPurchaseSum.total);
+          totalPayments += Number(vendorPaymentSum.total);
+        }
+
+        result.push({
+          id: `supplier-${s.id}`,
+          source,
+          vendorId: s.linkedVendorId || null,
+          supplierId: s.id,
+          name: s.name,
+          representative: s.representative,
+          phone: s.phone,
+          email: s.email,
+          businessNumber: s.businessNumber,
+          address: s.address,
+          supplyType: s.supplyType || [],
+          supplyItems: s.supplyItems,
+          paymentMethod: s.paymentMethod,
+          bankName: s.bankName,
+          accountNumber: s.accountNumber,
+          accountHolder: s.accountHolder,
+          memo: s.memo,
+          linkedVendorId: s.linkedVendorId,
+          isEditable: true,
+          totalPurchases,
+          totalPayments,
+          outstandingBalance: totalPurchases - totalPayments,
+        });
+      }
+
+      for (const v of vendorList) {
+        if (linkedVendorIds.has(v.id)) continue;
+
+        const [purchaseSum] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.vendorId, v.id));
+        const [paymentSum] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
+        const totalPurchases = Number(purchaseSum.total);
+        const totalPayments = Number(paymentSum.total);
+
+        result.push({
+          id: `vendor-${v.id}`,
+          source: "vendor",
+          vendorId: v.id,
+          supplierId: null,
+          name: v.companyName,
+          representative: v.contactName,
+          phone: v.contactPhone,
+          email: v.contactEmail,
+          businessNumber: v.businessNumber,
+          address: v.address,
+          supplyType: v.supplyType || [],
+          supplyItems: null,
+          paymentMethod: null,
+          bankName: v.bankName,
+          accountNumber: v.bankAccount,
+          accountHolder: v.bankHolder,
+          memo: v.memo,
+          linkedVendorId: null,
+          isEditable: false,
+          totalPurchases,
+          totalPayments,
+          outstandingBalance: totalPurchases - totalPayments,
+        });
+      }
+
+      result.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+      const totalOutstanding = result.reduce((s, v) => s + (v.outstandingBalance || 0), 0);
+
+      res.json({ vendors: result, totalOutstanding });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendors/dropdown - 매입 등록용 드롭다운
+  app.get('/api/admin/accounting/vendors/dropdown', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+
+      const supplierList = await db.select().from(suppliers).where(eq(suppliers.isActive, true));
+      const linkedVendorIds = new Set(supplierList.filter(s => s.linkedVendorId).map(s => s.linkedVendorId!));
+      const vendorList = await db.select().from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
+
+      const items: any[] = [];
+
+      for (const v of vendorList) {
+        if (linkedVendorIds.has(v.id)) continue;
+        items.push({
+          value: `vendor-${v.id}`,
+          label: `${v.companyName} (외주)`,
+          vendorId: v.id,
+          supplierId: null,
+          supplyType: v.supplyType || [],
+        });
+      }
+
+      for (const s of supplierList) {
+        const label = s.linkedVendorId ? `${s.name} (외주+공급)` : s.name;
+        items.push({
+          value: `supplier-${s.id}`,
+          label,
+          vendorId: s.linkedVendorId || null,
+          supplierId: s.id,
+          supplyType: s.supplyType || [],
+        });
+      }
+
+      items.sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+      res.json({ items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/vendors/options - 업체 select 옵션용 (legacy, keep for compatibility)
   app.get('/api/admin/accounting/vendors/options', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
@@ -13546,21 +13776,22 @@ export async function registerRoutes(
     }
   });
 
-  // PUT /api/admin/accounting/vendors/:id - 회계 추가정보 업데이트
-  app.put('/api/admin/accounting/vendors/:id', async (req, res) => {
+  // GET /api/admin/accounting/unlinked-vendors - 연결 가능한 외주업체 목록
+  app.get('/api/admin/accounting/unlinked-vendors', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
-      const vendorId = parseInt(req.params.id);
-      const { supplyType, businessNumber, address } = req.body;
+      const linkedIds = await db.select({ linkedVendorId: suppliers.linkedVendorId }).from(suppliers).where(and(eq(suppliers.isActive, true), sql`${suppliers.linkedVendorId} IS NOT NULL`));
+      const linkedSet = new Set(linkedIds.map(l => l.linkedVendorId!));
 
-      await db.update(vendors).set({
-        supplyType: supplyType || [],
-        businessNumber: businessNumber || null,
-        address: address || null,
-        updatedAt: new Date(),
-      }).where(eq(vendors.id, vendorId));
+      const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
 
-      res.json({ success: true });
+      const excludeId = req.query.excludeSupplierId ? parseInt(String(req.query.excludeSupplierId)) : null;
+      if (excludeId) {
+        const [current] = await db.select({ linkedVendorId: suppliers.linkedVendorId }).from(suppliers).where(eq(suppliers.id, excludeId));
+        if (current?.linkedVendorId) linkedSet.delete(current.linkedVendorId);
+      }
+
+      res.json(vendorList.filter(v => !linkedSet.has(v.id)));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -13582,6 +13813,7 @@ export async function registerRoutes(
         id: purchases.id,
         purchaseDate: purchases.purchaseDate,
         vendorId: purchases.vendorId,
+        supplierId: purchases.supplierId,
         materialType: purchases.materialType,
         productName: purchases.productName,
         quantity: purchases.quantity,
@@ -13597,9 +13829,13 @@ export async function registerRoutes(
       const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
       vendorList.forEach(v => vendorMap.set(v.id, v.companyName));
 
+      const supplierMap = new Map<number, string>();
+      const supplierList = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers);
+      supplierList.forEach(s => supplierMap.set(s.id, s.name));
+
       const enriched = purchaseList.map(p => ({
         ...p,
-        vendorName: vendorMap.get(p.vendorId) || "알 수 없음",
+        vendorName: p.vendorId ? vendorMap.get(p.vendorId) || "알 수 없음" : p.supplierId ? supplierMap.get(p.supplierId) || "알 수 없음" : "알 수 없음",
         source: "direct" as const,
       }));
 
@@ -13637,8 +13873,8 @@ export async function registerRoutes(
   app.post('/api/admin/purchases', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
-      const { purchaseDate, vendorId, memo, items } = req.body;
-      if (!purchaseDate || !vendorId || !items?.length) {
+      const { purchaseDate, vendorId, supplierId, memo, items } = req.body;
+      if (!purchaseDate || (!vendorId && !supplierId) || !items?.length) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
       }
 
@@ -13652,7 +13888,8 @@ export async function registerRoutes(
         }
         return {
           purchaseDate,
-          vendorId: parseInt(vendorId),
+          vendorId: vendorId ? parseInt(vendorId) : null,
+          supplierId: supplierId ? parseInt(supplierId) : null,
           materialType: validMaterialTypes.includes(item.materialType) ? item.materialType : "etc",
           productName: String(item.productName).trim(),
           quantity: String(qty),
@@ -13684,75 +13921,131 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/admin/accounting/vendor-balances - 업체별 외상 현황 (매입 정산)
+  // GET /api/admin/accounting/vendor-balances - 업체별 외상 현황 (통합 - 매입 정산)
   app.get('/api/admin/accounting/vendor-balances', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
 
+      const supplierList = await db.select().from(suppliers).where(eq(suppliers.isActive, true));
+      const linkedVendorIds = new Set(supplierList.filter(s => s.linkedVendorId).map(s => s.linkedVendorId!));
       const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName })
         .from(vendors).where(eq(vendors.isActive, true)).orderBy(asc(vendors.companyName));
 
-      const result = await Promise.all(vendorList.map(async (v) => {
-        const [purchaseSum] = await db.select({
-          total: sql<number>`COALESCE(SUM(total_amount), 0)`
-        }).from(purchases).where(eq(purchases.vendorId, v.id));
+      const result: any[] = [];
 
-        const [paymentSum] = await db.select({
-          total: sql<number>`COALESCE(SUM(amount), 0)`
-        }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
+      for (const s of supplierList) {
+        let totalPurchases = 0;
+        let totalPayments = 0;
 
+        const [sp] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.supplierId, s.id));
+        const [sv] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.supplierId, s.id));
+        totalPurchases += Number(sp.total);
+        totalPayments += Number(sv.total);
+
+        if (s.linkedVendorId) {
+          const [vp] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.vendorId, s.linkedVendorId));
+          const [vv] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.vendorId, s.linkedVendorId));
+          totalPurchases += Number(vp.total);
+          totalPayments += Number(vv.total);
+        }
+
+        if (totalPurchases > 0 || totalPayments > 0) {
+          result.push({
+            id: `supplier-${s.id}`,
+            source: s.linkedVendorId ? "both" : "supplier",
+            vendorId: s.linkedVendorId || null,
+            supplierId: s.id,
+            companyName: s.name,
+            totalPurchases,
+            totalPayments,
+            outstandingBalance: totalPurchases - totalPayments,
+          });
+        }
+      }
+
+      for (const v of vendorList) {
+        if (linkedVendorIds.has(v.id)) continue;
+        const [purchaseSum] = await db.select({ total: sql<number>`COALESCE(SUM(total_amount), 0)` }).from(purchases).where(eq(purchases.vendorId, v.id));
+        const [paymentSum] = await db.select({ total: sql<number>`COALESCE(SUM(amount), 0)` }).from(vendorPayments).where(eq(vendorPayments.vendorId, v.id));
         const totalPurchases = Number(purchaseSum.total);
         const totalPayments = Number(paymentSum.total);
 
-        return {
-          id: v.id,
-          companyName: v.companyName,
-          totalPurchases,
-          totalPayments,
-          outstandingBalance: totalPurchases - totalPayments,
-        };
-      }));
+        if (totalPurchases > 0 || totalPayments > 0) {
+          result.push({
+            id: `vendor-${v.id}`,
+            source: "vendor",
+            vendorId: v.id,
+            supplierId: null,
+            companyName: v.companyName,
+            totalPurchases,
+            totalPayments,
+            outstandingBalance: totalPurchases - totalPayments,
+          });
+        }
+      }
 
-      res.json(result.filter(v => v.totalPurchases > 0 || v.totalPayments > 0));
+      result.sort((a, b) => a.companyName.localeCompare(b.companyName, 'ko'));
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // GET /api/admin/accounting/vendors/:id/transactions - 업체별 거래 내역 (시간순)
-  app.get('/api/admin/accounting/vendors/:id/transactions', async (req, res) => {
+  // GET /api/admin/accounting/vendors/:compositeId/transactions - 업체별 거래 내역 (시간순, 통합)
+  app.get('/api/admin/accounting/vendors/:compositeId/transactions', async (req, res) => {
     try {
       if (!(await requireAccountingAdmin(req, res))) return;
-      const vendorId = parseInt(req.params.id);
+      const compositeId = req.params.compositeId;
       const { startDate, endDate } = req.query;
 
-      const purchaseConditions: any[] = [eq(purchases.vendorId, vendorId)];
-      if (startDate) purchaseConditions.push(gte(purchases.purchaseDate, String(startDate)));
-      if (endDate) purchaseConditions.push(lte(purchases.purchaseDate, String(endDate)));
+      let vendorIdVal: number | null = null;
+      let supplierIdVal: number | null = null;
 
-      const paymentConditions: any[] = [eq(vendorPayments.vendorId, vendorId)];
-      if (startDate) paymentConditions.push(gte(vendorPayments.paymentDate, String(startDate)));
-      if (endDate) paymentConditions.push(lte(vendorPayments.paymentDate, String(endDate)));
+      if (compositeId.startsWith('vendor-')) {
+        vendorIdVal = parseInt(compositeId.replace('vendor-', ''));
+      } else if (compositeId.startsWith('supplier-')) {
+        supplierIdVal = parseInt(compositeId.replace('supplier-', ''));
+        const [supplier] = await db.select({ linkedVendorId: suppliers.linkedVendorId }).from(suppliers).where(eq(suppliers.id, supplierIdVal));
+        if (supplier?.linkedVendorId) vendorIdVal = supplier.linkedVendorId;
+      } else {
+        vendorIdVal = parseInt(compositeId);
+      }
 
-      const [purchaseRows, paymentRows] = await Promise.all([
-        db.select({
-          id: purchases.id,
-          date: purchases.purchaseDate,
-          description: purchases.productName,
-          amount: purchases.totalAmount,
-        }).from(purchases).where(and(...purchaseConditions)),
-        db.select({
-          id: vendorPayments.id,
-          date: vendorPayments.paymentDate,
-          memo: vendorPayments.memo,
-          amount: vendorPayments.amount,
-        }).from(vendorPayments).where(and(...paymentConditions)),
-      ]);
+      const allRecords: any[] = [];
 
-      const allRecords: any[] = [
-        ...purchaseRows.map(p => ({ id: p.id, date: p.date, type: "purchase", description: p.description, amount: p.amount })),
-        ...paymentRows.map(p => ({ id: p.id, date: p.date, type: "payment", description: p.memo || "입금", amount: p.amount })),
-      ];
+      if (vendorIdVal) {
+        const purchaseConditions: any[] = [eq(purchases.vendorId, vendorIdVal)];
+        if (startDate) purchaseConditions.push(gte(purchases.purchaseDate, String(startDate)));
+        if (endDate) purchaseConditions.push(lte(purchases.purchaseDate, String(endDate)));
+
+        const paymentConditions: any[] = [eq(vendorPayments.vendorId, vendorIdVal)];
+        if (startDate) paymentConditions.push(gte(vendorPayments.paymentDate, String(startDate)));
+        if (endDate) paymentConditions.push(lte(vendorPayments.paymentDate, String(endDate)));
+
+        const [purchaseRows, paymentRows] = await Promise.all([
+          db.select({ id: purchases.id, date: purchases.purchaseDate, description: purchases.productName, amount: purchases.totalAmount }).from(purchases).where(and(...purchaseConditions)),
+          db.select({ id: vendorPayments.id, date: vendorPayments.paymentDate, memo: vendorPayments.memo, amount: vendorPayments.amount }).from(vendorPayments).where(and(...paymentConditions)),
+        ]);
+        allRecords.push(...purchaseRows.map(p => ({ id: `vp-${p.id}`, date: p.date, type: "purchase", description: p.description, amount: p.amount })));
+        allRecords.push(...paymentRows.map(p => ({ id: `vpm-${p.id}`, date: p.date, type: "payment", description: p.memo || "입금", amount: p.amount })));
+      }
+
+      if (supplierIdVal) {
+        const purchaseConditions: any[] = [eq(purchases.supplierId, supplierIdVal)];
+        if (startDate) purchaseConditions.push(gte(purchases.purchaseDate, String(startDate)));
+        if (endDate) purchaseConditions.push(lte(purchases.purchaseDate, String(endDate)));
+
+        const paymentConditions: any[] = [eq(vendorPayments.supplierId, supplierIdVal)];
+        if (startDate) paymentConditions.push(gte(vendorPayments.paymentDate, String(startDate)));
+        if (endDate) paymentConditions.push(lte(vendorPayments.paymentDate, String(endDate)));
+
+        const [purchaseRows, paymentRows] = await Promise.all([
+          db.select({ id: purchases.id, date: purchases.purchaseDate, description: purchases.productName, amount: purchases.totalAmount }).from(purchases).where(and(...purchaseConditions)),
+          db.select({ id: vendorPayments.id, date: vendorPayments.paymentDate, memo: vendorPayments.memo, amount: vendorPayments.amount }).from(vendorPayments).where(and(...paymentConditions)),
+        ]);
+        allRecords.push(...purchaseRows.map(p => ({ id: `sp-${p.id}`, date: p.date, type: "purchase", description: p.description, amount: p.amount })));
+        allRecords.push(...paymentRows.map(p => ({ id: `spm-${p.id}`, date: p.date, type: "payment", description: p.memo || "입금", amount: p.amount })));
+      }
 
       allRecords.sort((a, b) => a.date.localeCompare(b.date) || (a.type === "purchase" ? -1 : 1));
 

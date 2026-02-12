@@ -32,7 +32,8 @@ const unitOptions = ["박스", "kg", "팩", "송이", "개", "롤", "건"];
 interface PurchaseItem {
   id: number;
   purchaseDate: string;
-  vendorId: number;
+  vendorId: number | null;
+  supplierId: number | null;
   vendorName?: string;
   materialType: string;
   productName: string;
@@ -53,9 +54,11 @@ interface PurchaseSummary {
   byType: { type: string; amount: number; percentage: number }[];
 }
 
-interface VendorOption {
-  id: number;
-  companyName: string;
+interface DropdownItem {
+  value: string;
+  label: string;
+  vendorId: number | null;
+  supplierId: number | null;
   supplyType: string[];
 }
 
@@ -76,7 +79,7 @@ export default function PurchaseManagementTab() {
   const [searchText, setSearchText] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [addVendorId, setAddVendorId] = useState("");
+  const [addVendorValue, setAddVendorValue] = useState("");
   const [addMemo, setAddMemo] = useState("");
   const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -94,9 +97,11 @@ export default function PurchaseManagementTab() {
     },
   });
 
-  const { data: vendorOptions = [] } = useQuery<VendorOption[]>({
-    queryKey: ["/api/admin/accounting/vendors/options"],
+  const { data: dropdownData } = useQuery<{ items: DropdownItem[] }>({
+    queryKey: ["/api/admin/accounting/vendors/dropdown"],
   });
+
+  const dropdownItems = dropdownData?.items || [];
 
   const createMutation = useMutation({
     mutationFn: async (body: any) => {
@@ -107,6 +112,7 @@ export default function PurchaseManagementTab() {
       toast({ title: "등록 완료", description: `${data.count}건 매입이 등록되었습니다.` });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
       resetAddForm();
     },
     onError: (error: any) => {
@@ -123,6 +129,7 @@ export default function PurchaseManagementTab() {
       toast({ title: "삭제 완료" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
       setSelectedIds(new Set());
     },
     onError: (error: any) => {
@@ -133,7 +140,7 @@ export default function PurchaseManagementTab() {
   const resetAddForm = () => {
     setShowAddDialog(false);
     setAddDate(new Date().toISOString().slice(0, 10));
-    setAddVendorId("");
+    setAddVendorValue("");
     setAddMemo("");
     setAddItems([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
   };
@@ -151,12 +158,17 @@ export default function PurchaseManagementTab() {
   };
 
   const handleSubmit = () => {
-    if (!addVendorId) { toast({ title: "업체를 선택해주세요", variant: "destructive" }); return; }
+    if (!addVendorValue) { toast({ title: "업체를 선택해주세요", variant: "destructive" }); return; }
     const validItems = addItems.filter(item => item.productName && item.quantity && item.unitPrice);
     if (validItems.length === 0) { toast({ title: "품목을 입력해주세요", variant: "destructive" }); return; }
+
+    const selectedVendor = dropdownItems.find(d => d.value === addVendorValue);
+    if (!selectedVendor) { toast({ title: "업체 정보를 찾을 수 없습니다", variant: "destructive" }); return; }
+
     createMutation.mutate({
       purchaseDate: addDate,
-      vendorId: parseInt(addVendorId),
+      vendorId: selectedVendor.vendorId || null,
+      supplierId: selectedVendor.supplierId || null,
       memo: addMemo || null,
       items: validItems.map(item => ({
         materialType: item.materialType,
@@ -178,7 +190,6 @@ export default function PurchaseManagementTab() {
       if (filterSource === "site" && p.source !== "site") return false;
     }
     if (filterType !== "__all__" && p.materialType !== filterType) return false;
-    if (filterVendor !== "__all__" && String(p.vendorId) !== filterVendor) return false;
     if (searchText) {
       const term = searchText.toLowerCase();
       if (!p.productName.toLowerCase().includes(term)) return false;
@@ -200,7 +211,7 @@ export default function PurchaseManagementTab() {
     return Math.round(q * p);
   };
 
-  const selectedVendor = vendorOptions.find(v => String(v.id) === addVendorId);
+  const selectedDropdown = dropdownItems.find(v => v.value === addVendorValue);
 
   return (
     <div className="space-y-4">
@@ -343,17 +354,17 @@ export default function PurchaseManagementTab() {
               </div>
               <div className="space-y-2">
                 <Label>공급업체</Label>
-                <Select value={addVendorId} onValueChange={(v) => {
-                  setAddVendorId(v);
-                  const vendor = vendorOptions.find(vo => String(vo.id) === v);
-                  if (vendor?.supplyType?.length) {
-                    setAddItems(prev => prev.map(item => ({ ...item, materialType: vendor.supplyType[0] })));
+                <Select value={addVendorValue} onValueChange={(v) => {
+                  setAddVendorValue(v);
+                  const selected = dropdownItems.find(d => d.value === v);
+                  if (selected?.supplyType?.length) {
+                    setAddItems(prev => prev.map(item => ({ ...item, materialType: selected.supplyType[0] })));
                   }
                 }}>
                   <SelectTrigger data-testid="select-purchase-vendor"><SelectValue placeholder="업체 선택" /></SelectTrigger>
                   <SelectContent>
-                    {vendorOptions.map(v => (
-                      <SelectItem key={v.id} value={String(v.id)}>{v.companyName}</SelectItem>
+                    {dropdownItems.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

@@ -1521,6 +1521,35 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({
 export type Vendor = typeof vendors.$inferSelect;
 export type NewVendor = z.infer<typeof insertVendorSchema>;
 
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  representative: varchar("representative", { length: 50 }),
+  businessNumber: varchar("business_number", { length: 20 }),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 100 }),
+  address: text("address"),
+  supplyType: text("supply_type").array().notNull().default(sql`'{}'::text[]`),
+  supplyItems: text("supply_items"),
+  paymentMethod: varchar("payment_method", { length: 20 }),
+  bankName: varchar("bank_name", { length: 50 }),
+  accountNumber: varchar("account_number", { length: 50 }),
+  accountHolder: varchar("account_holder", { length: 50 }),
+  memo: text("memo"),
+  isActive: boolean("is_active").notNull().default(true),
+  linkedVendorId: integer("linked_vendor_id").references(() => vendors.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Supplier = typeof suppliers.$inferSelect;
+export type NewSupplier = z.infer<typeof insertSupplierSchema>;
+
 // 상품-외주업체 매핑 테이블
 export const productVendors = pgTable("product_vendors", {
   id: serial("id").primaryKey(),
@@ -1593,7 +1622,8 @@ export type NewAllocationDetail = z.infer<typeof insertAllocationDetailSchema>;
 
 export const vendorPayments = pgTable("vendor_payments", {
   id: serial("id").primaryKey(),
-  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  vendorId: integer("vendor_id").references(() => vendors.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   amount: integer("amount").notNull(),
   paymentDate: date("payment_date").notNull(),
   memo: text("memo"),
@@ -1657,7 +1687,8 @@ export type NewBankdaTransaction = z.infer<typeof insertBankdaTransactionSchema>
 export const purchases = pgTable("purchases", {
   id: serial("id").primaryKey(),
   purchaseDate: date("purchase_date").notNull(),
-  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  vendorId: integer("vendor_id").references(() => vendors.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   materialType: varchar("material_type", { length: 20 }).notNull(),
   productName: varchar("product_name", { length: 200 }).notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
