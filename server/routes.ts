@@ -13765,5 +13765,443 @@ export async function registerRoutes(
     }
   });
 
+  // ========================================
+  // 매출 현황 (Sales Overview) APIs
+  // ========================================
+
+  // 1-1. 통합 매출 현황
+  app.get('/api/admin/accounting/sales', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { startDate, endDate } = req.query as any;
+      const parsed = parseDateRangeKST(startDate, endDate);
+
+      const [siteResult, directResult] = await Promise.all([
+        db.select({
+          total: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
+          count: sql<number>`COUNT(DISTINCT ${settlementHistory.orderId})::int`,
+        }).from(settlementHistory)
+          .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+          .where(and(
+            eq(pendingOrders.status, '배송중'),
+            gte(settlementHistory.createdAt, parsed.startUTC),
+            lt(settlementHistory.createdAt, parsed.endUTC),
+          )),
+        db.select({
+          total: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+          count: sql<number>`COUNT(*)::int`,
+        }).from(directSales)
+          .where(and(
+            gte(directSales.saleDate, startDate || '1970-01-01'),
+            lte(directSales.saleDate, endDate || '2099-12-31'),
+          )),
+      ]);
+
+      const siteSales = { total: siteResult[0]?.total ?? 0, count: siteResult[0]?.count ?? 0 };
+      const directSalesData = { total: directResult[0]?.total ?? 0, count: directResult[0]?.count ?? 0 };
+
+      res.json({
+        siteSales,
+        directSales: directSalesData,
+        totalSales: siteSales.total + directSalesData.total,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 1-2. 일별 매출 집계
+  app.get('/api/admin/accounting/sales/daily', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { startDate, endDate } = req.query as any;
+      const parsed = parseDateRangeKST(startDate, endDate);
+
+      const [siteDaily, directDaily] = await Promise.all([
+        db.select({
+          date: sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+          total: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
+        }).from(settlementHistory)
+          .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+          .where(and(
+            eq(pendingOrders.status, '배송중'),
+            gte(settlementHistory.createdAt, parsed.startUTC),
+            lt(settlementHistory.createdAt, parsed.endUTC),
+          ))
+          .groupBy(sql`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`),
+        db.select({
+          date: sql<string>`TO_CHAR(${directSales.saleDate}, 'YYYY-MM-DD')`,
+          total: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+        }).from(directSales)
+          .where(and(
+            gte(directSales.saleDate, startDate || '1970-01-01'),
+            lte(directSales.saleDate, endDate || '2099-12-31'),
+          ))
+          .groupBy(sql`TO_CHAR(${directSales.saleDate}, 'YYYY-MM-DD')`),
+      ]);
+
+      const dateMap: Record<string, { siteSales: number; directSales: number }> = {};
+      for (const r of siteDaily) {
+        if (!dateMap[r.date]) dateMap[r.date] = { siteSales: 0, directSales: 0 };
+        dateMap[r.date].siteSales = r.total;
+      }
+      for (const r of directDaily) {
+        if (!dateMap[r.date]) dateMap[r.date] = { siteSales: 0, directSales: 0 };
+        dateMap[r.date].directSales = r.total;
+      }
+
+      const dates = Object.keys(dateMap).sort();
+      const daily = dates.map((date, idx) => {
+        const d = dateMap[date];
+        const total = d.siteSales + d.directSales;
+        const prevTotal = idx > 0 ? (dateMap[dates[idx - 1]].siteSales + dateMap[dates[idx - 1]].directSales) : 0;
+        const changeRate = idx > 0 && prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 1000) / 10 : 0;
+        return { date, siteSales: d.siteSales, directSales: d.directSales, total, changeRate };
+      });
+
+      res.json({ daily });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 1-3. 회원별 월간 세금계산서 발행액
+  app.get('/api/admin/accounting/sales/monthly-by-member', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+
+      const startKST = `${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endKST = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+09:00`;
+      const monthStartUTC = new Date(startKST);
+      const monthEndUTC = new Date(endKST);
+
+      const memberRows = await db.select({
+        memberId: settlementHistory.memberId,
+        memberName: members.username,
+        companyName: members.companyName,
+        businessNumber: members.businessNumber,
+        representative: members.representative,
+        orderCount: sql<number>`COUNT(DISTINCT ${settlementHistory.orderId})::int`,
+        totalOrderAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
+        pointerUsed: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
+        depositUsed: sql<number>`COALESCE(SUM(${settlementHistory.depositAmount}), 0)::int`,
+      })
+        .from(settlementHistory)
+        .innerJoin(members, eq(settlementHistory.memberId, members.id))
+        .where(and(
+          gte(settlementHistory.createdAt, monthStartUTC),
+          lt(settlementHistory.createdAt, monthEndUTC),
+        ))
+        .groupBy(
+          settlementHistory.memberId,
+          members.username,
+          members.companyName,
+          members.businessNumber,
+          members.representative,
+        )
+        .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
+
+      const memberData = memberRows.map(r => {
+        const taxInvoiceAmount = r.depositUsed;
+        const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
+        const vatAmount = taxInvoiceAmount - supplyAmount;
+        return {
+          memberId: r.memberId,
+          memberName: r.memberName,
+          businessName: r.companyName || r.memberName,
+          businessNumber: r.businessNumber || '',
+          representative: r.representative || '',
+          orderCount: r.orderCount,
+          totalOrderAmount: r.totalOrderAmount,
+          pointerUsed: r.pointerUsed,
+          taxInvoiceAmount,
+          supplyAmount,
+          vatAmount,
+        };
+      });
+
+      const totals = {
+        totalOrderAmount: memberData.reduce((s, m) => s + m.totalOrderAmount, 0),
+        pointerUsed: memberData.reduce((s, m) => s + m.pointerUsed, 0),
+        taxInvoiceAmount: memberData.reduce((s, m) => s + m.taxInvoiceAmount, 0),
+        supplyAmount: memberData.reduce((s, m) => s + m.supplyAmount, 0),
+        vatAmount: memberData.reduce((s, m) => s + m.vatAmount, 0),
+      };
+
+      const KST_OFFSET = 9 * 60 * 60 * 1000;
+      const now = new Date();
+      const kstNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + KST_OFFSET);
+      const currentYear = kstNow.getFullYear();
+      const currentMonth = kstNow.getMonth() + 1;
+      const currentDay = kstNow.getDate();
+
+      let closingStatus = "closed";
+      if (year === currentYear && month === currentMonth) {
+        closingStatus = "open";
+      } else if (
+        (year === currentYear && month === currentMonth - 1) ||
+        (year === currentYear - 1 && month === 12 && currentMonth === 1)
+      ) {
+        closingStatus = currentDay <= 10 ? "warning" : "overdue";
+      }
+
+      const deadlineMonth = month === 12 ? 1 : month + 1;
+      const deadlineYear = month === 12 ? year + 1 : year;
+      const deadline = `${deadlineYear}-${String(deadlineMonth).padStart(2, '0')}-10`;
+
+      res.json({
+        year, month, closingStatus, deadline,
+        members: memberData,
+        totals,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 1-4. 특정 회원 월간 주문 상세
+  app.get('/api/admin/accounting/sales/member/:memberId/monthly-detail', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { memberId } = req.params;
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+
+      const startKST = `${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endKST = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+09:00`;
+      const monthStartUTC = new Date(startKST);
+      const monthEndUTC = new Date(endKST);
+
+      const memberInfo = await db.select({
+        id: members.id,
+        name: members.username,
+        companyName: members.companyName,
+        businessNumber: members.businessNumber,
+        representative: members.representative,
+        phone: members.phone,
+      }).from(members).where(eq(members.id, memberId)).limit(1);
+
+      if (!memberInfo.length) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const orderRows = await db.select({
+        orderId: pendingOrders.id,
+        orderDate: sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+        productName: pendingOrders.productName,
+        productCode: pendingOrders.productCode,
+        supplyPrice: pendingOrders.supplyPrice,
+        pointerUsed: settlementHistory.pointerAmount,
+        depositUsed: settlementHistory.depositAmount,
+        totalAmount: settlementHistory.totalAmount,
+      })
+        .from(settlementHistory)
+        .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+        .where(and(
+          eq(settlementHistory.memberId, memberId),
+          gte(settlementHistory.createdAt, monthStartUTC),
+          lt(settlementHistory.createdAt, monthEndUTC),
+        ))
+        .orderBy(sql`${settlementHistory.createdAt} ASC`);
+
+      const totalOrderAmount = orderRows.reduce((s, r) => s + (r.totalAmount || 0), 0);
+      const pointerUsed = orderRows.reduce((s, r) => s + (r.pointerUsed || 0), 0);
+      const taxInvoiceAmount = totalOrderAmount - pointerUsed;
+      const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
+      const vatAmount = taxInvoiceAmount - supplyAmount;
+
+      const mi = memberInfo[0];
+      res.json({
+        member: {
+          id: mi.id,
+          name: mi.name,
+          companyName: mi.companyName || mi.name,
+          businessNumber: mi.businessNumber || '',
+          representative: mi.representative || '',
+          phone: mi.phone || '',
+        },
+        orders: orderRows.map(r => ({
+          orderId: r.orderId,
+          orderDate: r.orderDate,
+          productName: r.productName,
+          productCode: r.productCode,
+          unitPrice: r.supplyPrice || 0,
+          quantity: 1,
+          amount: r.totalAmount || 0,
+          pointerUsed: r.pointerUsed || 0,
+          depositUsed: r.depositUsed || 0,
+        })),
+        summary: { totalOrderAmount, pointerUsed, taxInvoiceAmount, supplyAmount, vatAmount },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 1-5. 세금계산서용 엑셀 다운로드
+  app.get('/api/admin/accounting/sales/tax-invoice-export', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+
+      const startKST = `${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endKST = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+09:00`;
+      const monthStartUTC = new Date(startKST);
+      const monthEndUTC = new Date(endKST);
+
+      const memberRows = await db.select({
+        companyName: members.companyName,
+        businessNumber: members.businessNumber,
+        representative: members.representative,
+        orderCount: sql<number>`COUNT(DISTINCT ${settlementHistory.orderId})::int`,
+        totalOrderAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
+        pointerUsed: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
+        depositUsed: sql<number>`COALESCE(SUM(${settlementHistory.depositAmount}), 0)::int`,
+      })
+        .from(settlementHistory)
+        .innerJoin(members, eq(settlementHistory.memberId, members.id))
+        .where(and(
+          gte(settlementHistory.createdAt, monthStartUTC),
+          lt(settlementHistory.createdAt, monthEndUTC),
+        ))
+        .groupBy(members.companyName, members.businessNumber, members.representative)
+        .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
+
+      const XLSX = await import('xlsx');
+      const data = memberRows.map(r => {
+        const taxInvoiceAmount = r.depositUsed;
+        const supplyAmount = Math.round(taxInvoiceAmount / 1.1);
+        const vatAmount = taxInvoiceAmount - supplyAmount;
+        return {
+          '공급받는자(상호)': r.companyName || '',
+          '사업자번호': r.businessNumber || '',
+          '대표자': r.representative || '',
+          '주문건수': r.orderCount,
+          '총주문액': r.totalOrderAmount,
+          '포인터사용': r.pointerUsed,
+          '발행대상액': taxInvoiceAmount,
+          '공급가액': supplyAmount,
+          '부가세': vatAmount,
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '세금계산서');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = encodeURIComponent(`세금계산서_${year}년${month}월.xlsx`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 1-6. 직접 매출 CRUD
+  app.get('/api/admin/direct-sales', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { startDate, endDate } = req.query as any;
+      const conditions: any[] = [];
+      if (startDate) conditions.push(gte(directSales.saleDate, startDate));
+      if (endDate) conditions.push(lte(directSales.saleDate, endDate));
+
+      const rows = await db.select().from(directSales)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(sql`${directSales.saleDate} DESC, ${directSales.createdAt} DESC`);
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post('/api/admin/direct-sales', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { saleDate, clientName, description, amount, memo } = req.body;
+      if (!saleDate || !clientName || !description || !amount || amount < 1) {
+        return res.status(400).json({ message: "필수 항목을 입력해주세요 (매출일, 거래처명, 내용, 금액)" });
+      }
+
+      const [row] = await db.insert(directSales).values({
+        saleDate, clientName, description, amount: parseInt(amount), memo: memo || null,
+      }).returning();
+
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put('/api/admin/direct-sales/:id', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const { saleDate, clientName, description, amount, memo } = req.body;
+      if (!saleDate || !clientName || !description || !amount || amount < 1) {
+        return res.status(400).json({ message: "필수 항목을 입력해주세요" });
+      }
+
+      const [row] = await db.update(directSales)
+        .set({ saleDate, clientName, description, amount: parseInt(amount), memo: memo || null, updatedAt: new Date() })
+        .where(eq(directSales.id, id))
+        .returning();
+
+      if (!row) return res.status(404).json({ message: "해당 매출을 찾을 수 없습니다" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete('/api/admin/direct-sales/:id', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.delete(directSales).where(eq(directSales.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "해당 매출을 찾을 수 없습니다" });
+      res.json({ message: "삭제 완료" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
