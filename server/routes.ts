@@ -2613,6 +2613,7 @@ export async function registerRoutes(
         drivingPrice: roundUpToTen(pr.drivingPrice!),
         topPrice: roundUpToTen(pr.topPrice!),
         supplyStatus: "supply" as const,
+        taxType: pr.taxType || "exempt",
         isVendorProduct: pr.isVendorProduct || false,
       };
       
@@ -2755,6 +2756,7 @@ export async function registerRoutes(
         drivingPrice: roundUpToTen(product.drivingPrice),
         topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
+        taxType: product.taxType || reg?.taxType || "exempt",
         isVendorProduct: reg?.isVendorProduct || product.isVendorProduct || false,
         appliedAt: new Date(),
       };
@@ -2855,6 +2857,7 @@ export async function registerRoutes(
         drivingPrice: roundUpToTen(product.drivingPrice),
         topPrice: roundUpToTen(product.topPrice),
         supplyStatus: "supply" as const,
+        taxType: product.taxType || reg?.taxType || "exempt",
         isVendorProduct: reg?.isVendorProduct || product.isVendorProduct || false,
         appliedAt: new Date(),
       };
@@ -6834,6 +6837,7 @@ export async function registerRoutes(
           orderDetailNumber: parsedRow.orderDetailNumber || null,
           volumeUnit: parsedRow.volumeUnit || null,
           uploadFormat: isPostOfficeFormat ? "postoffice" : "default",
+          taxType: parsedRow.currentProduct.taxType || "exempt",
           trackingNumber: null,
           courierCompany: null,
         });
@@ -13894,6 +13898,7 @@ export async function registerRoutes(
         companyName: members.companyName,
         businessNumber: members.businessNumber,
         representative: members.representative,
+        taxType: pendingOrders.taxType,
         orderCount: sql<number>`COUNT(DISTINCT ${settlementHistory.orderId})::int`,
         totalOrderAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
         pointerUsed: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
@@ -13901,6 +13906,7 @@ export async function registerRoutes(
       })
         .from(settlementHistory)
         .innerJoin(members, eq(settlementHistory.memberId, members.id))
+        .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
         .where(and(
           gte(settlementHistory.createdAt, monthStartUTC),
           lt(settlementHistory.createdAt, monthEndUTC),
@@ -13911,34 +13917,53 @@ export async function registerRoutes(
           members.companyName,
           members.businessNumber,
           members.representative,
+          pendingOrders.taxType,
         )
         .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
 
-      const memberData = memberRows.map(r => {
-        const invoiceAmount = r.depositUsed;
-        const supplyAmount = invoiceAmount;
-        const vatAmount = 0;
-        return {
-          memberId: r.memberId,
-          memberName: r.memberName,
-          businessName: r.companyName || r.memberName,
-          businessNumber: r.businessNumber || '',
-          representative: r.representative || '',
-          orderCount: r.orderCount,
-          totalOrderAmount: r.totalOrderAmount,
-          pointerUsed: r.pointerUsed,
-          taxInvoiceAmount: invoiceAmount,
-          supplyAmount,
-          vatAmount,
-        };
-      });
+      const memberMap: Record<string, any> = {};
+      for (const r of memberRows) {
+        if (!memberMap[r.memberId]) {
+          memberMap[r.memberId] = {
+            memberId: r.memberId,
+            memberName: r.memberName,
+            businessName: r.companyName || r.memberName,
+            businessNumber: r.businessNumber || '',
+            representative: r.representative || '',
+            orderCount: 0,
+            totalOrderAmount: 0,
+            pointerUsed: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const m = memberMap[r.memberId];
+        m.orderCount += r.orderCount;
+        m.totalOrderAmount += r.totalOrderAmount;
+        m.pointerUsed += r.pointerUsed;
+
+        if (r.taxType === 'taxable') {
+          m.taxableAmount += r.depositUsed;
+          m.taxableSupply += Math.round(r.depositUsed / 1.1);
+          m.taxableVat += r.depositUsed - Math.round(r.depositUsed / 1.1);
+        } else {
+          m.exemptAmount += r.depositUsed;
+        }
+      }
+
+      const memberData = Object.values(memberMap).sort((a: any, b: any) => 
+        (b.exemptAmount + b.taxableAmount) - (a.exemptAmount + a.taxableAmount)
+      );
 
       const totals = {
-        totalOrderAmount: memberData.reduce((s, m) => s + m.totalOrderAmount, 0),
-        pointerUsed: memberData.reduce((s, m) => s + m.pointerUsed, 0),
-        taxInvoiceAmount: memberData.reduce((s, m) => s + m.taxInvoiceAmount, 0),
-        supplyAmount: memberData.reduce((s, m) => s + m.supplyAmount, 0),
-        vatAmount: memberData.reduce((s, m) => s + m.vatAmount, 0),
+        totalOrderAmount: memberData.reduce((s: number, m: any) => s + m.totalOrderAmount, 0),
+        pointerUsed: memberData.reduce((s: number, m: any) => s + m.pointerUsed, 0),
+        exemptAmount: memberData.reduce((s: number, m: any) => s + m.exemptAmount, 0),
+        taxableAmount: memberData.reduce((s: number, m: any) => s + m.taxableAmount, 0),
+        taxableSupply: memberData.reduce((s: number, m: any) => s + m.taxableSupply, 0),
+        taxableVat: memberData.reduce((s: number, m: any) => s + m.taxableVat, 0),
       };
 
       const KST_OFFSET = 9 * 60 * 60 * 1000;
@@ -14007,6 +14032,7 @@ export async function registerRoutes(
         productName: pendingOrders.productName,
         productCode: pendingOrders.productCode,
         supplyPrice: pendingOrders.supplyPrice,
+        taxType: pendingOrders.taxType,
         pointerUsed: settlementHistory.pointerAmount,
         depositUsed: settlementHistory.depositAmount,
         totalAmount: settlementHistory.totalAmount,
@@ -14022,9 +14048,10 @@ export async function registerRoutes(
 
       const totalOrderAmount = orderRows.reduce((s, r) => s + (r.totalAmount || 0), 0);
       const pointerUsed = orderRows.reduce((s, r) => s + (r.pointerUsed || 0), 0);
-      const taxInvoiceAmount = totalOrderAmount - pointerUsed;
-      const supplyAmount = taxInvoiceAmount;
-      const vatAmount = 0;
+      const exemptDeposit = orderRows.filter(r => (r.taxType || 'exempt') !== 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
+      const taxableDeposit = orderRows.filter(r => r.taxType === 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
+      const taxableSupply = Math.round(taxableDeposit / 1.1);
+      const taxableVat = taxableDeposit - taxableSupply;
 
       const mi = memberInfo[0];
       res.json({
@@ -14046,8 +14073,9 @@ export async function registerRoutes(
           amount: r.totalAmount || 0,
           pointerUsed: r.pointerUsed || 0,
           depositUsed: r.depositUsed || 0,
+          taxType: r.taxType || 'exempt',
         })),
-        summary: { totalOrderAmount, pointerUsed, taxInvoiceAmount, supplyAmount, vatAmount },
+        summary: { totalOrderAmount, pointerUsed, exemptAmount: exemptDeposit, taxableAmount: taxableDeposit, taxableSupply, taxableVat },
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -14075,6 +14103,7 @@ export async function registerRoutes(
         companyName: members.companyName,
         businessNumber: members.businessNumber,
         representative: members.representative,
+        taxType: pendingOrders.taxType,
         orderCount: sql<number>`COUNT(DISTINCT ${settlementHistory.orderId})::int`,
         totalOrderAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
         pointerUsed: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
@@ -14082,35 +14111,64 @@ export async function registerRoutes(
       })
         .from(settlementHistory)
         .innerJoin(members, eq(settlementHistory.memberId, members.id))
+        .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
         .where(and(
           gte(settlementHistory.createdAt, monthStartUTC),
           lt(settlementHistory.createdAt, monthEndUTC),
         ))
-        .groupBy(members.companyName, members.businessNumber, members.representative)
+        .groupBy(members.companyName, members.businessNumber, members.representative, pendingOrders.taxType)
         .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
 
+      const excelMap: Record<string, any> = {};
+      for (const r of memberRows) {
+        const key = r.companyName || '';
+        if (!excelMap[key]) {
+          excelMap[key] = {
+            companyName: r.companyName || '',
+            businessNumber: r.businessNumber || '',
+            representative: r.representative || '',
+            orderCount: 0,
+            totalOrderAmount: 0,
+            pointerUsed: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const m = excelMap[key];
+        m.orderCount += r.orderCount;
+        m.totalOrderAmount += r.totalOrderAmount;
+        m.pointerUsed += r.pointerUsed;
+        if (r.taxType === 'taxable') {
+          m.taxableAmount += r.depositUsed;
+          m.taxableSupply += Math.round(r.depositUsed / 1.1);
+          m.taxableVat += r.depositUsed - Math.round(r.depositUsed / 1.1);
+        } else {
+          m.exemptAmount += r.depositUsed;
+        }
+      }
+
       const XLSX = await import('xlsx');
-      const data = memberRows.map(r => {
-        const invoiceAmount = r.depositUsed;
-        return {
-          '공급받는자(상호)': r.companyName || '',
-          '사업자번호': r.businessNumber || '',
-          '대표자': r.representative || '',
-          '주문건수': r.orderCount,
-          '총주문액': r.totalOrderAmount,
-          '포인터사용': r.pointerUsed,
-          '계산서발행액(면세)': invoiceAmount,
-          '공급가액': invoiceAmount,
-          '비고': '면세(농산물)',
-        };
-      });
+      const data = Object.values(excelMap).map((r: any) => ({
+        '공급받는자(상호)': r.companyName,
+        '사업자번호': r.businessNumber,
+        '대표자': r.representative,
+        '주문건수': r.orderCount,
+        '총주문액': r.totalOrderAmount,
+        '포인터사용': r.pointerUsed,
+        '면세금액(계산서)': r.exemptAmount,
+        '과세금액(세금계산서)': r.taxableAmount,
+        '과세공급가액': r.taxableSupply,
+        '부가세': r.taxableVat,
+      }));
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, '계산서(면세)');
+      XLSX.utils.book_append_sheet(wb, ws, '계산서');
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-      const filename = encodeURIComponent(`계산서_면세_${year}년${month}월.xlsx`);
+      const filename = encodeURIComponent(`계산서_${year}년${month}월.xlsx`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
       res.send(buf);

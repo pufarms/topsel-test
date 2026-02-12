@@ -428,6 +428,7 @@ export const productRegistrations = pgTable("product_registrations", {
   topMargin: integer("top_margin"),
   
   mappingStatus: text("mapping_status").notNull().default("incomplete"),
+  taxType: text("tax_type").notNull().default("exempt"),
   isVendorProduct: boolean("is_vendor_product").default(false),
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -490,6 +491,7 @@ export const nextWeekProducts = pgTable("next_week_products", {
   drivingPrice: integer("driving_price").notNull(),
   topPrice: integer("top_price").notNull(),
   supplyStatus: text("supply_status").notNull().default("supply"),
+  taxType: text("tax_type").notNull().default("exempt"),
   isVendorProduct: boolean("is_vendor_product").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -519,6 +521,7 @@ export const currentProducts = pgTable("current_products", {
   supplyStatus: text("supply_status").notNull().default("supply"), // 'supply' | 'suspended'
   suspendedAt: timestamp("suspended_at"),
   suspendReason: text("suspend_reason"),
+  taxType: text("tax_type").notNull().default("exempt"),
   isVendorProduct: boolean("is_vendor_product").default(false),
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1284,6 +1287,7 @@ export const pendingOrders = pgTable("pending_orders", {
   courierCompany: text("courier_company"),
   
   priceConfirmed: boolean("price_confirmed").notNull().default(false),
+  taxType: text("tax_type").notNull().default("exempt"),
   
   vendorId: integer("vendor_id"),
   fulfillmentType: varchar("fulfillment_type", { length: 10 }).default("self"),

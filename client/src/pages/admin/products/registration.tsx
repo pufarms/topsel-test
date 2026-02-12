@@ -33,7 +33,7 @@ function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): T & 
 }
 
 const COLUMN_KEYS = [
-  "checkbox", "categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName",
+  "checkbox", "categoryLarge", "categoryMedium", "categorySmall", "weight", "productCode", "productName", "taxType",
   "sourceProduct", "sourcePrice", "lossRate", "sourceWeight", "unitPrice", "sourceProductTotal",
   "boxCost", "materialCost", "outerBoxCost", "wrappingCost", "laborCost", "shippingCost", "totalCost",
   "startMarginRate", "startMargin", "startPrice", "drivingMarginRate", "drivingMargin", "drivingPrice",
@@ -42,7 +42,7 @@ const COLUMN_KEYS = [
 
 const MIN_COLUMN_WIDTHS: Record<string, number> = {
   checkbox: 40, categoryLarge: 50, categoryMedium: 50, categorySmall: 50, weight: 40,
-  productCode: 50, productName: 80, sourceProduct: 50, sourcePrice: 50, lossRate: 45,
+  productCode: 50, productName: 80, taxType: 55, sourceProduct: 50, sourcePrice: 50, lossRate: 45,
   sourceWeight: 50, unitPrice: 60, sourceProductTotal: 70, boxCost: 50, materialCost: 50,
   outerBoxCost: 55, wrappingCost: 50, laborCost: 50, shippingCost: 50, totalCost: 60,
   startMarginRate: 50, startMargin: 55, startPrice: 60, drivingMarginRate: 50, drivingMargin: 55,
@@ -51,7 +51,7 @@ const MIN_COLUMN_WIDTHS: Record<string, number> = {
 
 const HEADER_LABELS: Record<string, string> = {
   checkbox: "", categoryLarge: "대분류", categoryMedium: "중분류", categorySmall: "소분류", weight: "중량",
-  productCode: "코드", productName: "상품명", sourceProduct: "원상품", sourcePrice: "기준가", lossRate: "로스율%",
+  productCode: "코드", productName: "상품명", taxType: "과세구분", sourceProduct: "원상품", sourcePrice: "기준가", lossRate: "로스율%",
   sourceWeight: "기준중량", unitPrice: "개별단가", sourceProductTotal: "원상품합계", boxCost: "박스비", materialCost: "자재비",
   outerBoxCost: "아웃박스", wrappingCost: "보자기", laborCost: "작업비", shippingCost: "택배비", totalCost: "총원가",
   startMarginRate: "S마진율", startMargin: "S마진", startPrice: "S공급가", drivingMarginRate: "D마진율", drivingMargin: "D마진",
@@ -71,6 +71,7 @@ const calculateColumnWidth = (key: string, data: ProductRow[]): number => {
       case "weight": value = String(row.weight || ""); break;
       case "productCode": value = row.productCode || ""; break;
       case "productName": value = row.productName || ""; break;
+      case "taxType": value = row.taxType === "taxable" ? "과세" : "면세"; break;
       case "sourceProduct": value = row.sourceProduct || ""; break;
       case "sourcePrice": value = row.sourcePrice != null ? row.sourcePrice.toLocaleString() : ""; break;
       case "lossRate": value = String(row.lossRate || ""); break;
@@ -255,6 +256,8 @@ export default function ProductRegistrationPage() {
           weight: "",
           productCode: newProductCode,
           productName: "",
+          taxType: "exempt",
+          isVendorProduct: false,
           sourceProduct: null,
           sourcePrice: null,
           lossRate: 0,
@@ -886,6 +889,8 @@ export default function ProductRegistrationPage() {
       weight: "",
       productCode: "",
       productName: "",
+      taxType: "exempt",
+      isVendorProduct: false,
       sourceProduct: null,
       sourcePrice: null,
       lossRate: 0,
@@ -964,6 +969,7 @@ export default function ProductRegistrationPage() {
           weight: productData.weight,
           productCode: productData.productCode,
           productName: productData.productName,
+          taxType: productData.taxType || "exempt",
           sourceProduct: productData.sourceProduct,
           sourcePrice: productData.sourcePrice,
           lossRate: productData.lossRate,
@@ -1078,6 +1084,7 @@ export default function ProductRegistrationPage() {
           weight: p.weight,
           productCode: p.productCode,
           productName: p.productName,
+          taxType: p.taxType || "exempt",
           sourceProduct: p.sourceProduct,
           sourcePrice: p.sourcePrice,
           lossRate: p.lossRate,
@@ -1604,6 +1611,7 @@ export default function ProductRegistrationPage() {
                   { key: "weight", label: "중량", align: "center", bgColor: "" },
                   { key: "productCode", label: "코드", align: "left", bgColor: "" },
                   { key: "productName", label: "상품명", align: "left", bgColor: "" },
+                  { key: "taxType", label: "과세구분", align: "center", bgColor: "" },
                   { key: "sourceProduct", label: "원상품", align: "left", bgColor: "" },
                   { key: "sourcePrice", label: "기준가", align: "right", bgColor: "" },
                   { key: "lossRate", label: "로스율%", align: "right", bgColor: "" },
@@ -1722,6 +1730,17 @@ export default function ProductRegistrationPage() {
                   </td>
                   <td className={`px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden ${getCellClass(p.productName, false)}`} style={{ width: columnWidths.productName }}>
                     <input value={p.productName} onChange={e => handleCellChange(idx, "productName", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
+                  </td>
+                  <td className="px-0 py-0 border border-gray-300 dark:border-gray-600 overflow-visible" style={{ width: columnWidths.taxType }}>
+                    <select
+                      value={p.taxType || "exempt"}
+                      onChange={e => handleCellChange(idx, "taxType", e.target.value)}
+                      className="w-full h-6 px-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer"
+                      data-testid={`select-tax-type-${idx}`}
+                    >
+                      <option value="exempt">면세</option>
+                      <option value="taxable">과세</option>
+                    </select>
                   </td>
                   <td className="px-1 py-0.5 border border-gray-300 dark:border-gray-600 overflow-hidden" style={{ width: columnWidths.sourceProduct }}>
                     <input value={p.sourceProduct || ""} onChange={e => handleCellChange(idx, "sourceProduct", e.target.value)} className="w-full px-1 py-0.5 border-none bg-transparent outline-none text-xs focus:ring-2 focus:ring-inset focus:ring-blue-500" />
