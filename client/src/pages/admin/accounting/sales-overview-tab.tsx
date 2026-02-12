@@ -174,6 +174,8 @@ function MonthlySalesSummary() {
   const [selectedMonth, setSelectedMonth] = useState(kstNow.getMonth() + 1);
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
+  const [memberSearchOpen, setMemberSearchOpen] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
   const nextM = selectedMonth === 12 ? 1 : selectedMonth + 1;
@@ -313,23 +315,62 @@ function MonthlySalesSummary() {
             </div>
             {monthlyData && monthlyData.members.length > 0 && (
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
                 <Input
                   placeholder="업체명 검색"
                   value={memberSearch}
-                  onChange={(e) => setMemberSearch(e.target.value)}
-                  className="pl-8 pr-8 w-[200px]"
+                  onChange={(e) => {
+                    setMemberSearch(e.target.value);
+                    setMemberSearchOpen(true);
+                    if (!e.target.value.trim()) setSelectedMemberId(null);
+                  }}
+                  onFocus={() => { if (memberSearch.trim()) setMemberSearchOpen(true); }}
+                  onBlur={() => setTimeout(() => setMemberSearchOpen(false), 200)}
+                  className="pl-8 pr-8 w-[240px]"
                   data-testid="input-member-search"
                 />
-                {memberSearch && (
+                {(memberSearch || selectedMemberId) && (
                   <button
-                    onClick={() => setMemberSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => { setMemberSearch(""); setSelectedMemberId(null); setMemberSearchOpen(false); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
                     data-testid="button-clear-member-search"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
+                {memberSearchOpen && memberSearch.trim() && (() => {
+                  const q = memberSearch.trim().toLowerCase();
+                  const suggestions = monthlyData.members.filter((m) =>
+                    m.businessName?.toLowerCase().includes(q) ||
+                    m.memberName?.toLowerCase().includes(q) ||
+                    m.businessNumber?.includes(q)
+                  );
+                  if (suggestions.length === 0) return (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 p-3 text-sm text-muted-foreground text-center">
+                      검색 결과가 없습니다
+                    </div>
+                  );
+                  return (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                      {suggestions.map((m) => (
+                        <button
+                          key={m.memberId}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setSelectedMemberId(m.memberId);
+                            setMemberSearch(m.businessName);
+                            setMemberSearchOpen(false);
+                          }}
+                          data-testid={`suggestion-member-${m.memberId}`}
+                        >
+                          <span className="font-medium truncate">{m.businessName}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">{m.businessNumber || m.memberName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -363,6 +404,7 @@ function MonthlySalesSummary() {
                   <tbody>
                     {monthlyData.members
                       .filter((m) => {
+                        if (selectedMemberId) return m.memberId === selectedMemberId;
                         if (!memberSearch.trim()) return true;
                         const q = memberSearch.trim().toLowerCase();
                         return (
