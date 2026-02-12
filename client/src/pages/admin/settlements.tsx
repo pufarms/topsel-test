@@ -31,7 +31,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, Receipt, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, Receipt, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import VendorManagementTab from "./accounting/vendor-management-tab";
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
@@ -48,32 +49,33 @@ interface MemberBalance {
   username: string;
 }
 
-interface SettlementRecord {
-  settlementDate: string;
-  memberId: string;
-  memberCompanyName: string | null;
-  totalPointerAmount: number;
-  totalDepositAmount: number;
-  totalAmount: number;
-  orderCount: number;
+interface MemberSettlementViewItem {
+  type: "order" | "deposit" | "pointer";
+  date: string;
+  companyName: string;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  pointerChange: number;
+  depositChange: number;
+  description?: string;
+  balance: number;
 }
 
-interface DepositRecord {
-  historyDate: string;
-  memberId: string;
-  memberCompanyName: string | null;
-  type: string;
-  totalAmount: number;
-  txCount: number;
-}
-
-interface PointerRecord {
-  historyDate: string;
-  memberId: string;
-  memberCompanyName: string | null;
-  type: string;
-  totalAmount: number;
-  txCount: number;
+interface MemberSettlementViewResponse {
+  items: MemberSettlementViewItem[];
+  companyName: string;
+  startingBalance: number;
+  endingBalance: number;
+  startingDepositBalance: number;
+  startingPointerBalance: number;
+  endingDepositBalance: number;
+  endingPointerBalance: number;
+  totalOrderAmount: number;
+  totalDepositChange: number;
+  totalPointerChange: number;
 }
 
 const gradeLabels: Record<string, string> = {
@@ -82,14 +84,9 @@ const gradeLabels: Record<string, string> = {
   TOP: "탑",
 };
 
-const typeLabels: Record<string, string> = {
-  charge: "충전",
-  refund: "환급",
-  deduct: "차감",
-  grant: "지급",
-  auto: "자동정산",
-  manual: "수동정산",
-};
+function formatCurrency(n: number): string {
+  return n.toLocaleString("ko-KR") + "원";
+}
 
 const ITEMS_PER_PAGE = 30;
 
@@ -103,72 +100,26 @@ function MemberSettlementTab() {
   const [memberFilter, setMemberFilter] = useState("");
   const [memberGradeFilter, setMemberGradeFilter] = useState("all");
 
-  const settlementDateRange = useDateRange("month");
-  const depositDateRange = useDateRange("month");
-  const pointerDateRange = useDateRange("month");
-
-  const [settlementMemberFilter, setSettlementMemberFilter] = useState("");
-  const [settlementTypeFilter, setSettlementTypeFilter] = useState("all");
-  const [settlementPage, setSettlementPage] = useState(1);
-
-  const [depositMemberFilter, setDepositMemberFilter] = useState("");
-  const [depositTypeFilter, setDepositTypeFilter] = useState("all");
-  const [depositPage, setDepositPage] = useState(1);
-
-  const [pointerMemberFilter, setPointerMemberFilter] = useState("");
-  const [pointerTypeFilter, setPointerTypeFilter] = useState("all");
-  const [pointerPage, setPointerPage] = useState(1);
+  const detailDateRange = useDateRange("month");
+  const [detailMemberFilter, setDetailMemberFilter] = useState("");
+  const [detailPage, setDetailPage] = useState(1);
 
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
   });
 
-  const { data: settlements, isLoading: settlementsLoading } = useQuery<{ records: SettlementRecord[]; total: number; page: number; limit: number }>({
-    queryKey: ["/api/admin/settlements", settlementDateRange.dateRange.startDate, settlementDateRange.dateRange.endDate, settlementMemberFilter, settlementTypeFilter, settlementPage],
+  const { data: settlementView, isLoading: settlementViewLoading } = useQuery<MemberSettlementViewResponse>({
+    queryKey: ["/api/admin/member-settlement-view", detailMemberFilter, detailDateRange.dateRange.startDate, detailDateRange.dateRange.endDate],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (settlementDateRange.dateRange.startDate) params.set("startDate", settlementDateRange.dateRange.startDate);
-      if (settlementDateRange.dateRange.endDate) params.set("endDate", settlementDateRange.dateRange.endDate);
-      if (settlementMemberFilter) params.set("memberId", settlementMemberFilter);
-      if (settlementTypeFilter !== "all") params.set("paymentMethod", settlementTypeFilter);
-      params.set("page", String(settlementPage));
-      params.set("limit", String(ITEMS_PER_PAGE));
-      const res = await fetch(`/api/admin/settlements?${params.toString()}`, { credentials: "include" });
+      params.set("memberId", detailMemberFilter);
+      if (detailDateRange.dateRange.startDate) params.set("startDate", detailDateRange.dateRange.startDate);
+      if (detailDateRange.dateRange.endDate) params.set("endDate", detailDateRange.dateRange.endDate);
+      const res = await fetch(`/api/admin/member-settlement-view?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
-  });
-
-  const { data: depositRecords, isLoading: depositsLoading } = useQuery<{ records: DepositRecord[]; total: number; page: number; limit: number }>({
-    queryKey: ["/api/admin/deposit-history", depositDateRange.dateRange.startDate, depositDateRange.dateRange.endDate, depositMemberFilter, depositTypeFilter, depositPage],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (depositDateRange.dateRange.startDate) params.set("startDate", depositDateRange.dateRange.startDate);
-      if (depositDateRange.dateRange.endDate) params.set("endDate", depositDateRange.dateRange.endDate);
-      if (depositMemberFilter) params.set("memberId", depositMemberFilter);
-      if (depositTypeFilter !== "all") params.set("type", depositTypeFilter);
-      params.set("page", String(depositPage));
-      params.set("limit", String(ITEMS_PER_PAGE));
-      const res = await fetch(`/api/admin/deposit-history?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) throw new Error("조회 실패");
-      return res.json();
-    },
-  });
-
-  const { data: pointerRecords, isLoading: pointersLoading } = useQuery<{ records: PointerRecord[]; total: number; page: number; limit: number }>({
-    queryKey: ["/api/admin/pointer-history", pointerDateRange.dateRange.startDate, pointerDateRange.dateRange.endDate, pointerMemberFilter, pointerTypeFilter, pointerPage],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (pointerDateRange.dateRange.startDate) params.set("startDate", pointerDateRange.dateRange.startDate);
-      if (pointerDateRange.dateRange.endDate) params.set("endDate", pointerDateRange.dateRange.endDate);
-      if (pointerMemberFilter) params.set("memberId", pointerMemberFilter);
-      if (pointerTypeFilter !== "all") params.set("type", pointerTypeFilter);
-      params.set("page", String(pointerPage));
-      params.set("limit", String(ITEMS_PER_PAGE));
-      const res = await fetch(`/api/admin/pointer-history?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) throw new Error("조회 실패");
-      return res.json();
-    },
+    enabled: !!detailMemberFilter,
   });
 
   const depositChargeMutation = useMutation({
@@ -179,7 +130,7 @@ function MemberSettlementTab() {
     onSuccess: (data) => {
       toast({ title: "예치금 충전 완료", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/deposit-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/member-settlement-view"] });
       setActionDialog(null);
       setActionAmount("");
       setActionDescription("");
@@ -198,7 +149,7 @@ function MemberSettlementTab() {
     onSuccess: (data) => {
       toast({ title: "예치금 환급 완료", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/deposit-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/member-settlement-view"] });
       setActionDialog(null);
       setActionAmount("");
       setActionDescription("");
@@ -217,7 +168,7 @@ function MemberSettlementTab() {
     onSuccess: (data) => {
       toast({ title: "포인터 지급 완료", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pointer-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/member-settlement-view"] });
       setActionDialog(null);
       setActionAmount("");
       setActionDescription("");
@@ -250,18 +201,70 @@ function MemberSettlementTab() {
 
   const memberOptions = memberList.map(m => ({ id: m.id, label: `${m.companyName} (${m.username})` }));
 
-  const settlementTotalPages = Math.max(1, Math.ceil((settlements?.total || 0) / ITEMS_PER_PAGE));
-  const depositTotalPages = Math.max(1, Math.ceil((depositRecords?.total || 0) / ITEMS_PER_PAGE));
-  const pointerTotalPages = Math.max(1, Math.ceil((pointerRecords?.total || 0) / ITEMS_PER_PAGE));
+  const allItems = settlementView?.items || [];
+  const detailTotalPages = Math.max(1, Math.ceil(allItems.length / ITEMS_PER_PAGE));
+  const pagedItems = allItems.slice((detailPage - 1) * ITEMS_PER_PAGE, detailPage * ITEMS_PER_PAGE);
+  const isFirstPage = detailPage === 1;
+  const isLastPage = detailPage >= detailTotalPages || detailTotalPages <= 1;
+
+  const handleExcelDownload = () => {
+    if (!settlementView || !allItems.length) return;
+    const cn = settlementView.companyName || "전체";
+    const sd = detailDateRange.dateRange.startDate || "";
+    const ed = detailDateRange.dateRange.endDate || "";
+
+    const excelData: any[] = [];
+    excelData.push({
+      "적용날짜": "-",
+      "상호명": cn,
+      "내역(상품명)": "기간 시작 잔액",
+      "수량": "",
+      "단가": "",
+      "합계": "",
+      "포인터": settlementView.startingPointerBalance.toLocaleString() + "P",
+      "예치금": formatCurrency(settlementView.startingDepositBalance),
+      "예치금+포인터 잔액": formatCurrency(settlementView.startingBalance),
+    });
+
+    for (const item of allItems) {
+      excelData.push({
+        "적용날짜": item.date,
+        "상호명": item.companyName,
+        "내역(상품명)": item.productName,
+        "수량": item.quantity || "",
+        "단가": item.type === "order" ? item.unitPrice : "",
+        "합계": item.type === "order" ? item.subtotal : "",
+        "포인터": item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : "",
+        "예치금": item.depositChange !== 0 ? (item.depositChange > 0 ? `+${formatCurrency(item.depositChange)}` : `-${formatCurrency(Math.abs(item.depositChange))}`) : "",
+        "예치금+포인터 잔액": formatCurrency(item.balance),
+      });
+    }
+
+    excelData.push({
+      "적용날짜": "-",
+      "상호명": cn,
+      "내역(상품명)": "기간 종료 잔액",
+      "수량": "",
+      "단가": "",
+      "합계": "",
+      "포인터": settlementView.endingPointerBalance.toLocaleString() + "P",
+      "예치금": formatCurrency(settlementView.endingDepositBalance),
+      "예치금+포인터 잔액": formatCurrency(settlementView.endingBalance),
+    });
+
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "업체별정산내역");
+    XLSX.writeFile(wb, `업체별정산내역_${cn}_${sd}~${ed}.xlsx`);
+    toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
+  };
 
   return (
     <div className="space-y-4">
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="members" data-testid="tab-members">회원 잔액</TabsTrigger>
-          <TabsTrigger value="settlements" data-testid="tab-settlements">정산 이력</TabsTrigger>
-          <TabsTrigger value="deposits" data-testid="tab-deposits">예치금 이력</TabsTrigger>
-          <TabsTrigger value="pointers" data-testid="tab-pointers">포인터 이력</TabsTrigger>
+          <TabsTrigger value="member-detail" data-testid="tab-member-detail">업체별 정산 내역</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members">
@@ -361,305 +364,153 @@ function MemberSettlementTab() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="settlements">
+        <TabsContent value="member-detail">
           <Card className="overflow-hidden">
             <CardHeader className="pb-3">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <ArrowUpDown className="h-5 w-5" />정산 이력
+                    <FileText className="h-5 w-5" />업체별 정산 내역
                   </CardTitle>
-                  <DateRangeFilter onChange={(range) => { settlementDateRange.setDateRange(range); setSettlementPage(1); }} defaultPreset="month" />
+                  <DateRangeFilter onChange={(range) => { detailDateRange.setDateRange(range); setDetailPage(1); }} defaultPreset="month" />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select value={settlementMemberFilter || "all"} onValueChange={(v) => { setSettlementMemberFilter(v === "all" ? "" : v); setSettlementPage(1); }}>
-                    <SelectTrigger className="w-[200px]" data-testid="select-settlement-member">
-                      <SelectValue placeholder="회원 선택" />
+                  <Select value={detailMemberFilter || "none"} onValueChange={(v) => { setDetailMemberFilter(v === "none" ? "" : v); setDetailPage(1); }}>
+                    <SelectTrigger className="w-[240px]" data-testid="select-detail-member">
+                      <SelectValue placeholder="상호명 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체 회원</SelectItem>
+                      <SelectItem value="none">상호명 선택</SelectItem>
                       {memberOptions.map(m => (
                         <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={settlementTypeFilter} onValueChange={(v) => { setSettlementTypeFilter(v); setSettlementPage(1); }}>
-                    <SelectTrigger className="w-[140px]" data-testid="select-settlement-type">
-                      <SelectValue placeholder="유형" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="deposit">예치금</SelectItem>
-                      <SelectItem value="pointer">포인터</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="overflow-hidden">
-              {settlementsLoading ? (
-                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-              ) : (
-                <>
-                  <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[800px]">
-                      <TableHeader className="sticky top-0 z-10 bg-background">
-                        <TableRow>
-                          <TableHead>날짜</TableHead>
-                          <TableHead>상호명</TableHead>
-                          <TableHead className="text-right">주문 건수</TableHead>
-                          <TableHead className="text-right">포인터 차감</TableHead>
-                          <TableHead className="text-right">예치금 차감</TableHead>
-                          <TableHead className="text-right">총 정산액</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {!settlements?.records?.length ? (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 이력이 없습니다</TableCell>
-                          </TableRow>
-                        ) : (
-                          settlements.records.map((record, idx) => (
-                            <TableRow key={`${record.settlementDate}-${record.memberId}-${idx}`}>
-                              <TableCell className="whitespace-nowrap">{record.settlementDate}</TableCell>
-                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                              <TableCell className="text-right">{Number(record.orderCount).toLocaleString()}건</TableCell>
-                              <TableCell className="text-right">{Number(record.totalPointerAmount).toLocaleString()}P</TableCell>
-                              <TableCell className="text-right">{Number(record.totalDepositAmount).toLocaleString()}원</TableCell>
-                              <TableCell className="text-right font-medium">{Number(record.totalAmount).toLocaleString()}원</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                    <p className="text-sm text-muted-foreground">총 {settlements?.total || 0}건</p>
-                    {settlementTotalPages > 1 && (
-                      <div className="flex items-center gap-1">
-                        <Button size="sm" variant="outline" disabled={settlementPage <= 1} onClick={() => setSettlementPage(p => p - 1)} data-testid="button-settlement-prev">
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="text-sm px-2">{settlementPage} / {settlementTotalPages}</span>
-                        <Button size="sm" variant="outline" disabled={settlementPage >= settlementTotalPages} onClick={() => setSettlementPage(p => p + 1)} data-testid="button-settlement-next">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="deposits">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />예치금 이력
-                  </CardTitle>
-                  <DateRangeFilter onChange={(range) => { depositDateRange.setDateRange(range); setDepositPage(1); }} defaultPreset="month" />
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Select value={depositMemberFilter || "all"} onValueChange={(v) => { setDepositMemberFilter(v === "all" ? "" : v); setDepositPage(1); }}>
-                    <SelectTrigger className="w-[200px]" data-testid="select-deposit-member">
-                      <SelectValue placeholder="회원 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 회원</SelectItem>
-                      {memberOptions.map(m => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={depositTypeFilter} onValueChange={(v) => { setDepositTypeFilter(v); setDepositPage(1); }}>
-                    <SelectTrigger className="w-[140px]" data-testid="select-deposit-type">
-                      <SelectValue placeholder="유형" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 유형</SelectItem>
-                      <SelectItem value="charge">충전</SelectItem>
-                      <SelectItem value="refund">환급</SelectItem>
-                      <SelectItem value="deduct">차감</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {detailMemberFilter && allItems.length > 0 && (
+                    <Button size="sm" variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-excel-download">
+                      <Download className="h-4 w-4" />엑셀 다운로드
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden space-y-3">
-              {depositsLoading ? (
+              {!detailMemberFilter ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-base font-medium">상호명을 선택해주세요</p>
+                  <p className="text-sm mt-1">업체를 선택하면 해당 업체의 정산 내역을 확인할 수 있습니다.</p>
+                </div>
+              ) : settlementViewLoading ? (
                 <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : (
                 <>
-                  {depositRecords?.records?.length ? (
-                    <div className="flex flex-wrap gap-4 items-center text-sm">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        충전합계: {depositRecords.records.filter(r => r.type === "charge").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}원
-                      </span>
-                      <span className="font-semibold text-red-600 dark:text-red-400">
-                        차감/환급합계: {depositRecords.records.filter(r => r.type === "deduct" || r.type === "refund").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}원
-                      </span>
+                  {settlementView && (
+                    <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
+                      <span className="text-muted-foreground">총 {allItems.length}건</span>
+                      <span className="font-semibold">주문합계: {formatCurrency(settlementView.totalOrderAmount)}</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">예치금 변동: {settlementView.totalDepositChange >= 0 ? "+" : ""}{formatCurrency(settlementView.totalDepositChange)}</span>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">포인터 변동: {settlementView.totalPointerChange >= 0 ? "+" : ""}{settlementView.totalPointerChange.toLocaleString()}P</span>
                     </div>
-                  ) : null}
-                  <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[800px]">
-                      <TableHeader className="sticky top-0 z-10 bg-background">
-                        <TableRow>
-                          <TableHead>날짜</TableHead>
-                          <TableHead>상호명</TableHead>
-                          <TableHead>유형</TableHead>
-                          <TableHead className="text-right">건수</TableHead>
-                          <TableHead className="text-right">합계 금액</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {!depositRecords?.records?.length ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">선택한 기간에 예치금 이력이 없습니다</TableCell>
-                          </TableRow>
-                        ) : (
-                          depositRecords.records.map((record, idx) => (
-                            <TableRow key={`${record.historyDate}-${record.memberId}-${record.type}-${idx}`}>
-                              <TableCell className="whitespace-nowrap">{record.historyDate}</TableCell>
-                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant={record.type === "charge" ? "default" : record.type === "deduct" ? "destructive" : "secondary"} className="no-default-active-elevate">
-                                  {typeLabels[record.type] || record.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">{Number(record.txCount).toLocaleString()}건</TableCell>
-                              <TableCell className={`text-right font-medium ${record.type === "charge" ? "text-emerald-600" : record.type === "deduct" || record.type === "refund" ? "text-red-600" : ""}`}>
-                                {record.type === "charge" ? "+" : "-"}{Number(record.totalAmount).toLocaleString()}원
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                    <p className="text-sm text-muted-foreground">총 {depositRecords?.total || 0}건</p>
-                    {depositTotalPages > 1 && (
-                      <div className="flex items-center gap-1">
-                        <Button size="sm" variant="outline" disabled={depositPage <= 1} onClick={() => setDepositPage(p => p - 1)} data-testid="button-deposit-prev">
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="text-sm px-2">{depositPage} / {depositTotalPages}</span>
-                        <Button size="sm" variant="outline" disabled={depositPage >= depositTotalPages} onClick={() => setDepositPage(p => p + 1)} data-testid="button-deposit-next">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  )}
 
-        <TabsContent value="pointers">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Gift className="h-5 w-5" />포인터 이력
-                  </CardTitle>
-                  <DateRangeFilter onChange={(range) => { pointerDateRange.setDateRange(range); setPointerPage(1); }} defaultPreset="month" />
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Select value={pointerMemberFilter || "all"} onValueChange={(v) => { setPointerMemberFilter(v === "all" ? "" : v); setPointerPage(1); }}>
-                    <SelectTrigger className="w-[200px]" data-testid="select-pointer-member">
-                      <SelectValue placeholder="회원 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 회원</SelectItem>
-                      {memberOptions.map(m => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={pointerTypeFilter} onValueChange={(v) => { setPointerTypeFilter(v); setPointerPage(1); }}>
-                    <SelectTrigger className="w-[140px]" data-testid="select-pointer-type">
-                      <SelectValue placeholder="유형" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체 유형</SelectItem>
-                      <SelectItem value="grant">지급</SelectItem>
-                      <SelectItem value="deduct">차감</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="overflow-hidden space-y-3">
-              {pointersLoading ? (
-                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-              ) : (
-                <>
-                  {pointerRecords?.records?.length ? (
-                    <div className="flex flex-wrap gap-4 items-center text-sm">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        지급합계: {pointerRecords.records.filter(r => r.type === "grant").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}P
-                      </span>
-                      <span className="font-semibold text-red-600 dark:text-red-400">
-                        차감합계: {pointerRecords.records.filter(r => r.type === "deduct").reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}P
-                      </span>
-                    </div>
-                  ) : null}
                   <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <Table className="min-w-[800px]">
-                      <TableHeader className="sticky top-0 z-10 bg-background">
-                        <TableRow>
-                          <TableHead>날짜</TableHead>
-                          <TableHead>상호명</TableHead>
-                          <TableHead>유형</TableHead>
-                          <TableHead className="text-right">건수</TableHead>
-                          <TableHead className="text-right">합계 금액</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {!pointerRecords?.records?.length ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">선택한 기간에 포인터 이력이 없습니다</TableCell>
-                          </TableRow>
+                    <table className="w-full text-sm min-w-[1000px]">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b bg-muted/30">
+                          <th className="text-center py-2 px-3 whitespace-nowrap">적용날짜</th>
+                          <th className="text-left py-2 px-3 whitespace-nowrap">상호명</th>
+                          <th className="text-left py-2 px-3 whitespace-nowrap">내역(상품명)</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">수량</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">단가</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">합계</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">포인터</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">예치금</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">예치금+포인터 잔액</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {isFirstPage && settlementView && (
+                          <tr className="border-b bg-blue-50 dark:bg-blue-950/30" data-testid="row-starting-balance">
+                            <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
+                            <td className="py-2 px-3 whitespace-nowrap">{settlementView.companyName}</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={4}>기간 시작 잔액</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-blue-600 dark:text-blue-400">{settlementView.startingPointerBalance.toLocaleString()}P</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.startingDepositBalance)}</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.startingBalance)}</td>
+                          </tr>
+                        )}
+                        {allItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 내역이 없습니다</td>
+                          </tr>
                         ) : (
-                          pointerRecords.records.map((record, idx) => (
-                            <TableRow key={`${record.historyDate}-${record.memberId}-${record.type}-${idx}`}>
-                              <TableCell className="whitespace-nowrap">{record.historyDate}</TableCell>
-                              <TableCell>{record.memberCompanyName || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant={record.type === "grant" ? "default" : "destructive"} className="no-default-active-elevate">
-                                  {typeLabels[record.type] || record.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">{Number(record.txCount).toLocaleString()}건</TableCell>
-                              <TableCell className={`text-right font-medium ${record.type === "grant" ? "text-emerald-600" : "text-red-600"}`}>
-                                {record.type === "grant" ? "+" : "-"}{Number(record.totalAmount).toLocaleString()}P
-                              </TableCell>
-                            </TableRow>
+                          pagedItems.map((item, idx) => (
+                            <tr
+                              key={`${item.type}-${item.date}-${item.productCode}-${idx}`}
+                              className={`border-b ${item.type !== "order" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
+                              data-testid={`row-detail-${idx}`}
+                            >
+                              <td className="py-2 px-3 text-center whitespace-nowrap">{item.date}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">{item.companyName}</td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                {item.type === "order" ? (
+                                  item.productName
+                                ) : (
+                                  <span className={item.type === "deposit" ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
+                                    {item.productName}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right whitespace-nowrap">
+                                {item.quantity || ""}
+                              </td>
+                              <td className="py-2 px-3 text-right whitespace-nowrap">
+                                {item.type === "order" ? formatCurrency(item.unitPrice) : ""}
+                              </td>
+                              <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
+                                {item.type === "order" ? formatCurrency(item.subtotal) : ""}
+                              </td>
+                              <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.pointerChange > 0 ? "text-amber-600 dark:text-amber-400" : item.pointerChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                {item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : ""}
+                              </td>
+                              <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.depositChange > 0 ? "text-emerald-600 dark:text-emerald-400" : item.depositChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                {item.depositChange !== 0 ? (item.depositChange > 0 ? `+${formatCurrency(item.depositChange)}` : `-${formatCurrency(Math.abs(item.depositChange))}`) : ""}
+                              </td>
+                              <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
+                            </tr>
                           ))
                         )}
-                      </TableBody>
-                    </Table>
+                      </tbody>
+                      <tfoot>
+                        {isLastPage && settlementView && (
+                          <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold" data-testid="row-ending-balance">
+                            <td className="py-2 px-3 text-center text-muted-foreground">-</td>
+                            <td className="py-2 px-3">{settlementView.companyName}</td>
+                            <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={4}>기간 종료 잔액</td>
+                            <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{settlementView.endingPointerBalance.toLocaleString()}P</td>
+                            <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.endingDepositBalance)}</td>
+                            <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.endingBalance)}</td>
+                          </tr>
+                        )}
+                      </tfoot>
+                    </table>
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                    <p className="text-sm text-muted-foreground">총 {pointerRecords?.total || 0}건</p>
-                    {pointerTotalPages > 1 && (
+
+                  {detailTotalPages > 1 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                      <p className="text-sm text-muted-foreground">총 {allItems.length}건</p>
                       <div className="flex items-center gap-1">
-                        <Button size="sm" variant="outline" disabled={pointerPage <= 1} onClick={() => setPointerPage(p => p - 1)} data-testid="button-pointer-prev">
+                        <Button size="sm" variant="outline" disabled={detailPage <= 1} onClick={() => setDetailPage(p => p - 1)} data-testid="button-detail-prev">
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="text-sm px-2">{pointerPage} / {pointerTotalPages}</span>
-                        <Button size="sm" variant="outline" disabled={pointerPage >= pointerTotalPages} onClick={() => setPointerPage(p => p + 1)} data-testid="button-pointer-next">
+                        <span className="text-sm px-2">{detailPage} / {detailTotalPages}</span>
+                        <Button size="sm" variant="outline" disabled={detailPage >= detailTotalPages} onClick={() => setDetailPage(p => p + 1)} data-testid="button-detail-next">
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>

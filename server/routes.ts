@@ -10406,12 +10406,6 @@ export async function registerRoutes(
       let startUTC: Date | undefined;
       let endUTC: Date | undefined;
 
-      const orderConditions: any[] = [
-        eq(pendingOrders.memberId, memberId),
-        eq(pendingOrders.status, '배송중'),
-        eq(pendingOrders.priceConfirmed, true),
-      ];
-
       const depositConditions: any[] = [
         eq(depositHistory.memberId, memberId),
         inArray(depositHistory.type, ['charge', 'refund']),
@@ -10422,16 +10416,20 @@ export async function registerRoutes(
         eq(pointerHistory.type, 'grant'),
       ];
 
+      const settlementConditions: any[] = [
+        eq(settlementHistory.memberId, memberId),
+      ];
+
       if (startDate && endDate) {
         const parsed = parseDateRangeKST(startDate, endDate);
         startUTC = parsed.startUTC;
         endUTC = parsed.endUTC;
-        orderConditions.push(gte(pendingOrders.updatedAt, startUTC));
-        orderConditions.push(lte(pendingOrders.updatedAt, endUTC));
         depositConditions.push(gte(depositHistory.createdAt, startUTC));
         depositConditions.push(lte(depositHistory.createdAt, endUTC));
         pointerConditions.push(gte(pointerHistory.createdAt, startUTC));
         pointerConditions.push(lte(pointerHistory.createdAt, endUTC));
+        settlementConditions.push(gte(settlementHistory.createdAt, startUTC));
+        settlementConditions.push(lte(settlementHistory.createdAt, endUTC));
       }
 
       const memberResult = await db.select({ deposit: members.deposit, point: members.point })
@@ -10439,18 +10437,22 @@ export async function registerRoutes(
       const currentDeposit = memberResult[0]?.deposit ?? 0;
       const currentPointer = memberResult[0]?.point ?? 0;
 
-      const [orderRows, depositRows, pointerRows, depositNetSinceStart, pointerNetSinceStart] = await Promise.all([
+      const [orderSettlementRows, depositRows, pointerRows, depositNetSinceStart, pointerNetSinceStart] = await Promise.all([
         db.select({
-          orderDate: sql<string>`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+          settlementDate: sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
           productName: pendingOrders.productName,
           productCode: pendingOrders.productCode,
           supplyPrice: pendingOrders.supplyPrice,
           quantity: sql<number>`COUNT(*)::int`,
+          totalPointerAmount: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
+          totalDepositAmount: sql<number>`COALESCE(SUM(${settlementHistory.depositAmount}), 0)::int`,
+          totalAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
         })
-          .from(pendingOrders)
-          .where(and(...orderConditions))
+          .from(settlementHistory)
+          .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+          .where(and(...settlementConditions))
           .groupBy(
-            sql`TO_CHAR(${pendingOrders.updatedAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+            sql`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
             pendingOrders.productName,
             pendingOrders.productCode,
             pendingOrders.supplyPrice,
@@ -10515,18 +10517,18 @@ export async function registerRoutes(
 
       const items: SettlementRow[] = [];
 
-      for (const row of orderRows) {
+      for (const row of orderSettlementRows) {
         const price = row.supplyPrice || 0;
         items.push({
           type: "order",
-          date: row.orderDate,
+          date: row.settlementDate,
           productName: row.productName || "",
           productCode: row.productCode || "",
           quantity: row.quantity,
           unitPrice: price,
-          subtotal: price * row.quantity,
-          depositAmount: 0,
-          pointerAmount: 0,
+          subtotal: row.totalAmount,
+          depositAmount: -row.totalDepositAmount,
+          pointerAmount: -row.totalPointerAmount,
           balance: 0,
         });
       }
@@ -10574,19 +10576,13 @@ export async function registerRoutes(
 
       let runningBalance = startingBalance;
       for (const item of items) {
-        if (item.type === "order") {
-          runningBalance -= item.subtotal;
-        } else if (item.type === "deposit") {
-          runningBalance += item.depositAmount;
-        } else if (item.type === "pointer") {
-          runningBalance += item.pointerAmount;
-        }
+        runningBalance += item.depositAmount + item.pointerAmount;
         item.balance = runningBalance;
       }
 
       const totalOrderAmount = items.filter(i => i.type === "order").reduce((s, i) => s + i.subtotal, 0);
-      const totalDeposit = items.filter(i => i.type === "deposit").reduce((s, i) => s + i.depositAmount, 0);
-      const totalPointer = items.filter(i => i.type === "pointer").reduce((s, i) => s + i.pointerAmount, 0);
+      const totalDeposit = items.reduce((s, i) => s + i.depositAmount, 0);
+      const totalPointer = items.reduce((s, i) => s + i.pointerAmount, 0);
 
       res.json({
         items,
@@ -10599,6 +10595,248 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Member settlement view error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 업체별 통합 정산 내역 조회 (정산+예치금+포인터 통합)
+  app.get('/api/admin/member-settlement-view', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const adminUser = await storage.getUser(req.session.userId);
+      if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'super_admin')) {
+        return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+      }
+
+      const { memberId, startDate, endDate } = req.query as any;
+      if (!memberId) {
+        return res.status(400).json({ message: "회원을 선택해주세요" });
+      }
+
+      const memberInfo = await db.select({ companyName: members.companyName, deposit: members.deposit, point: members.point })
+        .from(members).where(eq(members.id, memberId)).limit(1);
+      if (!memberInfo.length) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const currentDeposit = memberInfo[0].deposit ?? 0;
+      const currentPointer = memberInfo[0].point ?? 0;
+      const companyName = memberInfo[0].companyName || "";
+
+      let startUTC: Date | undefined;
+      let endUTC: Date | undefined;
+
+      const depositConditions: any[] = [
+        eq(depositHistory.memberId, memberId),
+        inArray(depositHistory.type, ['charge', 'refund']),
+      ];
+      const pointerConditions: any[] = [
+        eq(pointerHistory.memberId, memberId),
+        eq(pointerHistory.type, 'grant'),
+      ];
+      const settlementConditions: any[] = [
+        eq(settlementHistory.memberId, memberId),
+      ];
+
+      if (startDate && endDate) {
+        const parsed = parseDateRangeKST(startDate, endDate);
+        startUTC = parsed.startUTC;
+        endUTC = parsed.endUTC;
+        depositConditions.push(gte(depositHistory.createdAt, startUTC));
+        depositConditions.push(lte(depositHistory.createdAt, endUTC));
+        pointerConditions.push(gte(pointerHistory.createdAt, startUTC));
+        pointerConditions.push(lte(pointerHistory.createdAt, endUTC));
+        settlementConditions.push(gte(settlementHistory.createdAt, startUTC));
+        settlementConditions.push(lte(settlementHistory.createdAt, endUTC));
+      }
+
+      const [orderSettlementRows, depositRows, pointerRows, depositAllNet, pointerAllNet, depositNetAfterEnd, pointerNetAfterEnd] = await Promise.all([
+        db.select({
+          settlementDate: sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+          productName: pendingOrders.productName,
+          productCode: pendingOrders.productCode,
+          supplyPrice: pendingOrders.supplyPrice,
+          quantity: sql<number>`COUNT(*)::int`,
+          totalPointerAmount: sql<number>`COALESCE(SUM(${settlementHistory.pointerAmount}), 0)::int`,
+          totalDepositAmount: sql<number>`COALESCE(SUM(${settlementHistory.depositAmount}), 0)::int`,
+          totalAmount: sql<number>`COALESCE(SUM(${settlementHistory.totalAmount}), 0)::int`,
+        })
+          .from(settlementHistory)
+          .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+          .where(and(...settlementConditions))
+          .groupBy(
+            sql`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+            pendingOrders.productName,
+            pendingOrders.productCode,
+            pendingOrders.supplyPrice,
+          ),
+        db.select({
+          id: depositHistory.id,
+          date: sql<string>`TO_CHAR(${depositHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+          type: depositHistory.type,
+          amount: depositHistory.amount,
+          description: depositHistory.description,
+        })
+          .from(depositHistory)
+          .where(and(...depositConditions)),
+        db.select({
+          id: pointerHistory.id,
+          date: sql<string>`TO_CHAR(${pointerHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
+          type: pointerHistory.type,
+          amount: pointerHistory.amount,
+          description: pointerHistory.description,
+        })
+          .from(pointerHistory)
+          .where(and(...pointerConditions)),
+        startUTC
+          ? db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(depositHistory).where(and(
+              eq(depositHistory.memberId, memberId),
+              gte(depositHistory.createdAt, startUTC),
+            ))
+          : db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(depositHistory).where(eq(depositHistory.memberId, memberId)),
+        startUTC
+          ? db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(pointerHistory).where(and(
+              eq(pointerHistory.memberId, memberId),
+              gte(pointerHistory.createdAt, startUTC),
+            ))
+          : db.select({
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(pointerHistory).where(eq(pointerHistory.memberId, memberId)),
+        endUTC
+          ? db.select({
+              netDeposit: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(depositHistory).where(and(
+              eq(depositHistory.memberId, memberId),
+              gt(depositHistory.createdAt, endUTC),
+            ))
+          : Promise.resolve([{ netDeposit: 0 }] as any),
+        endUTC
+          ? db.select({
+              netPointer: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+            }).from(pointerHistory).where(and(
+              eq(pointerHistory.memberId, memberId),
+              gt(pointerHistory.createdAt, endUTC),
+            ))
+          : Promise.resolve([{ netPointer: 0 }] as any),
+      ]);
+
+      const depositNetChange = (depositAllNet as any)?.[0]?.netChange ?? 0;
+      const pointerNetChange = (pointerAllNet as any)?.[0]?.netChange ?? 0;
+      const startingDepositBalance = currentDeposit - depositNetChange;
+      const startingPointerBalance = currentPointer - pointerNetChange;
+      const startingBalance = startingDepositBalance + startingPointerBalance;
+
+      const depositNetAfter = (depositNetAfterEnd as any)?.[0]?.netDeposit ?? 0;
+      const pointerNetAfter = (pointerNetAfterEnd as any)?.[0]?.netPointer ?? 0;
+      const endingDepositBalance = currentDeposit - depositNetAfter;
+      const endingPointerBalance = currentPointer - pointerNetAfter;
+
+      type AdminSettlementRow = {
+        type: "order" | "deposit" | "pointer";
+        date: string;
+        companyName: string;
+        productName: string;
+        productCode: string;
+        quantity: number;
+        unitPrice: number;
+        subtotal: number;
+        pointerChange: number;
+        depositChange: number;
+        description?: string;
+        balance: number;
+      };
+
+      const items: AdminSettlementRow[] = [];
+
+      for (const row of orderSettlementRows) {
+        const price = row.supplyPrice || 0;
+        items.push({
+          type: "order",
+          date: row.settlementDate,
+          companyName,
+          productName: row.productName || "",
+          productCode: row.productCode || "",
+          quantity: row.quantity,
+          unitPrice: price,
+          subtotal: row.totalAmount,
+          pointerChange: -row.totalPointerAmount,
+          depositChange: -row.totalDepositAmount,
+          balance: 0,
+        });
+      }
+
+      for (const row of depositRows) {
+        const signedAmount = row.type === 'refund' ? -row.amount : row.amount;
+        items.push({
+          type: "deposit",
+          date: row.date,
+          companyName,
+          productName: row.type === 'charge' ? '입금/예치금 충전' : '환급/예치금 환급',
+          productCode: "",
+          quantity: 1,
+          unitPrice: 0,
+          subtotal: 0,
+          pointerChange: 0,
+          depositChange: signedAmount,
+          description: row.description || undefined,
+          balance: 0,
+        });
+      }
+
+      for (const row of pointerRows) {
+        items.push({
+          type: "pointer",
+          date: row.date,
+          companyName,
+          productName: '포인터 충전',
+          productCode: "",
+          quantity: 1,
+          unitPrice: 0,
+          subtotal: 0,
+          pointerChange: row.amount,
+          depositChange: 0,
+          description: row.description || undefined,
+          balance: 0,
+        });
+      }
+
+      items.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        if (a.type === "deposit" || a.type === "pointer") return -1;
+        if (b.type === "deposit" || b.type === "pointer") return 1;
+        return (a.productName || "").localeCompare(b.productName || "");
+      });
+
+      let runningBalance = startingBalance;
+      for (const item of items) {
+        runningBalance += item.depositChange + item.pointerChange;
+        item.balance = runningBalance;
+      }
+
+      const totalOrderAmount = items.filter(i => i.type === "order").reduce((s, i) => s + i.subtotal, 0);
+      const totalDepositChange = items.reduce((s, i) => s + i.depositChange, 0);
+      const totalPointerChange = items.reduce((s, i) => s + i.pointerChange, 0);
+
+      res.json({
+        items,
+        companyName,
+        startingBalance,
+        endingBalance: endingDepositBalance + endingPointerBalance,
+        startingDepositBalance,
+        startingPointerBalance,
+        endingDepositBalance,
+        endingPointerBalance,
+        totalOrderAmount,
+        totalDepositChange,
+        totalPointerChange,
+      });
+    } catch (error: any) {
+      console.error("Admin member settlement view error:", error);
       res.status(500).json({ message: error.message });
     }
   });
