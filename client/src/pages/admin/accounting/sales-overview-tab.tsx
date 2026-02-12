@@ -322,9 +322,9 @@ function MonthlySalesSummary() {
                   onChange={(e) => {
                     setMemberSearch(e.target.value);
                     setMemberSearchOpen(true);
-                    if (!e.target.value.trim()) setSelectedMemberId(null);
+                    setSelectedMemberId(null);
                   }}
-                  onFocus={() => { if (memberSearch.trim()) setMemberSearchOpen(true); }}
+                  onFocus={() => { if (memberSearch.trim() && !selectedMemberId) setMemberSearchOpen(true); }}
                   onBlur={() => setTimeout(() => setMemberSearchOpen(false), 200)}
                   className="pl-8 pr-8 w-[240px]"
                   data-testid="input-member-search"
