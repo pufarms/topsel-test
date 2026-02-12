@@ -10604,7 +10604,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const adminUser = await storage.getUser(req.session.userId);
-      if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'super_admin')) {
+      if (!adminUser || (adminUser.role !== 'ADMIN' && adminUser.role !== 'SUPER_ADMIN')) {
         return res.status(403).json({ message: "관리자 권한이 필요합니다" });
       }
 
