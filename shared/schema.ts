@@ -1628,7 +1628,7 @@ export const vendorPayments = pgTable("vendor_payments", {
   paymentDate: date("payment_date").notNull(),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull().default("transfer"),
   memo: text("memo"),
-  createdBy: integer("created_by"),
+  createdBy: varchar("created_by", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
