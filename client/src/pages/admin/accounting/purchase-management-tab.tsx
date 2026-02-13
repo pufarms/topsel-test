@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, Link as LinkIcon, Pencil } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, Link as LinkIcon, Pencil, X, ChevronDown } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 const materialTypeLabels: Record<string, string> = {
@@ -79,9 +79,13 @@ export default function PurchaseManagementTab() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [addVendorValue, setAddVendorValue] = useState("");
+  const [vendorSearchText, setVendorSearchText] = useState("");
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const vendorSearchRef = useRef<HTMLDivElement>(null);
   const [addMemo, setAddMemo] = useState("");
   const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
 
   const queryParams = new URLSearchParams();
   if (dateRange.dateRange.startDate) queryParams.set("startDate", dateRange.dateRange.startDate);
@@ -140,9 +144,28 @@ export default function PurchaseManagementTab() {
     setShowAddDialog(false);
     setAddDate(new Date().toISOString().slice(0, 10));
     setAddVendorValue("");
+    setVendorSearchText("");
+    setVendorDropdownOpen(false);
     setAddMemo("");
     setAddItems([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setProductSuggestionIdx(null);
   };
+
+  const filteredVendors = useMemo(() => {
+    if (!vendorSearchText.trim()) return dropdownItems;
+    const term = vendorSearchText.toLowerCase();
+    return dropdownItems.filter(d => d.label.toLowerCase().includes(term));
+  }, [dropdownItems, vendorSearchText]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(e.target as Node)) {
+        setVendorDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleAddItem = () => {
     setAddItems(prev => [...prev, { materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
@@ -182,6 +205,18 @@ export default function PurchaseManagementTab() {
 
   const purchases = data?.purchases || [];
   const summary = data?.summary;
+
+  const existingProductNames = useMemo(() => {
+    const names = new Set<string>();
+    purchases.forEach(p => { if (p.productName) names.add(p.productName); });
+    return Array.from(names).sort();
+  }, [purchases]);
+
+  const getProductSuggestions = (text: string) => {
+    if (!text.trim()) return [];
+    const term = text.toLowerCase();
+    return existingProductNames.filter(n => n.toLowerCase().includes(term));
+  };
 
   const filtered = purchases.filter(p => {
     if (filterSource !== "__all__") {
@@ -351,22 +386,71 @@ export default function PurchaseManagementTab() {
                 <Label>매입일</Label>
                 <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} data-testid="input-purchase-date" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2" ref={vendorSearchRef}>
                 <Label>공급업체</Label>
-                <Select value={addVendorValue} onValueChange={(v) => {
-                  setAddVendorValue(v);
-                  const selected = dropdownItems.find(d => d.value === v);
-                  if (selected?.supplyType?.length) {
-                    setAddItems(prev => prev.map(item => ({ ...item, materialType: selected.supplyType[0] })));
-                  }
-                }}>
-                  <SelectTrigger data-testid="select-purchase-vendor"><SelectValue placeholder="업체 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {dropdownItems.map(d => (
-                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    value={addVendorValue ? (dropdownItems.find(d => d.value === addVendorValue)?.label || "") : vendorSearchText}
+                    onChange={(e) => {
+                      if (addVendorValue) {
+                        setAddVendorValue("");
+                      }
+                      setVendorSearchText(e.target.value);
+                      setVendorDropdownOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (addVendorValue) {
+                        const label = dropdownItems.find(d => d.value === addVendorValue)?.label || "";
+                        setVendorSearchText(label);
+                        setAddVendorValue("");
+                      }
+                      setVendorDropdownOpen(true);
+                    }}
+                    placeholder="업체명 검색"
+                    className="pl-8 pr-8"
+                    data-testid="input-vendor-search"
+                  />
+                  {(addVendorValue || vendorSearchText) ? (
+                    <button
+                      type="button"
+                      onClick={() => { setAddVendorValue(""); setVendorSearchText(""); setVendorDropdownOpen(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-vendor"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  )}
+                  {vendorDropdownOpen && !addVendorValue && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                      {filteredVendors.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                      ) : (
+                        filteredVendors.map(d => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setAddVendorValue(d.value);
+                              setVendorSearchText("");
+                              setVendorDropdownOpen(false);
+                              if (d.supplyType?.length) {
+                                setAddItems(prev => prev.map(item => ({ ...item, materialType: d.supplyType[0] })));
+                              }
+                            }}
+                            data-testid={`option-vendor-${d.value}`}
+                          >
+                            {d.label}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>메모 (선택)</Label>
@@ -411,7 +495,31 @@ export default function PurchaseManagementTab() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input value={item.productName} onChange={(e) => updateItem(idx, "productName", e.target.value)} placeholder="품목명" data-testid={`input-item-name-${idx}`} />
+                          <div className="relative">
+                            <Input
+                              value={item.productName}
+                              onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); }}
+                              onFocus={() => setProductSuggestionIdx(idx)}
+                              onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 150)}
+                              placeholder="품목명"
+                              data-testid={`input-item-name-${idx}`}
+                            />
+                            {productSuggestionIdx === idx && getProductSuggestions(item.productName).length > 0 && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[160px] overflow-y-auto">
+                                {getProductSuggestions(item.productName).map(name => (
+                                  <button
+                                    key={name}
+                                    type="button"
+                                    className="w-full text-left px-3 py-1.5 text-sm hover-elevate cursor-pointer"
+                                    onMouseDown={(e) => { e.preventDefault(); updateItem(idx, "productName", name); setProductSuggestionIdx(null); }}
+                                    data-testid={`suggestion-product-${idx}-${name}`}
+                                  >
+                                    {name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="수량" data-testid={`input-item-qty-${idx}`} />
