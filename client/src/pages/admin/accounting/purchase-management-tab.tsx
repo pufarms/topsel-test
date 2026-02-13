@@ -15,7 +15,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Plus, Trash2, Link as LinkIcon, Pencil } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
@@ -342,12 +341,12 @@ export default function PurchaseManagementTab() {
       )}
 
       <Dialog open={showAddDialog} onOpenChange={() => resetAddForm()}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[80vw] max-w-[80vw] max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>매입 등록</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>매입일</Label>
                 <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} data-testid="input-purchase-date" />
@@ -369,6 +368,10 @@ export default function PurchaseManagementTab() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>메모 (선택)</Label>
+                <Input value={addMemo} onChange={(e) => setAddMemo(e.target.value)} placeholder="메모" data-testid="input-purchase-memo" />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -378,17 +381,17 @@ export default function PurchaseManagementTab() {
                   <Plus className="h-3 w-3 mr-1" />품목 추가
                 </Button>
               </div>
-              <div className="border rounded-lg overflow-x-auto">
+              <div className="border rounded-lg">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[40px]">#</TableHead>
-                      <TableHead>분류</TableHead>
+                      <TableHead className="w-[110px]">분류</TableHead>
                       <TableHead>품목명</TableHead>
-                      <TableHead>수량</TableHead>
-                      <TableHead>단위</TableHead>
-                      <TableHead>단가</TableHead>
-                      <TableHead className="text-right">금액</TableHead>
+                      <TableHead className="w-[100px]">수량</TableHead>
+                      <TableHead className="w-[90px]">단위</TableHead>
+                      <TableHead className="w-[120px]">단가</TableHead>
+                      <TableHead className="w-[120px] text-right">금액</TableHead>
                       <TableHead className="w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -398,7 +401,7 @@ export default function PurchaseManagementTab() {
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell>
                           <Select value={item.materialType} onValueChange={(v) => updateItem(idx, "materialType", v)}>
-                            <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="raw">원물</SelectItem>
                               <SelectItem value="semi">반재료</SelectItem>
@@ -408,21 +411,21 @@ export default function PurchaseManagementTab() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input value={item.productName} onChange={(e) => updateItem(idx, "productName", e.target.value)} placeholder="품목명" className="min-w-[120px]" data-testid={`input-item-name-${idx}`} />
+                          <Input value={item.productName} onChange={(e) => updateItem(idx, "productName", e.target.value)} placeholder="품목명" data-testid={`input-item-name-${idx}`} />
                         </TableCell>
                         <TableCell>
-                          <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="수량" className="w-[80px]" data-testid={`input-item-qty-${idx}`} />
+                          <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="수량" data-testid={`input-item-qty-${idx}`} />
                         </TableCell>
                         <TableCell>
                           <Select value={item.unit} onValueChange={(v) => updateItem(idx, "unit", v)}>
-                            <SelectTrigger className="w-[80px]"><SelectValue /></SelectTrigger>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", e.target.value)} placeholder="단가" className="w-[100px]" data-testid={`input-item-price-${idx}`} />
+                          <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", e.target.value)} placeholder="단가" data-testid={`input-item-price-${idx}`} />
                         </TableCell>
                         <TableCell className="text-right font-medium whitespace-nowrap">{itemTotal(item).toLocaleString()}원</TableCell>
                         <TableCell>
@@ -439,18 +442,13 @@ export default function PurchaseManagementTab() {
                 합계: {addItems.reduce((s, item) => s + itemTotal(item), 0).toLocaleString()}원
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label>메모 (선택)</Label>
-              <Textarea value={addMemo} onChange={(e) => setAddMemo(e.target.value)} placeholder="메모" data-testid="input-purchase-memo" />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={resetAddForm} data-testid="button-cancel-purchase">취소</Button>
-              <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-submit-purchase">
-                {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}등록
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2 pt-4 border-t shrink-0">
+            <Button variant="outline" onClick={resetAddForm} data-testid="button-cancel-purchase">취소</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-submit-purchase">
+              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}등록
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
