@@ -13889,11 +13889,15 @@ export async function registerRoutes(
         if (!item.productName || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0 || isNaN(total)) {
           throw new Error("품목 데이터가 올바르지 않습니다");
         }
+        if (!item.materialCode) {
+          throw new Error("원재료 목록에서 품목을 선택해주세요");
+        }
         return {
           purchaseDate,
           vendorId: vendorId ? parseInt(vendorId) : null,
           supplierId: supplierId ? parseInt(supplierId) : null,
           materialType: validMaterialTypes.includes(item.materialType) ? item.materialType : "etc",
+          materialCode: item.materialCode ? String(item.materialCode).trim() : null,
           productName: String(item.productName).trim(),
           quantity: String(qty),
           unit: item.unit || "개",

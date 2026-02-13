@@ -61,9 +61,17 @@ interface DropdownItem {
   supplyType: string[];
 }
 
+interface MaterialItem {
+  id: string;
+  materialType: string;
+  materialCode: string;
+  materialName: string;
+}
+
 interface NewItemRow {
   materialType: string;
   productName: string;
+  materialCode: string;
   quantity: string;
   unit: string;
   unitPrice: string;
@@ -83,7 +91,7 @@ export default function PurchaseManagementTab() {
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
   const vendorSearchRef = useRef<HTMLDivElement>(null);
   const [addMemo, setAddMemo] = useState("");
-  const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
+  const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
 
@@ -105,6 +113,17 @@ export default function PurchaseManagementTab() {
   });
 
   const dropdownItems = dropdownData?.items || [];
+
+  const { data: materialsData } = useQuery<MaterialItem[]>({
+    queryKey: ["/api/materials"],
+    queryFn: async () => {
+      const res = await fetch("/api/materials", { credentials: "include" });
+      if (!res.ok) throw new Error("원재료 목록 조회 실패");
+      return res.json();
+    },
+  });
+
+  const allMaterials = materialsData || [];
 
   const createMutation = useMutation({
     mutationFn: async (body: any) => {
@@ -147,7 +166,7 @@ export default function PurchaseManagementTab() {
     setVendorSearchText("");
     setVendorDropdownOpen(false);
     setAddMemo("");
-    setAddItems([{ materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setAddItems([{ materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
     setProductSuggestionIdx(null);
   };
 
@@ -168,7 +187,7 @@ export default function PurchaseManagementTab() {
   }, []);
 
   const handleAddItem = () => {
-    setAddItems(prev => [...prev, { materialType: "raw", productName: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setAddItems(prev => [...prev, { materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   };
 
   const handleRemoveItem = (idx: number) => {
@@ -181,7 +200,10 @@ export default function PurchaseManagementTab() {
 
   const handleSubmit = () => {
     if (!addVendorValue) { toast({ title: "업체를 선택해주세요", variant: "destructive" }); return; }
-    const validItems = addItems.filter(item => item.productName && item.quantity && item.unitPrice);
+    const itemsWithInput = addItems.filter(item => item.productName || item.quantity || item.unitPrice);
+    const invalidItems = itemsWithInput.filter(item => !item.materialCode);
+    if (invalidItems.length > 0) { toast({ title: "품목을 원재료 목록에서 선택해주세요", description: "재료명을 검색하여 목록에서 선택해야 합니다.", variant: "destructive" }); return; }
+    const validItems = itemsWithInput.filter(item => item.materialCode && item.quantity && item.unitPrice);
     if (validItems.length === 0) { toast({ title: "품목을 입력해주세요", variant: "destructive" }); return; }
 
     const selectedVendor = dropdownItems.find(d => d.value === addVendorValue);
@@ -195,6 +217,7 @@ export default function PurchaseManagementTab() {
       items: validItems.map(item => ({
         materialType: item.materialType,
         productName: item.productName,
+        materialCode: item.materialCode,
         quantity: parseFloat(item.quantity),
         unit: item.unit,
         unitPrice: parseInt(item.unitPrice),
@@ -206,16 +229,24 @@ export default function PurchaseManagementTab() {
   const purchases = data?.purchases || [];
   const summary = data?.summary;
 
-  const existingProductNames = useMemo(() => {
-    const names = new Set<string>();
-    purchases.forEach(p => { if (p.productName) names.add(p.productName); });
-    return Array.from(names).sort();
-  }, [purchases]);
+  const materialTypeMap: Record<string, string> = { raw: "raw", semi: "semi", sub: "subsidiary", subsidiary: "subsidiary", etc: "etc" };
 
-  const getProductSuggestions = (text: string) => {
-    if (!text.trim()) return [];
+  const getMaterialSuggestions = (text: string) => {
+    if (!text.trim()) return allMaterials.slice(0, 20);
     const term = text.toLowerCase();
-    return existingProductNames.filter(n => n.toLowerCase().includes(term));
+    return allMaterials.filter(m =>
+      m.materialName.toLowerCase().includes(term) || m.materialCode.toLowerCase().includes(term)
+    );
+  };
+
+  const selectMaterial = (idx: number, material: MaterialItem) => {
+    setAddItems(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      productName: material.materialName,
+      materialCode: material.materialCode,
+      materialType: materialTypeMap[material.materialType] || material.materialType,
+    } : item));
+    setProductSuggestionIdx(null);
   };
 
   const filtered = purchases.filter(p => {
@@ -484,39 +515,61 @@ export default function PurchaseManagementTab() {
                       <TableRow key={idx}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell>
-                          <Select value={item.materialType} onValueChange={(v) => updateItem(idx, "materialType", v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="raw">원물</SelectItem>
-                              <SelectItem value="semi">반재료</SelectItem>
-                              <SelectItem value="subsidiary">부자재</SelectItem>
-                              <SelectItem value="etc">기타</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Badge variant="outline" className="no-default-active-elevate text-xs whitespace-nowrap">
+                            {materialTypeLabels[item.materialType] || item.materialType || "-"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="relative">
-                            <Input
-                              value={item.productName}
-                              onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); }}
-                              onFocus={() => setProductSuggestionIdx(idx)}
-                              onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 150)}
-                              placeholder="품목명"
-                              data-testid={`input-item-name-${idx}`}
-                            />
-                            {productSuggestionIdx === idx && getProductSuggestions(item.productName).length > 0 && (
-                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[160px] overflow-y-auto">
-                                {getProductSuggestions(item.productName).map(name => (
-                                  <button
-                                    key={name}
-                                    type="button"
-                                    className="w-full text-left px-3 py-1.5 text-sm hover-elevate cursor-pointer"
-                                    onMouseDown={(e) => { e.preventDefault(); updateItem(idx, "productName", name); setProductSuggestionIdx(null); }}
-                                    data-testid={`suggestion-product-${idx}-${name}`}
-                                  >
-                                    {name}
-                                  </button>
-                                ))}
+                            {item.materialCode ? (
+                              <div className="flex items-center gap-1 border rounded-md px-3 h-9 bg-background">
+                                <span className="flex-1 text-sm truncate">{item.productName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "raw" } : it));
+                                  }}
+                                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                                  data-testid={`button-clear-material-${idx}`}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none z-10" />
+                                <Input
+                                  value={item.productName}
+                                  onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); }}
+                                  onFocus={() => setProductSuggestionIdx(idx)}
+                                  onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 150)}
+                                  placeholder="재료명 검색"
+                                  className="pl-7"
+                                  data-testid={`input-item-name-${idx}`}
+                                />
+                              </>
+                            )}
+                            {productSuggestionIdx === idx && !item.materialCode && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                                {getMaterialSuggestions(item.productName).length === 0 ? (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                                ) : (
+                                  getMaterialSuggestions(item.productName).map(m => (
+                                    <button
+                                      key={m.id}
+                                      type="button"
+                                      className="w-full text-left px-3 py-1.5 text-sm hover-elevate cursor-pointer flex items-center gap-2"
+                                      onMouseDown={(e) => { e.preventDefault(); selectMaterial(idx, m); }}
+                                      data-testid={`suggestion-material-${idx}-${m.materialCode}`}
+                                    >
+                                      <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
+                                        {materialTypeLabels[materialTypeMap[m.materialType] || m.materialType] || m.materialType}
+                                      </Badge>
+                                      <span className="truncate">{m.materialName}</span>
+                                      <span className="text-muted-foreground text-xs shrink-0">({m.materialCode})</span>
+                                    </button>
+                                  ))
+                                )}
                               </div>
                             )}
                           </div>

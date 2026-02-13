@@ -1690,6 +1690,7 @@ export const purchases = pgTable("purchases", {
   vendorId: integer("vendor_id").references(() => vendors.id),
   supplierId: integer("supplier_id").references(() => suppliers.id),
   materialType: varchar("material_type", { length: 20 }).notNull(),
+  materialCode: varchar("material_code", { length: 50 }),
   productName: varchar("product_name", { length: 200 }).notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
   unit: varchar("unit", { length: 20 }).notNull(),
