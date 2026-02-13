@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, Link as LinkIcon, Pencil, X, ChevronDown } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, X, ChevronDown } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 const materialTypeLabels: Record<string, string> = {
@@ -80,9 +80,8 @@ interface NewItemRow {
 export default function PurchaseManagementTab() {
   const { toast } = useToast();
   const dateRange = useDateRange("month");
-  const [filterSource, setFilterSource] = useState("__all__");
   const [filterType, setFilterType] = useState("__all__");
-  const [filterVendor, setFilterVendor] = useState("__all__");
+  const [filterVendorName, setFilterVendorName] = useState("__all__");
   const [searchText, setSearchText] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -253,11 +252,14 @@ export default function PurchaseManagementTab() {
     setProductSuggestionIdx(null);
   };
 
+  const vendorNames = useMemo(() => {
+    const names = new Set<string>();
+    purchases.forEach(p => { if (p.vendorName) names.add(p.vendorName); });
+    return Array.from(names).sort();
+  }, [purchases]);
+
   const filtered = purchases.filter(p => {
-    if (filterSource !== "__all__") {
-      if (filterSource === "direct" && p.source !== "direct") return false;
-      if (filterSource === "site" && p.source !== "site") return false;
-    }
+    if (filterVendorName !== "__all__" && p.vendorName !== filterVendorName) return false;
     if (filterType !== "__all__" && p.materialType !== filterType) return false;
     if (searchText) {
       const term = searchText.toLowerCase();
@@ -287,12 +289,13 @@ export default function PurchaseManagementTab() {
       <div className="flex flex-wrap items-end gap-2 justify-between">
         <div className="flex flex-wrap items-end gap-2">
           <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" />
-          <Select value={filterSource} onValueChange={setFilterSource}>
-            <SelectTrigger className="w-[130px]" data-testid="select-filter-source"><SelectValue /></SelectTrigger>
+          <Select value={filterVendorName} onValueChange={setFilterVendorName}>
+            <SelectTrigger className="w-[180px]" data-testid="select-filter-vendor"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">전체</SelectItem>
-              <SelectItem value="site">사이트 매입</SelectItem>
-              <SelectItem value="direct">직접 매입</SelectItem>
+              <SelectItem value="__all__">업체 전체</SelectItem>
+              {vendorNames.map(name => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={filterType} onValueChange={setFilterType}>
@@ -353,7 +356,6 @@ export default function PurchaseManagementTab() {
                 <TableRow>
                   <TableHead className="w-[40px]"></TableHead>
                   <TableHead>날짜</TableHead>
-                  <TableHead>구분</TableHead>
                   <TableHead>타입</TableHead>
                   <TableHead>업체명</TableHead>
                   <TableHead>품목명</TableHead>
@@ -365,7 +367,7 @@ export default function PurchaseManagementTab() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">매입 데이터가 없습니다</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">매입 데이터가 없습니다</TableCell>
                   </TableRow>
                 ) : (
                   filtered.map((p) => (
@@ -376,12 +378,6 @@ export default function PurchaseManagementTab() {
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{p.purchaseDate}</TableCell>
-                      <TableCell>
-                        {p.source === "site"
-                          ? <Badge variant="outline" className="no-default-active-elevate text-xs"><LinkIcon className="h-3 w-3 mr-1" />사이트</Badge>
-                          : <Badge variant="secondary" className="no-default-active-elevate text-xs"><Pencil className="h-3 w-3 mr-1" />직접</Badge>
-                        }
-                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="no-default-active-elevate text-xs">{materialTypeLabels[p.materialType] || p.materialType}</Badge>
                       </TableCell>
