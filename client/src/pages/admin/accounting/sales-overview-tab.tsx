@@ -1616,23 +1616,11 @@ function DirectSalesManagement() {
                 </tbody>
               </table>
             </div>
-            <p className="text-sm text-amber-600 dark:text-amber-400">재고가 부족하지만 확인 후 등록하시겠습니까? 등록 시 현재 재고에서 차감됩니다.</p>
+            <p className="text-sm text-destructive font-medium">재고가 부족하여 등록할 수 없습니다. 재고를 확인한 후 다시 시도해주세요.</p>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setStockWarningDialog(prev => ({ ...prev, open: false }))} data-testid="button-stock-warning-cancel">
-              취소
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setStockWarningDialog(prev => ({ ...prev, open: false }));
-                doRegister(stockWarningDialog.validItems, stockWarningDialog.clientName);
-              }}
-              disabled={createMutation.isPending}
-              data-testid="button-stock-warning-confirm"
-            >
-              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              확인 후 등록
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setStockWarningDialog(prev => ({ ...prev, open: false }))} data-testid="button-stock-warning-close">
+              닫기
             </Button>
           </div>
         </DialogContent>
