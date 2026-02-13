@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -17,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard, AlertTriangle } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 const materialTypeLabels: Record<string, string> = {
@@ -409,10 +408,6 @@ export default function PurchaseManagementTab() {
   const periodPurchaseTotal = filtered.filter(p => p.rowType === "purchase").reduce((s, p) => s + p.totalAmount, 0);
   const periodPaymentTotal = filtered.filter(p => p.rowType === "payment").reduce((s, p) => s + p.totalAmount, 0);
 
-  const totalOutstanding = vendorBalances.reduce((s, v) => s + (v.outstandingBalance || 0), 0);
-  const totalVendorPurchases = vendorBalances.reduce((s, v) => s + (v.totalPurchases || 0), 0);
-  const totalVendorPayments = vendorBalances.reduce((s, v) => s + (v.totalPayments || 0), 0);
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-2 justify-between">
@@ -642,111 +637,88 @@ export default function PurchaseManagementTab() {
         </>
       )}
 
-      <Dialog open={showSettlementDialog} onOpenChange={setShowSettlementDialog}>
-        <DialogContent className="w-[70vw] max-w-[70vw] max-h-[80vh] flex flex-col">
-          <DialogHeader className="shrink-0">
+      <Dialog open={showSettlementDialog} onOpenChange={(open) => {
+        setShowSettlementDialog(open);
+        if (!open) {
+          setSelectedSettlementVendor(null);
+          setPaymentDate(new Date().toISOString().slice(0, 10));
+          setPaymentMethod("transfer");
+          setPaymentAmount("");
+          setPaymentMemo("");
+        }
+      }}>
+        <DialogContent className="max-w-[480px]">
+          <DialogHeader>
             <DialogTitle>정산/결제</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            <div>
-              <h4 className="font-semibold mb-2 text-sm">업체별 외상 현황</h4>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>업체 선택</Label>
               {isLoadingBalances ? (
-                <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : (
-                <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[280px]">
-                  <Table className="min-w-[600px]">
-                    <TableHeader className="sticky top-0 z-10 bg-background">
-                      <TableRow>
-                        <TableHead>업체명</TableHead>
-                        <TableHead className="text-right">총 매입액</TableHead>
-                        <TableHead className="text-right">총 결제액</TableHead>
-                        <TableHead className="text-right">외상 잔액</TableHead>
-                        <TableHead className="text-center">상태</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {vendorBalances.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">데이터가 없습니다</TableCell>
-                        </TableRow>
-                      ) : (
-                        <>
-                          {vendorBalances.map((v) => (
-                            <TableRow
-                              key={v.id}
-                              className={`cursor-pointer ${selectedSettlementVendor?.id === v.id ? "bg-muted/50" : ""}`}
-                              onClick={() => setSelectedSettlementVendor(v)}
-                              data-testid={`row-settlement-vendor-${v.id}`}
-                            >
-                              <TableCell className="font-medium">{v.companyName}</TableCell>
-                              <TableCell className="text-right">{(v.totalPurchases || 0).toLocaleString()}원</TableCell>
-                              <TableCell className="text-right">{(v.totalPayments || 0).toLocaleString()}원</TableCell>
-                              <TableCell className="text-right font-semibold">{(v.outstandingBalance || 0).toLocaleString()}원</TableCell>
-                              <TableCell className="text-center">
-                                {(v.outstandingBalance || 0) >= 1000000 && (
-                                  <AlertTriangle className="h-4 w-4 text-amber-500 inline" />
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="font-semibold bg-muted/30">
-                            <TableCell>합계</TableCell>
-                            <TableCell className="text-right">{totalVendorPurchases.toLocaleString()}원</TableCell>
-                            <TableCell className="text-right">{totalVendorPayments.toLocaleString()}원</TableCell>
-                            <TableCell className="text-right">{totalOutstanding.toLocaleString()}원</TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                <Select
+                  value={selectedSettlementVendor?.id || ""}
+                  onValueChange={(val) => {
+                    const found = vendorBalances.find(v => v.id === val);
+                    setSelectedSettlementVendor(found || null);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-settlement-vendor"><SelectValue placeholder="업체를 선택하세요" /></SelectTrigger>
+                  <SelectContent>
+                    {vendorBalances.map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.companyName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              <p className="text-xs text-muted-foreground mt-1">업체를 클릭하여 결제를 등록하세요</p>
             </div>
 
             {selectedSettlementVendor && (
-              <Card>
-                <CardContent className="pt-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-sm">{selectedSettlementVendor.companyName} 결제 등록</h4>
-                    <span className="text-sm text-muted-foreground">
-                      외상 잔액: <span className="font-semibold text-foreground">{(selectedSettlementVendor.outstandingBalance || 0).toLocaleString()}원</span>
-                    </span>
+              <>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="text-center">
+                      <div className="text-sm text-muted-foreground mb-1">현재 외상 잔액</div>
+                      <div className="text-2xl font-bold" data-testid="text-settlement-balance">
+                        {(selectedSettlementVendor.outstandingBalance || 0).toLocaleString()}원
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>결제일</Label>
+                    <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} data-testid="input-payment-date" />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>결제일</Label>
-                      <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} data-testid="input-payment-date" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>결제 구분</Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="transfer">계좌이체</SelectItem>
-                          <SelectItem value="product_offset">상품상계</SelectItem>
-                          <SelectItem value="card">카드결제</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>결제액</Label>
-                      <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="금액" data-testid="input-payment-amount" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>메모 (선택)</Label>
-                      <Textarea value={paymentMemo} onChange={(e) => setPaymentMemo(e.target.value)} placeholder="메모" className="resize-none" data-testid="input-payment-memo" />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>결제 구분</Label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="transfer">계좌이체</SelectItem>
+                        <SelectItem value="product_offset">상품상계</SelectItem>
+                        <SelectItem value="card">카드결제</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setSelectedSettlementVendor(null)}>취소</Button>
-                    <Button onClick={handlePaymentSubmit} disabled={paymentMutation.isPending} data-testid="button-submit-payment">
-                      {paymentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}결제 등록
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="space-y-2">
+                  <Label>결제액</Label>
+                  <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="금액을 입력하세요" data-testid="input-payment-amount" />
+                </div>
+                <div className="space-y-2">
+                  <Label>메모 (선택)</Label>
+                  <Input value={paymentMemo} onChange={(e) => setPaymentMemo(e.target.value)} placeholder="메모" data-testid="input-payment-memo" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowSettlementDialog(false)}>취소</Button>
+                  <Button onClick={handlePaymentSubmit} disabled={paymentMutation.isPending} data-testid="button-submit-payment">
+                    {paymentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}결제 등록
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </DialogContent>
