@@ -420,212 +420,223 @@ export default function PurchaseManagementTab() {
   const periodPaymentTotal = filtered.filter(p => p.rowType === "payment").reduce((s, p) => s + p.totalAmount, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-2 justify-between">
-        <div className="flex flex-wrap items-end gap-2">
-          <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" />
-          <div className="relative w-[200px]" ref={filterVendorRef}>
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-            <Input
-              value={filterVendorName !== "__all__" ? (filterVendorDropdownOpen ? filterVendorSearchText : filterVendorName) : filterVendorSearchText}
-              onChange={(e) => {
-                if (filterVendorName !== "__all__") {
-                  setFilterVendorName("__all__");
-                }
-                setFilterVendorSearchText(e.target.value);
-                setFilterVendorDropdownOpen(true);
-              }}
-              onFocus={() => {
-                if (filterVendorName !== "__all__") {
-                  setFilterVendorSearchText(filterVendorName);
-                  setFilterVendorName("__all__");
-                }
-                setFilterVendorDropdownOpen(true);
-              }}
-              placeholder="업체 검색"
-              className="pl-8 pr-8"
-              data-testid="input-filter-vendor"
-            />
-            {(filterVendorName !== "__all__" || filterVendorSearchText) ? (
-              <button
-                type="button"
-                onClick={() => { setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                data-testid="button-clear-filter-vendor"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : (
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            )}
-            {filterVendorDropdownOpen && filterVendorName === "__all__" && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer text-muted-foreground"
-                  onMouseDown={(e) => { e.preventDefault(); setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
-                  data-testid="option-filter-vendor-all"
-                >
-                  업체 전체
-                </button>
-                {filteredFilterVendors.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+    <div className="space-y-5">
+      <Card className="bg-muted/30 dark:bg-muted/10">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-wrap items-end gap-2 justify-between">
+            <div className="flex flex-wrap items-end gap-2">
+              <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" />
+              <div className="relative w-[200px]" ref={filterVendorRef}>
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                <Input
+                  value={filterVendorName !== "__all__" ? (filterVendorDropdownOpen ? filterVendorSearchText : filterVendorName) : filterVendorSearchText}
+                  onChange={(e) => {
+                    if (filterVendorName !== "__all__") {
+                      setFilterVendorName("__all__");
+                    }
+                    setFilterVendorSearchText(e.target.value);
+                    setFilterVendorDropdownOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (filterVendorName !== "__all__") {
+                      setFilterVendorSearchText(filterVendorName);
+                      setFilterVendorName("__all__");
+                    }
+                    setFilterVendorDropdownOpen(true);
+                  }}
+                  placeholder="업체 검색"
+                  className="pl-8 pr-8"
+                  data-testid="input-filter-vendor"
+                />
+                {(filterVendorName !== "__all__" || filterVendorSearchText) ? (
+                  <button
+                    type="button"
+                    onClick={() => { setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    data-testid="button-clear-filter-vendor"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 ) : (
-                  filteredFilterVendors.map(name => (
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                )}
+                {filterVendorDropdownOpen && filterVendorName === "__all__" && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
                     <button
-                      key={name}
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
-                      onMouseDown={(e) => { e.preventDefault(); setFilterVendorName(name); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
-                      data-testid={`option-filter-vendor-${name}`}
+                      className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer text-muted-foreground"
+                      onMouseDown={(e) => { e.preventDefault(); setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                      data-testid="option-filter-vendor-all"
                     >
-                      {name}
+                      업체 전체
                     </button>
-                  ))
+                    {filteredFilterVendors.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                    ) : (
+                      filteredFilterVendors.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                          onMouseDown={(e) => { e.preventDefault(); setFilterVendorName(name); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                          data-testid={`option-filter-vendor-${name}`}
+                        >
+                          {name}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">타입 전체</SelectItem>
-              <SelectItem value="raw">원물</SelectItem>
-              <SelectItem value="semi">반재료</SelectItem>
-              <SelectItem value="subsidiary">부자재</SelectItem>
-              <SelectItem value="etc">기타</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="relative min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="품목 검색..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" data-testid="input-purchase-search" />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button className="bg-orange-500 border-orange-600 text-white" onClick={() => setShowSettlementDialog(true)} data-testid="button-settlement">
-            <CreditCard className="h-4 w-4 mr-1" />정산/결제
-          </Button>
-          <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-purchase">
-            <Plus className="h-4 w-4 mr-1" />매입 등록
-          </Button>
-        </div>
-      </div>
-
-      {summary && (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <div className="text-muted-foreground">매입 합계</div>
-                <div className="text-lg font-bold">{(summary.totalAmount || 0).toLocaleString()}원</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">결제 합계</div>
-                <div className="text-lg font-bold text-blue-600">{(summary.totalPaymentAmount || 0).toLocaleString()}원</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">외상 잔액 (선택기간)</div>
-                <div className="text-lg font-bold text-amber-600">{((summary.totalAmount || 0) - (summary.totalPaymentAmount || 0)).toLocaleString()}원</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">매입 건수</div>
-                <div className="font-semibold">{(summary.directCount || 0)}건</div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">타입 전체</SelectItem>
+                  <SelectItem value="raw">원물</SelectItem>
+                  <SelectItem value="semi">반재료</SelectItem>
+                  <SelectItem value="subsidiary">부자재</SelectItem>
+                  <SelectItem value="etc">기타</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative min-w-[180px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="품목 검색..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" data-testid="input-purchase-search" />
               </div>
             </div>
-            {summary.byType?.length > 0 && (
-              <div className="mt-3 pt-3 border-t flex flex-wrap gap-4 text-sm">
-                {summary.byType.map(t => (
-                  <span key={t.type}>{materialTypeLabels[t.type] || t.type}: {t.amount.toLocaleString()}원 ({t.percentage}%)</span>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2">
+              <Button className="bg-orange-500 border-orange-600 text-white" onClick={() => setShowSettlementDialog(true)} data-testid="button-settlement">
+                <CreditCard className="h-4 w-4 mr-1" />정산/결제
+              </Button>
+              <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-purchase">
+                <Plus className="h-4 w-4 mr-1" />매입 등록
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="text-xs text-muted-foreground mb-1">매입 합계</div>
+              <div className="text-lg font-bold">{(summary.totalAmount || 0).toLocaleString()}원</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="text-xs text-muted-foreground mb-1">결제 합계</div>
+              <div className="text-lg font-bold text-blue-600">{(summary.totalPaymentAmount || 0).toLocaleString()}원</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="text-xs text-muted-foreground mb-1">외상 잔액 (선택기간)</div>
+              <div className="text-lg font-bold text-amber-600">{((summary.totalAmount || 0) - (summary.totalPaymentAmount || 0)).toLocaleString()}원</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="text-xs text-muted-foreground mb-1">매입 건수</div>
+              <div className="text-lg font-bold">{(summary.directCount || 0)}건</div>
+            </CardContent>
+          </Card>
+          {summary.byType?.length > 0 && (
+            <div className="col-span-2 sm:col-span-4 flex flex-wrap gap-4 text-xs text-muted-foreground px-1">
+              {summary.byType.map(t => (
+                <span key={t.type}>{materialTypeLabels[t.type] || t.type}: {t.amount.toLocaleString()}원 ({t.percentage}%)</span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : (
         <>
-          <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-            <Table className="min-w-[1100px]">
-              <TableHeader className="sticky top-0 z-10 bg-background">
-                <TableRow>
-                  <TableHead className="w-[40px]"></TableHead>
-                  <TableHead>날짜</TableHead>
-                  <TableHead>구분</TableHead>
-                  <TableHead>업체명</TableHead>
-                  <TableHead>품목/내용</TableHead>
-                  <TableHead className="text-right">수량</TableHead>
-                  <TableHead className="text-right">단가</TableHead>
-                  <TableHead className="text-right">금액</TableHead>
-                  <TableHead className="text-right">누적합계</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWithCumulative.length === 0 ? (
+          <div>
+            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+              <Table className="min-w-[1100px]">
+                <TableHeader className="sticky top-0 z-10 bg-muted/70 dark:bg-muted/40">
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">데이터가 없습니다</TableCell>
+                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead>날짜</TableHead>
+                    <TableHead>구분</TableHead>
+                    <TableHead>업체명</TableHead>
+                    <TableHead>품목/내용</TableHead>
+                    <TableHead className="text-right">수량</TableHead>
+                    <TableHead className="text-right">단가</TableHead>
+                    <TableHead className="text-right">금액</TableHead>
+                    <TableHead className="text-right">누적합계</TableHead>
                   </TableRow>
-                ) : (
-                  filteredWithCumulative.map((p) => (
-                    <TableRow
-                      key={`${p.rowType}-${p.id}`}
-                      className={p.rowType === "payment" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
-                      data-testid={`row-${p.rowType}-${p.id}`}
-                    >
-                      <TableCell>
-                        {p.rowType === "purchase" && p.source === "direct" && (
-                          <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="rounded" />
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{p.purchaseDate}</TableCell>
-                      <TableCell>
-                        {p.rowType === "purchase" ? (
-                          <Badge variant="outline" className="no-default-active-elevate text-xs">{materialTypeLabels[p.materialType] || p.materialType}</Badge>
-                        ) : (
-                          <Badge variant="default" className="no-default-active-elevate text-xs">
-                            {paymentMethodLabels[p.paymentMethod || "transfer"] || "결제"}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{p.vendorName || "-"}</TableCell>
-                      <TableCell>{p.rowType === "purchase" ? p.productName : (p.memo || "결제")}</TableCell>
-                      <TableCell className="text-right">
-                        {p.rowType === "purchase" ? `${Number(p.quantity).toLocaleString()} ${p.unit}` : ""}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {p.rowType === "purchase" ? `${p.unitPrice.toLocaleString()}원` : ""}
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${p.rowType === "payment" ? "text-blue-600" : ""}`}>
-                        {p.rowType === "purchase" ? `+${p.totalAmount.toLocaleString()}원` : `-${p.totalAmount.toLocaleString()}원`}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-primary">{p.cumulativeAmount.toLocaleString()}원</TableCell>
+                </TableHeader>
+                <TableBody>
+                  {filteredWithCumulative.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">데이터가 없습니다</TableCell>
                     </TableRow>
-                  ))
+                  ) : (
+                    filteredWithCumulative.map((p) => (
+                      <TableRow
+                        key={`${p.rowType}-${p.id}`}
+                        className={p.rowType === "payment" ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}
+                        data-testid={`row-${p.rowType}-${p.id}`}
+                      >
+                        <TableCell>
+                          {p.rowType === "purchase" && p.source === "direct" && (
+                            <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="rounded" />
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{p.purchaseDate}</TableCell>
+                        <TableCell>
+                          {p.rowType === "purchase" ? (
+                            <Badge variant="outline" className="no-default-active-elevate text-xs">{materialTypeLabels[p.materialType] || p.materialType}</Badge>
+                          ) : (
+                            <Badge variant="default" className="no-default-active-elevate text-xs">
+                              {paymentMethodLabels[p.paymentMethod || "transfer"] || "결제"}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{p.vendorName || "-"}</TableCell>
+                        <TableCell>{p.rowType === "purchase" ? p.productName : (p.memo || "결제")}</TableCell>
+                        <TableCell className="text-right">
+                          {p.rowType === "purchase" ? `${Number(p.quantity).toLocaleString()} ${p.unit}` : ""}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {p.rowType === "purchase" ? `${p.unitPrice.toLocaleString()}원` : ""}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${p.rowType === "payment" ? "text-blue-600" : ""}`}>
+                          {p.rowType === "purchase" ? `+${p.totalAmount.toLocaleString()}원` : `-${p.totalAmount.toLocaleString()}원`}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-primary">{p.cumulativeAmount.toLocaleString()}원</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm mt-2 px-1">
+              <div className="flex items-center gap-2">
+                {selectedIds.size > 0 && (
+                  <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(Array.from(selectedIds))} disabled={deleteMutation.isPending} data-testid="button-batch-delete">
+                    <Trash2 className="h-3 w-3 mr-1" />선택 삭제 ({selectedIds.size}건)
+                  </Button>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <div className="flex items-center gap-2">
-              {selectedIds.size > 0 && (
-                <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(Array.from(selectedIds))} disabled={deleteMutation.isPending} data-testid="button-batch-delete">
-                  <Trash2 className="h-3 w-3 mr-1" />선택 삭제 ({selectedIds.size}건)
-                </Button>
-              )}
-              <span className="text-muted-foreground">(직접 매입만 삭제 가능)</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-muted-foreground">매입: <span className="font-semibold text-foreground">+{periodPurchaseTotal.toLocaleString()}원</span></span>
-              <span className="text-muted-foreground">결제: <span className="font-semibold text-blue-600">-{periodPaymentTotal.toLocaleString()}원</span></span>
-              <span className="text-muted-foreground">잔액: <span className="font-semibold text-foreground">{(periodPurchaseTotal - periodPaymentTotal).toLocaleString()}원</span></span>
+                <span className="text-muted-foreground">(직접 매입만 삭제 가능)</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground">매입: <span className="font-semibold text-foreground">+{periodPurchaseTotal.toLocaleString()}원</span></span>
+                <span className="text-muted-foreground">결제: <span className="font-semibold text-blue-600">-{periodPaymentTotal.toLocaleString()}원</span></span>
+                <span className="text-muted-foreground">잔액: <span className="font-semibold text-foreground">{(periodPurchaseTotal - periodPaymentTotal).toLocaleString()}원</span></span>
+              </div>
             </div>
           </div>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
+
+          <Card className="bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm font-bold">
                   현재시점 누적합계액{filterVendorName !== "__all__" ? ` (${filterVendorName})` : " (전체)"}
                 </span>
                 <div className="flex items-center gap-6 text-sm">
