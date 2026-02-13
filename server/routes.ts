@@ -11073,7 +11073,7 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
 
     try {
-      const { companyName, contactName, contactPhone, contactEmail, loginId, loginPassword, settlementCycle, bankName, bankAccount, bankHolder, memo } = req.body;
+      const { companyName, contactName, contactPhone, contactEmail, loginId, loginPassword, settlementCycle, bankName, bankAccount, bankHolder, memo, businessType } = req.body;
       if (!companyName) return res.status(400).json({ message: "업체명은 필수입니다" });
       if (!loginId) return res.status(400).json({ message: "로그인ID는 필수입니다" });
       if (!loginPassword) return res.status(400).json({ message: "비밀번호는 필수입니다" });
@@ -11089,6 +11089,7 @@ export async function registerRoutes(
         loginId, loginPassword: hashedPassword,
         settlementCycle: settlementCycle || "monthly",
         bankName, bankAccount, bankHolder, memo,
+        businessType: businessType || "supply",
       });
 
       const { loginPassword: _, ...rest } = vendor;
@@ -11105,9 +11106,9 @@ export async function registerRoutes(
 
     try {
       const id = parseInt(req.params.id);
-      const { companyName, contactName, contactPhone, contactEmail, loginId, loginPassword, settlementCycle, bankName, bankAccount, bankHolder, memo } = req.body;
+      const { companyName, contactName, contactPhone, contactEmail, loginId, loginPassword, settlementCycle, bankName, bankAccount, bankHolder, memo, businessType } = req.body;
 
-      const updateData: any = { companyName, contactName, contactPhone, contactEmail, loginId, settlementCycle, bankName, bankAccount, bankHolder, memo };
+      const updateData: any = { companyName, contactName, contactPhone, contactEmail, loginId, settlementCycle, bankName, bankAccount, bankHolder, memo, businessType };
 
       if (loginPassword) {
         const bcrypt = await import("bcryptjs");
@@ -13761,6 +13762,31 @@ export async function registerRoutes(
       }
 
       items.sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+      res.json({ items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/sales-vendors/dropdown - 매출 등록용 드롭다운 (businessType이 sales 또는 both인 업체)
+  app.get('/api/admin/accounting/sales-vendors/dropdown', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+
+      const vendorList = await db.select().from(vendors).where(
+        and(
+          eq(vendors.isActive, true),
+          or(eq(vendors.businessType, "sales"), eq(vendors.businessType, "both"))
+        )
+      ).orderBy(asc(vendors.companyName));
+
+      const items = vendorList.map(v => ({
+        value: `vendor-${v.id}`,
+        label: v.companyName,
+        vendorId: v.id,
+        businessType: v.businessType,
+      }));
+
       res.json({ items });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

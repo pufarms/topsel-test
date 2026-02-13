@@ -60,9 +60,16 @@ interface Vendor {
   bankHolder: string | null;
   isActive: boolean | null;
   memo: string | null;
+  businessType: string;
   createdAt: string;
   updatedAt: string;
 }
+
+const businessTypeLabels: Record<string, string> = {
+  supply: "공급(매입)",
+  sales: "직접매출",
+  both: "공급+매출",
+};
 
 const settlementCycleLabels: Record<string, string> = {
   monthly: "월 1회",
@@ -90,6 +97,7 @@ export default function VendorManagement() {
     bankAccount: "",
     bankHolder: "",
     memo: "",
+    businessType: "supply",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -157,7 +165,7 @@ export default function VendorManagement() {
     setForm({
       companyName: "", contactName: "", contactPhone: "", contactEmail: "",
       loginId: "", loginPassword: "", confirmPassword: "", settlementCycle: "monthly",
-      bankName: "", bankAccount: "", bankHolder: "", memo: "",
+      bankName: "", bankAccount: "", bankHolder: "", memo: "", businessType: "supply",
     });
   }
 
@@ -168,7 +176,7 @@ export default function VendorManagement() {
     setForm({
       companyName: "", contactName: "", contactPhone: "", contactEmail: "",
       loginId: "", loginPassword: "", confirmPassword: "", settlementCycle: "monthly",
-      bankName: "", bankAccount: "", bankHolder: "", memo: "",
+      bankName: "", bankAccount: "", bankHolder: "", memo: "", businessType: "supply",
     });
     setDialogOpen(true);
   }
@@ -190,6 +198,7 @@ export default function VendorManagement() {
       bankAccount: v.bankAccount || "",
       bankHolder: v.bankHolder || "",
       memo: v.memo || "",
+      businessType: v.businessType || "supply",
     });
     setDialogOpen(true);
   }
@@ -404,6 +413,7 @@ export default function VendorManagement() {
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead>업체명</TableHead>
+                          <TableHead>유형</TableHead>
                           <TableHead>담당자</TableHead>
                           <TableHead>연락처</TableHead>
                           <TableHead>정산주기</TableHead>
@@ -417,6 +427,11 @@ export default function VendorManagement() {
                         {vendors.map((v) => (
                           <TableRow key={v.id} data-testid={`row-vendor-${v.id}`}>
                             <TableCell className="font-medium" data-testid={`text-vendor-name-${v.id}`}>{v.companyName}</TableCell>
+                            <TableCell>
+                              <Badge variant={v.businessType === "both" ? "default" : "outline"} className="no-default-active-elevate text-xs" data-testid={`badge-business-type-${v.id}`}>
+                                {businessTypeLabels[v.businessType || "supply"] || v.businessType}
+                              </Badge>
+                            </TableCell>
                             <TableCell>{v.contactName || "-"}</TableCell>
                             <TableCell>{v.contactPhone || "-"}</TableCell>
                             <TableCell>{settlementCycleLabels[v.settlementCycle || "monthly"] || v.settlementCycle}</TableCell>
@@ -530,14 +545,29 @@ export default function VendorManagement() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>업체명 *</Label>
-              <Input
-                value={form.companyName}
-                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                placeholder="업체명 입력"
-                data-testid="input-company-name"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>업체명 *</Label>
+                <Input
+                  value={form.companyName}
+                  onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                  placeholder="업체명 입력"
+                  data-testid="input-company-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>업체 유형 *</Label>
+                <Select value={form.businessType} onValueChange={(v) => setForm({ ...form, businessType: v })}>
+                  <SelectTrigger data-testid="select-business-type">
+                    <SelectValue placeholder="업체 유형 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="supply">공급(매입)</SelectItem>
+                    <SelectItem value="sales">직접매출</SelectItem>
+                    <SelectItem value="both">공급+매출</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

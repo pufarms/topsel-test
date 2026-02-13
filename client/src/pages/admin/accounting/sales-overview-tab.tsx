@@ -816,8 +816,8 @@ function DirectSalesManagement() {
     },
   });
 
-  const { data: dropdownData } = useQuery<{ items: DSDropdownItem[] }>({
-    queryKey: ["/api/admin/accounting/vendors/dropdown"],
+  const { data: dropdownData } = useQuery<{ items: { value: string; label: string; vendorId: number; businessType: string }[] }>({
+    queryKey: ["/api/admin/accounting/sales-vendors/dropdown"],
   });
   const dropdownItems = dropdownData?.items || [];
 

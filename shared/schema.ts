@@ -1509,6 +1509,7 @@ export const vendors = pgTable("vendors", {
   supplyType: text("supply_type").array().default(sql`'{}'::text[]`),
   businessNumber: varchar("business_number", { length: 20 }),
   address: text("address"),
+  businessType: varchar("business_type", { length: 20 }).default("supply").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
