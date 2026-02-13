@@ -270,6 +270,17 @@ export default function PurchaseManagementTab() {
     return vendorNames.filter(name => name.toLowerCase().includes(term));
   }, [vendorNames, filterVendorSearchText]);
 
+  const { data: cumulativeData } = useQuery<{ cumulativeTotal: number }>({
+    queryKey: ["/api/admin/purchases/cumulative-total", filterVendorName],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filterVendorName !== "__all__") params.set("vendorName", filterVendorName);
+      const res = await fetch(`/api/admin/purchases/cumulative-total?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("누적합계 조회 실패");
+      return res.json();
+    },
+  });
+
   const filtered = purchases.filter(p => {
     if (filterVendorName !== "__all__" && p.vendorName !== filterVendorName) return false;
     if (filterType !== "__all__" && p.materialType !== filterType) return false;
@@ -279,6 +290,14 @@ export default function PurchaseManagementTab() {
     }
     return true;
   });
+
+  const filteredWithCumulative = useMemo(() => {
+    let cumulative = 0;
+    return filtered.map(p => {
+      cumulative += p.totalAmount;
+      return { ...p, cumulativeAmount: cumulative };
+    });
+  }, [filtered]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => {
@@ -427,15 +446,16 @@ export default function PurchaseManagementTab() {
                   <TableHead className="text-right">수량</TableHead>
                   <TableHead className="text-right">단가</TableHead>
                   <TableHead className="text-right">금액</TableHead>
+                  <TableHead className="text-right">누적합계</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {filteredWithCumulative.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">매입 데이터가 없습니다</TableCell>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">매입 데이터가 없습니다</TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((p) => (
+                  filteredWithCumulative.map((p) => (
                     <TableRow key={`${p.source}-${p.id}`} data-testid={`row-purchase-${p.id}`}>
                       <TableCell>
                         {p.source === "direct" && (
@@ -451,6 +471,7 @@ export default function PurchaseManagementTab() {
                       <TableCell className="text-right">{Number(p.quantity).toLocaleString()} {p.unit}</TableCell>
                       <TableCell className="text-right">{p.unitPrice.toLocaleString()}원</TableCell>
                       <TableCell className="text-right font-medium">{p.totalAmount.toLocaleString()}원</TableCell>
+                      <TableCell className="text-right font-medium text-primary">{p.cumulativeAmount.toLocaleString()}원</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -466,7 +487,15 @@ export default function PurchaseManagementTab() {
               )}
               <span className="text-muted-foreground">(직접 매입만 삭제 가능)</span>
             </div>
-            <span className="text-muted-foreground">합계: <span className="font-semibold text-foreground">{filtered.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}원</span></span>
+            <span className="text-muted-foreground">선택기간 합계: <span className="font-semibold text-foreground">{filtered.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}원</span></span>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-1">
+            <span className="text-sm font-medium">
+              현재시점 누적합계액{filterVendorName !== "__all__" ? ` (${filterVendorName})` : " (전체)"}:
+            </span>
+            <span className="text-lg font-bold text-primary" data-testid="text-cumulative-total">
+              {(cumulativeData?.cumulativeTotal || 0).toLocaleString()}원
+            </span>
           </div>
         </>
       )}

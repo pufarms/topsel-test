@@ -13928,6 +13928,38 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/admin/purchases/cumulative-total - 현재시점 전체 누적합계 (날짜 필터 없음, 업체 필터만)
+  app.get('/api/admin/purchases/cumulative-total', async (req, res) => {
+    try {
+      if (!(await requireAccountingAdmin(req, res))) return;
+      const { vendorName } = req.query;
+
+      const purchaseList = await db.select({
+        vendorId: purchases.vendorId,
+        supplierId: purchases.supplierId,
+        totalAmount: purchases.totalAmount,
+      }).from(purchases);
+
+      const vendorMap = new Map<number, string>();
+      const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
+      vendorList.forEach(v => vendorMap.set(v.id, v.companyName));
+      const supplierList2 = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers);
+      const supplierMap = new Map<number, string>();
+      supplierList2.forEach(s => supplierMap.set(s.id, s.name));
+
+      let total = 0;
+      for (const p of purchaseList) {
+        const name = p.vendorId ? vendorMap.get(p.vendorId) : (p.supplierId ? supplierMap.get(p.supplierId) : undefined);
+        if (vendorName && name !== String(vendorName)) continue;
+        total += Number(p.totalAmount) || 0;
+      }
+
+      res.json({ cumulativeTotal: total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/admin/accounting/vendor-balances - 업체별 외상 현황 (통합 - 매입 정산)
   app.get('/api/admin/accounting/vendor-balances', async (req, res) => {
     try {
