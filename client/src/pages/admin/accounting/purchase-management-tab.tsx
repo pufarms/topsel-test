@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,6 +125,90 @@ export default function PurchaseManagementTab() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
 
+  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+  const cellRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const spreadsheetRef = useRef<HTMLTableElement>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
+  type ColumnKey = typeof COLUMNS[number];
+
+  const setCellRef = useCallback((row: number, col: number, el: HTMLElement | null) => {
+    const key = `${row}-${col}`;
+    if (el) cellRefs.current.set(key, el);
+    else cellRefs.current.delete(key);
+  }, []);
+
+  const focusCell = useCallback((row: number, col: number) => {
+    setActiveCell({ row, col });
+    const key = `${row}-${col}`;
+    const colKey = COLUMNS[col];
+    if (colKey === "type" || colKey === "unit") {
+      setOpenDropdown(key);
+    } else {
+      setOpenDropdown(null);
+    }
+    setTimeout(() => {
+      const el = cellRefs.current.get(key);
+      if (el) {
+        if (el.tagName === "INPUT") {
+          (el as HTMLInputElement).focus();
+          (el as HTMLInputElement).select();
+        } else {
+          el.focus();
+        }
+      }
+    }, 50);
+  }, []);
+
+  const moveToNextCell = useCallback((row: number, col: number) => {
+    const nextCol = col + 1;
+    if (nextCol < COLUMNS.length) {
+      focusCell(row, nextCol);
+    } else {
+      const newRow = row + 1;
+      if (newRow >= addItems.length) {
+        setAddItems(prev => [...prev, { materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+        setTimeout(() => focusCell(newRow, 0), 80);
+      } else {
+        focusCell(newRow, 0);
+      }
+    }
+  }, [addItems.length, focusCell]);
+
+  const moveToPrevCell = useCallback((row: number, col: number) => {
+    if (col > 0) {
+      focusCell(row, col - 1);
+    } else if (row > 0) {
+      focusCell(row - 1, COLUMNS.length - 1);
+    }
+  }, [focusCell]);
+
+  const handleCellKeyDown = useCallback((e: React.KeyboardEvent, row: number, col: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      moveToNextCell(row, col);
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        moveToPrevCell(row, col);
+      } else {
+        moveToNextCell(row, col);
+      }
+    } else if (e.key === "ArrowRight" && (COLUMNS[col] === "type" || COLUMNS[col] === "unit" || COLUMNS[col] === "product")) {
+      moveToNextCell(row, col);
+    } else if (e.key === "ArrowLeft" && (COLUMNS[col] === "type" || COLUMNS[col] === "unit" || COLUMNS[col] === "product")) {
+      moveToPrevCell(row, col);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (row < addItems.length - 1) focusCell(row + 1, col);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (row > 0) focusCell(row - 1, col);
+    }
+  }, [moveToNextCell, moveToPrevCell, focusCell, addItems.length]);
+
   const [showSettlementDialog, setShowSettlementDialog] = useState(false);
   const [selectedSettlementVendor, setSelectedSettlementVendor] = useState<VendorBalance | null>(null);
   const [settlementVendorSearch, setSettlementVendorSearch] = useState("");
@@ -237,6 +321,8 @@ export default function PurchaseManagementTab() {
     setAddMemo("");
     setAddItems([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
     setProductSuggestionIdx(null);
+    setActiveCell(null);
+    setOpenDropdown(null);
   };
 
   const filteredVendors = useMemo(() => {
@@ -255,6 +341,9 @@ export default function PurchaseManagementTab() {
       }
       if (settlementVendorRef.current && !settlementVendorRef.current.contains(e.target as Node)) {
         setSettlementVendorDropdownOpen(false);
+      }
+      if (spreadsheetRef.current && !spreadsheetRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -892,139 +981,238 @@ export default function PurchaseManagementTab() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>품목 목록</Label>
-                <Button size="sm" variant="outline" onClick={handleAddItem} data-testid="button-add-item">
-                  <Plus className="h-3 w-3 mr-1" />품목 추가
-                </Button>
+                <Label>품목 목록 <span className="text-xs text-muted-foreground ml-2">(Enter: 다음 칸 이동 / 방향키·마우스: 자유 이동)</span></Label>
               </div>
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[40px]">#</TableHead>
-                      <TableHead className="w-[120px]">타입</TableHead>
-                      <TableHead>품목명</TableHead>
-                      <TableHead className="w-[100px]">수량</TableHead>
-                      <TableHead className="w-[90px]">단위</TableHead>
-                      <TableHead className="w-[120px]">단가</TableHead>
-                      <TableHead className="w-[120px] text-right">금액</TableHead>
-                      <TableHead className="w-[130px] text-right">누적합계</TableHead>
-                      <TableHead className="w-[40px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {addItems.map((item, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell>
-                          {item.materialCode ? (
-                            <Badge variant="outline" className="no-default-active-elevate text-xs whitespace-nowrap">
-                              {materialTypeLabels[item.materialType] || item.materialType || "-"}
-                            </Badge>
-                          ) : (
-                            <Select
-                              value={item.materialType}
-                              onValueChange={(v) => {
-                                setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: v, productName: "", materialCode: "" } : it));
-                              }}
+              <div className="border rounded-lg overflow-hidden">
+                <table ref={spreadsheetRef} className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col />
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "85px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "36px" }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">#</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">타입</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">품목명</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">수량</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">단위</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">단가</th>
+                      <th className="px-1 py-2 text-right text-xs font-medium text-muted-foreground">금액</th>
+                      <th className="px-1 py-2 text-right text-xs font-medium text-muted-foreground">누적합계</th>
+                      <th className="px-1 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {addItems.map((item, idx) => {
+                      const isActiveRow = activeCell?.row === idx;
+                      const amt = itemTotal(item);
+                      const cumAmt = addItems.slice(0, idx + 1).reduce((sum, it) => sum + itemTotal(it), 0);
+                      return (
+                        <tr key={idx} className={`border-b last:border-b-0 ${isActiveRow ? "bg-blue-50/60 dark:bg-blue-950/20" : ""}`}>
+                          <td className="px-2 py-1 text-xs text-muted-foreground">{idx + 1}</td>
+                          <td className="px-1 py-1">
+                            <div
+                              className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 0 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
+                              tabIndex={0}
+                              ref={(el) => setCellRef(idx, 0, el)}
+                              onClick={() => focusCell(idx, 0)}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 0)}
+                              data-testid={`cell-type-${idx}`}
                             >
-                              <SelectTrigger className="h-9 text-xs" data-testid={`select-item-type-${idx}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__all__">전체</SelectItem>
-                                <SelectItem value="raw">원물</SelectItem>
-                                <SelectItem value="semi">반재료</SelectItem>
-                                <SelectItem value="sub">부자재</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="relative">
-                            {item.materialCode ? (
-                              <div className="flex items-center gap-1 border rounded-md px-3 h-9 bg-background">
-                                <span className="flex-1 text-sm truncate">{item.productName}</span>
-                                <button
-                                  type="button"
+                              <span className="truncate">{item.materialType === "__all__" ? "전체" : materialTypeLabels[item.materialType] || item.materialType}</span>
+                              <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                              {openDropdown === `${idx}-0` && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
+                                  {[{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }].map(opt => (
+                                    <button
+                                      key={opt.v}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
+                                        setOpenDropdown(null);
+                                        moveToNextCell(idx, 0);
+                                      }}
+                                      data-testid={`cell-type-opt-${idx}-${opt.v}`}
+                                    >
+                                      {opt.l}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <div className="relative">
+                              {item.materialCode ? (
+                                <div
+                                  className={`h-8 flex items-center rounded-sm border text-xs px-2 cursor-pointer ${activeCell?.row === idx && activeCell?.col === 1 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent bg-muted/30"}`}
+                                  tabIndex={0}
+                                  ref={(el) => setCellRef(idx, 1, el)}
                                   onClick={() => {
                                     setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "__all__" } : it));
+                                    focusCell(idx, 1);
                                   }}
-                                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                                  data-testid={`button-clear-material-${idx}`}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Backspace" || e.key === "Delete") {
+                                      setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "__all__" } : it));
+                                      focusCell(idx, 1);
+                                    } else {
+                                      handleCellKeyDown(e, idx, 1);
+                                    }
+                                  }}
+                                  data-testid={`cell-product-selected-${idx}`}
                                 >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none z-10" />
-                                <Input
+                                  <span className="truncate">{item.productName}</span>
+                                  <X className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  className={`w-full h-8 rounded-sm border text-xs px-2 outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 1 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                                  ref={(el) => setCellRef(idx, 1, el as HTMLElement)}
                                   value={item.productName}
                                   onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); }}
-                                  onFocus={() => setProductSuggestionIdx(idx)}
-                                  onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 150)}
+                                  onFocus={() => { setActiveCell({ row: idx, col: 1 }); setProductSuggestionIdx(idx); setOpenDropdown(null); }}
+                                  onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 200)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !item.materialCode) {
+                                      const suggestions = getMaterialSuggestions(item.productName, item.materialType);
+                                      if (suggestions.length === 1) {
+                                        e.preventDefault();
+                                        selectMaterial(idx, suggestions[0]);
+                                        moveToNextCell(idx, 1);
+                                        return;
+                                      }
+                                    }
+                                    if (e.key === "Enter" && item.materialCode) {
+                                      e.preventDefault();
+                                      moveToNextCell(idx, 1);
+                                      return;
+                                    }
+                                    if (e.key === "ArrowDown" || e.key === "ArrowUp") return;
+                                    handleCellKeyDown(e, idx, 1);
+                                  }}
                                   placeholder="재료명 검색"
-                                  className="pl-7"
-                                  data-testid={`input-item-name-${idx}`}
+                                  data-testid={`cell-product-${idx}`}
                                 />
-                              </>
-                            )}
-                            {productSuggestionIdx === idx && !item.materialCode && (
-                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
-                                {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
-                                  <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
-                                ) : (
-                                  getMaterialSuggestions(item.productName, item.materialType).map(m => (
+                              )}
+                              {productSuggestionIdx === idx && !item.materialCode && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[180px] overflow-y-auto min-w-[250px]">
+                                  {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
+                                    <div className="px-2 py-1.5 text-xs text-muted-foreground">검색 결과가 없습니다</div>
+                                  ) : (
+                                    getMaterialSuggestions(item.productName, item.materialType).map(m => (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        className="w-full text-left px-2 py-1 text-xs hover-elevate cursor-pointer flex items-center gap-1.5"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          selectMaterial(idx, m);
+                                          moveToNextCell(idx, 1);
+                                        }}
+                                        data-testid={`cell-suggestion-${idx}-${m.materialCode}`}
+                                      >
+                                        <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
+                                          {materialTypeLabels[materialTypeMap[m.materialType] || m.materialType] || m.materialType}
+                                        </Badge>
+                                        <span className="truncate">{m.materialName}</span>
+                                        <span className="text-muted-foreground text-[10px] shrink-0">({m.materialCode})</span>
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              className={`w-full h-8 rounded-sm border text-xs px-2 text-right outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 2 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                              ref={(el) => setCellRef(idx, 2, el as HTMLElement)}
+                              value={item.quantity}
+                              onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+                              onFocus={() => { setActiveCell({ row: idx, col: 2 }); setOpenDropdown(null); }}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 2)}
+                              placeholder="0"
+                              data-testid={`cell-qty-${idx}`}
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <div
+                              className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 3 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
+                              tabIndex={0}
+                              ref={(el) => setCellRef(idx, 3, el)}
+                              onClick={() => focusCell(idx, 3)}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 3)}
+                              data-testid={`cell-unit-${idx}`}
+                            >
+                              <span className="truncate">{item.unit}</span>
+                              <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                              {openDropdown === `${idx}-3` && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
+                                  {unitOptions.map(u => (
                                     <button
-                                      key={m.id}
+                                      key={u}
                                       type="button"
-                                      className="w-full text-left px-3 py-1.5 text-sm hover-elevate cursor-pointer flex items-center gap-2"
-                                      onMouseDown={(e) => { e.preventDefault(); selectMaterial(idx, m); }}
-                                      data-testid={`suggestion-material-${idx}-${m.materialCode}`}
+                                      className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        updateItem(idx, "unit", u);
+                                        setOpenDropdown(null);
+                                        moveToNextCell(idx, 3);
+                                      }}
+                                      data-testid={`cell-unit-opt-${idx}-${u}`}
                                     >
-                                      <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
-                                        {materialTypeLabels[materialTypeMap[m.materialType] || m.materialType] || m.materialType}
-                                      </Badge>
-                                      <span className="truncate">{m.materialName}</span>
-                                      <span className="text-muted-foreground text-xs shrink-0">({m.materialCode})</span>
+                                      {u}
                                     </button>
-                                  ))
-                                )}
-                              </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              className={`w-full h-8 rounded-sm border text-xs px-2 text-right outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 4 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                              ref={(el) => setCellRef(idx, 4, el as HTMLElement)}
+                              value={item.unitPrice}
+                              onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                              onFocus={() => { setActiveCell({ row: idx, col: 4 }); setOpenDropdown(null); }}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 4)}
+                              placeholder="0"
+                              data-testid={`cell-price-${idx}`}
+                            />
+                          </td>
+                          <td className="px-1 py-1 text-right text-xs font-medium whitespace-nowrap">{amt > 0 ? `${amt.toLocaleString()}원` : ""}</td>
+                          <td className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap text-primary" data-testid={`text-cumulative-${idx}`}>{cumAmt > 0 ? `${cumAmt.toLocaleString()}원` : ""}</td>
+                          <td className="px-1 py-1 text-center">
+                            {addItems.length > 1 && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveItem(idx)} data-testid={`button-remove-item-${idx}`}><Trash2 className="h-3 w-3" /></Button>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, "quantity", e.target.value)} placeholder="수량" data-testid={`input-item-qty-${idx}`} />
-                        </TableCell>
-                        <TableCell>
-                          <Select value={item.unit} onValueChange={(v) => updateItem(idx, "unit", v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {unitOptions.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", e.target.value)} placeholder="단가" data-testid={`input-item-price-${idx}`} />
-                        </TableCell>
-                        <TableCell className="text-right font-medium whitespace-nowrap">{itemTotal(item).toLocaleString()}원</TableCell>
-                        <TableCell className="text-right font-semibold whitespace-nowrap text-primary" data-testid={`text-cumulative-${idx}`}>
-                          {addItems.slice(0, idx + 1).reduce((sum, it) => sum + itemTotal(it), 0).toLocaleString()}원
-                        </TableCell>
-                        <TableCell>
-                          {addItems.length > 1 && (
-                            <Button size="icon" variant="ghost" onClick={() => handleRemoveItem(idx)}><Trash2 className="h-3 w-3" /></Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <div className="text-right text-sm font-semibold">
-                합계: {addItems.reduce((s, item) => s + itemTotal(item), 0).toLocaleString()}원
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={handleAddItem} data-testid="button-add-item">
+                  <Plus className="h-3 w-3 mr-1" />행 추가
+                </Button>
+                <div className="text-sm font-semibold">
+                  합계: <span className="text-primary">{addItems.reduce((s, item) => s + itemTotal(item), 0).toLocaleString()}원</span>
+                </div>
               </div>
             </div>
           </div>
