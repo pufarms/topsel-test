@@ -130,6 +130,7 @@ export default function PurchaseManagementTab() {
   const cellRefs = useRef<Map<string, HTMLElement>>(new Map());
   const spreadsheetRef = useRef<HTMLTableElement>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [dropdownHighlight, setDropdownHighlight] = useState(-1);
 
   const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
   type ColumnKey = typeof COLUMNS[number];
@@ -1025,26 +1026,72 @@ export default function PurchaseManagementTab() {
                               ref={(el) => setCellRef(idx, 0, el)}
                               onClick={() => {
                                 setActiveCell({ row: idx, col: 0 });
-                                setOpenDropdown(prev => prev === `${idx}-0` ? null : `${idx}-0`);
+                                const key = `${idx}-0`;
+                                setOpenDropdown(prev => {
+                                  if (prev === key) return null;
+                                  setDropdownHighlight(-1);
+                                  return key;
+                                });
                               }}
-                              onKeyDown={(e) => handleCellKeyDown(e, idx, 0)}
+                              onKeyDown={(e) => {
+                                const typeOpts = [{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }];
+                                if (openDropdown === `${idx}-0`) {
+                                  if (e.key === "ArrowDown") {
+                                    e.preventDefault();
+                                    setDropdownHighlight(prev => prev < typeOpts.length - 1 ? prev + 1 : 0);
+                                    return;
+                                  }
+                                  if (e.key === "ArrowUp") {
+                                    e.preventDefault();
+                                    setDropdownHighlight(prev => prev > 0 ? prev - 1 : typeOpts.length - 1);
+                                    return;
+                                  }
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (dropdownHighlight >= 0 && dropdownHighlight < typeOpts.length) {
+                                      const opt = typeOpts[dropdownHighlight];
+                                      setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
+                                      setOpenDropdown(null);
+                                      setDropdownHighlight(-1);
+                                      moveToNextCell(idx, 0);
+                                    }
+                                    return;
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setOpenDropdown(null);
+                                    setDropdownHighlight(-1);
+                                    return;
+                                  }
+                                } else {
+                                  if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
+                                    e.preventDefault();
+                                    setOpenDropdown(`${idx}-0`);
+                                    setDropdownHighlight(e.key === "ArrowUp" ? 3 : 0);
+                                    return;
+                                  }
+                                }
+                                handleCellKeyDown(e, idx, 0);
+                              }}
                               data-testid={`cell-type-${idx}`}
                             >
                               <span className="truncate">{item.materialType === "__all__" ? "전체" : materialTypeLabels[item.materialType] || item.materialType}</span>
                               <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
                               {openDropdown === `${idx}-0` && (
                                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
-                                  {[{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }].map(opt => (
+                                  {[{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }].map((opt, oIdx) => (
                                     <button
                                       key={opt.v}
                                       type="button"
-                                      className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
+                                      className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer ${dropdownHighlight === oIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
                                         setOpenDropdown(null);
+                                        setDropdownHighlight(-1);
                                         moveToNextCell(idx, 0);
                                       }}
+                                      onMouseEnter={() => setDropdownHighlight(oIdx)}
                                       data-testid={`cell-type-opt-${idx}-${opt.v}`}
                                     >
                                       {opt.l}
@@ -1142,7 +1189,7 @@ export default function PurchaseManagementTab() {
                                         key={m.id}
                                         type="button"
                                         ref={(el) => { if (el && suggestionHighlight === sIdx) el.scrollIntoView({ block: "nearest" }); }}
-                                        className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
+                                        className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
                                         onMouseDown={(e) => {
                                           e.preventDefault();
                                           selectMaterial(idx, m);
@@ -1184,26 +1231,70 @@ export default function PurchaseManagementTab() {
                               ref={(el) => setCellRef(idx, 3, el)}
                               onClick={() => {
                                 setActiveCell({ row: idx, col: 3 });
-                                setOpenDropdown(prev => prev === `${idx}-3` ? null : `${idx}-3`);
+                                const key = `${idx}-3`;
+                                setOpenDropdown(prev => {
+                                  if (prev === key) return null;
+                                  setDropdownHighlight(-1);
+                                  return key;
+                                });
                               }}
-                              onKeyDown={(e) => handleCellKeyDown(e, idx, 3)}
+                              onKeyDown={(e) => {
+                                if (openDropdown === `${idx}-3`) {
+                                  if (e.key === "ArrowDown") {
+                                    e.preventDefault();
+                                    setDropdownHighlight(prev => prev < unitOptions.length - 1 ? prev + 1 : 0);
+                                    return;
+                                  }
+                                  if (e.key === "ArrowUp") {
+                                    e.preventDefault();
+                                    setDropdownHighlight(prev => prev > 0 ? prev - 1 : unitOptions.length - 1);
+                                    return;
+                                  }
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (dropdownHighlight >= 0 && dropdownHighlight < unitOptions.length) {
+                                      updateItem(idx, "unit", unitOptions[dropdownHighlight]);
+                                      setOpenDropdown(null);
+                                      setDropdownHighlight(-1);
+                                      moveToNextCell(idx, 3);
+                                    }
+                                    return;
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setOpenDropdown(null);
+                                    setDropdownHighlight(-1);
+                                    return;
+                                  }
+                                } else {
+                                  if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
+                                    e.preventDefault();
+                                    setOpenDropdown(`${idx}-3`);
+                                    setDropdownHighlight(e.key === "ArrowUp" ? unitOptions.length - 1 : 0);
+                                    return;
+                                  }
+                                }
+                                handleCellKeyDown(e, idx, 3);
+                              }}
                               data-testid={`cell-unit-${idx}`}
                             >
                               <span className="truncate">{item.unit}</span>
                               <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
                               {openDropdown === `${idx}-3` && (
                                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
-                                  {unitOptions.map(u => (
+                                  {unitOptions.map((u, uIdx) => (
                                     <button
                                       key={u}
                                       type="button"
-                                      className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
+                                      className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer ${dropdownHighlight === uIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         updateItem(idx, "unit", u);
                                         setOpenDropdown(null);
+                                        setDropdownHighlight(-1);
                                         moveToNextCell(idx, 3);
                                       }}
+                                      onMouseEnter={() => setDropdownHighlight(uIdx)}
                                       data-testid={`cell-unit-opt-${idx}-${u}`}
                                     >
                                       {u}
