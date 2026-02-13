@@ -13774,10 +13774,7 @@ export async function registerRoutes(
       if (!(await requireAccountingAdmin(req, res))) return;
 
       const vendorList = await db.select().from(vendors).where(
-        and(
-          eq(vendors.isActive, true),
-          or(eq(vendors.businessType, "sales"), eq(vendors.businessType, "both"))
-        )
+        eq(vendors.isActive, true)
       ).orderBy(asc(vendors.companyName));
 
       const items = vendorList.map(v => ({
