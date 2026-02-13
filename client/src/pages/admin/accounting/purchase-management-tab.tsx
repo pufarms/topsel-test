@@ -91,7 +91,7 @@ export default function PurchaseManagementTab() {
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
   const vendorSearchRef = useRef<HTMLDivElement>(null);
   const [addMemo, setAddMemo] = useState("");
-  const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+  const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
 
@@ -166,7 +166,7 @@ export default function PurchaseManagementTab() {
     setVendorSearchText("");
     setVendorDropdownOpen(false);
     setAddMemo("");
-    setAddItems([{ materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setAddItems([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
     setProductSuggestionIdx(null);
   };
 
@@ -187,7 +187,7 @@ export default function PurchaseManagementTab() {
   }, []);
 
   const handleAddItem = () => {
-    setAddItems(prev => [...prev, { materialType: "raw", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setAddItems(prev => [...prev, { materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   };
 
   const handleRemoveItem = (idx: number) => {
@@ -231,10 +231,14 @@ export default function PurchaseManagementTab() {
 
   const materialTypeMap: Record<string, string> = { raw: "raw", semi: "semi", sub: "subsidiary", subsidiary: "subsidiary", etc: "etc" };
 
-  const getMaterialSuggestions = (text: string) => {
-    if (!text.trim()) return allMaterials.slice(0, 20);
+  const getMaterialSuggestions = (text: string, typeFilter: string) => {
+    let filtered = allMaterials;
+    if (typeFilter && typeFilter !== "__all__") {
+      filtered = filtered.filter(m => m.materialType === typeFilter);
+    }
+    if (!text.trim()) return filtered.slice(0, 20);
     const term = text.toLowerCase();
-    return allMaterials.filter(m =>
+    return filtered.filter(m =>
       m.materialName.toLowerCase().includes(term) || m.materialCode.toLowerCase().includes(term)
     );
   };
@@ -294,7 +298,7 @@ export default function PurchaseManagementTab() {
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">분류 전체</SelectItem>
+              <SelectItem value="__all__">타입 전체</SelectItem>
               <SelectItem value="raw">원물</SelectItem>
               <SelectItem value="semi">반재료</SelectItem>
               <SelectItem value="subsidiary">부자재</SelectItem>
@@ -350,7 +354,7 @@ export default function PurchaseManagementTab() {
                   <TableHead className="w-[40px]"></TableHead>
                   <TableHead>날짜</TableHead>
                   <TableHead>구분</TableHead>
-                  <TableHead>분류</TableHead>
+                  <TableHead>타입</TableHead>
                   <TableHead>업체명</TableHead>
                   <TableHead>품목명</TableHead>
                   <TableHead className="text-right">수량</TableHead>
@@ -469,9 +473,6 @@ export default function PurchaseManagementTab() {
                               setAddVendorValue(d.value);
                               setVendorSearchText("");
                               setVendorDropdownOpen(false);
-                              if (d.supplyType?.length) {
-                                setAddItems(prev => prev.map(item => ({ ...item, materialType: d.supplyType[0] })));
-                              }
                             }}
                             data-testid={`option-vendor-${d.value}`}
                           >
@@ -501,7 +502,7 @@ export default function PurchaseManagementTab() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[40px]">#</TableHead>
-                      <TableHead className="w-[110px]">분류</TableHead>
+                      <TableHead className="w-[120px]">타입</TableHead>
                       <TableHead>품목명</TableHead>
                       <TableHead className="w-[100px]">수량</TableHead>
                       <TableHead className="w-[90px]">단위</TableHead>
@@ -515,9 +516,28 @@ export default function PurchaseManagementTab() {
                       <TableRow key={idx}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="no-default-active-elevate text-xs whitespace-nowrap">
-                            {materialTypeLabels[item.materialType] || item.materialType || "-"}
-                          </Badge>
+                          {item.materialCode ? (
+                            <Badge variant="outline" className="no-default-active-elevate text-xs whitespace-nowrap">
+                              {materialTypeLabels[item.materialType] || item.materialType || "-"}
+                            </Badge>
+                          ) : (
+                            <Select
+                              value={item.materialType}
+                              onValueChange={(v) => {
+                                setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: v, productName: "", materialCode: "" } : it));
+                              }}
+                            >
+                              <SelectTrigger className="h-9 text-xs" data-testid={`select-item-type-${idx}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__all__">전체</SelectItem>
+                                <SelectItem value="raw">원물</SelectItem>
+                                <SelectItem value="semi">반재료</SelectItem>
+                                <SelectItem value="sub">부자재</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="relative">
@@ -527,7 +547,7 @@ export default function PurchaseManagementTab() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "raw" } : it));
+                                    setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "__all__" } : it));
                                   }}
                                   className="shrink-0 text-muted-foreground hover:text-foreground"
                                   data-testid={`button-clear-material-${idx}`}
@@ -551,10 +571,10 @@ export default function PurchaseManagementTab() {
                             )}
                             {productSuggestionIdx === idx && !item.materialCode && (
                               <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
-                                {getMaterialSuggestions(item.productName).length === 0 ? (
+                                {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
                                   <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
                                 ) : (
-                                  getMaterialSuggestions(item.productName).map(m => (
+                                  getMaterialSuggestions(item.productName, item.materialType).map(m => (
                                     <button
                                       key={m.id}
                                       type="button"
