@@ -82,6 +82,9 @@ export default function PurchaseManagementTab() {
   const dateRange = useDateRange("month");
   const [filterType, setFilterType] = useState("__all__");
   const [filterVendorName, setFilterVendorName] = useState("__all__");
+  const [filterVendorSearchText, setFilterVendorSearchText] = useState("");
+  const [filterVendorDropdownOpen, setFilterVendorDropdownOpen] = useState(false);
+  const filterVendorRef = useRef<HTMLDivElement>(null);
   const [searchText, setSearchText] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDate, setAddDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -179,6 +182,9 @@ export default function PurchaseManagementTab() {
     const handleClickOutside = (e: MouseEvent) => {
       if (vendorSearchRef.current && !vendorSearchRef.current.contains(e.target as Node)) {
         setVendorDropdownOpen(false);
+      }
+      if (filterVendorRef.current && !filterVendorRef.current.contains(e.target as Node)) {
+        setFilterVendorDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
