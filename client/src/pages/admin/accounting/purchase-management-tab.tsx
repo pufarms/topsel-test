@@ -124,6 +124,7 @@ export default function PurchaseManagementTab() {
   const [addItems, setAddItems] = useState<NewItemRow[]>([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
+  const [suggestionHighlight, setSuggestionHighlight] = useState(-1);
 
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
   const cellRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -1083,16 +1084,39 @@ export default function PurchaseManagementTab() {
                                   className={`w-full h-8 rounded-sm border text-xs px-2 outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 1 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
                                   ref={(el) => setCellRef(idx, 1, el as HTMLElement)}
                                   value={item.productName}
-                                  onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); }}
-                                  onFocus={() => { setActiveCell({ row: idx, col: 1 }); setProductSuggestionIdx(idx); setOpenDropdown(null); }}
-                                  onBlur={() => setTimeout(() => setProductSuggestionIdx(null), 200)}
+                                  onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); setSuggestionHighlight(-1); }}
+                                  onFocus={() => { setActiveCell({ row: idx, col: 1 }); setProductSuggestionIdx(idx); setSuggestionHighlight(-1); setOpenDropdown(null); }}
+                                  onBlur={() => setTimeout(() => { setProductSuggestionIdx(null); setSuggestionHighlight(-1); }, 200)}
                                   onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !item.materialCode) {
-                                      const suggestions = getMaterialSuggestions(item.productName, item.materialType);
-                                      if (suggestions.length === 1) {
+                                    const suggestions = productSuggestionIdx === idx && !item.materialCode ? getMaterialSuggestions(item.productName, item.materialType) : [];
+                                    if (suggestions.length > 0) {
+                                      if (e.key === "ArrowDown") {
                                         e.preventDefault();
-                                        selectMaterial(idx, suggestions[0]);
-                                        moveToNextCell(idx, 1);
+                                        setSuggestionHighlight(prev => prev < suggestions.length - 1 ? prev + 1 : 0);
+                                        return;
+                                      }
+                                      if (e.key === "ArrowUp") {
+                                        e.preventDefault();
+                                        setSuggestionHighlight(prev => prev > 0 ? prev - 1 : suggestions.length - 1);
+                                        return;
+                                      }
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        if (suggestionHighlight >= 0 && suggestionHighlight < suggestions.length) {
+                                          selectMaterial(idx, suggestions[suggestionHighlight]);
+                                          setSuggestionHighlight(-1);
+                                          moveToNextCell(idx, 1);
+                                        } else if (suggestions.length === 1) {
+                                          selectMaterial(idx, suggestions[0]);
+                                          setSuggestionHighlight(-1);
+                                          moveToNextCell(idx, 1);
+                                        }
+                                        return;
+                                      }
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        setProductSuggestionIdx(null);
+                                        setSuggestionHighlight(-1);
                                         return;
                                       }
                                     }
@@ -1113,16 +1137,19 @@ export default function PurchaseManagementTab() {
                                   {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
                                     <div className="px-2 py-1.5 text-xs text-muted-foreground">검색 결과가 없습니다</div>
                                   ) : (
-                                    getMaterialSuggestions(item.productName, item.materialType).map(m => (
+                                    getMaterialSuggestions(item.productName, item.materialType).map((m, sIdx) => (
                                       <button
                                         key={m.id}
                                         type="button"
-                                        className="w-full text-left px-2 py-1 text-xs hover-elevate cursor-pointer flex items-center gap-1.5"
+                                        ref={(el) => { if (el && suggestionHighlight === sIdx) el.scrollIntoView({ block: "nearest" }); }}
+                                        className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
                                         onMouseDown={(e) => {
                                           e.preventDefault();
                                           selectMaterial(idx, m);
+                                          setSuggestionHighlight(-1);
                                           moveToNextCell(idx, 1);
                                         }}
+                                        onMouseEnter={() => setSuggestionHighlight(sIdx)}
                                         data-testid={`cell-suggestion-${idx}-${m.materialCode}`}
                                       >
                                         <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
