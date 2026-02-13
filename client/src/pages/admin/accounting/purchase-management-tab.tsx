@@ -107,6 +107,7 @@ interface CumulativeData {
 export default function PurchaseManagementTab() {
   const { toast } = useToast();
   const dateRange = useDateRange("month");
+  const [filterCategory, setFilterCategory] = useState("__all__");
   const [filterType, setFilterType] = useState("__all__");
   const [filterVendorName, setFilterVendorName] = useState("__all__");
   const [filterVendorSearchText, setFilterVendorSearchText] = useState("");
@@ -379,9 +380,11 @@ export default function PurchaseManagementTab() {
 
   const filtered = allRows.filter(p => {
     if (filterVendorName !== "__all__" && p.vendorName !== filterVendorName) return false;
-    if (filterType !== "__all__") {
+    if (filterCategory === "purchase") {
       if (p.rowType === "payment") return false;
-      if (p.materialType !== filterType) return false;
+      if (filterType !== "__all__" && p.materialType !== filterType) return false;
+    } else if (filterCategory === "payment") {
+      if (p.rowType !== "payment") return false;
     }
     if (searchText) {
       const term = searchText.toLowerCase();
@@ -488,16 +491,26 @@ export default function PurchaseManagementTab() {
                   </div>
                 )}
               </div>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
+              <Select value={filterCategory} onValueChange={(v) => { setFilterCategory(v); setFilterType("__all__"); }}>
+                <SelectTrigger className="w-[120px]" data-testid="select-filter-category"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">타입 전체</SelectItem>
-                  <SelectItem value="raw">원물</SelectItem>
-                  <SelectItem value="semi">반재료</SelectItem>
-                  <SelectItem value="subsidiary">부자재</SelectItem>
-                  <SelectItem value="etc">기타</SelectItem>
+                  <SelectItem value="__all__">전체</SelectItem>
+                  <SelectItem value="purchase">매입 타입</SelectItem>
+                  <SelectItem value="payment">정산 결제</SelectItem>
                 </SelectContent>
               </Select>
+              {filterCategory === "purchase" && (
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">타입 전체</SelectItem>
+                    <SelectItem value="raw">원물</SelectItem>
+                    <SelectItem value="semi">반재료</SelectItem>
+                    <SelectItem value="subsidiary">부자재</SelectItem>
+                    <SelectItem value="etc">기타</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
               <div className="relative min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="품목 검색..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" data-testid="input-purchase-search" />
