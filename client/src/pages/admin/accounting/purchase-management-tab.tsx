@@ -264,6 +264,12 @@ export default function PurchaseManagementTab() {
     return Array.from(names).sort();
   }, [purchases]);
 
+  const filteredFilterVendors = useMemo(() => {
+    if (!filterVendorSearchText.trim()) return vendorNames;
+    const term = filterVendorSearchText.toLowerCase();
+    return vendorNames.filter(name => name.toLowerCase().includes(term));
+  }, [vendorNames, filterVendorSearchText]);
+
   const filtered = purchases.filter(p => {
     if (filterVendorName !== "__all__" && p.vendorName !== filterVendorName) return false;
     if (filterType !== "__all__" && p.materialType !== filterType) return false;
@@ -295,15 +301,68 @@ export default function PurchaseManagementTab() {
       <div className="flex flex-wrap items-end gap-2 justify-between">
         <div className="flex flex-wrap items-end gap-2">
           <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" />
-          <Select value={filterVendorName} onValueChange={setFilterVendorName}>
-            <SelectTrigger className="w-[180px]" data-testid="select-filter-vendor"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">업체 전체</SelectItem>
-              {vendorNames.map(name => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative w-[200px]" ref={filterVendorRef}>
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+            <Input
+              value={filterVendorName !== "__all__" ? (filterVendorDropdownOpen ? filterVendorSearchText : filterVendorName) : filterVendorSearchText}
+              onChange={(e) => {
+                if (filterVendorName !== "__all__") {
+                  setFilterVendorName("__all__");
+                }
+                setFilterVendorSearchText(e.target.value);
+                setFilterVendorDropdownOpen(true);
+              }}
+              onFocus={() => {
+                if (filterVendorName !== "__all__") {
+                  setFilterVendorSearchText(filterVendorName);
+                  setFilterVendorName("__all__");
+                }
+                setFilterVendorDropdownOpen(true);
+              }}
+              placeholder="업체 검색"
+              className="pl-8 pr-8"
+              data-testid="input-filter-vendor"
+            />
+            {(filterVendorName !== "__all__" || filterVendorSearchText) ? (
+              <button
+                type="button"
+                onClick={() => { setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                data-testid="button-clear-filter-vendor"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : (
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            )}
+            {filterVendorDropdownOpen && filterVendorName === "__all__" && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer text-muted-foreground"
+                  onMouseDown={(e) => { e.preventDefault(); setFilterVendorName("__all__"); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                  data-testid="option-filter-vendor-all"
+                >
+                  업체 전체
+                </button>
+                {filteredFilterVendors.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                ) : (
+                  filteredFilterVendors.map(name => (
+                    <button
+                      key={name}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                      onMouseDown={(e) => { e.preventDefault(); setFilterVendorName(name); setFilterVendorSearchText(""); setFilterVendorDropdownOpen(false); }}
+                      data-testid={`option-filter-vendor-${name}`}
+                    >
+                      {name}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-[120px]" data-testid="select-filter-material"><SelectValue /></SelectTrigger>
             <SelectContent>
