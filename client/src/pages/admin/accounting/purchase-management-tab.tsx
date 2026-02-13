@@ -386,8 +386,9 @@ export default function PurchaseManagementTab() {
   });
 
   const filteredWithCumulative = useMemo(() => {
+    const ascending = [...filtered].reverse();
     let cumulative = 0;
-    return filtered.map(p => {
+    const withCumulative = ascending.map(p => {
       if (p.rowType === "purchase") {
         cumulative += p.totalAmount;
       } else {
@@ -395,6 +396,7 @@ export default function PurchaseManagementTab() {
       }
       return { ...p, cumulativeAmount: cumulative };
     });
+    return withCumulative.reverse();
   }, [filtered]);
 
   const toggleSelect = (id: number) => {
