@@ -928,7 +928,7 @@ function DirectSalesManagement() {
   const getUnitByType = (type: string): string => {
     if (type === "product") return "박스";
     if (type === "raw" || type === "semi") return "kg";
-    if (type === "sub") return "개";
+    if (type === "sub" || type === "subsidiary") return "개";
     return "박스";
   };
 
