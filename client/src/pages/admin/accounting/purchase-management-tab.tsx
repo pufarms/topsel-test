@@ -16,7 +16,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 const materialTypeLabels: Record<string, string> = {
@@ -660,6 +661,37 @@ export default function PurchaseManagementTab() {
       ) : (
         <>
           <div>
+            <div className="flex justify-end mb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const rows = filteredWithCumulative.map(p => ({
+                    "날짜": p.purchaseDate,
+                    "구분": p.rowType === "payment" ? (paymentMethodLabels[p.paymentMethod || ""] || "결제") : (materialTypeLabels[p.materialType] || p.materialType),
+                    "업체명": p.vendorName,
+                    "품목/내용": p.productName,
+                    "수량": p.rowType === "purchase" ? Number(p.quantity) : "",
+                    "단위": p.rowType === "purchase" ? p.unit : "",
+                    "단가": p.rowType === "purchase" ? p.unitPrice : "",
+                    "금액": p.rowType === "purchase" ? p.totalAmount : -p.totalAmount,
+                    "누적합계": p.cumulativeAmount,
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(rows);
+                  const colWidths = [{ wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 25 }, { wch: 8 }, { wch: 6 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
+                  ws["!cols"] = colWidths;
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "매입장부");
+                  const startDate = dateRange.dateRange.startDate || "";
+                  const endDate = dateRange.dateRange.endDate || "";
+                  const fileName = `매입장부_${startDate}_${endDate}.xlsx`;
+                  XLSX.writeFile(wb, fileName);
+                }}
+                data-testid="button-download-excel"
+              >
+                <Download className="h-4 w-4 mr-1" />엑셀 다운로드
+              </Button>
+            </div>
             <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
               <Table className="min-w-[1100px]">
                 <TableHeader className="sticky top-0 z-10 bg-muted/70 dark:bg-muted/40">
