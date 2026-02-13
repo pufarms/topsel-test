@@ -411,7 +411,7 @@ export default function PurchaseManagementTab() {
       )}
 
       <Dialog open={showAddDialog} onOpenChange={() => resetAddForm()}>
-        <DialogContent className="w-[80vw] max-w-[80vw] max-h-[85vh] flex flex-col">
+        <DialogContent className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle>매입 등록</DialogTitle>
           </DialogHeader>
