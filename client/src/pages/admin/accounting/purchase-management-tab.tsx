@@ -125,6 +125,9 @@ export default function PurchaseManagementTab() {
 
   const [showSettlementDialog, setShowSettlementDialog] = useState(false);
   const [selectedSettlementVendor, setSelectedSettlementVendor] = useState<VendorBalance | null>(null);
+  const [settlementVendorSearch, setSettlementVendorSearch] = useState("");
+  const [settlementVendorDropdownOpen, setSettlementVendorDropdownOpen] = useState(false);
+  const settlementVendorRef = useRef<HTMLDivElement>(null);
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState("transfer");
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -247,6 +250,9 @@ export default function PurchaseManagementTab() {
       }
       if (filterVendorRef.current && !filterVendorRef.current.contains(e.target as Node)) {
         setFilterVendorDropdownOpen(false);
+      }
+      if (settlementVendorRef.current && !settlementVendorRef.current.contains(e.target as Node)) {
+        setSettlementVendorDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -641,6 +647,8 @@ export default function PurchaseManagementTab() {
         setShowSettlementDialog(open);
         if (!open) {
           setSelectedSettlementVendor(null);
+          setSettlementVendorSearch("");
+          setSettlementVendorDropdownOpen(false);
           setPaymentDate(new Date().toISOString().slice(0, 10));
           setPaymentMethod("transfer");
           setPaymentAmount("");
@@ -657,20 +665,69 @@ export default function PurchaseManagementTab() {
               {isLoadingBalances ? (
                 <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
               ) : (
-                <Select
-                  value={selectedSettlementVendor?.id || ""}
-                  onValueChange={(val) => {
-                    const found = vendorBalances.find(v => v.id === val);
-                    setSelectedSettlementVendor(found || null);
-                  }}
-                >
-                  <SelectTrigger data-testid="select-settlement-vendor"><SelectValue placeholder="업체를 선택하세요" /></SelectTrigger>
-                  <SelectContent>
-                    {vendorBalances.map(v => (
-                      <SelectItem key={v.id} value={v.id}>{v.companyName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative" ref={settlementVendorRef}>
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    value={selectedSettlementVendor ? (settlementVendorDropdownOpen ? settlementVendorSearch : selectedSettlementVendor.companyName) : settlementVendorSearch}
+                    onChange={(e) => {
+                      if (selectedSettlementVendor) {
+                        setSelectedSettlementVendor(null);
+                      }
+                      setSettlementVendorSearch(e.target.value);
+                      setSettlementVendorDropdownOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (selectedSettlementVendor) {
+                        setSettlementVendorSearch(selectedSettlementVendor.companyName);
+                        setSelectedSettlementVendor(null);
+                      }
+                      setSettlementVendorDropdownOpen(true);
+                    }}
+                    placeholder="업체명을 검색하세요"
+                    className="pl-8 pr-8"
+                    data-testid="input-settlement-vendor-search"
+                  />
+                  {(selectedSettlementVendor || settlementVendorSearch) ? (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedSettlementVendor(null); setSettlementVendorSearch(""); setSettlementVendorDropdownOpen(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-settlement-vendor"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  )}
+                  {settlementVendorDropdownOpen && !selectedSettlementVendor && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                      {(() => {
+                        const term = settlementVendorSearch.toLowerCase().trim();
+                        const list = term ? vendorBalances.filter(v => v.companyName.toLowerCase().includes(term)) : vendorBalances;
+                        if (list.length === 0) return (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                        );
+                        return list.map(v => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer flex items-center justify-between gap-2"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setSelectedSettlementVendor(v);
+                              setSettlementVendorSearch("");
+                              setSettlementVendorDropdownOpen(false);
+                            }}
+                            data-testid={`option-settlement-vendor-${v.id}`}
+                          >
+                            <span>{v.companyName}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">{(v.outstandingBalance || 0).toLocaleString()}원</span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
