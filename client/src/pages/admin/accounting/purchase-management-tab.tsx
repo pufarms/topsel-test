@@ -1318,7 +1318,7 @@ export default function PurchaseManagementTab() {
                             />
                           </td>
                           <td className="px-1 py-1 text-right text-xs font-medium whitespace-nowrap">{amt > 0 ? `${amt.toLocaleString()}원` : ""}</td>
-                          <td className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap text-primary" data-testid={`text-cumulative-${idx}`}>{cumAmt > 0 ? `${cumAmt.toLocaleString()}원` : ""}</td>
+                          <td className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap text-orange-500" data-testid={`text-cumulative-${idx}`}>{cumAmt > 0 ? `${cumAmt.toLocaleString()}원` : ""}</td>
                           <td className="px-1 py-1 text-center">
                             {addItems.length > 1 && (
                               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveItem(idx)} data-testid={`button-remove-item-${idx}`}><Trash2 className="h-3 w-3" /></Button>
