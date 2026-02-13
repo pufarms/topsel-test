@@ -50,6 +50,7 @@ interface PurchaseItem {
   source: "direct" | "site";
   rowType: "purchase" | "payment";
   paymentMethod: string | null;
+  createdAt: string | null;
 }
 
 interface PurchaseSummary {
@@ -344,7 +345,11 @@ export default function PurchaseManagementTab() {
     combined.sort((a, b) => {
       if (a.purchaseDate < b.purchaseDate) return -1;
       if (a.purchaseDate > b.purchaseDate) return 1;
-      return a.id - b.id;
+      const aTime = a.createdAt || "";
+      const bTime = b.createdAt || "";
+      if (aTime < bTime) return -1;
+      if (aTime > bTime) return 1;
+      return 0;
     });
     return combined;
   }, [purchases, payments]);

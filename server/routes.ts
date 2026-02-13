@@ -13827,9 +13827,10 @@ export async function registerRoutes(
         unitPrice: purchases.unitPrice,
         totalAmount: purchases.totalAmount,
         memo: purchases.memo,
+        createdAt: purchases.createdAt,
       }).from(purchases)
         .where(whereClause)
-        .orderBy(desc(purchases.purchaseDate), desc(purchases.id));
+        .orderBy(asc(purchases.purchaseDate), asc(purchases.createdAt));
 
       const vendorMap = new Map<number, string>();
       const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
@@ -13845,6 +13846,7 @@ export async function registerRoutes(
         source: "direct" as const,
         rowType: "purchase" as const,
         paymentMethod: null as string | null,
+        createdAt: p.createdAt?.toISOString() || null,
       }));
 
       const paymentConditions: any[] = [];
@@ -13860,9 +13862,10 @@ export async function registerRoutes(
         amount: vendorPayments.amount,
         paymentMethod: vendorPayments.paymentMethod,
         memo: vendorPayments.memo,
+        createdAt: vendorPayments.createdAt,
       }).from(vendorPayments)
         .where(paymentWhereClause)
-        .orderBy(desc(vendorPayments.paymentDate), desc(vendorPayments.id));
+        .orderBy(asc(vendorPayments.paymentDate), asc(vendorPayments.createdAt));
 
       const paymentRows = paymentList.map(p => ({
         id: p.id,
@@ -13880,6 +13883,7 @@ export async function registerRoutes(
         source: "direct" as const,
         rowType: "payment" as const,
         paymentMethod: p.paymentMethod || "transfer",
+        createdAt: p.createdAt?.toISOString() || null,
       }));
 
       const totalAmount = enriched.reduce((s, p) => s + p.totalAmount, 0);
