@@ -573,13 +573,13 @@ export default function SettlementsPage() {
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
         <TabsList className="flex-wrap mb-4">
           <TabsTrigger value="member-settlement" className="gap-1" data-testid="tab-member-settlement">
-            <Wallet className="h-4 w-4" />회원 정산
+            <Wallet className="h-4 w-4" />회원정산 관리
           </TabsTrigger>
           <TabsTrigger value="vendor-management" className="gap-1" data-testid="tab-vendor-management">
-            <Building2 className="h-4 w-4" />공급업체 관리
+            <Building2 className="h-4 w-4" />매입업체 관리
           </TabsTrigger>
           <TabsTrigger value="purchase-management" className="gap-1" data-testid="tab-purchase-management">
-            <ShoppingCart className="h-4 w-4" />매입 관리
+            <ShoppingCart className="h-4 w-4" />매입장부 관리
           </TabsTrigger>
           <TabsTrigger value="sales-overview" className="gap-1" data-testid="tab-sales-overview">
             <DollarSign className="h-4 w-4" />매출 현황
