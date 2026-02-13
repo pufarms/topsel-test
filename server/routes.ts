@@ -12037,28 +12037,30 @@ export async function registerRoutes(
   // ========================================
 
   let lastBankdaSyncTime: number = 0;
-  const BANKDA_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+  let bankdaSyncLock: boolean = false;
+  const BANKDA_AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
-  async function syncBankdaTransactions() {
+  async function syncBankdaTransactions(isAutoSync: boolean = false) {
     if (process.env.BANKDA_ENABLED !== 'true' || !process.env.BANKDA_ACCESS_TOKEN) {
       return { success: false, error: '뱅크다 API가 설정되지 않았습니다. 환경변수(BANKDA_ENABLED, BANKDA_ACCESS_TOKEN)를 확인해주세요.', processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
     }
 
-    const now = Date.now();
-    if (lastBankdaSyncTime > 0 && (now - lastBankdaSyncTime) < BANKDA_SYNC_INTERVAL_MS) {
-      const remainingSec = Math.ceil((BANKDA_SYNC_INTERVAL_MS - (now - lastBankdaSyncTime)) / 1000);
-      return { success: false, error: `API 조회 제한: ${remainingSec}초 후 다시 시도해주세요 (5분 간격 제한)`, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0, rateLimited: true, retryAfterSeconds: remainingSec };
+    if (bankdaSyncLock) {
+      return { success: false, error: '동기화가 이미 진행 중입니다. 잠시 후 다시 시도해주세요.', processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
     }
 
+    bankdaSyncLock = true;
     let bankEntries: any[] = [];
 
     try {
       const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-      const dateStr = kstNow.toISOString().slice(0, 10).replace(/-/g, '');
+      const dateTo = kstNow.toISOString().slice(0, 10).replace(/-/g, '');
+      const oneWeekAgo = new Date(kstNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const dateFrom = oneWeekAgo.toISOString().slice(0, 10).replace(/-/g, '');
 
       const params = new URLSearchParams({
-        datefrom: dateStr,
-        dateto: dateStr,
+        datefrom: dateFrom,
+        dateto: dateTo,
         datatype: 'json',
         charset: 'utf8',
       });
@@ -12067,7 +12069,7 @@ export async function registerRoutes(
       }
 
       const apiUrl = process.env.BANKDA_API_URL || 'https://a.bankda.com/dtsvc/bank_tr.php';
-      console.log(`[뱅크다] API 호출: ${apiUrl}, 조회기간: ${dateStr}`);
+      console.log(`[뱅크다] ${isAutoSync ? '자동' : '수동'} 동기화 API 호출: ${apiUrl}, 조회기간: ${dateFrom}~${dateTo}`);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -12088,6 +12090,7 @@ export async function registerRoutes(
       lastBankdaSyncTime = Date.now();
     } catch (err: any) {
       console.error('[뱅크다] API 호출 실패:', err.message);
+      bankdaSyncLock = false;
       return { success: false, error: `뱅크다 API 호출 실패: ${err.message}`, processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
     }
 
@@ -12207,7 +12210,32 @@ export async function registerRoutes(
       }
     }
 
+    bankdaSyncLock = false;
     return { success: true, processed, matched, unmatched, duplicateNames, skipped, total: depositEntries.length };
+  }
+
+  // 뱅크다 자동 동기화 스케줄러 (30분 간격)
+  if (process.env.BANKDA_ENABLED === 'true' && process.env.BANKDA_ACCESS_TOKEN) {
+    console.log('[뱅크다] 자동 동기화 스케줄러 시작 (30분 간격)');
+    setTimeout(async () => {
+      console.log('[뱅크다] 서버 시작 후 첫 자동 동기화 실행');
+      try {
+        const result = await syncBankdaTransactions(true);
+        console.log(`[뱅크다] 첫 자동 동기화 결과: 처리=${result.processed}, 매칭=${result.matched}, 미매칭=${result.unmatched}, 중복건너뜀=${result.skipped}`);
+      } catch (err: any) {
+        console.error('[뱅크다] 첫 자동 동기화 실패:', err.message);
+      }
+    }, 10000);
+
+    setInterval(async () => {
+      console.log('[뱅크다] 자동 동기화 실행 중...');
+      try {
+        const result = await syncBankdaTransactions(true);
+        console.log(`[뱅크다] 자동 동기화 결과: 처리=${result.processed}, 매칭=${result.matched}, 미매칭=${result.unmatched}, 중복건너뜀=${result.skipped}`);
+      } catch (err: any) {
+        console.error('[뱅크다] 자동 동기화 실패:', err.message);
+      }
+    }, BANKDA_AUTO_SYNC_INTERVAL_MS);
   }
 
   // 관리자: 뱅크다 입금 내역 조회
