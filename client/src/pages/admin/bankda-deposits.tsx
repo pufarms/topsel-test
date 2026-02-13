@@ -137,11 +137,23 @@ function getStatusBadgeClass(status: string): string {
   }
 }
 
+function getDefaultDateRange() {
+  const now = new Date();
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstNow = new Date(now.getTime() + kstOffset);
+  const oneWeekAgo = new Date(kstNow.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return {
+    start: oneWeekAgo.toISOString().slice(0, 10),
+    end: kstNow.toISOString().slice(0, 10),
+  };
+}
+
 export default function BankdaDeposits() {
   const { toast } = useToast();
+  const defaultRange = getDefaultDateRange();
   const [statusFilter, setStatusFilter] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(defaultRange.start);
+  const [endDate, setEndDate] = useState(defaultRange.end);
   const [manualMatchTx, setManualMatchTx] = useState<BankdaTransaction | null>(null);
   const [ignoreTx, setIgnoreTx] = useState<BankdaTransaction | null>(null);
   const [ignoreMemo, setIgnoreMemo] = useState("");

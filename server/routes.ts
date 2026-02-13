@@ -12084,9 +12084,23 @@ export async function registerRoutes(
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
-      console.log(`[뱅크다] API 응답 수신, 거래건수: ${data?.response?.bank?.length || 0}`);
-      bankEntries = data?.response?.bank || [];
+      const rawText = await response.text();
+      console.log(`[뱅크다] API 원본 응답 (처음 500자): ${rawText.slice(0, 500)}`);
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        console.error('[뱅크다] JSON 파싱 실패, 원본 응답:', rawText.slice(0, 1000));
+        bankdaSyncLock = false;
+        return { success: false, error: 'API 응답 파싱 실패', processed: 0, matched: 0, unmatched: 0, duplicateNames: 0, skipped: 0 };
+      }
+      console.log(`[뱅크다] 응답 구조 키: ${JSON.stringify(Object.keys(data || {}))}`);
+      if (data?.response) {
+        console.log(`[뱅크다] response 키: ${JSON.stringify(Object.keys(data.response))}`);
+      }
+      const bankData = data?.response?.bank || data?.bank || data?.data?.bank || data?.result?.bank || [];
+      console.log(`[뱅크다] API 응답 수신, 거래건수: ${Array.isArray(bankData) ? bankData.length : 'N/A (not array)'}`);
+      bankEntries = Array.isArray(bankData) ? bankData : [];
       lastBankdaSyncTime = Date.now();
     } catch (err: any) {
       console.error('[뱅크다] API 호출 실패:', err.message);
