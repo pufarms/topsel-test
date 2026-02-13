@@ -496,7 +496,7 @@ export default function PurchaseManagementTab() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowSettlementDialog(true)} data-testid="button-settlement">
+          <Button className="bg-orange-500 border-orange-600 text-white" onClick={() => setShowSettlementDialog(true)} data-testid="button-settlement">
             <CreditCard className="h-4 w-4 mr-1" />정산/결제
           </Button>
           <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-purchase">
