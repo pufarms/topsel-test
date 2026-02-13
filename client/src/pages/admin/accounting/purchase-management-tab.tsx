@@ -983,7 +983,7 @@ export default function PurchaseManagementTab() {
               <div className="flex items-center justify-between">
                 <Label>품목 목록 <span className="text-xs text-muted-foreground ml-2">(Enter: 다음 칸 이동 / 방향키·마우스: 자유 이동)</span></Label>
               </div>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg">
                 <table ref={spreadsheetRef} className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
                   <colgroup>
                     <col style={{ width: "40px" }} />
@@ -1022,7 +1022,10 @@ export default function PurchaseManagementTab() {
                               className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 0 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
                               tabIndex={0}
                               ref={(el) => setCellRef(idx, 0, el)}
-                              onClick={() => focusCell(idx, 0)}
+                              onClick={() => {
+                                setActiveCell({ row: idx, col: 0 });
+                                setOpenDropdown(prev => prev === `${idx}-0` ? null : `${idx}-0`);
+                              }}
                               onKeyDown={(e) => handleCellKeyDown(e, idx, 0)}
                               data-testid={`cell-type-${idx}`}
                             >
@@ -1035,8 +1038,8 @@ export default function PurchaseManagementTab() {
                                       key={opt.v}
                                       type="button"
                                       className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
                                         setOpenDropdown(null);
                                         moveToNextCell(idx, 0);
@@ -1152,7 +1155,10 @@ export default function PurchaseManagementTab() {
                               className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 3 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
                               tabIndex={0}
                               ref={(el) => setCellRef(idx, 3, el)}
-                              onClick={() => focusCell(idx, 3)}
+                              onClick={() => {
+                                setActiveCell({ row: idx, col: 3 });
+                                setOpenDropdown(prev => prev === `${idx}-3` ? null : `${idx}-3`);
+                              }}
                               onKeyDown={(e) => handleCellKeyDown(e, idx, 3)}
                               data-testid={`cell-unit-${idx}`}
                             >
@@ -1165,8 +1171,8 @@ export default function PurchaseManagementTab() {
                                       key={u}
                                       type="button"
                                       className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         updateItem(idx, "unit", u);
                                         setOpenDropdown(null);
                                         moveToNextCell(idx, 3);
