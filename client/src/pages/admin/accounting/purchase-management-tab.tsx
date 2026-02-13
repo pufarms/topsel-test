@@ -508,6 +508,7 @@ export default function PurchaseManagementTab() {
                       <TableHead className="w-[90px]">단위</TableHead>
                       <TableHead className="w-[120px]">단가</TableHead>
                       <TableHead className="w-[120px] text-right">금액</TableHead>
+                      <TableHead className="w-[130px] text-right">누적합계</TableHead>
                       <TableHead className="w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -609,6 +610,9 @@ export default function PurchaseManagementTab() {
                           <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", e.target.value)} placeholder="단가" data-testid={`input-item-price-${idx}`} />
                         </TableCell>
                         <TableCell className="text-right font-medium whitespace-nowrap">{itemTotal(item).toLocaleString()}원</TableCell>
+                        <TableCell className="text-right font-semibold whitespace-nowrap text-primary" data-testid={`text-cumulative-${idx}`}>
+                          {addItems.slice(0, idx + 1).reduce((sum, it) => sum + itemTotal(it), 0).toLocaleString()}원
+                        </TableCell>
                         <TableCell>
                           {addItems.length > 1 && (
                             <Button size="icon" variant="ghost" onClick={() => handleRemoveItem(idx)}><Trash2 className="h-3 w-3" /></Button>
