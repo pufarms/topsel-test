@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
@@ -652,16 +652,157 @@ function DailySalesDetail() {
   );
 }
 
+const materialTypeLabelsDS: Record<string, string> = {
+  raw: "원물",
+  semi: "반재료",
+  subsidiary: "부자재",
+  sub: "부자재",
+  etc: "기타",
+};
+
+const unitOptionsDS = ["박스", "kg", "팩", "송이", "개", "롤", "건"];
+
+interface DSItemRow {
+  materialType: string;
+  productName: string;
+  materialCode: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+}
+
+interface DSMaterialItem {
+  id: string;
+  materialType: string;
+  materialCode: string;
+  materialName: string;
+}
+
+interface DSDropdownItem {
+  value: string;
+  label: string;
+  vendorId: number | null;
+  supplierId: number | null;
+  supplyType: string[];
+}
+
 function DirectSalesManagement() {
   const { toast } = useToast();
   const dateRange = useDateRange("month");
   const [editDialog, setEditDialog] = useState<DirectSaleRow | null>(null);
-  const [createDialog, setCreateDialog] = useState(false);
-  const [formData, setFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "" });
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const now = new Date();
   const kstNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 9 * 60 * 60 * 1000);
   const todayStr = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, '0')}-${String(kstNow.getDate()).padStart(2, '0')}`;
+
+  const [addDate, setAddDate] = useState(todayStr);
+  const [addClientValue, setAddClientValue] = useState("");
+  const [clientSearchText, setClientSearchText] = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const clientSearchRef = useRef<HTMLDivElement>(null);
+  const [addMemo, setAddMemo] = useState("");
+  const [addItems, setAddItems] = useState<DSItemRow[]>([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+  const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
+  const [suggestionHighlight, setSuggestionHighlight] = useState(-1);
+  const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+  const cellRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const spreadsheetRef = useRef<HTMLTableElement>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [dropdownHighlight, setDropdownHighlight] = useState(-1);
+
+  const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "" });
+
+  const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
+
+  const setCellRef = useCallback((row: number, col: number, el: HTMLElement | null) => {
+    const key = `${row}-${col}`;
+    if (el) cellRefs.current.set(key, el);
+    else cellRefs.current.delete(key);
+  }, []);
+
+  const focusCell = useCallback((row: number, col: number) => {
+    setActiveCell({ row, col });
+    const key = `${row}-${col}`;
+    const colKey = COLUMNS[col];
+    if (colKey === "type" || colKey === "unit") {
+      setOpenDropdown(key);
+    } else {
+      setOpenDropdown(null);
+    }
+    setTimeout(() => {
+      const el = cellRefs.current.get(key);
+      if (el) {
+        if (el.tagName === "INPUT") {
+          (el as HTMLInputElement).focus();
+          (el as HTMLInputElement).select();
+        } else {
+          el.focus();
+        }
+      }
+    }, 50);
+  }, []);
+
+  const moveToNextCell = useCallback((row: number, col: number) => {
+    const nextCol = col + 1;
+    if (nextCol < COLUMNS.length) {
+      focusCell(row, nextCol);
+    } else {
+      const newRow = row + 1;
+      if (newRow >= addItems.length) {
+        setAddItems(prev => [...prev, { materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+        setTimeout(() => focusCell(newRow, 0), 80);
+      } else {
+        focusCell(newRow, 0);
+      }
+    }
+  }, [addItems.length, focusCell]);
+
+  const moveToPrevCell = useCallback((row: number, col: number) => {
+    if (col > 0) {
+      focusCell(row, col - 1);
+    } else if (row > 0) {
+      focusCell(row - 1, COLUMNS.length - 1);
+    }
+  }, [focusCell]);
+
+  const handleCellKeyDown = useCallback((e: React.KeyboardEvent, row: number, col: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      moveToNextCell(row, col);
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        moveToPrevCell(row, col);
+      } else {
+        moveToNextCell(row, col);
+      }
+    } else if (e.key === "ArrowRight" && (COLUMNS[col] === "type" || COLUMNS[col] === "unit" || COLUMNS[col] === "product")) {
+      moveToNextCell(row, col);
+    } else if (e.key === "ArrowLeft" && (COLUMNS[col] === "type" || COLUMNS[col] === "unit" || COLUMNS[col] === "product")) {
+      moveToPrevCell(row, col);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (row < addItems.length - 1) focusCell(row + 1, col);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (row > 0) focusCell(row - 1, col);
+    }
+  }, [moveToNextCell, moveToPrevCell, focusCell, addItems.length]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (clientSearchRef.current && !clientSearchRef.current.contains(e.target as Node)) {
+        setClientDropdownOpen(false);
+      }
+      if (spreadsheetRef.current && !spreadsheetRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const { data: directList = [], isLoading } = useQuery<DirectSaleRow[]>({
     queryKey: ["/api/admin/direct-sales", dateRange.dateRange.startDate, dateRange.dateRange.endDate],
@@ -675,6 +816,69 @@ function DirectSalesManagement() {
     },
   });
 
+  const { data: dropdownData } = useQuery<{ items: DSDropdownItem[] }>({
+    queryKey: ["/api/admin/accounting/vendors/dropdown"],
+  });
+  const dropdownItems = dropdownData?.items || [];
+
+  const { data: materialsData } = useQuery<DSMaterialItem[]>({
+    queryKey: ["/api/materials"],
+    queryFn: async () => {
+      const res = await fetch("/api/materials", { credentials: "include" });
+      if (!res.ok) throw new Error("원재료 목록 조회 실패");
+      return res.json();
+    },
+  });
+  const allMaterials = materialsData || [];
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearchText.trim()) return dropdownItems;
+    const term = clientSearchText.toLowerCase();
+    return dropdownItems.filter(d => d.label.toLowerCase().includes(term));
+  }, [dropdownItems, clientSearchText]);
+
+  const materialTypeMap: Record<string, string> = { raw: "raw", semi: "semi", sub: "subsidiary", subsidiary: "subsidiary", etc: "etc" };
+
+  const getMaterialSuggestions = (text: string, typeFilter: string) => {
+    let filtered = allMaterials;
+    if (typeFilter && typeFilter !== "__all__") {
+      filtered = filtered.filter(m => m.materialType === typeFilter);
+    }
+    if (!text.trim()) return filtered.slice(0, 20);
+    const term = text.toLowerCase();
+    return filtered.filter(m =>
+      m.materialName.toLowerCase().includes(term) || m.materialCode.toLowerCase().includes(term)
+    );
+  };
+
+  const selectMaterial = (idx: number, material: DSMaterialItem) => {
+    setAddItems(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      productName: material.materialName,
+      materialCode: material.materialCode,
+      materialType: materialTypeMap[material.materialType] || material.materialType,
+    } : item));
+    setProductSuggestionIdx(null);
+  };
+
+  const updateItem = (idx: number, field: keyof DSItemRow, value: string) => {
+    setAddItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+  };
+
+  const itemTotal = (item: DSItemRow) => {
+    const q = parseFloat(item.quantity) || 0;
+    const p = parseInt(item.unitPrice) || 0;
+    return Math.round(q * p);
+  };
+
+  const handleAddItem = () => {
+    setAddItems(prev => [...prev, { materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+  };
+
+  const handleRemoveItem = (idx: number) => {
+    setAddItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/admin/direct-sales", data);
@@ -685,8 +889,7 @@ function DirectSalesManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/direct-sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales/daily"] });
-      setCreateDialog(false);
-      resetForm();
+      resetAddForm();
     },
     onError: (e: any) => toast({ title: "등록 실패", description: e.message, variant: "destructive" }),
   });
@@ -702,7 +905,6 @@ function DirectSalesManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales/daily"] });
       setEditDialog(null);
-      resetForm();
     },
     onError: (e: any) => toast({ title: "수정 실패", description: e.message, variant: "destructive" }),
   });
@@ -721,16 +923,70 @@ function DirectSalesManagement() {
     onError: (e: any) => toast({ title: "삭제 실패", description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => setFormData({ saleDate: todayStr, clientName: "", description: "", amount: "", memo: "" });
+  const resetAddForm = () => {
+    setShowAddDialog(false);
+    setAddDate(todayStr);
+    setAddClientValue("");
+    setClientSearchText("");
+    setClientDropdownOpen(false);
+    setAddMemo("");
+    setAddItems([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
+    setProductSuggestionIdx(null);
+    setActiveCell(null);
+    setOpenDropdown(null);
+  };
 
-  const handleCreate = () => {
-    setCreateDialog(true);
-    resetForm();
+  const handleSubmit = () => {
+    if (!addClientValue) {
+      toast({ title: "거래처를 선택해주세요", variant: "destructive" });
+      return;
+    }
+    const itemsWithInput = addItems.filter(item => item.productName || item.quantity || item.unitPrice);
+    if (itemsWithInput.length === 0) {
+      toast({ title: "품목을 입력해주세요", variant: "destructive" });
+      return;
+    }
+    const validItems = itemsWithInput.filter(item => item.productName && item.quantity && item.unitPrice);
+    if (validItems.length === 0) {
+      toast({ title: "품목 정보를 완전히 입력해주세요", variant: "destructive" });
+      return;
+    }
+
+    const selectedClient = dropdownItems.find(d => d.value === addClientValue);
+    const clientName = selectedClient?.label || addClientValue;
+
+    const promises = validItems.map(item => {
+      const amt = itemTotal(item);
+      return createMutation.mutateAsync({
+        saleDate: addDate,
+        clientName,
+        description: item.productName,
+        amount: amt,
+        memo: addMemo || null,
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/direct-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales/daily"] });
+      resetAddForm();
+    }).catch(() => {});
+  };
+
+  const handleEditSubmit = () => {
+    if (!editDialog) return;
+    const payload = { ...editFormData, amount: parseInt(editFormData.amount) || 0 };
+    if (!payload.saleDate || !payload.clientName || !payload.description || payload.amount < 1) {
+      toast({ title: "필수 항목을 입력해주세요", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({ id: editDialog.id, data: payload });
   };
 
   const handleEdit = (row: DirectSaleRow) => {
     setEditDialog(row);
-    setFormData({
+    setEditFormData({
       saleDate: row.saleDate,
       clientName: row.clientName,
       description: row.description,
@@ -739,27 +995,14 @@ function DirectSalesManagement() {
     });
   };
 
-  const handleSubmit = () => {
-    const payload = { ...formData, amount: parseInt(formData.amount) || 0 };
-    if (!payload.saleDate || !payload.clientName || !payload.description || payload.amount < 1) {
-      toast({ title: "필수 항목을 입력해주세요", variant: "destructive" });
-      return;
-    }
-    if (editDialog) {
-      updateMutation.mutate({ id: editDialog.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
-  };
-
   const totalAmount = directList.reduce((s, d) => s + d.amount, 0);
 
   return (
-    <div className="rounded-lg border-l-4 border-l-amber-500 border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border-l-4 border-l-amber-500 border border-border bg-card">
       <div className="p-5">
         <SectionHeader number="3" title="직접 매출 관리" icon={Handshake} color="amber">
           <div className="flex items-center gap-2">
-            <Button size="sm" className="gap-1" onClick={handleCreate} data-testid="button-create-direct-sale">
+            <Button size="sm" className="gap-1" onClick={() => { resetAddForm(); setShowAddDialog(true); setAddDate(todayStr); }} data-testid="button-create-direct-sale">
               <Plus className="h-4 w-4" />등록
             </Button>
             <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" />
@@ -816,38 +1059,421 @@ function DirectSalesManagement() {
         )}
       </div>
 
-      <Dialog open={createDialog || !!editDialog} onOpenChange={(open) => { if (!open) { setCreateDialog(false); setEditDialog(null); } }}>
+      <Dialog open={showAddDialog} onOpenChange={() => resetAddForm()}>
+        <DialogContent className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>매출 등록</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>매출일</Label>
+                <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} data-testid="input-sale-date" />
+              </div>
+              <div className="space-y-2" ref={clientSearchRef}>
+                <Label>거래처</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    value={addClientValue ? (dropdownItems.find(d => d.value === addClientValue)?.label || "") : clientSearchText}
+                    onChange={(e) => {
+                      if (addClientValue) setAddClientValue("");
+                      setClientSearchText(e.target.value);
+                      setClientDropdownOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (addClientValue) {
+                        const label = dropdownItems.find(d => d.value === addClientValue)?.label || "";
+                        setClientSearchText(label);
+                        setAddClientValue("");
+                      }
+                      setClientDropdownOpen(true);
+                    }}
+                    placeholder="거래처명 검색"
+                    className="pl-8 pr-8"
+                    data-testid="input-client-search"
+                  />
+                  {(addClientValue || clientSearchText) ? (
+                    <button
+                      type="button"
+                      onClick={() => { setAddClientValue(""); setClientSearchText(""); setClientDropdownOpen(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-client"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  )}
+                  {clientDropdownOpen && !addClientValue && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                      {filteredClients.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                      ) : (
+                        filteredClients.map(d => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setAddClientValue(d.value);
+                              setClientSearchText("");
+                              setClientDropdownOpen(false);
+                            }}
+                            data-testid={`option-client-${d.value}`}
+                          >
+                            {d.label}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>메모 (선택)</Label>
+                <Input value={addMemo} onChange={(e) => setAddMemo(e.target.value)} placeholder="메모" data-testid="input-sale-memo" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>품목 목록 <span className="text-xs text-muted-foreground ml-2">(Enter: 다음 칸 이동 / 방향키·마우스: 자유 이동)</span></Label>
+              </div>
+              <div className="border rounded-lg">
+                <table ref={spreadsheetRef} className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col />
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "85px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "36px" }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">#</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">타입</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">품목명</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">수량</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">단위</th>
+                      <th className="px-1 py-2 text-left text-xs font-medium text-muted-foreground">단가</th>
+                      <th className="px-1 py-2 text-right text-xs font-medium text-muted-foreground">금액</th>
+                      <th className="px-1 py-2 text-right text-xs font-medium text-muted-foreground">누적합계</th>
+                      <th className="px-1 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {addItems.map((item, idx) => {
+                      const isActiveRow = activeCell?.row === idx;
+                      const amt = itemTotal(item);
+                      const cumAmt = addItems.slice(0, idx + 1).reduce((sum, it) => sum + itemTotal(it), 0);
+                      return (
+                        <tr key={idx} className={`border-b last:border-b-0 ${isActiveRow ? "bg-blue-50/60 dark:bg-blue-950/20" : ""}`}>
+                          <td className="px-2 py-1 text-xs text-muted-foreground">{idx + 1}</td>
+                          <td className="px-1 py-1">
+                            <div
+                              className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 0 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
+                              tabIndex={0}
+                              ref={(el) => setCellRef(idx, 0, el)}
+                              onClick={() => {
+                                setActiveCell({ row: idx, col: 0 });
+                                const key = `${idx}-0`;
+                                setOpenDropdown(prev => {
+                                  if (prev === key) return null;
+                                  setDropdownHighlight(-1);
+                                  return key;
+                                });
+                              }}
+                              onKeyDown={(e) => {
+                                const typeOpts = [{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }];
+                                if (openDropdown === `${idx}-0`) {
+                                  if (e.key === "ArrowDown") { e.preventDefault(); setDropdownHighlight(prev => prev < typeOpts.length - 1 ? prev + 1 : 0); return; }
+                                  if (e.key === "ArrowUp") { e.preventDefault(); setDropdownHighlight(prev => prev > 0 ? prev - 1 : typeOpts.length - 1); return; }
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (dropdownHighlight >= 0 && dropdownHighlight < typeOpts.length) {
+                                      const opt = typeOpts[dropdownHighlight];
+                                      setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
+                                      setOpenDropdown(null); setDropdownHighlight(-1); moveToNextCell(idx, 0);
+                                    }
+                                    return;
+                                  }
+                                  if (e.key === "Escape") { e.preventDefault(); setOpenDropdown(null); setDropdownHighlight(-1); return; }
+                                } else {
+                                  if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
+                                    e.preventDefault(); setOpenDropdown(`${idx}-0`); setDropdownHighlight(e.key === "ArrowUp" ? 3 : 0); return;
+                                  }
+                                }
+                                handleCellKeyDown(e, idx, 0);
+                              }}
+                              data-testid={`ds-cell-type-${idx}`}
+                            >
+                              <span className="truncate">{item.materialType === "__all__" ? "전체" : materialTypeLabelsDS[item.materialType] || item.materialType}</span>
+                              <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                              {openDropdown === `${idx}-0` && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
+                                  {[{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }].map((opt, oIdx) => (
+                                    <button
+                                      key={opt.v}
+                                      type="button"
+                                      className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer ${dropdownHighlight === oIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
+                                        setOpenDropdown(null); setDropdownHighlight(-1); moveToNextCell(idx, 0);
+                                      }}
+                                      onMouseEnter={() => setDropdownHighlight(oIdx)}
+                                      data-testid={`ds-cell-type-opt-${idx}-${opt.v}`}
+                                    >
+                                      {opt.l}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <div className="relative">
+                              {item.materialCode ? (
+                                <div
+                                  className={`h-8 flex items-center rounded-sm border text-xs px-2 cursor-pointer ${activeCell?.row === idx && activeCell?.col === 1 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent bg-muted/30"}`}
+                                  tabIndex={0}
+                                  ref={(el) => setCellRef(idx, 1, el)}
+                                  onClick={() => {
+                                    setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "__all__" } : it));
+                                    focusCell(idx, 1);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Backspace" || e.key === "Delete") {
+                                      setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: "", materialCode: "", materialType: "__all__" } : it));
+                                      focusCell(idx, 1);
+                                    } else {
+                                      handleCellKeyDown(e, idx, 1);
+                                    }
+                                  }}
+                                  data-testid={`ds-cell-product-selected-${idx}`}
+                                >
+                                  <span className="truncate">{item.productName}</span>
+                                  <X className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  className={`w-full h-8 rounded-sm border text-xs px-2 outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 1 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                                  ref={(el) => setCellRef(idx, 1, el as HTMLElement)}
+                                  value={item.productName}
+                                  onChange={(e) => { updateItem(idx, "productName", e.target.value); setProductSuggestionIdx(idx); setSuggestionHighlight(-1); }}
+                                  onFocus={() => { setActiveCell({ row: idx, col: 1 }); setProductSuggestionIdx(idx); setSuggestionHighlight(-1); setOpenDropdown(null); }}
+                                  onBlur={() => setTimeout(() => { setProductSuggestionIdx(null); setSuggestionHighlight(-1); }, 200)}
+                                  onKeyDown={(e) => {
+                                    const suggestions = productSuggestionIdx === idx && !item.materialCode ? getMaterialSuggestions(item.productName, item.materialType) : [];
+                                    if (suggestions.length > 0) {
+                                      if (e.key === "ArrowDown") { e.preventDefault(); setSuggestionHighlight(prev => prev < suggestions.length - 1 ? prev + 1 : 0); return; }
+                                      if (e.key === "ArrowUp") { e.preventDefault(); setSuggestionHighlight(prev => prev > 0 ? prev - 1 : suggestions.length - 1); return; }
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        if (suggestionHighlight >= 0 && suggestionHighlight < suggestions.length) {
+                                          selectMaterial(idx, suggestions[suggestionHighlight]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                        } else if (suggestions.length === 1) {
+                                          selectMaterial(idx, suggestions[0]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                        }
+                                        return;
+                                      }
+                                      if (e.key === "Escape") { e.preventDefault(); setProductSuggestionIdx(null); setSuggestionHighlight(-1); return; }
+                                    }
+                                    if (e.key === "Enter" && item.materialCode) { e.preventDefault(); moveToNextCell(idx, 1); return; }
+                                    if (e.key === "ArrowDown" || e.key === "ArrowUp") return;
+                                    handleCellKeyDown(e, idx, 1);
+                                  }}
+                                  placeholder="재료명 검색"
+                                  data-testid={`ds-cell-product-${idx}`}
+                                />
+                              )}
+                              {productSuggestionIdx === idx && !item.materialCode && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[180px] overflow-y-auto min-w-[250px]">
+                                  {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
+                                    <div className="px-2 py-1.5 text-xs text-muted-foreground">검색 결과가 없습니다</div>
+                                  ) : (
+                                    getMaterialSuggestions(item.productName, item.materialType).map((m, sIdx) => (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        ref={(el) => { if (el && suggestionHighlight === sIdx) el.scrollIntoView({ block: "nearest" }); }}
+                                        className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          selectMaterial(idx, m); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                        }}
+                                        onMouseEnter={() => setSuggestionHighlight(sIdx)}
+                                        data-testid={`ds-cell-suggestion-${idx}-${m.materialCode}`}
+                                      >
+                                        <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
+                                          {materialTypeLabelsDS[materialTypeMap[m.materialType] || m.materialType] || m.materialType}
+                                        </Badge>
+                                        <span className="truncate">{m.materialName}</span>
+                                        <span className="text-muted-foreground text-[10px] shrink-0">({m.materialCode})</span>
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              className={`w-full h-8 rounded-sm border text-xs px-2 text-right outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 2 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                              ref={(el) => setCellRef(idx, 2, el as HTMLElement)}
+                              value={item.quantity}
+                              onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+                              onFocus={() => { setActiveCell({ row: idx, col: 2 }); setOpenDropdown(null); }}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 2)}
+                              placeholder="0"
+                              data-testid={`ds-cell-qty-${idx}`}
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <div
+                              className={`relative h-8 flex items-center rounded-sm border cursor-pointer text-xs px-2 ${activeCell?.row === idx && activeCell?.col === 3 ? "border-primary ring-1 ring-primary bg-background" : "border-transparent"}`}
+                              tabIndex={0}
+                              ref={(el) => setCellRef(idx, 3, el)}
+                              onClick={() => {
+                                setActiveCell({ row: idx, col: 3 });
+                                const key = `${idx}-3`;
+                                setOpenDropdown(prev => {
+                                  if (prev === key) return null;
+                                  setDropdownHighlight(-1);
+                                  return key;
+                                });
+                              }}
+                              onKeyDown={(e) => {
+                                if (openDropdown === `${idx}-3`) {
+                                  if (e.key === "ArrowDown") { e.preventDefault(); setDropdownHighlight(prev => prev < unitOptionsDS.length - 1 ? prev + 1 : 0); return; }
+                                  if (e.key === "ArrowUp") { e.preventDefault(); setDropdownHighlight(prev => prev > 0 ? prev - 1 : unitOptionsDS.length - 1); return; }
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (dropdownHighlight >= 0 && dropdownHighlight < unitOptionsDS.length) {
+                                      updateItem(idx, "unit", unitOptionsDS[dropdownHighlight]);
+                                      setOpenDropdown(null); setDropdownHighlight(-1); moveToNextCell(idx, 3);
+                                    }
+                                    return;
+                                  }
+                                  if (e.key === "Escape") { e.preventDefault(); setOpenDropdown(null); setDropdownHighlight(-1); return; }
+                                } else {
+                                  if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
+                                    e.preventDefault(); setOpenDropdown(`${idx}-3`); setDropdownHighlight(e.key === "ArrowUp" ? unitOptionsDS.length - 1 : 0); return;
+                                  }
+                                }
+                                handleCellKeyDown(e, idx, 3);
+                              }}
+                              data-testid={`ds-cell-unit-${idx}`}
+                            >
+                              <span className="truncate">{item.unit}</span>
+                              <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
+                              {openDropdown === `${idx}-3` && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
+                                  {unitOptionsDS.map((u, uIdx) => (
+                                    <button
+                                      key={u}
+                                      type="button"
+                                      className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer ${dropdownHighlight === uIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateItem(idx, "unit", u);
+                                        setOpenDropdown(null); setDropdownHighlight(-1); moveToNextCell(idx, 3);
+                                      }}
+                                      onMouseEnter={() => setDropdownHighlight(uIdx)}
+                                      data-testid={`ds-cell-unit-opt-${idx}-${u}`}
+                                    >
+                                      {u}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              className={`w-full h-8 rounded-sm border text-xs px-2 text-right outline-none bg-background ${activeCell?.row === idx && activeCell?.col === 4 ? "border-primary ring-1 ring-primary" : "border-transparent"}`}
+                              ref={(el) => setCellRef(idx, 4, el as HTMLElement)}
+                              value={item.unitPrice}
+                              onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                              onFocus={() => { setActiveCell({ row: idx, col: 4 }); setOpenDropdown(null); }}
+                              onKeyDown={(e) => handleCellKeyDown(e, idx, 4)}
+                              placeholder="0"
+                              data-testid={`ds-cell-price-${idx}`}
+                            />
+                          </td>
+                          <td className="px-1 py-1 text-right text-xs font-medium whitespace-nowrap">{amt > 0 ? `${amt.toLocaleString()}원` : ""}</td>
+                          <td className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap text-orange-500" data-testid={`ds-text-cumulative-${idx}`}>{cumAmt > 0 ? `${cumAmt.toLocaleString()}원` : ""}</td>
+                          <td className="px-1 py-1 text-center">
+                            {addItems.length > 1 && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleRemoveItem(idx)} data-testid={`ds-button-remove-item-${idx}`}><Trash2 className="h-3 w-3" /></Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={handleAddItem} data-testid="ds-button-add-item">
+                  <Plus className="h-3 w-3 mr-1" />행 추가
+                </Button>
+                <div className="text-sm font-semibold">
+                  합계: <span className="text-primary">{addItems.reduce((s, item) => s + itemTotal(item), 0).toLocaleString()}원</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t shrink-0">
+            <Button variant="outline" onClick={resetAddForm} data-testid="button-cancel-sale">취소</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-submit-sale">
+              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}등록
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editDialog} onOpenChange={(open) => { if (!open) setEditDialog(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editDialog ? "직접 매출 수정" : "직접 매출 등록"}</DialogTitle>
+            <DialogTitle>직접 매출 수정</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
               <Label>매출일 *</Label>
-              <Input type="date" value={formData.saleDate} onChange={(e) => setFormData(p => ({ ...p, saleDate: e.target.value }))} data-testid="input-sale-date" />
+              <Input type="date" value={editFormData.saleDate} onChange={(e) => setEditFormData(p => ({ ...p, saleDate: e.target.value }))} data-testid="input-edit-sale-date" />
             </div>
             <div className="space-y-1">
               <Label>거래처명 *</Label>
-              <Input value={formData.clientName} onChange={(e) => setFormData(p => ({ ...p, clientName: e.target.value }))} placeholder="거래처명 입력" data-testid="input-client-name" />
+              <Input value={editFormData.clientName} onChange={(e) => setEditFormData(p => ({ ...p, clientName: e.target.value }))} placeholder="거래처명 입력" data-testid="input-edit-client-name" />
             </div>
             <div className="space-y-1">
               <Label>내용 *</Label>
-              <Input value={formData.description} onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="매출 내용 입력" data-testid="input-description" />
+              <Input value={editFormData.description} onChange={(e) => setEditFormData(p => ({ ...p, description: e.target.value }))} placeholder="매출 내용 입력" data-testid="input-edit-description" />
             </div>
             <div className="space-y-1">
               <Label>금액 *</Label>
-              <Input type="number" value={formData.amount} onChange={(e) => setFormData(p => ({ ...p, amount: e.target.value }))} placeholder="금액 입력" data-testid="input-amount" />
+              <Input type="number" value={editFormData.amount} onChange={(e) => setEditFormData(p => ({ ...p, amount: e.target.value }))} placeholder="금액 입력" data-testid="input-edit-amount" />
             </div>
             <div className="space-y-1">
               <Label>메모</Label>
-              <Textarea value={formData.memo} onChange={(e) => setFormData(p => ({ ...p, memo: e.target.value }))} placeholder="메모 (선택)" rows={2} data-testid="input-memo" />
+              <Textarea value={editFormData.memo} onChange={(e) => setEditFormData(p => ({ ...p, memo: e.target.value }))} placeholder="메모 (선택)" rows={2} data-testid="input-edit-memo" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCreateDialog(false); setEditDialog(null); }}>취소</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-direct-sale">
-              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              {editDialog ? "수정" : "등록"}
+            <Button variant="outline" onClick={() => setEditDialog(null)}>취소</Button>
+            <Button onClick={handleEditSubmit} disabled={updateMutation.isPending} data-testid="button-submit-edit-sale">
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}수정
             </Button>
           </DialogFooter>
         </DialogContent>
