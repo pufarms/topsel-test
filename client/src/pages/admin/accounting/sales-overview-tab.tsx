@@ -687,16 +687,11 @@ interface DSMaterialItem {
   materialName: string;
 }
 
-interface DSCurrentProduct {
+interface DSProductStock {
   id: string;
   productCode: string;
   productName: string;
-  categoryLarge: string | null;
-  categoryMedium: string | null;
-  categorySmall: string | null;
-  weight: string;
-  startPrice: number;
-  supplyStatus: string;
+  currentStock: number;
 }
 
 interface DSDropdownItem {
@@ -854,15 +849,15 @@ function DirectSalesManagement() {
   });
   const allMaterials = materialsData || [];
 
-  const { data: currentProductsData } = useQuery<DSCurrentProduct[]>({
-    queryKey: ["/api/current-products", "supply"],
+  const { data: productStocksData } = useQuery<DSProductStock[]>({
+    queryKey: ["/api/product-stocks/all"],
     queryFn: async () => {
-      const res = await fetch("/api/current-products?status=supply", { credentials: "include" });
-      if (!res.ok) throw new Error("현재공급가 상품 조회 실패");
+      const res = await fetch("/api/product-stocks/all", { credentials: "include" });
+      if (!res.ok) throw new Error("공급상품 재고 조회 실패");
       return res.json();
     },
   });
-  const allCurrentProducts = currentProductsData || [];
+  const allProductStocks = productStocksData || [];
 
   const filteredClients = useMemo(() => {
     if (!clientSearchText.trim()) return dropdownItems;
@@ -903,7 +898,7 @@ function DirectSalesManagement() {
     }
 
     if (isProductType) {
-      let filtered = allCurrentProducts;
+      let filtered = allProductStocks;
       if (text.trim()) {
         const term = text.toLowerCase();
         filtered = filtered.filter(p =>
@@ -917,7 +912,7 @@ function DirectSalesManagement() {
           name: p.productName,
           type: "product",
           typeLabel: "일반",
-          extra: p.weight,
+          extra: `재고: ${p.currentStock}`,
         });
       });
     }
