@@ -658,7 +658,16 @@ const materialTypeLabelsDS: Record<string, string> = {
   subsidiary: "부자재",
   sub: "부자재",
   etc: "기타",
+  product: "일반",
 };
+
+const salesTypeOptions = [
+  { v: "__all__", l: "전체" },
+  { v: "raw", l: "원물" },
+  { v: "semi", l: "반재료" },
+  { v: "sub", l: "부자재" },
+  { v: "product", l: "일반" },
+];
 
 const unitOptionsDS = ["박스", "kg", "팩", "송이", "개", "롤", "건"];
 
@@ -676,6 +685,18 @@ interface DSMaterialItem {
   materialType: string;
   materialCode: string;
   materialName: string;
+}
+
+interface DSCurrentProduct {
+  id: string;
+  productCode: string;
+  productName: string;
+  categoryLarge: string | null;
+  categoryMedium: string | null;
+  categorySmall: string | null;
+  weight: string;
+  startPrice: number;
+  supplyStatus: string;
 }
 
 interface DSDropdownItem {
@@ -831,6 +852,16 @@ function DirectSalesManagement() {
   });
   const allMaterials = materialsData || [];
 
+  const { data: currentProductsData } = useQuery<DSCurrentProduct[]>({
+    queryKey: ["/api/current-products", "supply"],
+    queryFn: async () => {
+      const res = await fetch("/api/current-products?status=supply", { credentials: "include" });
+      if (!res.ok) throw new Error("현재공급가 상품 조회 실패");
+      return res.json();
+    },
+  });
+  const allCurrentProducts = currentProductsData || [];
+
   const filteredClients = useMemo(() => {
     if (!clientSearchText.trim()) return dropdownItems;
     const term = clientSearchText.toLowerCase();
@@ -839,25 +870,66 @@ function DirectSalesManagement() {
 
   const materialTypeMap: Record<string, string> = { raw: "raw", semi: "semi", sub: "subsidiary", subsidiary: "subsidiary", etc: "etc" };
 
-  const getMaterialSuggestions = (text: string, typeFilter: string) => {
-    let filtered = allMaterials;
-    if (typeFilter && typeFilter !== "__all__") {
-      filtered = filtered.filter(m => m.materialType === typeFilter);
+  type SuggestionItem = { id: string; code: string; name: string; type: string; typeLabel: string; extra?: string };
+
+  const getSuggestions = (text: string, typeFilter: string): SuggestionItem[] => {
+    const results: SuggestionItem[] = [];
+    const isMaterialType = typeFilter === "__all__" || typeFilter === "raw" || typeFilter === "semi" || typeFilter === "sub";
+    const isProductType = typeFilter === "__all__" || typeFilter === "product";
+
+    if (isMaterialType) {
+      let filtered = allMaterials;
+      if (typeFilter !== "__all__") {
+        filtered = filtered.filter(m => m.materialType === typeFilter);
+      }
+      if (text.trim()) {
+        const term = text.toLowerCase();
+        filtered = filtered.filter(m =>
+          m.materialName.toLowerCase().includes(term) || m.materialCode.toLowerCase().includes(term)
+        );
+      }
+      filtered.slice(0, typeFilter === "__all__" ? 10 : 20).forEach(m => {
+        const mapped = materialTypeMap[m.materialType] || m.materialType;
+        results.push({
+          id: m.id,
+          code: m.materialCode,
+          name: m.materialName,
+          type: mapped,
+          typeLabel: materialTypeLabelsDS[mapped] || m.materialType,
+        });
+      });
     }
-    if (!text.trim()) return filtered.slice(0, 20);
-    const term = text.toLowerCase();
-    return filtered.filter(m =>
-      m.materialName.toLowerCase().includes(term) || m.materialCode.toLowerCase().includes(term)
-    );
+
+    if (isProductType) {
+      let filtered = allCurrentProducts;
+      if (text.trim()) {
+        const term = text.toLowerCase();
+        filtered = filtered.filter(p =>
+          p.productName.toLowerCase().includes(term) || p.productCode.toLowerCase().includes(term)
+        );
+      }
+      filtered.slice(0, typeFilter === "__all__" ? 10 : 20).forEach(p => {
+        results.push({
+          id: p.id,
+          code: p.productCode,
+          name: p.productName,
+          type: "product",
+          typeLabel: "일반",
+          extra: p.weight,
+        });
+      });
+    }
+
+    return results;
   };
 
-  const selectMaterial = (idx: number, material: DSMaterialItem) => {
-    setAddItems(prev => prev.map((item, i) => i === idx ? {
-      ...item,
-      productName: material.materialName,
-      materialCode: material.materialCode,
-      materialType: materialTypeMap[material.materialType] || material.materialType,
-    } : item));
+  const selectSuggestion = (idx: number, item: SuggestionItem) => {
+    setAddItems(prev => prev.map((row, i) => i === idx ? {
+      ...row,
+      productName: item.name,
+      materialCode: item.code,
+      materialType: item.type,
+    } : row));
     setProductSuggestionIdx(null);
   };
 
@@ -1190,14 +1262,13 @@ function DirectSalesManagement() {
                                 });
                               }}
                               onKeyDown={(e) => {
-                                const typeOpts = [{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }];
                                 if (openDropdown === `${idx}-0`) {
-                                  if (e.key === "ArrowDown") { e.preventDefault(); setDropdownHighlight(prev => prev < typeOpts.length - 1 ? prev + 1 : 0); return; }
-                                  if (e.key === "ArrowUp") { e.preventDefault(); setDropdownHighlight(prev => prev > 0 ? prev - 1 : typeOpts.length - 1); return; }
+                                  if (e.key === "ArrowDown") { e.preventDefault(); setDropdownHighlight(prev => prev < salesTypeOptions.length - 1 ? prev + 1 : 0); return; }
+                                  if (e.key === "ArrowUp") { e.preventDefault(); setDropdownHighlight(prev => prev > 0 ? prev - 1 : salesTypeOptions.length - 1); return; }
                                   if (e.key === "Enter") {
                                     e.preventDefault();
-                                    if (dropdownHighlight >= 0 && dropdownHighlight < typeOpts.length) {
-                                      const opt = typeOpts[dropdownHighlight];
+                                    if (dropdownHighlight >= 0 && dropdownHighlight < salesTypeOptions.length) {
+                                      const opt = salesTypeOptions[dropdownHighlight];
                                       setAddItems(prev => prev.map((it, i) => i === idx ? { ...it, materialType: opt.v, productName: "", materialCode: "" } : it));
                                       setOpenDropdown(null); setDropdownHighlight(-1); moveToNextCell(idx, 0);
                                     }
@@ -1206,7 +1277,7 @@ function DirectSalesManagement() {
                                   if (e.key === "Escape") { e.preventDefault(); setOpenDropdown(null); setDropdownHighlight(-1); return; }
                                 } else {
                                   if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === " ") {
-                                    e.preventDefault(); setOpenDropdown(`${idx}-0`); setDropdownHighlight(e.key === "ArrowUp" ? 3 : 0); return;
+                                    e.preventDefault(); setOpenDropdown(`${idx}-0`); setDropdownHighlight(e.key === "ArrowUp" ? salesTypeOptions.length - 1 : 0); return;
                                   }
                                 }
                                 handleCellKeyDown(e, idx, 0);
@@ -1217,7 +1288,7 @@ function DirectSalesManagement() {
                               <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-muted-foreground" />
                               {openDropdown === `${idx}-0` && (
                                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md">
-                                  {[{ v: "__all__", l: "전체" }, { v: "raw", l: "원물" }, { v: "semi", l: "반재료" }, { v: "sub", l: "부자재" }].map((opt, oIdx) => (
+                                  {salesTypeOptions.map((opt, oIdx) => (
                                     <button
                                       key={opt.v}
                                       type="button"
@@ -1271,16 +1342,16 @@ function DirectSalesManagement() {
                                   onFocus={() => { setActiveCell({ row: idx, col: 1 }); setProductSuggestionIdx(idx); setSuggestionHighlight(-1); setOpenDropdown(null); }}
                                   onBlur={() => setTimeout(() => { setProductSuggestionIdx(null); setSuggestionHighlight(-1); }, 200)}
                                   onKeyDown={(e) => {
-                                    const suggestions = productSuggestionIdx === idx && !item.materialCode ? getMaterialSuggestions(item.productName, item.materialType) : [];
+                                    const suggestions = productSuggestionIdx === idx && !item.materialCode ? getSuggestions(item.productName, item.materialType) : [];
                                     if (suggestions.length > 0) {
                                       if (e.key === "ArrowDown") { e.preventDefault(); setSuggestionHighlight(prev => prev < suggestions.length - 1 ? prev + 1 : 0); return; }
                                       if (e.key === "ArrowUp") { e.preventDefault(); setSuggestionHighlight(prev => prev > 0 ? prev - 1 : suggestions.length - 1); return; }
                                       if (e.key === "Enter") {
                                         e.preventDefault();
                                         if (suggestionHighlight >= 0 && suggestionHighlight < suggestions.length) {
-                                          selectMaterial(idx, suggestions[suggestionHighlight]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                          selectSuggestion(idx, suggestions[suggestionHighlight]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
                                         } else if (suggestions.length === 1) {
-                                          selectMaterial(idx, suggestions[0]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                          selectSuggestion(idx, suggestions[0]); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
                                         }
                                         return;
                                       }
@@ -1290,38 +1361,42 @@ function DirectSalesManagement() {
                                     if (e.key === "ArrowDown" || e.key === "ArrowUp") return;
                                     handleCellKeyDown(e, idx, 1);
                                   }}
-                                  placeholder="재료명 검색"
+                                  placeholder="품목명 검색"
                                   data-testid={`ds-cell-product-${idx}`}
                                 />
                               )}
-                              {productSuggestionIdx === idx && !item.materialCode && (
-                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[180px] overflow-y-auto min-w-[250px]">
-                                  {getMaterialSuggestions(item.productName, item.materialType).length === 0 ? (
-                                    <div className="px-2 py-1.5 text-xs text-muted-foreground">검색 결과가 없습니다</div>
-                                  ) : (
-                                    getMaterialSuggestions(item.productName, item.materialType).map((m, sIdx) => (
-                                      <button
-                                        key={m.id}
-                                        type="button"
-                                        ref={(el) => { if (el && suggestionHighlight === sIdx) el.scrollIntoView({ block: "nearest" }); }}
-                                        className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
-                                        onMouseDown={(e) => {
-                                          e.preventDefault();
-                                          selectMaterial(idx, m); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
-                                        }}
-                                        onMouseEnter={() => setSuggestionHighlight(sIdx)}
-                                        data-testid={`ds-cell-suggestion-${idx}-${m.materialCode}`}
-                                      >
-                                        <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
-                                          {materialTypeLabelsDS[materialTypeMap[m.materialType] || m.materialType] || m.materialType}
-                                        </Badge>
-                                        <span className="truncate">{m.materialName}</span>
-                                        <span className="text-muted-foreground text-[10px] shrink-0">({m.materialCode})</span>
-                                      </button>
-                                    ))
-                                  )}
-                                </div>
-                              )}
+                              {productSuggestionIdx === idx && !item.materialCode && (() => {
+                                const suggestions = getSuggestions(item.productName, item.materialType);
+                                return (
+                                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[220px] overflow-y-auto min-w-[280px]">
+                                    {suggestions.length === 0 ? (
+                                      <div className="px-2 py-1.5 text-xs text-muted-foreground">검색 결과가 없습니다</div>
+                                    ) : (
+                                      suggestions.map((s, sIdx) => (
+                                        <button
+                                          key={`${s.type}-${s.id}`}
+                                          type="button"
+                                          ref={(el) => { if (el && suggestionHighlight === sIdx) el.scrollIntoView({ block: "nearest" }); }}
+                                          className={`w-full text-left px-2 py-1 text-xs cursor-pointer flex items-center gap-1.5 ${suggestionHighlight === sIdx ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            selectSuggestion(idx, s); setSuggestionHighlight(-1); moveToNextCell(idx, 1);
+                                          }}
+                                          onMouseEnter={() => setSuggestionHighlight(sIdx)}
+                                          data-testid={`ds-cell-suggestion-${idx}-${s.code}`}
+                                        >
+                                          <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">
+                                            {s.typeLabel}
+                                          </Badge>
+                                          <span className="truncate">{s.name}</span>
+                                          <span className="text-muted-foreground text-[10px] shrink-0">({s.code})</span>
+                                          {s.extra && <span className="text-muted-foreground text-[10px] shrink-0">{s.extra}</span>}
+                                        </button>
+                                      ))
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </td>
                           <td className="px-1 py-1">
