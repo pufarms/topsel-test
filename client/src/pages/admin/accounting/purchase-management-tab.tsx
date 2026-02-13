@@ -342,9 +342,9 @@ export default function PurchaseManagementTab() {
   const allRows = useMemo(() => {
     const combined: PurchaseItem[] = [...purchases, ...payments];
     combined.sort((a, b) => {
-      if (a.purchaseDate > b.purchaseDate) return -1;
-      if (a.purchaseDate < b.purchaseDate) return 1;
-      return b.id - a.id;
+      if (a.purchaseDate < b.purchaseDate) return -1;
+      if (a.purchaseDate > b.purchaseDate) return 1;
+      return a.id - b.id;
     });
     return combined;
   }, [purchases, payments]);
@@ -386,9 +386,8 @@ export default function PurchaseManagementTab() {
   });
 
   const filteredWithCumulative = useMemo(() => {
-    const ascending = [...filtered].reverse();
     let cumulative = 0;
-    const withCumulative = ascending.map(p => {
+    return filtered.map(p => {
       if (p.rowType === "purchase") {
         cumulative += p.totalAmount;
       } else {
@@ -396,7 +395,6 @@ export default function PurchaseManagementTab() {
       }
       return { ...p, cumulativeAmount: cumulative };
     });
-    return withCumulative.reverse();
   }, [filtered]);
 
   const toggleSelect = (id: number) => {
