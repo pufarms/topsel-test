@@ -1626,6 +1626,7 @@ export const vendorPayments = pgTable("vendor_payments", {
   supplierId: integer("supplier_id").references(() => suppliers.id),
   amount: integer("amount").notNull(),
   paymentDate: date("payment_date").notNull(),
+  paymentMethod: varchar("payment_method", { length: 30 }).notNull().default("transfer"),
   memo: text("memo"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

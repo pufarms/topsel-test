@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -16,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, X, ChevronDown } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard, AlertTriangle } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 const materialTypeLabels: Record<string, string> = {
@@ -24,6 +25,12 @@ const materialTypeLabels: Record<string, string> = {
   semi: "반재료",
   subsidiary: "부자재",
   etc: "기타",
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  transfer: "계좌이체",
+  product_offset: "상품상계",
+  card: "카드결제",
 };
 
 const unitOptions = ["박스", "kg", "팩", "송이", "개", "롤", "건"];
@@ -42,6 +49,8 @@ interface PurchaseItem {
   totalAmount: number;
   memo: string | null;
   source: "direct" | "site";
+  rowType: "purchase" | "payment";
+  paymentMethod: string | null;
 }
 
 interface PurchaseSummary {
@@ -51,6 +60,7 @@ interface PurchaseSummary {
   directCount: number;
   siteCount: number;
   byType: { type: string; amount: number; percentage: number }[];
+  totalPaymentAmount: number;
 }
 
 interface DropdownItem {
@@ -77,6 +87,23 @@ interface NewItemRow {
   unitPrice: string;
 }
 
+interface VendorBalance {
+  id: string;
+  source: "vendor" | "supplier" | "both";
+  vendorId: number | null;
+  supplierId: number | null;
+  companyName: string;
+  totalPurchases: number;
+  totalPayments: number;
+  outstandingBalance: number;
+}
+
+interface CumulativeData {
+  cumulativeTotal: number;
+  cumulativePayment: number;
+  outstandingBalance: number;
+}
+
 export default function PurchaseManagementTab() {
   const { toast } = useToast();
   const dateRange = useDateRange("month");
@@ -97,11 +124,18 @@ export default function PurchaseManagementTab() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
 
+  const [showSettlementDialog, setShowSettlementDialog] = useState(false);
+  const [selectedSettlementVendor, setSelectedSettlementVendor] = useState<VendorBalance | null>(null);
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState("transfer");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMemo, setPaymentMemo] = useState("");
+
   const queryParams = new URLSearchParams();
   if (dateRange.dateRange.startDate) queryParams.set("startDate", dateRange.dateRange.startDate);
   if (dateRange.dateRange.endDate) queryParams.set("endDate", dateRange.dateRange.endDate);
 
-  const { data, isLoading } = useQuery<{ purchases: PurchaseItem[]; summary: PurchaseSummary }>({
+  const { data, isLoading } = useQuery<{ purchases: PurchaseItem[]; payments: PurchaseItem[]; summary: PurchaseSummary }>({
     queryKey: ["/api/admin/purchases", dateRange.dateRange.startDate, dateRange.dateRange.endDate],
     queryFn: async () => {
       const res = await fetch(`/api/admin/purchases?${queryParams.toString()}`, { credentials: "include" });
@@ -127,6 +161,11 @@ export default function PurchaseManagementTab() {
 
   const allMaterials = materialsData || [];
 
+  const { data: vendorBalances = [], isLoading: isLoadingBalances } = useQuery<VendorBalance[]>({
+    queryKey: ["/api/admin/accounting/vendor-balances"],
+    enabled: showSettlementDialog,
+  });
+
   const createMutation = useMutation({
     mutationFn: async (body: any) => {
       const res = await apiRequest("POST", "/api/admin/purchases", body);
@@ -137,6 +176,7 @@ export default function PurchaseManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases/cumulative-total"] });
       resetAddForm();
     },
     onError: (error: any) => {
@@ -154,10 +194,33 @@ export default function PurchaseManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases/cumulative-total"] });
       setSelectedIds(new Set());
     },
     onError: (error: any) => {
       toast({ title: "삭제 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const paymentMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await apiRequest("POST", "/api/admin/vendor-payments", body);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "결제 등록 완료" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendor-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases/cumulative-total"] });
+      setPaymentDate(new Date().toISOString().slice(0, 10));
+      setPaymentMethod("transfer");
+      setPaymentAmount("");
+      setPaymentMemo("");
+      setSelectedSettlementVendor(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "등록 실패", description: error.message, variant: "destructive" });
     },
   });
 
@@ -231,7 +294,20 @@ export default function PurchaseManagementTab() {
     });
   };
 
+  const handlePaymentSubmit = () => {
+    if (!selectedSettlementVendor) return;
+    const amount = parseInt(paymentAmount);
+    if (!amount || amount <= 0) { toast({ title: "올바른 금액을 입력해주세요", variant: "destructive" }); return; }
+
+    const body: any = { paymentDate, paymentMethod, amount, memo: paymentMemo || null };
+    if (selectedSettlementVendor.vendorId) body.vendorId = selectedSettlementVendor.vendorId;
+    if (selectedSettlementVendor.supplierId) body.supplierId = selectedSettlementVendor.supplierId;
+
+    paymentMutation.mutate(body);
+  };
+
   const purchases = data?.purchases || [];
+  const payments = data?.payments || [];
   const summary = data?.summary;
 
   const materialTypeMap: Record<string, string> = { raw: "raw", semi: "semi", sub: "subsidiary", subsidiary: "subsidiary", etc: "etc" };
@@ -258,11 +334,21 @@ export default function PurchaseManagementTab() {
     setProductSuggestionIdx(null);
   };
 
+  const allRows = useMemo(() => {
+    const combined: PurchaseItem[] = [...purchases, ...payments];
+    combined.sort((a, b) => {
+      if (a.purchaseDate > b.purchaseDate) return -1;
+      if (a.purchaseDate < b.purchaseDate) return 1;
+      return b.id - a.id;
+    });
+    return combined;
+  }, [purchases, payments]);
+
   const vendorNames = useMemo(() => {
     const names = new Set<string>();
-    purchases.forEach(p => { if (p.vendorName) names.add(p.vendorName); });
+    allRows.forEach(p => { if (p.vendorName) names.add(p.vendorName); });
     return Array.from(names).sort();
-  }, [purchases]);
+  }, [allRows]);
 
   const filteredFilterVendors = useMemo(() => {
     if (!filterVendorSearchText.trim()) return vendorNames;
@@ -270,7 +356,7 @@ export default function PurchaseManagementTab() {
     return vendorNames.filter(name => name.toLowerCase().includes(term));
   }, [vendorNames, filterVendorSearchText]);
 
-  const { data: cumulativeData } = useQuery<{ cumulativeTotal: number }>({
+  const { data: cumulativeData } = useQuery<CumulativeData>({
     queryKey: ["/api/admin/purchases/cumulative-total", filterVendorName],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -281,9 +367,12 @@ export default function PurchaseManagementTab() {
     },
   });
 
-  const filtered = purchases.filter(p => {
+  const filtered = allRows.filter(p => {
     if (filterVendorName !== "__all__" && p.vendorName !== filterVendorName) return false;
-    if (filterType !== "__all__" && p.materialType !== filterType) return false;
+    if (filterType !== "__all__") {
+      if (p.rowType === "payment") return false;
+      if (p.materialType !== filterType) return false;
+    }
     if (searchText) {
       const term = searchText.toLowerCase();
       if (!p.productName.toLowerCase().includes(term)) return false;
@@ -294,7 +383,11 @@ export default function PurchaseManagementTab() {
   const filteredWithCumulative = useMemo(() => {
     let cumulative = 0;
     return filtered.map(p => {
-      cumulative += p.totalAmount;
+      if (p.rowType === "purchase") {
+        cumulative += p.totalAmount;
+      } else {
+        cumulative -= p.totalAmount;
+      }
       return { ...p, cumulativeAmount: cumulative };
     });
   }, [filtered]);
@@ -313,7 +406,12 @@ export default function PurchaseManagementTab() {
     return Math.round(q * p);
   };
 
-  const selectedDropdown = dropdownItems.find(v => v.value === addVendorValue);
+  const periodPurchaseTotal = filtered.filter(p => p.rowType === "purchase").reduce((s, p) => s + p.totalAmount, 0);
+  const periodPaymentTotal = filtered.filter(p => p.rowType === "payment").reduce((s, p) => s + p.totalAmount, 0);
+
+  const totalOutstanding = vendorBalances.reduce((s, v) => s + (v.outstandingBalance || 0), 0);
+  const totalVendorPurchases = vendorBalances.reduce((s, v) => s + (v.totalPurchases || 0), 0);
+  const totalVendorPayments = vendorBalances.reduce((s, v) => s + (v.totalPayments || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -397,26 +495,35 @@ export default function PurchaseManagementTab() {
             <Input placeholder="품목 검색..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" data-testid="input-purchase-search" />
           </div>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-purchase">
-          <Plus className="h-4 w-4 mr-1" />매입 등록
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowSettlementDialog(true)} data-testid="button-settlement">
+            <CreditCard className="h-4 w-4 mr-1" />정산/결제
+          </Button>
+          <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-purchase">
+            <Plus className="h-4 w-4 mr-1" />매입 등록
+          </Button>
+        </div>
       </div>
 
       {summary && (
         <Card>
           <CardContent className="pt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
               <div>
-                <div className="text-muted-foreground">총 매입</div>
+                <div className="text-muted-foreground">매입 합계</div>
                 <div className="text-lg font-bold">{(summary.totalAmount || 0).toLocaleString()}원</div>
               </div>
               <div>
-                <div className="text-muted-foreground">사이트 매입</div>
-                <div className="font-semibold">{(summary.siteAmount || 0).toLocaleString()}원 <span className="text-xs text-muted-foreground">({summary.siteCount || 0}건)</span></div>
+                <div className="text-muted-foreground">결제 합계</div>
+                <div className="text-lg font-bold text-blue-600">{(summary.totalPaymentAmount || 0).toLocaleString()}원</div>
               </div>
               <div>
-                <div className="text-muted-foreground">직접 매입</div>
-                <div className="font-semibold">{(summary.directAmount || 0).toLocaleString()}원 <span className="text-xs text-muted-foreground">({summary.directCount || 0}건)</span></div>
+                <div className="text-muted-foreground">외상 잔액 (선택기간)</div>
+                <div className="text-lg font-bold text-amber-600">{((summary.totalAmount || 0) - (summary.totalPaymentAmount || 0)).toLocaleString()}원</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">매입 건수</div>
+                <div className="font-semibold">{(summary.directCount || 0)}건</div>
               </div>
             </div>
             {summary.byType?.length > 0 && (
@@ -435,14 +542,14 @@ export default function PurchaseManagementTab() {
       ) : (
         <>
           <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-            <Table className="min-w-[1000px]">
+            <Table className="min-w-[1100px]">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead className="w-[40px]"></TableHead>
                   <TableHead>날짜</TableHead>
-                  <TableHead>타입</TableHead>
+                  <TableHead>구분</TableHead>
                   <TableHead>업체명</TableHead>
-                  <TableHead>품목명</TableHead>
+                  <TableHead>품목/내용</TableHead>
                   <TableHead className="text-right">수량</TableHead>
                   <TableHead className="text-right">단가</TableHead>
                   <TableHead className="text-right">금액</TableHead>
@@ -452,25 +559,41 @@ export default function PurchaseManagementTab() {
               <TableBody>
                 {filteredWithCumulative.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">매입 데이터가 없습니다</TableCell>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">데이터가 없습니다</TableCell>
                   </TableRow>
                 ) : (
                   filteredWithCumulative.map((p) => (
-                    <TableRow key={`${p.source}-${p.id}`} data-testid={`row-purchase-${p.id}`}>
+                    <TableRow
+                      key={`${p.rowType}-${p.id}`}
+                      className={p.rowType === "payment" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
+                      data-testid={`row-${p.rowType}-${p.id}`}
+                    >
                       <TableCell>
-                        {p.source === "direct" && (
+                        {p.rowType === "purchase" && p.source === "direct" && (
                           <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="rounded" />
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{p.purchaseDate}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="no-default-active-elevate text-xs">{materialTypeLabels[p.materialType] || p.materialType}</Badge>
+                        {p.rowType === "purchase" ? (
+                          <Badge variant="outline" className="no-default-active-elevate text-xs">{materialTypeLabels[p.materialType] || p.materialType}</Badge>
+                        ) : (
+                          <Badge variant="default" className="no-default-active-elevate text-xs">
+                            {paymentMethodLabels[p.paymentMethod || "transfer"] || "결제"}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>{p.vendorName || "-"}</TableCell>
-                      <TableCell>{p.productName}</TableCell>
-                      <TableCell className="text-right">{Number(p.quantity).toLocaleString()} {p.unit}</TableCell>
-                      <TableCell className="text-right">{p.unitPrice.toLocaleString()}원</TableCell>
-                      <TableCell className="text-right font-medium">{p.totalAmount.toLocaleString()}원</TableCell>
+                      <TableCell>{p.rowType === "purchase" ? p.productName : (p.memo || "결제")}</TableCell>
+                      <TableCell className="text-right">
+                        {p.rowType === "purchase" ? `${Number(p.quantity).toLocaleString()} ${p.unit}` : ""}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.rowType === "purchase" ? `${p.unitPrice.toLocaleString()}원` : ""}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${p.rowType === "payment" ? "text-blue-600" : ""}`}>
+                        {p.rowType === "purchase" ? `+${p.totalAmount.toLocaleString()}원` : `-${p.totalAmount.toLocaleString()}원`}
+                      </TableCell>
                       <TableCell className="text-right font-medium text-primary">{p.cumulativeAmount.toLocaleString()}원</TableCell>
                     </TableRow>
                   ))
@@ -487,18 +610,147 @@ export default function PurchaseManagementTab() {
               )}
               <span className="text-muted-foreground">(직접 매입만 삭제 가능)</span>
             </div>
-            <span className="text-muted-foreground">선택기간 합계: <span className="font-semibold text-foreground">{filtered.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}원</span></span>
+            <div className="flex items-center gap-4">
+              <span className="text-muted-foreground">매입: <span className="font-semibold text-foreground">+{periodPurchaseTotal.toLocaleString()}원</span></span>
+              <span className="text-muted-foreground">결제: <span className="font-semibold text-blue-600">-{periodPaymentTotal.toLocaleString()}원</span></span>
+              <span className="text-muted-foreground">잔액: <span className="font-semibold text-foreground">{(periodPurchaseTotal - periodPaymentTotal).toLocaleString()}원</span></span>
+            </div>
           </div>
-          <div className="flex items-center justify-end gap-2 px-1">
-            <span className="text-sm font-medium">
-              현재시점 누적합계액{filterVendorName !== "__all__" ? ` (${filterVendorName})` : " (전체)"}:
-            </span>
-            <span className="text-lg font-bold text-primary" data-testid="text-cumulative-total">
-              {(cumulativeData?.cumulativeTotal || 0).toLocaleString()}원
-            </span>
-          </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  현재시점 누적합계액{filterVendorName !== "__all__" ? ` (${filterVendorName})` : " (전체)"}
+                </span>
+                <div className="flex items-center gap-6 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">총 매입: </span>
+                    <span className="font-bold" data-testid="text-cumulative-purchase">{(cumulativeData?.cumulativeTotal || 0).toLocaleString()}원</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">총 결제: </span>
+                    <span className="font-bold text-blue-600" data-testid="text-cumulative-payment">{(cumulativeData?.cumulativePayment || 0).toLocaleString()}원</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">외상 잔액: </span>
+                    <span className="text-lg font-bold text-primary" data-testid="text-cumulative-total">{(cumulativeData?.outstandingBalance || 0).toLocaleString()}원</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
+
+      <Dialog open={showSettlementDialog} onOpenChange={setShowSettlementDialog}>
+        <DialogContent className="w-[70vw] max-w-[70vw] max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>정산/결제</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div>
+              <h4 className="font-semibold mb-2 text-sm">업체별 외상 현황</h4>
+              {isLoadingBalances ? (
+                <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+              ) : (
+                <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[280px]">
+                  <Table className="min-w-[600px]">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead>업체명</TableHead>
+                        <TableHead className="text-right">총 매입액</TableHead>
+                        <TableHead className="text-right">총 결제액</TableHead>
+                        <TableHead className="text-right">외상 잔액</TableHead>
+                        <TableHead className="text-center">상태</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vendorBalances.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">데이터가 없습니다</TableCell>
+                        </TableRow>
+                      ) : (
+                        <>
+                          {vendorBalances.map((v) => (
+                            <TableRow
+                              key={v.id}
+                              className={`cursor-pointer ${selectedSettlementVendor?.id === v.id ? "bg-muted/50" : ""}`}
+                              onClick={() => setSelectedSettlementVendor(v)}
+                              data-testid={`row-settlement-vendor-${v.id}`}
+                            >
+                              <TableCell className="font-medium">{v.companyName}</TableCell>
+                              <TableCell className="text-right">{(v.totalPurchases || 0).toLocaleString()}원</TableCell>
+                              <TableCell className="text-right">{(v.totalPayments || 0).toLocaleString()}원</TableCell>
+                              <TableCell className="text-right font-semibold">{(v.outstandingBalance || 0).toLocaleString()}원</TableCell>
+                              <TableCell className="text-center">
+                                {(v.outstandingBalance || 0) >= 1000000 && (
+                                  <AlertTriangle className="h-4 w-4 text-amber-500 inline" />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="font-semibold bg-muted/30">
+                            <TableCell>합계</TableCell>
+                            <TableCell className="text-right">{totalVendorPurchases.toLocaleString()}원</TableCell>
+                            <TableCell className="text-right">{totalVendorPayments.toLocaleString()}원</TableCell>
+                            <TableCell className="text-right">{totalOutstanding.toLocaleString()}원</TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">업체를 클릭하여 결제를 등록하세요</p>
+            </div>
+
+            {selectedSettlementVendor && (
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-sm">{selectedSettlementVendor.companyName} 결제 등록</h4>
+                    <span className="text-sm text-muted-foreground">
+                      외상 잔액: <span className="font-semibold text-foreground">{(selectedSettlementVendor.outstandingBalance || 0).toLocaleString()}원</span>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>결제일</Label>
+                      <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} data-testid="input-payment-date" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>결제 구분</Label>
+                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="transfer">계좌이체</SelectItem>
+                          <SelectItem value="product_offset">상품상계</SelectItem>
+                          <SelectItem value="card">카드결제</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>결제액</Label>
+                      <Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="금액" data-testid="input-payment-amount" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>메모 (선택)</Label>
+                      <Textarea value={paymentMemo} onChange={(e) => setPaymentMemo(e.target.value)} placeholder="메모" className="resize-none" data-testid="input-payment-memo" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setSelectedSettlementVendor(null)}>취소</Button>
+                    <Button onClick={handlePaymentSubmit} disabled={paymentMutation.isPending} data-testid="button-submit-payment">
+                      {paymentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}결제 등록
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAddDialog} onOpenChange={() => resetAddForm()}>
         <DialogContent className="w-[80vw] max-w-[80vw] h-[80vh] max-h-[80vh] flex flex-col">

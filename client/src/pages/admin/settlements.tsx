@@ -31,12 +31,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, Receipt, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import VendorManagementTab from "./accounting/vendor-management-tab";
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
-import PurchaseSettlementTab from "./accounting/purchase-settlement-tab";
 import SalesOverviewTab from "./accounting/sales-overview-tab";
 import ProfitLossTab from "./accounting/profit-loss-tab";
 
@@ -582,9 +581,6 @@ export default function SettlementsPage() {
           <TabsTrigger value="purchase-management" className="gap-1" data-testid="tab-purchase-management">
             <ShoppingCart className="h-4 w-4" />매입 관리
           </TabsTrigger>
-          <TabsTrigger value="purchase-settlement" className="gap-1" data-testid="tab-purchase-settlement">
-            <Receipt className="h-4 w-4" />매입 정산
-          </TabsTrigger>
           <TabsTrigger value="sales-overview" className="gap-1" data-testid="tab-sales-overview">
             <DollarSign className="h-4 w-4" />매출 현황
           </TabsTrigger>
@@ -603,10 +599,6 @@ export default function SettlementsPage() {
 
         <TabsContent value="purchase-management">
           <PurchaseManagementTab />
-        </TabsContent>
-
-        <TabsContent value="purchase-settlement">
-          <PurchaseSettlementTab />
         </TabsContent>
 
         <TabsContent value="sales-overview">

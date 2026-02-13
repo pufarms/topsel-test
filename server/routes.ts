@@ -11187,7 +11187,7 @@ export async function registerRoutes(
     if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
 
     try {
-      const { vendorId, supplierId, amount, paymentDate, memo } = req.body;
+      const { vendorId, supplierId, amount, paymentDate, paymentMethod, memo } = req.body;
       if ((!vendorId && !supplierId) || amount === undefined || amount === null || !paymentDate) {
         return res.status(400).json({ message: "업체, 금액, 결재일은 필수입니다" });
       }
@@ -11198,6 +11198,8 @@ export async function registerRoutes(
       if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
         return res.status(400).json({ message: "결재일 형식이 올바르지 않습니다 (YYYY-MM-DD)" });
       }
+      const validMethods = ["transfer", "product_offset", "card"];
+      const method = validMethods.includes(paymentMethod) ? paymentMethod : "transfer";
 
       if (vendorId && !supplierId) {
         const parsedVendorId = parseInt(vendorId);
@@ -11212,6 +11214,7 @@ export async function registerRoutes(
         supplierId: supplierId ? parseInt(supplierId) : null,
         amount: parsedAmount,
         paymentDate,
+        paymentMethod: method,
         memo: memo || null,
         createdBy: req.session.userId,
       }).returning();
@@ -13840,11 +13843,49 @@ export async function registerRoutes(
         ...p,
         vendorName: p.vendorId ? vendorMap.get(p.vendorId) || "알 수 없음" : p.supplierId ? supplierMap.get(p.supplierId) || "알 수 없음" : "알 수 없음",
         source: "direct" as const,
+        rowType: "purchase" as const,
+        paymentMethod: null as string | null,
+      }));
+
+      const paymentConditions: any[] = [];
+      if (startDate) paymentConditions.push(gte(vendorPayments.paymentDate, String(startDate)));
+      if (endDate) paymentConditions.push(lte(vendorPayments.paymentDate, String(endDate)));
+      const paymentWhereClause = paymentConditions.length > 0 ? and(...paymentConditions) : undefined;
+
+      const paymentList = await db.select({
+        id: vendorPayments.id,
+        paymentDate: vendorPayments.paymentDate,
+        vendorId: vendorPayments.vendorId,
+        supplierId: vendorPayments.supplierId,
+        amount: vendorPayments.amount,
+        paymentMethod: vendorPayments.paymentMethod,
+        memo: vendorPayments.memo,
+      }).from(vendorPayments)
+        .where(paymentWhereClause)
+        .orderBy(desc(vendorPayments.paymentDate), desc(vendorPayments.id));
+
+      const paymentRows = paymentList.map(p => ({
+        id: p.id,
+        purchaseDate: p.paymentDate,
+        vendorId: p.vendorId,
+        supplierId: p.supplierId,
+        materialType: "",
+        productName: p.memo || "결제",
+        quantity: "0",
+        unit: "",
+        unitPrice: 0,
+        totalAmount: p.amount,
+        memo: p.memo,
+        vendorName: p.vendorId ? vendorMap.get(p.vendorId) || "알 수 없음" : p.supplierId ? supplierMap.get(p.supplierId) || "알 수 없음" : "알 수 없음",
+        source: "direct" as const,
+        rowType: "payment" as const,
+        paymentMethod: p.paymentMethod || "transfer",
       }));
 
       const totalAmount = enriched.reduce((s, p) => s + p.totalAmount, 0);
       const directCount = enriched.length;
       const directAmount = totalAmount;
+      const totalPaymentAmount = paymentRows.reduce((s, p) => s + p.totalAmount, 0);
 
       const byTypeMap = new Map<string, number>();
       enriched.forEach(p => {
@@ -13858,6 +13899,7 @@ export async function registerRoutes(
 
       res.json({
         purchases: enriched,
+        payments: paymentRows,
         summary: {
           totalAmount,
           directAmount,
@@ -13865,6 +13907,7 @@ export async function registerRoutes(
           directCount,
           siteCount: 0,
           byType,
+          totalPaymentAmount,
         },
       });
     } catch (error: any) {
@@ -13934,12 +13977,6 @@ export async function registerRoutes(
       if (!(await requireAccountingAdmin(req, res))) return;
       const { vendorName } = req.query;
 
-      const purchaseList = await db.select({
-        vendorId: purchases.vendorId,
-        supplierId: purchases.supplierId,
-        totalAmount: purchases.totalAmount,
-      }).from(purchases);
-
       const vendorMap = new Map<number, string>();
       const vendorList = await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors);
       vendorList.forEach(v => vendorMap.set(v.id, v.companyName));
@@ -13947,14 +13984,43 @@ export async function registerRoutes(
       const supplierMap = new Map<number, string>();
       supplierList2.forEach(s => supplierMap.set(s.id, s.name));
 
-      let total = 0;
+      const getVendorName = (vId: number | null, sId: number | null) => {
+        if (vId) return vendorMap.get(vId);
+        if (sId) return supplierMap.get(sId);
+        return undefined;
+      };
+
+      const purchaseList = await db.select({
+        vendorId: purchases.vendorId,
+        supplierId: purchases.supplierId,
+        totalAmount: purchases.totalAmount,
+      }).from(purchases);
+
+      let totalPurchase = 0;
       for (const p of purchaseList) {
-        const name = p.vendorId ? vendorMap.get(p.vendorId) : (p.supplierId ? supplierMap.get(p.supplierId) : undefined);
+        const name = getVendorName(p.vendorId, p.supplierId);
         if (vendorName && name !== String(vendorName)) continue;
-        total += Number(p.totalAmount) || 0;
+        totalPurchase += Number(p.totalAmount) || 0;
       }
 
-      res.json({ cumulativeTotal: total });
+      const paymentList = await db.select({
+        vendorId: vendorPayments.vendorId,
+        supplierId: vendorPayments.supplierId,
+        amount: vendorPayments.amount,
+      }).from(vendorPayments);
+
+      let totalPayment = 0;
+      for (const p of paymentList) {
+        const name = getVendorName(p.vendorId, p.supplierId);
+        if (vendorName && name !== String(vendorName)) continue;
+        totalPayment += Number(p.amount) || 0;
+      }
+
+      res.json({
+        cumulativeTotal: totalPurchase,
+        cumulativePayment: totalPayment,
+        outstandingBalance: totalPurchase - totalPayment,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
