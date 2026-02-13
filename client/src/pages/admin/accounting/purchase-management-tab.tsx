@@ -713,7 +713,7 @@ export default function PurchaseManagementTab() {
                         <TableCell className={`text-right font-medium ${p.rowType === "payment" ? "text-blue-600" : ""}`}>
                           {p.rowType === "purchase" ? `+${p.totalAmount.toLocaleString()}원` : `-${p.totalAmount.toLocaleString()}원`}
                         </TableCell>
-                        <TableCell className="text-right font-medium text-primary">{p.cumulativeAmount.toLocaleString()}원</TableCell>
+                        <TableCell className="text-right font-medium text-orange-500">{p.cumulativeAmount.toLocaleString()}원</TableCell>
                       </TableRow>
                     ))
                   )}
