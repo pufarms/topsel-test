@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
@@ -733,6 +733,8 @@ function DirectSalesManagement() {
   const [dropdownHighlight, setDropdownHighlight] = useState(-1);
 
   const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "" });
+  const [stockWarningDialog, setStockWarningDialog] = useState<{ open: boolean; insufficientItems: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number }[]; validItems: DSItemRow[]; clientName: string }>({ open: false, insufficientItems: [], validItems: [], clientName: "" });
+  const [stockChecking, setStockChecking] = useState(false);
 
   const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
 
@@ -923,12 +925,20 @@ function DirectSalesManagement() {
     return results;
   };
 
+  const getUnitByType = (type: string): string => {
+    if (type === "product") return "박스";
+    if (type === "raw" || type === "semi") return "kg";
+    if (type === "sub") return "개";
+    return "박스";
+  };
+
   const selectSuggestion = (idx: number, item: SuggestionItem) => {
     setAddItems(prev => prev.map((row, i) => i === idx ? {
       ...row,
       productName: item.name,
       materialCode: item.code,
       materialType: item.type,
+      unit: getUnitByType(item.type),
     } : row));
     setProductSuggestionIdx(null);
   };
@@ -1008,7 +1018,35 @@ function DirectSalesManagement() {
     setOpenDropdown(null);
   };
 
-  const handleSubmit = () => {
+  const doRegister = (validItems: DSItemRow[], clientName: string) => {
+    const promises = validItems.map(item => {
+      const amt = itemTotal(item);
+      return createMutation.mutateAsync({
+        saleDate: addDate,
+        clientName,
+        description: item.productName,
+        amount: amt,
+        memo: addMemo || null,
+        stockItems: item.materialCode ? [{
+          materialCode: item.materialCode,
+          materialType: item.materialType,
+          quantity: item.quantity,
+          productName: item.productName,
+        }] : undefined,
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/direct-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales/daily"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/product-stocks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      resetAddForm();
+    }).catch(() => {});
+  };
+
+  const handleSubmit = async () => {
     if (!addClientValue) {
       toast({ title: "거래처를 선택해주세요", variant: "destructive" });
       return;
@@ -1027,23 +1065,39 @@ function DirectSalesManagement() {
     const selectedClient = dropdownItems.find(d => d.value === addClientValue);
     const clientName = selectedClient?.label || addClientValue;
 
-    const promises = validItems.map(item => {
-      const amt = itemTotal(item);
-      return createMutation.mutateAsync({
-        saleDate: addDate,
-        clientName,
-        description: item.productName,
-        amount: amt,
-        memo: addMemo || null,
-      });
-    });
+    const itemsWithCode = validItems.filter(item => item.materialCode);
+    if (itemsWithCode.length > 0) {
+      setStockChecking(true);
+      try {
+        const checkRes = await apiRequest("POST", "/api/admin/direct-sales/check-stock", {
+          items: itemsWithCode.map(item => ({
+            materialCode: item.materialCode,
+            productName: item.productName,
+            materialType: item.materialType,
+            quantity: item.quantity,
+          })),
+        });
+        const checkData = await checkRes.json();
 
-    Promise.all(promises).then(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/direct-sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/sales/daily"] });
-      resetAddForm();
-    }).catch(() => {});
+        if (!checkData.allSufficient) {
+          setStockWarningDialog({
+            open: true,
+            insufficientItems: checkData.insufficientItems,
+            validItems,
+            clientName,
+          });
+          setStockChecking(false);
+          return;
+        }
+      } catch (err: any) {
+        toast({ title: "재고 확인 실패", description: err.message, variant: "destructive" });
+        setStockChecking(false);
+        return;
+      }
+      setStockChecking(false);
+    }
+
+    doRegister(validItems, clientName);
   };
 
   const handleEditSubmit = () => {
@@ -1511,8 +1565,74 @@ function DirectSalesManagement() {
 
           <div className="flex justify-end gap-2 pt-4 border-t shrink-0">
             <Button variant="outline" onClick={resetAddForm} data-testid="button-cancel-sale">취소</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-submit-sale">
-              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}등록
+            <Button onClick={handleSubmit} disabled={createMutation.isPending || stockChecking} data-testid="button-submit-sale">
+              {(createMutation.isPending || stockChecking) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              {stockChecking ? "재고 확인중..." : "등록"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={stockWarningDialog.open} onOpenChange={(open) => !open && setStockWarningDialog(prev => ({ ...prev, open: false }))}>
+        <DialogContent className="max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              재고 부족 알림
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">다음 품목의 재고가 부족합니다:</p>
+            <div className="border rounded-md overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left px-3 py-2 font-medium">품목명</th>
+                    <th className="text-right px-3 py-2 font-medium">요청 수량</th>
+                    <th className="text-right px-3 py-2 font-medium">현재 재고</th>
+                    <th className="text-right px-3 py-2 font-medium">부족분</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockWarningDialog.insufficientItems.map((item, i) => {
+                    const typeLabel = item.itemType === "product" ? "일반" : item.itemType === "raw" ? "원물" : item.itemType === "semi" ? "반재료" : item.itemType === "sub" ? "부자재" : item.itemType;
+                    const unitLabel = item.itemType === "product" ? "박스" : (item.itemType === "raw" || item.itemType === "semi") ? "kg" : "개";
+                    return (
+                      <tr key={i} className="border-b last:border-b-0">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="no-default-active-elevate text-[10px] shrink-0">{typeLabel}</Badge>
+                            <span className="truncate">{item.itemName}</span>
+                          </div>
+                        </td>
+                        <td className="text-right px-3 py-2 text-destructive font-medium">{item.requestedQty} {unitLabel}</td>
+                        <td className="text-right px-3 py-2">{item.currentStock} {unitLabel}</td>
+                        <td className="text-right px-3 py-2 text-destructive font-medium">
+                          -{(item.requestedQty - item.currentStock).toFixed(item.itemType === "raw" || item.itemType === "semi" ? 1 : 0)} {unitLabel}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-sm text-amber-600 dark:text-amber-400">재고가 부족하지만 확인 후 등록하시겠습니까? 등록 시 현재 재고에서 차감됩니다.</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setStockWarningDialog(prev => ({ ...prev, open: false }))} data-testid="button-stock-warning-cancel">
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setStockWarningDialog(prev => ({ ...prev, open: false }));
+                doRegister(stockWarningDialog.validItems, stockWarningDialog.clientName);
+              }}
+              disabled={createMutation.isPending}
+              data-testid="button-stock-warning-confirm"
+            >
+              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              확인 후 등록
             </Button>
           </div>
         </DialogContent>

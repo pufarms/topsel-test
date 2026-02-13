@@ -14624,13 +14624,68 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/admin/direct-sales/check-stock', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { items } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "품목 정보가 필요합니다" });
+      }
+
+      const stockResults: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number; sufficient: boolean }[] = [];
+
+      for (const item of items) {
+        const { materialCode, productName, materialType, quantity } = item;
+        if (!materialCode || !quantity) continue;
+        const qty = parseFloat(quantity) || 0;
+        if (qty <= 0) continue;
+
+        if (materialType === "product") {
+          const stock = await storage.getProductStock(materialCode);
+          const currentStock = stock?.currentStock || 0;
+          stockResults.push({
+            itemCode: materialCode,
+            itemName: productName || materialCode,
+            itemType: "product",
+            requestedQty: qty,
+            currentStock,
+            sufficient: currentStock >= qty,
+          });
+        } else {
+          const material = await storage.getMaterialByCode(materialCode);
+          const currentStock = material?.currentStock || 0;
+          stockResults.push({
+            itemCode: materialCode,
+            itemName: productName || materialCode,
+            itemType: materialType || "raw",
+            requestedQty: qty,
+            currentStock,
+            sufficient: currentStock >= qty,
+          });
+        }
+      }
+
+      const insufficientItems = stockResults.filter(r => !r.sufficient);
+      res.json({
+        allSufficient: insufficientItems.length === 0,
+        results: stockResults,
+        insufficientItems,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post('/api/admin/direct-sales', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { saleDate, clientName, description, amount, memo } = req.body;
+      const { saleDate, clientName, description, amount, memo, stockItems } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요 (매출일, 거래처명, 내용, 금액)" });
       }
@@ -14638,6 +14693,63 @@ export async function registerRoutes(
       const [row] = await db.insert(directSales).values({
         saleDate, clientName, description, amount: parseInt(amount), memo: memo || null,
       }).returning();
+
+      if (stockItems && Array.isArray(stockItems)) {
+        for (const si of stockItems) {
+          const { materialCode, materialType, quantity, productName } = si;
+          if (!materialCode || !quantity) continue;
+          const qty = parseFloat(quantity) || 0;
+          if (qty <= 0) continue;
+
+          if (materialType === "product") {
+            const stock = await storage.getProductStock(materialCode);
+            const beforeStock = stock?.currentStock || 0;
+            const afterStock = beforeStock - qty;
+            if (stock) {
+              await storage.updateProductStock(materialCode, afterStock);
+            } else {
+              await storage.createProductStock({
+                productCode: materialCode,
+                productName: productName || materialCode,
+                currentStock: -qty,
+              });
+            }
+            await storage.createStockHistory({
+              stockType: "product",
+              actionType: "out",
+              itemCode: materialCode,
+              itemName: productName || materialCode,
+              quantity: Math.round(-qty),
+              beforeStock: Math.round(beforeStock),
+              afterStock: Math.round(afterStock),
+              reason: "매출 등록",
+              note: `직접매출 - ${clientName}`,
+              adminId: req.session.userId!,
+              source: "manual",
+            });
+          } else {
+            const material = await storage.getMaterialByCode(materialCode);
+            if (material) {
+              const beforeStock = material.currentStock;
+              const afterStock = beforeStock - qty;
+              await storage.updateMaterial(material.id, { currentStock: afterStock } as any);
+              await storage.createStockHistory({
+                stockType: materialType || "raw",
+                actionType: "out",
+                itemCode: materialCode,
+                itemName: productName || materialCode,
+                quantity: Math.round(-qty),
+                beforeStock: Math.round(beforeStock),
+                afterStock: Math.round(afterStock),
+                reason: "매출 등록",
+                note: `직접매출 - ${clientName}`,
+                adminId: req.session.userId!,
+                source: "manual",
+              });
+            }
+          }
+        }
+      }
 
       res.json(row);
     } catch (error: any) {
