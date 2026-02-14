@@ -138,6 +138,10 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: inquiryCounts } = useQuery<{ total: number; byStatus: Record<string, number>; byCategory: Record<string, number>; unreadCount: number }>({
+    queryKey: ["/api/admin/inquiries/counts"],
+  });
+
   const today = new Date();
   const formattedDate = today.toLocaleDateString("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -216,10 +220,6 @@ export default function AdminDashboard() {
     { label: "Driving회원", value: tierCounts.DRIVING, unit: "명", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-300", icon: <Zap className="h-4 w-4" /> },
     { label: "Top회원", value: tierCounts.TOP, unit: "명", color: "text-emerald-600", bg: "bg-emerald-100", border: "border-emerald-300", icon: <Crown className="h-4 w-4" /> },
   ];
-
-  const { data: inquiryCounts } = useQuery<{ total: number; byStatus: Record<string, number>; byCategory: Record<string, number>; unreadCount: number }>({
-    queryKey: ["/api/admin/inquiries/counts"],
-  });
 
   const inquiryCardDefs = [
     { label: "일반문의", value: inquiryCounts?.byCategory?.["일반문의"] ?? 0, icon: <HelpCircle className="h-4 w-4" />, border: "border-blue-300", text: "text-blue-600" },
