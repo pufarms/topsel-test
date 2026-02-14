@@ -128,6 +128,7 @@ Preferred communication style: Simple, everyday language.
 -   **Form Handling**: React Hook Form with Zod validation.
 -   **Build Tool**: Vite.
 -   **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography.
+-   **Design Requirements**: All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
 
 ### Backend
 -   **Framework**: Express 5 on Node.js with TypeScript.
@@ -138,27 +139,25 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 -   **ORM**: Drizzle ORM with PostgreSQL dialect.
 -   **Schema**: Shared `shared/schema.ts` with Zod schemas generated from Drizzle.
--   **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, and `siteSettings`.
+-   **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, `siteSettings`, `vendors`, `product_vendors`, `order_allocations`, `allocation_details`, `vendor_payments`, `inquiries`, `inquiry_messages`, `inquiry_fields`, `inquiry_attachments`.
 
 ### Core Features
--   **User Portals**: Member Mypage and Admin dashboards.
+-   **User Portals**: Member Mypage, Admin dashboards, and Partner Portal.
 -   **Product & Inventory Management**: Tools for categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
 -   **Admin Design System**: Standardized components and design rules.
--   **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter`.
+-   **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter`, `DateRangeFilter` (KST timezone, server-side SQL filtering).
 -   **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
 -   **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management.
 -   **Legal Compliance**: Term Agreement Record Keeping.
--   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms, categorizing addresses as `VALID`, `WARNING`, or `INVALID`.
--   **AI Address Learning Management**: Admin interface to register error address patterns for AI analysis and application.
+-   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms, categorizing addresses as `VALID`, `WARNING`, or `INVALID`. Includes AI Address Learning Management.
 -   **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
--   **Date Range Filtering (KST)**: All order-related pages include a `DateRangeFilter` component with preset buttons. Date filtering uses KST timezone (UTC+9) with server-side SQL filtering.
--   **Design Requirements**: All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
 -   **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
--   **Outsourcing/Vendor System**: Includes `vendors` and `product_vendors` tables. Extends product schemas to support vendor products. Admin pages for vendor CRUD and product mapping. Stock logic differentiates between vendor and self-fulfilled orders.
--   **Allocation System**: New DB tables `order_allocations` and `allocation_details`. APIs and admin page for managing a 5-step workflow (aggregation → notification → response → confirmation → assignment). Features auto-adjustment for insufficient vendor supply, moving unallocated orders to "주문조정" status.
--   **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication (`partner_token` cookie), independent from admin auth. Routes in `server/partner-routes.ts`, frontend pages in `client/src/pages/partner/`. Features: login/dashboard, allocation response, order list + Excel download, tracking registration (individual + bulk Excel), settlement view (정산현황) with order/payment rows and running balance. All data scoped by vendorId for security. Auth context in `client/src/lib/partner-auth.tsx`.
--   **Vendor Payment System**: `vendor_payments` table stores admin-entered payments per vendor. Settlement API merges order rows (from tracking registration) and payment rows chronologically. Running balance = cumulative subtotal - cumulative payments. Admin APIs: GET/POST/DELETE at `/api/admin/vendor-payments`. Partner settlement page at `/partner/settlement` shows both types with blue-highlighted payment rows.
--   **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with 3 tabs. **매출 개요**: 4 summary cards (총 매출액, 주문 건수, 평균 주문금액, 활성 회원 수) with period-over-period growth comparison, AreaChart for revenue trend (auto-granularity: daily/weekly/monthly based on date range), PieChart for top 5 member revenue share, BarChart for top 10 products. **회원별 매출**: Sortable member table with search, drill-down to daily trend + product breakdown per member. **상품별 매출**: Cascading category filters (대/중/소분류) + search, drill-down to daily trend + member breakdown per product. Order list dialog with pagination + Excel export. All data sourced from `pending_orders` where `status='배송중' AND priceConfirmed=true`. APIs: 8 endpoints under `/api/admin/statistics/*` with KST date filtering. Single-file implementation at `client/src/pages/admin/stats.tsx`.
+-   **Outsourcing/Vendor System**: Manages vendors and product mapping, with stock logic differentiating between vendor and self-fulfilled orders.
+-   **Allocation System**: 5-step workflow (aggregation → notification → response → confirmation → assignment) for allocating orders to vendors, with auto-adjustment for insufficient supply.
+-   **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication, offering dashboard, allocation response, order list, tracking registration (individual + bulk Excel), and settlement view.
+-   **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view merging order and payment rows.
+-   **Inquiry Board System (문의 게시판)**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features for both admin and members, integrated with dashboards for notifications.
+-   **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with overview, member-specific, and product-specific sales data, including charts, tables, and Excel export, all sourced from `priceConfirmed=true` orders.
 
 ## External Dependencies
 

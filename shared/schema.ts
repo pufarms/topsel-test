@@ -1733,10 +1733,10 @@ export const insertDirectSaleSchema = createInsertSchema(directSales).omit({
 export type DirectSale = typeof directSales.$inferSelect;
 export type NewDirectSale = z.infer<typeof insertDirectSaleSchema>;
 
-export const inquiryStatuses = ["대기", "답변완료"] as const;
+export const inquiryStatuses = ["대기", "확인중", "답변완료", "추가문의", "종결"] as const;
 export type InquiryStatus = typeof inquiryStatuses[number];
 
-export const inquiryCategories = ["일반문의", "상품문의", "배송문의", "결제문의", "기타"] as const;
+export const inquiryCategories = ["일반문의", "상품CS/미수", "정산/계산서", "회원정보(등급)", "행사특가/변경", "기타"] as const;
 export type InquiryCategory = typeof inquiryCategories[number];
 
 export const inquiries = pgTable("inquiries", {
@@ -1747,9 +1747,13 @@ export const inquiries = pgTable("inquiries", {
   title: varchar("title", { length: 300 }).notNull(),
   content: text("content").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("대기"),
-  answer: text("answer"),
-  answeredBy: varchar("answered_by", { length: 100 }),
-  answeredAt: timestamp("answered_at"),
+  priority: varchar("priority", { length: 10 }).notNull().default("normal"),
+  isStarred: boolean("is_starred").notNull().default(false),
+  closedAt: timestamp("closed_at"),
+  closedBy: varchar("closed_by", { length: 100 }),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  unreadByAdmin: boolean("unread_by_admin").notNull().default(true),
+  unreadByMember: boolean("unread_by_member").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1757,11 +1761,63 @@ export const inquiries = pgTable("inquiries", {
 export const insertInquirySchema = createInsertSchema(inquiries).omit({
   id: true,
   status: true,
-  answer: true,
-  answeredBy: true,
-  answeredAt: true,
+  isStarred: true,
+  closedAt: true,
+  closedBy: true,
+  lastMessageAt: true,
+  unreadByAdmin: true,
+  unreadByMember: true,
   createdAt: true,
   updatedAt: true,
 });
 export type Inquiry = typeof inquiries.$inferSelect;
 export type NewInquiry = z.infer<typeof insertInquirySchema>;
+
+export const inquiryMessages = pgTable("inquiry_messages", {
+  id: serial("id").primaryKey(),
+  inquiryId: integer("inquiry_id").notNull(),
+  senderType: varchar("sender_type", { length: 10 }).notNull(),
+  senderId: varchar("sender_id", { length: 100 }).notNull(),
+  senderName: varchar("sender_name", { length: 100 }).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInquiryMessageSchema = createInsertSchema(inquiryMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InquiryMessage = typeof inquiryMessages.$inferSelect;
+export type NewInquiryMessage = z.infer<typeof insertInquiryMessageSchema>;
+
+export const inquiryFields = pgTable("inquiry_fields", {
+  id: serial("id").primaryKey(),
+  inquiryId: integer("inquiry_id").notNull(),
+  fieldName: varchar("field_name", { length: 100 }).notNull(),
+  fieldValue: text("field_value").notNull(),
+});
+
+export const insertInquiryFieldSchema = createInsertSchema(inquiryFields).omit({
+  id: true,
+});
+export type InquiryField = typeof inquiryFields.$inferSelect;
+export type NewInquiryField = z.infer<typeof insertInquiryFieldSchema>;
+
+export const inquiryAttachments = pgTable("inquiry_attachments", {
+  id: serial("id").primaryKey(),
+  inquiryId: integer("inquiry_id").notNull(),
+  messageId: integer("message_id"),
+  fileName: varchar("file_name", { length: 300 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  fileType: varchar("file_type", { length: 50 }),
+  label: varchar("label", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInquiryAttachmentSchema = createInsertSchema(inquiryAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InquiryAttachment = typeof inquiryAttachments.$inferSelect;
+export type NewInquiryAttachment = z.infer<typeof insertInquiryAttachmentSchema>;

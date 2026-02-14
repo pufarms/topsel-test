@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt, gt } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt, gt, count } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
 
@@ -14839,10 +14839,39 @@ export async function registerRoutes(
   });
 
   // ═══════════════════════════════════════════════════════
-  // 문의 게시판 API
+  // 문의 게시판 API (Thread-based)
   // ═══════════════════════════════════════════════════════
 
-  // 관리자: 문의 목록 조회
+  const inquiryUploadsDir = path.resolve(process.cwd(), "uploads/inquiries");
+  if (!fs.existsSync(inquiryUploadsDir)) {
+    fs.mkdirSync(inquiryUploadsDir, { recursive: true });
+  }
+  const inquiryUpload = multer({ dest: 'uploads/inquiries/', limits: { fileSize: 10 * 1024 * 1024 } });
+
+  // ── Admin APIs ──
+
+  app.get("/api/admin/inquiries/counts", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const allInquiries = await db.select().from(inquiries);
+      const total = allInquiries.length;
+      const byStatus: Record<string, number> = {};
+      const byCategory: Record<string, number> = {};
+      let unreadCount = 0;
+      for (const inq of allInquiries) {
+        byStatus[inq.status] = (byStatus[inq.status] || 0) + 1;
+        byCategory[inq.category] = (byCategory[inq.category] || 0) + 1;
+        if (inq.unreadByAdmin) unreadCount++;
+      }
+      res.json({ total, byStatus, byCategory, unreadCount });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/admin/inquiries", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
@@ -14851,24 +14880,53 @@ export async function registerRoutes(
 
       const status = req.query.status as string | undefined;
       const category = req.query.category as string | undefined;
+      const search = req.query.search as string | undefined;
 
       const conditions: any[] = [];
       if (status && status !== "전체") conditions.push(eq(inquiries.status, status));
       if (category && category !== "전체") conditions.push(eq(inquiries.category, category));
-
-      let rows;
-      if (conditions.length > 0) {
-        rows = await db.select().from(inquiries).where(and(...conditions)).orderBy(desc(inquiries.createdAt));
-      } else {
-        rows = await db.select().from(inquiries).orderBy(desc(inquiries.createdAt));
+      if (search && search.trim()) {
+        const term = `%${search.trim()}%`;
+        conditions.push(or(
+          ilike(inquiries.title, term),
+          ilike(inquiries.content, term),
+          ilike(inquiries.memberName, term)
+        ));
       }
-      res.json(rows);
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const rows = await db.select().from(inquiries)
+        .where(whereClause)
+        .orderBy(
+          sql`CASE WHEN ${inquiries.priority} = 'urgent' THEN 0 ELSE 1 END`,
+          desc(inquiries.lastMessageAt)
+        );
+
+      const inquiryIds = rows.map(r => r.id);
+      let messageCounts: Record<number, number> = {};
+      if (inquiryIds.length > 0) {
+        const counts = await db.select({
+          inquiryId: inquiryMessages.inquiryId,
+          cnt: count()
+        }).from(inquiryMessages)
+          .where(inArray(inquiryMessages.inquiryId, inquiryIds))
+          .groupBy(inquiryMessages.inquiryId);
+        for (const c of counts) {
+          messageCounts[c.inquiryId] = Number(c.cnt);
+        }
+      }
+
+      const result = rows.map(r => ({
+        ...r,
+        messageCount: messageCounts[r.id] || 0,
+      }));
+
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // 관리자: 문의 상세 조회
   app.get("/api/admin/inquiries/:id", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
@@ -14876,36 +14934,75 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
-      const [row] = await db.select().from(inquiries).where(eq(inquiries.id, id));
-      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
-      res.json(row);
+      const [inquiry] = await db.select().from(inquiries).where(eq(inquiries.id, id));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+
+      const messages = await db.select().from(inquiryMessages)
+        .where(eq(inquiryMessages.inquiryId, id))
+        .orderBy(asc(inquiryMessages.createdAt));
+      const fields = await db.select().from(inquiryFields)
+        .where(eq(inquiryFields.inquiryId, id));
+      const attachments = await db.select().from(inquiryAttachments)
+        .where(eq(inquiryAttachments.inquiryId, id));
+
+      res.json({ ...inquiry, messages, fields, attachments });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // 관리자: 문의 답변 등록/수정
-  app.patch("/api/admin/inquiries/:id/answer", async (req, res) => {
+  app.post("/api/admin/inquiries/:id/messages", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
-      const { answer } = req.body;
-      if (!answer || !answer.trim()) return res.status(400).json({ message: "답변 내용을 입력해주세요" });
+      const { content } = req.body;
+      if (!content || !content.trim()) return res.status(400).json({ message: "내용을 입력해주세요" });
 
-      const [row] = await db.update(inquiries)
-        .set({
-          answer: answer.trim(),
-          answeredBy: user.name || user.username,
-          answeredAt: new Date(),
-          status: "답변완료",
-          updatedAt: new Date(),
-        })
-        .where(eq(inquiries.id, id))
-        .returning();
+      const [inquiry] = await db.select().from(inquiries).where(eq(inquiries.id, id));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
 
+      const [message] = await db.insert(inquiryMessages).values({
+        inquiryId: id,
+        senderType: "admin",
+        senderId: user.id,
+        senderName: user.name || user.username,
+        content: content.trim(),
+      }).returning();
+
+      await db.update(inquiries).set({
+        status: "답변완료",
+        unreadByMember: true,
+        unreadByAdmin: false,
+        lastMessageAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(inquiries.id, id));
+
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/inquiries/:id/status", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ message: "상태를 입력해주세요" });
+
+      const updateData: any = { status, updatedAt: new Date() };
+      if (status === "종결") {
+        updateData.closedAt = new Date();
+        updateData.closedBy = user.name || user.username;
+      }
+
+      const [row] = await db.update(inquiries).set(updateData).where(eq(inquiries.id, id)).returning();
       if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
       res.json(row);
     } catch (error: any) {
@@ -14913,7 +15010,38 @@ export async function registerRoutes(
     }
   });
 
-  // 관리자: 문의 삭제
+  app.patch("/api/admin/inquiries/:id/star", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const { isStarred } = req.body;
+
+      const [row] = await db.update(inquiries).set({ isStarred: !!isStarred }).where(eq(inquiries.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/inquiries/:id/read", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.update(inquiries).set({ unreadByAdmin: false }).where(eq(inquiries.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/admin/inquiries/:id", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
@@ -14921,6 +15049,9 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
+      await db.delete(inquiryAttachments).where(eq(inquiryAttachments.inquiryId, id));
+      await db.delete(inquiryFields).where(eq(inquiryFields.inquiryId, id));
+      await db.delete(inquiryMessages).where(eq(inquiryMessages.inquiryId, id));
       const [row] = await db.delete(inquiries).where(eq(inquiries.id, id)).returning();
       if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
       res.json({ message: "삭제 완료" });
@@ -14929,61 +15060,274 @@ export async function registerRoutes(
     }
   });
 
-  // 회원: 내 문의 목록 조회
+  app.post("/api/admin/inquiries/:id/attachments", inquiryUpload.single('file'), async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const [inquiry] = await db.select().from(inquiries).where(eq(inquiries.id, id));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+
+      if (!req.file) return res.status(400).json({ message: "파일을 선택해주세요" });
+
+      const file = req.file;
+      const fileUrl = `/uploads/inquiries/${file.filename}`;
+      const [attachment] = await db.insert(inquiryAttachments).values({
+        inquiryId: id,
+        fileName: file.originalname,
+        fileUrl,
+        fileSize: file.size,
+        fileType: file.mimetype,
+      }).returning();
+
+      res.json(attachment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Member APIs ──
+
+  app.get("/api/member/inquiries/counts", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const myInquiries = await db.select().from(inquiries).where(eq(inquiries.memberId, member.id));
+      const total = myInquiries.length;
+      const byStatus: Record<string, number> = {};
+      let newReplies = 0;
+      for (const inq of myInquiries) {
+        byStatus[inq.status] = (byStatus[inq.status] || 0) + 1;
+        if (inq.unreadByMember) newReplies++;
+      }
+      res.json({ total, byStatus, newReplies });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/member/inquiries", async (req, res) => {
     try {
-      if (!req.session.userId || req.session.userType !== "member") {
-        return res.status(401).json({ message: "로그인 필요" });
-      }
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
       const member = await storage.getMember(req.session.userId);
       if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
 
       const rows = await db.select().from(inquiries)
         .where(eq(inquiries.memberId, member.id))
-        .orderBy(desc(inquiries.createdAt));
-      res.json(rows);
+        .orderBy(desc(inquiries.lastMessageAt));
+
+      const inquiryIds = rows.map(r => r.id);
+      let messageCounts: Record<number, number> = {};
+      if (inquiryIds.length > 0) {
+        const counts = await db.select({
+          inquiryId: inquiryMessages.inquiryId,
+          cnt: count()
+        }).from(inquiryMessages)
+          .where(inArray(inquiryMessages.inquiryId, inquiryIds))
+          .groupBy(inquiryMessages.inquiryId);
+        for (const c of counts) {
+          messageCounts[c.inquiryId] = Number(c.cnt);
+        }
+      }
+
+      const result = rows.map(r => ({
+        ...r,
+        messageCount: messageCounts[r.id] || 0,
+      }));
+
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // 회원: 문의 등록
   app.post("/api/member/inquiries", async (req, res) => {
     try {
-      if (!req.session.userId || req.session.userType !== "member") {
-        return res.status(401).json({ message: "로그인 필요" });
-      }
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
       const member = await storage.getMember(req.session.userId);
       if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
 
-      const parsed = insertInquirySchema.safeParse({
-        ...req.body,
-        memberId: member.id,
-        memberName: member.companyName || member.name,
-      });
-      if (!parsed.success) return res.status(400).json({ message: "입력값이 올바르지 않습니다", errors: parsed.error.flatten() });
+      const { category, title, content, priority, fields } = req.body;
 
-      const [row] = await db.insert(inquiries).values(parsed.data).returning();
-      res.json(row);
+      if (!category) return res.status(400).json({ message: "카테고리를 선택해주세요" });
+      if (!title || !title.trim()) return res.status(400).json({ message: "제목을 입력해주세요" });
+
+      const requiredFieldsMap: Record<string, string[]> = {
+        "일반문의": [],
+        "상품CS/미수": ["담당자/연락처", "상품발송일", "상품명/코드", "수령자", "운송장번호"],
+        "정산/계산서": ["사업자명/ID", "요청금액/내용"],
+        "회원정보(등급)": ["회원아이디", "담당자이름/연락처", "문의접수일"],
+        "행사특가/변경": ["행사상품명/코드", "사이트명/행사명", "판매예상수량", "행사/출고예정일"],
+        "기타": [],
+      };
+
+      const needsContent = category !== "행사특가/변경";
+      if (needsContent && (!content || !content.trim())) {
+        return res.status(400).json({ message: "내용을 입력해주세요" });
+      }
+
+      const requiredFields = requiredFieldsMap[category] || [];
+      if (requiredFields.length > 0) {
+        const fieldMap: Record<string, string> = {};
+        if (Array.isArray(fields)) {
+          for (const f of fields) {
+            if (f.field_name && f.field_value) fieldMap[f.field_name] = f.field_value;
+          }
+        }
+        for (const rf of requiredFields) {
+          if (!fieldMap[rf] || !fieldMap[rf].trim()) {
+            return res.status(400).json({ message: `필수 항목 '${rf}'을(를) 입력해주세요` });
+          }
+        }
+      }
+
+      const [inquiry] = await db.insert(inquiries).values({
+        memberId: member.id,
+        memberName: member.companyName || member.memberName || member.username,
+        category: category,
+        title: title.trim(),
+        content: (content || "").trim(),
+        priority: priority || "normal",
+      }).returning();
+
+      await db.insert(inquiryMessages).values({
+        inquiryId: inquiry.id,
+        senderType: "member",
+        senderId: member.id,
+        senderName: member.companyName || member.memberName || member.username,
+        content: (content || title).trim(),
+      });
+
+      if (Array.isArray(fields) && fields.length > 0) {
+        const fieldValues = fields
+          .filter((f: any) => f.field_name && f.field_value)
+          .map((f: any) => ({
+            inquiryId: inquiry.id,
+            fieldName: f.field_name,
+            fieldValue: f.field_value,
+          }));
+        if (fieldValues.length > 0) {
+          await db.insert(inquiryFields).values(fieldValues);
+        }
+      }
+
+      res.status(201).json(inquiry);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // 회원: 문의 상세 조회
   app.get("/api/member/inquiries/:id", async (req, res) => {
     try {
-      if (!req.session.userId || req.session.userType !== "member") {
-        return res.status(401).json({ message: "로그인 필요" });
-      }
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
       const member = await storage.getMember(req.session.userId);
       if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
 
       const id = parseInt(req.params.id);
-      const [row] = await db.select().from(inquiries)
+      const [inquiry] = await db.select().from(inquiries)
         .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+
+      const messages = await db.select().from(inquiryMessages)
+        .where(eq(inquiryMessages.inquiryId, id))
+        .orderBy(asc(inquiryMessages.createdAt));
+      const fields = await db.select().from(inquiryFields)
+        .where(eq(inquiryFields.inquiryId, id));
+      const attachments = await db.select().from(inquiryAttachments)
+        .where(eq(inquiryAttachments.inquiryId, id));
+
+      res.json({ ...inquiry, messages, fields, attachments });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/member/inquiries/:id/messages", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const id = parseInt(req.params.id);
+      const { content } = req.body;
+      if (!content || !content.trim()) return res.status(400).json({ message: "내용을 입력해주세요" });
+
+      const [inquiry] = await db.select().from(inquiries)
+        .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      if (inquiry.status === "종결") return res.status(400).json({ message: "종결된 문의에는 메시지를 보낼 수 없습니다" });
+
+      const [message] = await db.insert(inquiryMessages).values({
+        inquiryId: id,
+        senderType: "member",
+        senderId: member.id,
+        senderName: member.companyName || member.memberName || member.username,
+        content: content.trim(),
+      }).returning();
+
+      const updateData: any = {
+        unreadByAdmin: true,
+        unreadByMember: false,
+        lastMessageAt: new Date(),
+        updatedAt: new Date(),
+      };
+      if (inquiry.status === "답변완료") {
+        updateData.status = "추가문의";
+      }
+      await db.update(inquiries).set(updateData).where(eq(inquiries.id, id));
+
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/member/inquiries/:id/read", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.update(inquiries)
+        .set({ unreadByMember: false })
+        .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)))
+        .returning();
       if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
       res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/member/inquiries/:id/attachments", inquiryUpload.single('file'), async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") return res.status(401).json({ message: "로그인 필요" });
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const id = parseInt(req.params.id);
+      const [inquiry] = await db.select().from(inquiries)
+        .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)));
+      if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+
+      if (!req.file) return res.status(400).json({ message: "파일을 선택해주세요" });
+
+      const file = req.file;
+      const fileUrl = `/uploads/inquiries/${file.filename}`;
+      const [attachment] = await db.insert(inquiryAttachments).values({
+        inquiryId: id,
+        fileName: file.originalname,
+        fileUrl,
+        fileSize: file.size,
+        fileType: file.mimetype,
+      }).returning();
+
+      res.json(attachment);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

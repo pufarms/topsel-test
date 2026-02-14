@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { 
@@ -210,6 +211,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const { data: inquiryCounts } = useQuery<{ total: number; byStatus: Record<string, number>; byCategory: Record<string, number>; unreadCount: number }>({
+    queryKey: ["/api/admin/inquiries/counts"],
+    refetchInterval: 30000,
+  });
+  const unreadInquiryCount = inquiryCounts?.unreadCount ?? 0;
+
   const handleLogout = async () => {
     await logout();
     navigate("/");
@@ -289,7 +296,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <TooltipTrigger asChild>
             <Link href={item.path!}>
               <div
-                className={`flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
+                className={`relative flex items-center justify-center p-2.5 rounded-md cursor-pointer transition-colors ${
                   isActive(item.path)
                     ? "bg-slate-700/70 text-sky-400 ring-1 ring-sky-400/50"
                     : "text-slate-300 hover:bg-slate-800 hover:text-white"
@@ -297,6 +304,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 data-testid={`menu-${item.id}`}
               >
                 {item.icon}
+                {item.id === "board" && unreadInquiryCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full min-w-[16px] h-4 flex items-center justify-center font-bold px-0.5">
+                    {unreadInquiryCount}
+                  </span>
+                )}
               </div>
             </Link>
           </TooltipTrigger>
@@ -380,15 +392,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <Link key={item.id} href={item.path!} onClick={() => setMobileOpen(false)}>
         <span
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${
+          className={`flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer transition-colors ${
             isActive(item.path)
               ? "bg-slate-700/70 text-sky-400 border-l-2 border-sky-400 ml-[-2px] pl-[13px]"
               : "text-slate-300 hover:bg-slate-800 hover:text-white"
           }`}
           data-testid={`menu-${item.id}`}
         >
-          {item.icon}
-          <span>{item.label}</span>
+          <span className="flex items-center gap-3">
+            {item.icon}
+            <span>{item.label}</span>
+          </span>
+          {item.id === "board" && unreadInquiryCount > 0 && (
+            <span className="bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center font-bold px-1" data-testid="badge-inquiry-unread">
+              {unreadInquiryCount}
+            </span>
+          )}
         </span>
       </Link>
     );

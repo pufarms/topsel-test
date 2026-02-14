@@ -96,9 +96,10 @@ interface SidebarItemProps {
   children?: { label: string; tab: SidebarTab }[];
   isOpen?: boolean;
   onToggle?: () => void;
+  badge?: number;
 }
 
-function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, onToggle }: SidebarItemProps) {
+function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, onToggle, badge }: SidebarItemProps) {
   const isActive = activeTab === tab || children?.some(c => c.tab === activeTab);
   const showChildren = children && (isOpen ?? isActive);
   
@@ -126,12 +127,16 @@ function SidebarItem({ icon, label, tab, activeTab, onClick, children, isOpen, o
       >
         {icon}
         <span>{label}</span>
-        {children && children.length > 0 && (
+        {badge && badge > 0 ? (
+          <span className="ml-auto bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center font-bold px-1" data-testid={`badge-${tab}`}>
+            {badge}
+          </span>
+        ) : children && children.length > 0 ? (
           <ChevronRight className={cn(
             "ml-auto h-4 w-4 transition-transform",
             showChildren && "rotate-90"
           )} />
-        )}
+        ) : null}
       </button>
       {showChildren && (
         <div className="ml-4 mt-1 space-y-1 border-l-2 border-muted pl-4">
@@ -197,6 +202,63 @@ const memberGradeLabels: Record<string, string> = {
   TOP: "탑셀러",
 };
 
+function InquiryDashboardCard({ onNavigate }: { onNavigate: () => void }) {
+  const { data: counts } = useQuery<{ total: number; byStatus: Record<string, number>; newReplies: number }>({
+    queryKey: ["/api/member/inquiries/counts"],
+  });
+
+  const total = counts?.total ?? 0;
+  const pending = counts?.byStatus?.["대기"] ?? 0;
+  const newReplies = counts?.newReplies ?? 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-purple-600" />
+            <CardTitle className="text-base">문의게시판</CardTitle>
+            {newReplies > 0 && (
+              <Badge variant="destructive" className="text-xs" data-testid="badge-new-replies">
+                새 답변 {newReplies}
+              </Badge>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={onNavigate} data-testid="button-inquiry-more">
+            더보기
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {total === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">등록된 문의가 없습니다</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={onNavigate} data-testid="button-first-inquiry">
+              문의하기
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-3 rounded-lg bg-muted/50">
+              <div className="text-lg font-bold text-foreground">{total}</div>
+              <div className="text-xs text-muted-foreground">전체 문의</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
+              <div className="text-lg font-bold text-red-600">{pending}</div>
+              <div className="text-xs text-muted-foreground">답변 대기</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <div className="text-lg font-bold text-blue-600">{newReplies}</div>
+              <div className="text-xs text-muted-foreground">새 답변</div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
@@ -213,6 +275,12 @@ export default function Dashboard() {
 
   // SSE 실시간 업데이트 연결 (회원만)
   useSSE({}, !!isMember);
+
+  const { data: memberInquiryCounts } = useQuery<{ total: number; byStatus: Record<string, number>; newReplies: number }>({
+    queryKey: ["/api/member/inquiries/counts"],
+    enabled: !!isMember,
+    refetchInterval: 30000,
+  });
   
   // 메뉴 토글 함수 (아코디언 동작)
   const toggleMenu = (menuId: string) => {
@@ -819,6 +887,7 @@ export default function Dashboard() {
         tab="inquiry"
         activeTab={activeTab}
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+        badge={memberInquiryCounts?.newReplies}
       />
       <SidebarItem
         icon={<BookOpen className="h-4 w-4" />}
@@ -1138,28 +1207,7 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5 text-purple-600" />
-                        <CardTitle className="text-base">문의게시판</CardTitle>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("inquiry")}>
-                        더보기
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">등록된 문의가 없습니다</p>
-                      <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab("inquiry")}>
-                        문의하기
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <InquiryDashboardCard onNavigate={() => setActiveTab("inquiry")} />
               </div>
 
               <Card>

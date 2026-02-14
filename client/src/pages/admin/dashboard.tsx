@@ -217,13 +217,17 @@ export default function AdminDashboard() {
     { label: "Top회원", value: tierCounts.TOP, unit: "명", color: "text-emerald-600", bg: "bg-emerald-100", border: "border-emerald-300", icon: <Crown className="h-4 w-4" /> },
   ];
 
+  const { data: inquiryCounts } = useQuery<{ total: number; byStatus: Record<string, number>; byCategory: Record<string, number>; unreadCount: number }>({
+    queryKey: ["/api/admin/inquiries/counts"],
+  });
+
   const inquiryCardDefs = [
-    { label: "일반 문의", value: 0, icon: <HelpCircle className="h-4 w-4" />, border: "border-blue-300", text: "text-blue-600" },
-    { label: "상품 CS/미수", value: 0, icon: <AlertCircle className="h-4 w-4" />, border: "border-red-300", text: "text-red-600" },
-    { label: "정산/계산서", value: 0, icon: <FileText className="h-4 w-4" />, border: "border-yellow-300", text: "text-yellow-600" },
-    { label: "회원정보(등급)", value: 0, icon: <Users className="h-4 w-4" />, border: "border-orange-300", text: "text-orange-600" },
-    { label: "행사특가/변경", value: 0, icon: <Gift className="h-4 w-4" />, border: "border-green-300", text: "text-green-600" },
-    { label: "기타", value: 0, icon: <MessageSquare className="h-4 w-4" />, border: "border-gray-300", text: "text-gray-600" },
+    { label: "일반문의", value: inquiryCounts?.byCategory?.["일반문의"] ?? 0, icon: <HelpCircle className="h-4 w-4" />, border: "border-blue-300", text: "text-blue-600" },
+    { label: "상품CS/미수", value: inquiryCounts?.byCategory?.["상품CS/미수"] ?? 0, icon: <AlertCircle className="h-4 w-4" />, border: "border-red-300", text: "text-red-600" },
+    { label: "정산/계산서", value: inquiryCounts?.byCategory?.["정산/계산서"] ?? 0, icon: <FileText className="h-4 w-4" />, border: "border-yellow-300", text: "text-yellow-600" },
+    { label: "회원정보(등급)", value: inquiryCounts?.byCategory?.["회원정보(등급)"] ?? 0, icon: <Users className="h-4 w-4" />, border: "border-orange-300", text: "text-orange-600" },
+    { label: "행사특가/변경", value: inquiryCounts?.byCategory?.["행사특가/변경"] ?? 0, icon: <Gift className="h-4 w-4" />, border: "border-green-300", text: "text-green-600" },
+    { label: "기타", value: inquiryCounts?.byCategory?.["기타"] ?? 0, icon: <MessageSquare className="h-4 w-4" />, border: "border-gray-300", text: "text-gray-600" },
   ];
 
   return (
