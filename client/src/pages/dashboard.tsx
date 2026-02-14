@@ -70,6 +70,7 @@ import MemberOrderList from "@/pages/member/order-list";
 import MemberProductList from "@/pages/member/product-list";
 import MemberSettlementTab from "@/pages/member/settlement-tab";
 import MemberStatsTab from "@/pages/member/member-stats-tab";
+import MemberInquiryTab from "@/pages/member/inquiry-tab";
 
 type SidebarTab = 
   | "dashboard" 
@@ -1144,7 +1145,7 @@ export default function Dashboard() {
                         <MessageSquare className="h-5 w-5 text-purple-600" />
                         <CardTitle className="text-base">문의게시판</CardTitle>
                       </div>
-                      <Button variant="ghost" size="sm" className="text-xs">
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("inquiry")}>
                         더보기
                       </Button>
                     </div>
@@ -1153,7 +1154,7 @@ export default function Dashboard() {
                     <div className="text-center py-8 text-muted-foreground">
                       <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">등록된 문의가 없습니다</p>
-                      <Button variant="outline" size="sm" className="mt-3">
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab("inquiry")}>
                         문의하기
                       </Button>
                     </div>
@@ -1806,6 +1807,10 @@ export default function Dashboard() {
 
               {activeTab === "member-stats" && (
                 <MemberStatsTab />
+              )}
+
+              {activeTab === "inquiry" && (
+                <MemberInquiryTab />
               )}
           </main>
         </div>

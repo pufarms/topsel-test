@@ -1732,3 +1732,36 @@ export const insertDirectSaleSchema = createInsertSchema(directSales).omit({
 });
 export type DirectSale = typeof directSales.$inferSelect;
 export type NewDirectSale = z.infer<typeof insertDirectSaleSchema>;
+
+export const inquiryStatuses = ["대기", "답변완료"] as const;
+export type InquiryStatus = typeof inquiryStatuses[number];
+
+export const inquiryCategories = ["일반문의", "상품문의", "배송문의", "결제문의", "기타"] as const;
+export type InquiryCategory = typeof inquiryCategories[number];
+
+export const inquiries = pgTable("inquiries", {
+  id: serial("id").primaryKey(),
+  memberId: varchar("member_id").notNull(),
+  memberName: varchar("member_name", { length: 100 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull().default("일반문의"),
+  title: varchar("title", { length: 300 }).notNull(),
+  content: text("content").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("대기"),
+  answer: text("answer"),
+  answeredBy: varchar("answered_by", { length: 100 }),
+  answeredAt: timestamp("answered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertInquirySchema = createInsertSchema(inquiries).omit({
+  id: true,
+  status: true,
+  answer: true,
+  answeredBy: true,
+  answeredAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Inquiry = typeof inquiries.$inferSelect;
+export type NewInquiry = z.infer<typeof insertInquirySchema>;

@@ -16,6 +16,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminOrders from "@/pages/admin/orders";
 import AdminGallery from "@/pages/admin/gallery";
+import BoardManagement from "@/pages/admin/board-management";
 import AdminManagement from "@/pages/admin/admins";
 import VendorManagement from "@/pages/admin/vendors";
 import MemberManagement from "@/pages/admin/members";
@@ -217,6 +218,9 @@ function Router() {
       </Route>
       <Route path="/admin/settings/gallery">
         <AdminRoute><AdminGallery /></AdminRoute>
+      </Route>
+      <Route path="/admin/board">
+        <AdminRoute><BoardManagement /></AdminRoute>
       </Route>
 
       <Route path="/partner/login">

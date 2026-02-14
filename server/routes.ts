@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -14833,6 +14833,157 @@ export async function registerRoutes(
       const [row] = await db.delete(directSales).where(eq(directSales.id, id)).returning();
       if (!row) return res.status(404).json({ message: "해당 매출을 찾을 수 없습니다" });
       res.json({ message: "삭제 완료" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════
+  // 문의 게시판 API
+  // ═══════════════════════════════════════════════════════
+
+  // 관리자: 문의 목록 조회
+  app.get("/api/admin/inquiries", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const status = req.query.status as string | undefined;
+      const category = req.query.category as string | undefined;
+
+      const conditions: any[] = [];
+      if (status && status !== "전체") conditions.push(eq(inquiries.status, status));
+      if (category && category !== "전체") conditions.push(eq(inquiries.category, category));
+
+      let rows;
+      if (conditions.length > 0) {
+        rows = await db.select().from(inquiries).where(and(...conditions)).orderBy(desc(inquiries.createdAt));
+      } else {
+        rows = await db.select().from(inquiries).orderBy(desc(inquiries.createdAt));
+      }
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 문의 상세 조회
+  app.get("/api/admin/inquiries/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.select().from(inquiries).where(eq(inquiries.id, id));
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 문의 답변 등록/수정
+  app.patch("/api/admin/inquiries/:id/answer", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const { answer } = req.body;
+      if (!answer || !answer.trim()) return res.status(400).json({ message: "답변 내용을 입력해주세요" });
+
+      const [row] = await db.update(inquiries)
+        .set({
+          answer: answer.trim(),
+          answeredBy: user.name || user.username,
+          answeredAt: new Date(),
+          status: "답변완료",
+          updatedAt: new Date(),
+        })
+        .where(eq(inquiries.id, id))
+        .returning();
+
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 문의 삭제
+  app.delete("/api/admin/inquiries/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "로그인 필요" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.delete(inquiries).where(eq(inquiries.id, id)).returning();
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json({ message: "삭제 완료" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 내 문의 목록 조회
+  app.get("/api/member/inquiries", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "로그인 필요" });
+      }
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const rows = await db.select().from(inquiries)
+        .where(eq(inquiries.memberId, member.id))
+        .orderBy(desc(inquiries.createdAt));
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 문의 등록
+  app.post("/api/member/inquiries", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "로그인 필요" });
+      }
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const parsed = insertInquirySchema.safeParse({
+        ...req.body,
+        memberId: member.id,
+        memberName: member.companyName || member.name,
+      });
+      if (!parsed.success) return res.status(400).json({ message: "입력값이 올바르지 않습니다", errors: parsed.error.flatten() });
+
+      const [row] = await db.insert(inquiries).values(parsed.data).returning();
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 회원: 문의 상세 조회
+  app.get("/api/member/inquiries/:id", async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== "member") {
+        return res.status(401).json({ message: "로그인 필요" });
+      }
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const id = parseInt(req.params.id);
+      const [row] = await db.select().from(inquiries)
+        .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)));
+      if (!row) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
+      res.json(row);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

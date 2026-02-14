@@ -32,7 +32,8 @@ import {
   Warehouse,
   Shield,
   MessageSquare,
-  Landmark
+  Landmark,
+  ClipboardList
 } from "lucide-react";
 
 interface MenuItem {
@@ -98,6 +99,7 @@ const menuItems: MenuItem[] = [
   { id: "settlements", label: "회계장부", icon: <Calculator className="h-5 w-5" />, path: "/admin/settlements" },
   { id: "bankda-deposits", label: "입금관리", icon: <Landmark className="h-5 w-5" />, path: "/admin/bankda-deposits" },
   { id: "stats", label: "통계관리", icon: <BarChart3 className="h-5 w-5" />, path: "/admin/stats" },
+  { id: "board", label: "게시판 관리", icon: <ClipboardList className="h-5 w-5" />, path: "/admin/board" },
   { id: "coupons", label: "쿠폰관리", icon: <Ticket className="h-5 w-5" />, path: "/admin/coupons" },
   { 
     id: "kakao-notifications", 
