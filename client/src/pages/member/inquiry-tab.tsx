@@ -153,15 +153,18 @@ export default function MemberInquiryTab() {
 
   const { data: inquiries = [], isLoading: inquiriesLoading } = useQuery<InquiryWithCount[]>({
     queryKey: ["/api/member/inquiries"],
+    refetchInterval: 5000,
   });
 
   const { data: counts } = useQuery<InquiryCounts>({
     queryKey: ["/api/member/inquiries/counts"],
+    refetchInterval: 5000,
   });
 
   const { data: detail, isLoading: detailLoading } = useQuery<InquiryDetail>({
     queryKey: ["/api/member/inquiries", selectedInquiryId],
     enabled: !!selectedInquiryId && activeView === "detail",
+    refetchInterval: 3000,
   });
 
   const refetchAllInquiries = async () => {

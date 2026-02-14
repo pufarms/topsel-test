@@ -80,6 +80,7 @@ export default function BoardManagement() {
 
   const { data: counts } = useQuery<InquiryCounts>({
     queryKey: ["/api/admin/inquiries/counts"],
+    refetchInterval: 5000,
   });
 
   const { data: inquiries = [], isLoading: isListLoading } = useQuery<InquiryWithCount[]>({
@@ -93,6 +94,7 @@ export default function BoardManagement() {
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
+    refetchInterval: 5000,
   });
 
   const { data: detail, isLoading: isDetailLoading } = useQuery<InquiryDetail>({
@@ -103,6 +105,7 @@ export default function BoardManagement() {
       return res.json();
     },
     enabled: !!selectedInquiryId,
+    refetchInterval: 3000,
   });
 
   const refetchAllInquiries = async () => {
