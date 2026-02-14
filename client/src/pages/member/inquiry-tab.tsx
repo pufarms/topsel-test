@@ -164,14 +164,18 @@ export default function MemberInquiryTab() {
     enabled: !!selectedInquiryId && activeView === "detail",
   });
 
+  const refetchAllInquiries = async () => {
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ["/api/member/inquiries"] }),
+      queryClient.refetchQueries({ queryKey: ["/api/member/inquiries/counts"] }),
+    ]);
+  };
+
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("PATCH", `/api/member/inquiries/${id}/read`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries/counts"] });
-    },
+    onSuccess: () => { refetchAllInquiries(); },
   });
 
   const createMutation = useMutation({
@@ -180,8 +184,7 @@ export default function MemberInquiryTab() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries/counts"] });
+      refetchAllInquiries();
       setSelectedCategory("");
       setFormData({});
       setIsUrgent(false);
@@ -199,9 +202,8 @@ export default function MemberInquiryTab() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries", selectedInquiryId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/member/inquiries/counts"] });
+      queryClient.refetchQueries({ queryKey: ["/api/member/inquiries", selectedInquiryId] });
+      refetchAllInquiries();
       setReplyText("");
       toast({ title: "추가 문의가 등록되었습니다" });
     },

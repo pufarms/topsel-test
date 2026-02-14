@@ -105,14 +105,18 @@ export default function BoardManagement() {
     enabled: !!selectedInquiryId,
   });
 
+  const refetchAllInquiries = async () => {
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ["/api/admin/inquiries"] }),
+      queryClient.refetchQueries({ queryKey: ["/api/admin/inquiries/counts"] }),
+    ]);
+  };
+
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("PATCH", `/api/admin/inquiries/${id}/read`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries/counts"] });
-    },
+    onSuccess: () => { refetchAllInquiries(); },
   });
 
   const replyMutation = useMutation({
@@ -121,8 +125,7 @@ export default function BoardManagement() {
     },
     onSuccess: () => {
       setReplyText("");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries/counts"] });
+      refetchAllInquiries();
       toast({ title: "답변이 등록되었습니다" });
     },
     onError: () => {
@@ -135,8 +138,7 @@ export default function BoardManagement() {
       await apiRequest("PATCH", `/api/admin/inquiries/${id}/status`, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries/counts"] });
+      refetchAllInquiries();
       toast({ title: "상태가 변경되었습니다" });
     },
     onError: () => {
@@ -149,7 +151,7 @@ export default function BoardManagement() {
       await apiRequest("PATCH", `/api/admin/inquiries/${id}/star`, { isStarred });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries"] });
+      queryClient.refetchQueries({ queryKey: ["/api/admin/inquiries"] });
     },
   });
 
@@ -159,8 +161,7 @@ export default function BoardManagement() {
     },
     onSuccess: () => {
       setSelectedInquiryId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/inquiries/counts"] });
+      refetchAllInquiries();
       toast({ title: "문의가 삭제되었습니다" });
     },
     onError: () => {
