@@ -678,6 +678,9 @@ interface DSItemRow {
   quantity: string;
   unit: string;
   unitPrice: string;
+  categoryL?: string;
+  categoryM?: string;
+  categoryS?: string;
 }
 
 interface DSMaterialItem {
@@ -859,6 +862,16 @@ function DirectSalesManagement() {
   });
   const allProductStocks = productStocksData || [];
 
+  const { data: currentProductsData } = useQuery<any[]>({
+    queryKey: ["/api/current-products"],
+    queryFn: async () => {
+      const res = await fetch("/api/current-products", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const allCurrentProducts = currentProductsData || [];
+
   const filteredClients = useMemo(() => {
     if (!clientSearchText.trim()) return dropdownItems;
     const term = clientSearchText.toLowerCase();
@@ -928,12 +941,26 @@ function DirectSalesManagement() {
   };
 
   const selectSuggestion = (idx: number, item: SuggestionItem) => {
+    let categoryL = "";
+    let categoryM = "";
+    let categoryS = "";
+    if (item.type === "product") {
+      const cp = allCurrentProducts.find((p: any) => p.productCode === item.code);
+      if (cp) {
+        categoryL = cp.categoryLarge || "";
+        categoryM = cp.categoryMedium || "";
+        categoryS = cp.categorySmall || "";
+      }
+    }
     setAddItems(prev => prev.map((row, i) => i === idx ? {
       ...row,
       productName: item.name,
       materialCode: item.code,
       materialType: item.type,
       unit: getUnitByType(item.type),
+      categoryL,
+      categoryM,
+      categoryS,
     } : row));
     setProductSuggestionIdx(null);
   };
@@ -1022,6 +1049,13 @@ function DirectSalesManagement() {
         description: item.productName,
         amount: amt,
         memo: addMemo || null,
+        productCode: item.materialType === "product" ? item.materialCode : null,
+        productName: item.productName || null,
+        quantity: item.quantity ? parseInt(item.quantity) : null,
+        unitPrice: item.unitPrice ? parseInt(item.unitPrice) : null,
+        categoryL: item.categoryL || null,
+        categoryM: item.categoryM || null,
+        categoryS: item.categoryS || null,
         stockItems: item.materialCode ? [{
           materialCode: item.materialCode,
           materialType: item.materialType,

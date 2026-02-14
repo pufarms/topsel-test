@@ -1721,6 +1721,13 @@ export const directSales = pgTable("direct_sales", {
   description: text("description").notNull(),
   amount: integer("amount").notNull(),
   memo: text("memo"),
+  productCode: varchar("product_code", { length: 100 }),
+  productName: varchar("product_name", { length: 300 }),
+  quantity: integer("quantity"),
+  unitPrice: integer("unit_price"),
+  categoryL: varchar("category_l", { length: 100 }),
+  categoryM: varchar("category_m", { length: 100 }),
+  categoryS: varchar("category_s", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

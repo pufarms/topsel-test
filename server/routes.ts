@@ -12512,14 +12512,31 @@ export async function registerRoutes(
         totalOrders: sql<number>`COUNT(*)`,
       }).from(pendingOrders).where(and(...baseConditions));
 
-      const totalRevenue = Number(summaryResult.totalRevenue);
-      const totalOrders = Number(summaryResult.totalOrders);
+      const startDateStr = startDate || '1970-01-01';
+      const endDateStr = endDate || '2099-12-31';
+
+      const [dsSummary] = await db.select({
+        dsRevenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+        dsCount: sql<number>`COUNT(*)`,
+      }).from(directSales).where(and(
+        gte(directSales.saleDate, startDateStr),
+        lte(directSales.saleDate, endDateStr),
+      ));
+
+      const totalRevenue = Number(summaryResult.totalRevenue) + Number(dsSummary.dsRevenue);
+      const totalOrders = Number(summaryResult.totalOrders) + Number(dsSummary.dsCount);
       const avgOrderAmount = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
       const [activeMemberResult] = await db.select({
         count: sql<number>`COUNT(DISTINCT ${pendingOrders.memberId})`,
       }).from(pendingOrders).where(and(...baseConditions));
-      const activeMemberCount = Number(activeMemberResult.count);
+      const [dsClientCount] = await db.select({
+        count: sql<number>`COUNT(DISTINCT ${directSales.clientName})`,
+      }).from(directSales).where(and(
+        gte(directSales.saleDate, startDateStr),
+        lte(directSales.saleDate, endDateStr),
+      ));
+      const activeMemberCount = Number(activeMemberResult.count) + Number(dsClientCount.count);
 
       const duration = endUTC.getTime() - startUTC.getTime();
       const prevStart = new Date(startUTC.getTime() - duration);
@@ -12537,8 +12554,19 @@ export async function registerRoutes(
         prevOrders: sql<number>`COUNT(*)`,
       }).from(pendingOrders).where(and(...prevConditions));
 
-      const prevRevenue = Number(prevResult.prevRevenue);
-      const prevOrders = Number(prevResult.prevOrders);
+      const prevDays = Math.ceil(duration / (1000 * 60 * 60 * 24));
+      const prevStartDateStr = prevStart.toISOString().slice(0, 10);
+      const prevEndDateStr = prevEnd.toISOString().slice(0, 10);
+      const [dsPrevSummary] = await db.select({
+        dsRevenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+        dsCount: sql<number>`COUNT(*)`,
+      }).from(directSales).where(and(
+        gte(directSales.saleDate, prevStartDateStr),
+        lt(directSales.saleDate, prevEndDateStr),
+      ));
+
+      const prevRevenue = Number(prevResult.prevRevenue) + Number(dsPrevSummary.dsRevenue);
+      const prevOrders = Number(prevResult.prevOrders) + Number(dsPrevSummary.dsCount);
       const revenueGrowth = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 10000) / 100 : 0;
       const ordersGrowth = prevOrders > 0 ? Math.round(((totalOrders - prevOrders) / prevOrders) * 10000) / 100 : 0;
 
@@ -12561,6 +12589,47 @@ export async function registerRoutes(
         .groupBy(dateBucket)
         .orderBy(dateBucket);
 
+      let dsTrendBucket: string;
+      if (daysDiff <= 31) dsTrendBucket = 'YYYY-MM-DD';
+      else if (daysDiff <= 90) dsTrendBucket = 'week';
+      else dsTrendBucket = 'month';
+
+      let dsTrendQuery;
+      if (dsTrendBucket === 'YYYY-MM-DD') {
+        dsTrendQuery = await db.select({
+          date: directSales.saleDate,
+          revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+          orders: sql<number>`COUNT(*)`,
+        }).from(directSales).where(and(
+          gte(directSales.saleDate, startDateStr),
+          lte(directSales.saleDate, endDateStr),
+        )).groupBy(directSales.saleDate);
+      } else {
+        const truncFn = dsTrendBucket === 'week' ? 'week' : 'month';
+        dsTrendQuery = await db.select({
+          date: sql<string>`TO_CHAR(DATE_TRUNC('${sql.raw(truncFn)}', ${directSales.saleDate}::date), 'YYYY-MM-DD')`.as('date'),
+          revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+          orders: sql<number>`COUNT(*)`,
+        }).from(directSales).where(and(
+          gte(directSales.saleDate, startDateStr),
+          lte(directSales.saleDate, endDateStr),
+        )).groupBy(sql`DATE_TRUNC('${sql.raw(truncFn)}', ${directSales.saleDate}::date)`);
+      }
+
+      const trendMap = new Map<string, { revenue: number; orders: number }>();
+      for (const t of trend) {
+        const d = String(t.date);
+        trendMap.set(d, { revenue: Number(t.revenue), orders: Number(t.orders) });
+      }
+      for (const t of dsTrendQuery) {
+        const d = String(t.date);
+        const existing = trendMap.get(d) || { revenue: 0, orders: 0 };
+        trendMap.set(d, { revenue: existing.revenue + Number(t.revenue), orders: existing.orders + Number(t.orders) });
+      }
+      const mergedTrend = Array.from(trendMap.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
       const topMembers = await db.select({
         memberId: pendingOrders.memberId,
         companyName: pendingOrders.memberCompanyName,
@@ -12569,7 +12638,24 @@ export async function registerRoutes(
         .where(and(...baseConditions))
         .groupBy(pendingOrders.memberId, pendingOrders.memberCompanyName)
         .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`))
-        .limit(5);
+        .limit(10);
+
+      const dsTopClients = await db.select({
+        clientName: directSales.clientName,
+        revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+      }).from(directSales).where(and(
+        gte(directSales.saleDate, startDateStr),
+        lte(directSales.saleDate, endDateStr),
+      )).groupBy(directSales.clientName)
+        .orderBy(desc(sql`COALESCE(SUM(${directSales.amount}), 0)`))
+        .limit(10);
+
+      const allClients: { memberId: string; companyName: string | null; revenue: number; source: string }[] = [
+        ...topMembers.map(m => ({ memberId: m.memberId, companyName: m.companyName, revenue: Number(m.revenue), source: 'member' })),
+        ...dsTopClients.map(c => ({ memberId: `ds_${c.clientName}`, companyName: c.clientName, revenue: Number(c.revenue), source: 'direct' })),
+      ];
+      allClients.sort((a, b) => b.revenue - a.revenue);
+      const mergedTopMembers = allClients.slice(0, 5);
 
       const topProducts = await db.select({
         productName: pendingOrders.productName,
@@ -12580,7 +12666,47 @@ export async function registerRoutes(
         .where(and(...baseConditions))
         .groupBy(pendingOrders.productCode, pendingOrders.productName)
         .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`))
-        .limit(10);
+        .limit(20);
+
+      const dsTopProducts = await db.select({
+        productCode: directSales.productCode,
+        productName: directSales.productName,
+        revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
+        quantity: sql<number>`COALESCE(SUM(${directSales.quantity}), COUNT(*))`,
+      }).from(directSales).where(and(
+        gte(directSales.saleDate, startDateStr),
+        lte(directSales.saleDate, endDateStr),
+        isNotNull(directSales.productCode),
+      )).groupBy(directSales.productCode, directSales.productName)
+        .orderBy(desc(sql`COALESCE(SUM(${directSales.amount}), 0)`))
+        .limit(20);
+
+      const productMap = new Map<string, { productName: string | null; productCode: string | null; revenue: number; quantity: number }>();
+      for (const p of topProducts) {
+        const key = `member_${p.productCode || ''}_${p.productName || ''}`;
+        productMap.set(key, { productName: p.productName, productCode: p.productCode, revenue: Number(p.revenue), quantity: Number(p.quantity) });
+      }
+      let dsOverIdx = 0;
+      for (const p of dsTopProducts) {
+        dsOverIdx++;
+        if (p.productCode) {
+          let found = false;
+          for (const [k, v] of productMap) {
+            if (v.productCode === p.productCode) {
+              v.revenue += Number(p.revenue);
+              v.quantity += Number(p.quantity);
+              found = true;
+              break;
+            }
+          }
+          if (found) continue;
+        }
+        const key = `direct_${p.productCode || ''}_${p.productName || ''}_${dsOverIdx}`;
+        productMap.set(key, { productName: p.productName || p.productCode || '기타(직접매출)', productCode: p.productCode, revenue: Number(p.revenue), quantity: Number(p.quantity) });
+      }
+      const mergedTopProducts = Array.from(productMap.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 10);
 
       res.json({
         summary: {
@@ -12593,9 +12719,9 @@ export async function registerRoutes(
           revenueGrowth,
           ordersGrowth,
         },
-        trend: trend.map(t => ({ date: t.date, revenue: Number(t.revenue), orders: Number(t.orders) })),
-        topMembers: topMembers.map(m => ({ memberId: m.memberId, companyName: m.companyName, revenue: Number(m.revenue) })),
-        topProducts: topProducts.map(p => ({ productName: p.productName, productCode: p.productCode, revenue: Number(p.revenue), quantity: Number(p.quantity) })),
+        trend: mergedTrend,
+        topMembers: mergedTopMembers.map(m => ({ memberId: m.memberId, companyName: m.companyName, revenue: m.revenue, source: m.source })),
+        topProducts: mergedTopProducts.map(p => ({ productName: p.productName, productCode: p.productCode, revenue: p.revenue, quantity: p.quantity })),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -12648,10 +12774,31 @@ export async function registerRoutes(
         }
       }
 
-      const totalRevenue = memberStats.reduce((sum, m) => sum + Number(m.revenue), 0);
+      const { startUTC: byMemberStartUTC, endUTC: byMemberEndUTC } = parseDateRangeKST(startDate, endDate);
+      const byMemberStartStr = startDate || '1970-01-01';
+      const byMemberEndStr = endDate || '2099-12-31';
 
-      res.json({
-        members: memberStats.map(m => ({
+      const dsClientConditions: any[] = [
+        gte(directSales.saleDate, byMemberStartStr),
+        lte(directSales.saleDate, byMemberEndStr),
+      ];
+      if (search && search.trim()) {
+        dsClientConditions.push(ilike(directSales.clientName, `%${search.trim()}%`));
+      }
+
+      const dsClientStats = await db.select({
+        clientName: directSales.clientName,
+        orderCount: sql<number>`COUNT(*)`.as('order_count'),
+        revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`.as('revenue'),
+        firstOrderDate: sql<string>`MIN(${directSales.saleDate})`.as('first_order_date'),
+        lastOrderDate: sql<string>`MAX(${directSales.saleDate})`.as('last_order_date'),
+      }).from(directSales)
+        .where(and(...dsClientConditions))
+        .groupBy(directSales.clientName)
+        .orderBy(desc(sql`COALESCE(SUM(${directSales.amount}), 0)`));
+
+      const allMembers: any[] = [
+        ...memberStats.map(m => ({
           memberId: m.memberId,
           companyName: m.companyName,
           memberName: memberNameMap[m.memberId] || '',
@@ -12660,7 +12807,26 @@ export async function registerRoutes(
           avgOrderAmount: Number(m.orderCount) > 0 ? Math.round(Number(m.revenue) / Number(m.orderCount)) : 0,
           firstOrderDate: m.firstOrderDate || '',
           lastOrderDate: m.lastOrderDate || '',
+          source: 'member',
         })),
+        ...dsClientStats.map(c => ({
+          memberId: `direct_${c.clientName}`,
+          companyName: c.clientName,
+          memberName: c.clientName,
+          orderCount: Number(c.orderCount),
+          revenue: Number(c.revenue),
+          avgOrderAmount: Number(c.orderCount) > 0 ? Math.round(Number(c.revenue) / Number(c.orderCount)) : 0,
+          firstOrderDate: c.firstOrderDate || '',
+          lastOrderDate: c.lastOrderDate || '',
+          source: 'direct',
+        })),
+      ];
+      allMembers.sort((a, b) => b.revenue - a.revenue);
+
+      const totalRevenue = allMembers.reduce((sum, m) => sum + m.revenue, 0);
+
+      res.json({
+        members: allMembers,
         totalRevenue,
       });
     } catch (error: any) {
@@ -12839,7 +13005,83 @@ export async function registerRoutes(
         .groupBy(pendingOrders.productCode, pendingOrders.productName, pendingOrders.categoryLarge, pendingOrders.categoryMedium, pendingOrders.categorySmall, pendingOrders.fulfillmentType)
         .orderBy(desc(sql`COALESCE(SUM(COALESCE(${pendingOrders.supplyPrice}, 0)), 0)`));
 
-      const totalRevenue = products.reduce((sum, p) => sum + Number(p.revenue), 0);
+      const byProdStartStr = startDate || '1970-01-01';
+      const byProdEndStr = endDate || '2099-12-31';
+
+      const dsProductConditions: any[] = [
+        gte(directSales.saleDate, byProdStartStr),
+        lte(directSales.saleDate, byProdEndStr),
+      ];
+      if (categoryLarge && categoryLarge.trim()) dsProductConditions.push(eq(directSales.categoryL, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) dsProductConditions.push(eq(directSales.categoryM, categoryMedium.trim()));
+      if (categorySmall && categorySmall.trim()) dsProductConditions.push(eq(directSales.categoryS, categorySmall.trim()));
+      if (search && search.trim()) {
+        dsProductConditions.push(or(
+          ilike(directSales.productName, `%${search.trim()}%`),
+          ilike(directSales.productCode, `%${search.trim()}%`),
+          ilike(directSales.description, `%${search.trim()}%`),
+        ));
+      }
+      if (vendorFilter === 'self' || !vendorFilter || vendorFilter === 'all' || vendorFilter === '') {
+      } else {
+        dsProductConditions.push(sql`1=0`);
+      }
+
+      const dsProducts = await db.select({
+        productCode: directSales.productCode,
+        productName: directSales.productName,
+        categoryL: directSales.categoryL,
+        categoryM: directSales.categoryM,
+        categoryS: directSales.categoryS,
+        quantity: sql<number>`COALESCE(SUM(${directSales.quantity}), COUNT(*))`.as('quantity'),
+        revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`.as('revenue'),
+      }).from(directSales)
+        .where(and(...dsProductConditions))
+        .groupBy(directSales.productCode, directSales.productName, directSales.categoryL, directSales.categoryM, directSales.categoryS);
+
+      const productMap = new Map<string, { productCode: string | null; productName: string | null; categoryLarge: string; categoryMedium: string; categorySmall: string; quantity: number; revenue: number; vendorName: string; source: string }>();
+      for (const p of products) {
+        const key = `member_${p.productCode}_${p.fulfillmentType || 'self'}`;
+        productMap.set(key, {
+          productCode: p.productCode,
+          productName: p.productName,
+          categoryLarge: p.categoryLarge || '',
+          categoryMedium: p.categoryMedium || '',
+          categorySmall: p.categorySmall || '',
+          quantity: Number(p.quantity),
+          revenue: Number(p.revenue),
+          vendorName: (p.fulfillmentType === 'vendor' && p.vendorName) ? p.vendorName : '탑셀러',
+          source: 'member',
+        });
+      }
+      let dsIdx = 0;
+      for (const p of dsProducts) {
+        dsIdx++;
+        if (p.productCode) {
+          const memberKey = `member_${p.productCode}_self`;
+          const existing = productMap.get(memberKey);
+          if (existing) {
+            existing.revenue += Number(p.revenue);
+            existing.quantity += Number(p.quantity);
+            continue;
+          }
+        }
+        const uniqueKey = `direct_${p.productCode || ''}_${p.productName || ''}_${dsIdx}`;
+        productMap.set(uniqueKey, {
+          productCode: p.productCode,
+          productName: p.productName || p.productCode || '기타(직접매출)',
+          categoryLarge: p.categoryL || '',
+          categoryMedium: p.categoryM || '',
+          categorySmall: p.categoryS || '',
+          quantity: Number(p.quantity),
+          revenue: Number(p.revenue),
+          vendorName: '직접매출',
+          source: 'direct',
+        });
+      }
+
+      const allProducts = Array.from(productMap.values()).sort((a, b) => b.revenue - a.revenue);
+      const totalRevenue = allProducts.reduce((sum, p) => sum + p.revenue, 0);
 
       const baseCatConditions: any[] = [
         eq(pendingOrders.status, '배송중'),
@@ -12851,12 +13093,22 @@ export async function registerRoutes(
       const largeCategories = await db.selectDistinct({ value: pendingOrders.categoryLarge })
         .from(pendingOrders)
         .where(and(...baseCatConditions, isNotNull(pendingOrders.categoryLarge)));
+      const dsLargeCategories = await db.selectDistinct({ value: directSales.categoryL })
+        .from(directSales)
+        .where(and(gte(directSales.saleDate, byProdStartStr), lte(directSales.saleDate, byProdEndStr), isNotNull(directSales.categoryL)));
+      const allLarge = [...new Set([...largeCategories.map(c => c.value), ...dsLargeCategories.map(c => c.value)].filter(Boolean))] as string[];
 
       const mediumConditions = [...baseCatConditions, isNotNull(pendingOrders.categoryMedium)];
       if (categoryLarge && categoryLarge.trim()) mediumConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
       const mediumCategories = await db.selectDistinct({ value: pendingOrders.categoryMedium })
         .from(pendingOrders)
         .where(and(...mediumConditions));
+      const dsMedConditions: any[] = [gte(directSales.saleDate, byProdStartStr), lte(directSales.saleDate, byProdEndStr), isNotNull(directSales.categoryM)];
+      if (categoryLarge && categoryLarge.trim()) dsMedConditions.push(eq(directSales.categoryL, categoryLarge.trim()));
+      const dsMediumCategories = await db.selectDistinct({ value: directSales.categoryM })
+        .from(directSales)
+        .where(and(...dsMedConditions));
+      const allMedium = [...new Set([...mediumCategories.map(c => c.value), ...dsMediumCategories.map(c => c.value)].filter(Boolean))] as string[];
 
       const smallConditions = [...baseCatConditions, isNotNull(pendingOrders.categorySmall)];
       if (categoryLarge && categoryLarge.trim()) smallConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
@@ -12864,23 +13116,21 @@ export async function registerRoutes(
       const smallCategories = await db.selectDistinct({ value: pendingOrders.categorySmall })
         .from(pendingOrders)
         .where(and(...smallConditions));
+      const dsSmConditions: any[] = [gte(directSales.saleDate, byProdStartStr), lte(directSales.saleDate, byProdEndStr), isNotNull(directSales.categoryS)];
+      if (categoryLarge && categoryLarge.trim()) dsSmConditions.push(eq(directSales.categoryL, categoryLarge.trim()));
+      if (categoryMedium && categoryMedium.trim()) dsSmConditions.push(eq(directSales.categoryM, categoryMedium.trim()));
+      const dsSmallCategories = await db.selectDistinct({ value: directSales.categoryS })
+        .from(directSales)
+        .where(and(...dsSmConditions));
+      const allSmall = [...new Set([...smallCategories.map(c => c.value), ...dsSmallCategories.map(c => c.value)].filter(Boolean))] as string[];
 
       res.json({
-        products: products.map(p => ({
-          productCode: p.productCode,
-          productName: p.productName,
-          categoryLarge: p.categoryLarge || '',
-          categoryMedium: p.categoryMedium || '',
-          categorySmall: p.categorySmall || '',
-          quantity: Number(p.quantity),
-          revenue: Number(p.revenue),
-          vendorName: (p.fulfillmentType === 'vendor' && p.vendorName) ? p.vendorName : '탑셀러',
-        })),
+        products: allProducts,
         totalRevenue,
         categories: {
-          large: largeCategories.map(c => c.value).filter(Boolean) as string[],
-          medium: mediumCategories.map(c => c.value).filter(Boolean) as string[],
-          small: smallCategories.map(c => c.value).filter(Boolean) as string[],
+          large: allLarge,
+          medium: allMedium,
+          small: allSmall,
         },
         vendorList: await db.select({ id: vendors.id, companyName: vendors.companyName }).from(vendors).where(eq(vendors.isActive, true)).orderBy(vendors.companyName),
       });
@@ -14727,13 +14977,20 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { saleDate, clientName, description, amount, memo, stockItems } = req.body;
+      const { saleDate, clientName, description, amount, memo, stockItems, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요 (매출일, 거래처명, 내용, 금액)" });
       }
 
       const [row] = await db.insert(directSales).values({
         saleDate, clientName, description, amount: parseInt(amount), memo: memo || null,
+        productCode: productCode || null,
+        productName: productName || null,
+        quantity: quantity ? parseInt(quantity) : null,
+        unitPrice: unitPrice ? parseInt(unitPrice) : null,
+        categoryL: categoryL || null,
+        categoryM: categoryM || null,
+        categoryS: categoryS || null,
       }).returning();
 
       if (stockItems && Array.isArray(stockItems)) {
@@ -14806,13 +15063,23 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
-      const { saleDate, clientName, description, amount, memo } = req.body;
+      const { saleDate, clientName, description, amount, memo, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요" });
       }
 
       const [row] = await db.update(directSales)
-        .set({ saleDate, clientName, description, amount: parseInt(amount), memo: memo || null, updatedAt: new Date() })
+        .set({
+          saleDate, clientName, description, amount: parseInt(amount), memo: memo || null,
+          productCode: productCode || null,
+          productName: productName || null,
+          quantity: quantity ? parseInt(quantity) : null,
+          unitPrice: unitPrice ? parseInt(unitPrice) : null,
+          categoryL: categoryL || null,
+          categoryM: categoryM || null,
+          categoryS: categoryS || null,
+          updatedAt: new Date(),
+        })
         .where(eq(directSales.id, id))
         .returning();
 

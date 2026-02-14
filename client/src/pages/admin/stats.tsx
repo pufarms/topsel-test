@@ -154,7 +154,7 @@ function OverviewTab({ startDate, endDate }: { startDate: string; endDate: strin
     { label: "총 매출액", value: formatRevenue(summary.totalRevenue || 0), growth: summary.revenueGrowth },
     { label: "총 주문 건수", value: formatCount(summary.totalOrders || 0), growth: summary.ordersGrowth },
     { label: "평균 주문금액", value: formatRevenue(summary.avgOrderAmount || 0), growth: undefined },
-    { label: "활성 회원 수", value: (summary.activeMemberCount || 0).toLocaleString() + "명", growth: undefined },
+    { label: "활성 거래처", value: (summary.activeMemberCount || 0).toLocaleString() + "곳", growth: undefined },
   ];
 
   const pieData = topMembers?.length
@@ -224,7 +224,7 @@ function OverviewTab({ startDate, endDate }: { startDate: string; endDate: strin
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">회원별 매출 비중</CardTitle>
+            <CardTitle className="text-base">거래처별 매출 비중</CardTitle>
           </CardHeader>
           <CardContent>
             {pieData.length > 0 ? (
@@ -482,12 +482,13 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                     const dateRange = m.firstOrderDate === m.lastOrderDate
                       ? m.firstOrderDate || "-"
                       : `${m.firstOrderDate || ""} ~ ${m.lastOrderDate || ""}`;
+                    const isDirect = m.source === 'direct';
                     return (
                       <>
                         <TableRow
                           key={m.memberId}
-                          className="cursor-pointer hover-elevate"
-                          onClick={() => setExpandedId(isExpanded ? null : m.memberId)}
+                          className={`${isDirect ? '' : 'cursor-pointer'} hover-elevate`}
+                          onClick={() => !isDirect && setExpandedId(isExpanded ? null : m.memberId)}
                           data-testid={`row-member-${m.memberId}`}
                         >
                           <TableCell>{idx + 1}</TableCell>
@@ -496,6 +497,7 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                             {m.companyName && m.memberName && m.companyName !== m.memberName && (
                               <span className="text-muted-foreground text-xs ml-1">({m.memberName})</span>
                             )}
+                            {isDirect && <Badge variant="outline" className="ml-2 text-xs">직접매출</Badge>}
                           </TableCell>
                           <TableCell className="text-center text-sm text-muted-foreground whitespace-nowrap" data-testid={`date-range-${m.memberId}`}>{dateRange}</TableCell>
                           <TableCell className="text-right">{formatCount(m.orderCount || 0)}</TableCell>
@@ -503,7 +505,7 @@ function ByMemberTab({ startDate, endDate }: { startDate: string; endDate: strin
                           <TableCell className="text-right">{formatRevenue(Math.round(m.avgOrderAmount || 0))}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
                         </TableRow>
-                        {isExpanded && (
+                        {isExpanded && !isDirect && (
                           <TableRow key={`detail-${m.memberId}`}>
                             <TableCell colSpan={7} className="p-0">
                               <MemberDrillDown memberId={m.memberId} startDate={startDate} endDate={endDate} />
@@ -749,27 +751,30 @@ function ByProductTab({ startDate, endDate }: { startDate: string; endDate: stri
                     const share = totalRevenue > 0 ? ((p.revenue / totalRevenue) * 100).toFixed(1) + "%" : "0%";
                     const categoryStr = [p.categoryLarge, p.categoryMedium, p.categorySmall].filter(Boolean).join(" > ");
                     const isExpanded = expandedCode === p.productCode;
+                    const isDirect = p.source === 'direct';
+                    const vendorLabel = isDirect ? '직접매출' : (p.vendorName || '탑셀러');
+                    const vendorIsDirect = vendorLabel === '직접매출';
                     return (
                       <>
                         <TableRow
-                          key={p.productCode}
-                          className="cursor-pointer hover-elevate"
-                          onClick={() => setExpandedCode(isExpanded ? null : p.productCode)}
+                          key={`${p.productCode}_${p.source || 'member'}`}
+                          className={`${isDirect ? '' : 'cursor-pointer'} hover-elevate`}
+                          onClick={() => !isDirect && setExpandedCode(isExpanded ? null : p.productCode)}
                           data-testid={`row-product-${p.productCode}`}
                         >
                           <TableCell>{idx + 1}</TableCell>
                           <TableCell className="font-medium">{p.productName}</TableCell>
                           <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">{categoryStr}</TableCell>
                           <TableCell>
-                            <Badge variant={(!p.vendorName || p.vendorName === '탑셀러') ? 'secondary' : 'outline'} className={(!p.vendorName || p.vendorName === '탑셀러') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-800'}>
-                              {p.vendorName || '탑셀러'}
+                            <Badge variant={vendorIsDirect ? 'outline' : ((!p.vendorName || p.vendorName === '탑셀러') ? 'secondary' : 'outline')} className={vendorIsDirect ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800' : ((!p.vendorName || p.vendorName === '탑셀러') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-800')}>
+                              {vendorLabel}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">{(p.quantity || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-right font-medium">{formatRevenue(p.revenue || 0)}</TableCell>
                           <TableCell className="text-right">{share}</TableCell>
                         </TableRow>
-                        {isExpanded && (
+                        {isExpanded && !isDirect && (
                           <TableRow key={`detail-${p.productCode}`}>
                             <TableCell colSpan={7} className="p-0">
                               <ProductDrillDown productCode={p.productCode} startDate={startDate} endDate={endDate} />
