@@ -518,7 +518,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* 초기화 다이얼로그 1단계 */}
       <Dialog open={resetStep === 1} onOpenChange={(open) => { if (!open) { setResetStep(0); setConfirmText(""); } }}>
