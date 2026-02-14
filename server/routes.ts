@@ -12670,14 +12670,13 @@ export async function registerRoutes(
 
       const dsTopProducts = await db.select({
         productCode: directSales.productCode,
-        productName: directSales.productName,
+        productName: sql<string>`COALESCE(${directSales.productName}, ${directSales.description})`.as('product_name_resolved'),
         revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`,
         quantity: sql<number>`COALESCE(SUM(${directSales.quantity}), COUNT(*))`,
       }).from(directSales).where(and(
         gte(directSales.saleDate, startDateStr),
         lte(directSales.saleDate, endDateStr),
-        isNotNull(directSales.productCode),
-      )).groupBy(directSales.productCode, directSales.productName)
+      )).groupBy(directSales.productCode, sql`COALESCE(${directSales.productName}, ${directSales.description})`)
         .orderBy(desc(sql`COALESCE(SUM(${directSales.amount}), 0)`))
         .limit(20);
 
@@ -13029,7 +13028,7 @@ export async function registerRoutes(
 
       const dsProducts = await db.select({
         productCode: directSales.productCode,
-        productName: directSales.productName,
+        productName: sql<string>`COALESCE(${directSales.productName}, ${directSales.description})`.as('product_name_resolved'),
         categoryL: directSales.categoryL,
         categoryM: directSales.categoryM,
         categoryS: directSales.categoryS,
@@ -13037,7 +13036,7 @@ export async function registerRoutes(
         revenue: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`.as('revenue'),
       }).from(directSales)
         .where(and(...dsProductConditions))
-        .groupBy(directSales.productCode, directSales.productName, directSales.categoryL, directSales.categoryM, directSales.categoryS);
+        .groupBy(directSales.productCode, sql`COALESCE(${directSales.productName}, ${directSales.description})`, directSales.categoryL, directSales.categoryM, directSales.categoryS);
 
       const productMap = new Map<string, { productCode: string | null; productName: string | null; categoryLarge: string; categoryMedium: string; categorySmall: string; quantity: number; revenue: number; vendorName: string; source: string }>();
       for (const p of products) {
