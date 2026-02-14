@@ -3,8 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSSE } from "@/hooks/use-sse";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,7 +21,6 @@ import {
   Zap,
   Crown,
   TrendingUp,
-  TrendingDown,
   Calendar,
   Clock,
   Package,
@@ -36,102 +33,17 @@ import {
   FileText,
   Gift,
   Percent,
-  Trash2
+  Trash2,
+  Megaphone
 } from "lucide-react";
 import type { User, Order, Member } from "@shared/schema";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
 
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
-  variant?: "default" | "primary" | "success" | "warning" | "danger";
-  subMessage?: string;
-}
-
-function StatCard({ title, value, icon, trend, trendValue, variant = "default", subMessage }: StatCardProps) {
-  const variantStyles = {
-    default: "bg-card border",
-    primary: "bg-primary/5 border-primary/20",
-    success: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
-    warning: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
-    danger: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
-  };
-
-  const iconStyles = {
-    default: "text-muted-foreground",
-    primary: "text-primary",
-    success: "text-emerald-600 dark:text-emerald-400",
-    warning: "text-amber-600 dark:text-amber-400",
-    danger: "text-red-600 dark:text-red-400",
-  };
-
+function SectionBadge({ number, color }: { number: number; color: string }) {
   return (
-    <div className={`rounded-lg border p-4 ${variantStyles[variant]} transition-all hover:shadow-sm`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-muted-foreground font-medium">{title}</span>
-        <div className={`p-2 rounded-lg bg-background/50 ${iconStyles[variant]}`}>
-          {icon}
-        </div>
-      </div>
-      <div className="flex items-end justify-between">
-        <span className="text-2xl font-bold tracking-tight">{value}</span>
-        {trend && trendValue && (
-          <div className={`flex items-center gap-1 text-xs font-medium ${
-            trend === "up" ? "text-emerald-600" : trend === "down" ? "text-red-600" : "text-muted-foreground"
-          }`}>
-            {trend === "up" ? <TrendingUp className="h-3 w-3" /> : 
-             trend === "down" ? <TrendingDown className="h-3 w-3" /> : null}
-            {trendValue}
-          </div>
-        )}
-      </div>
-      {subMessage && (
-        <div className="mt-2 flex items-start gap-1">
-          <AlertCircle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
-          <span className="text-xs text-amber-600 dark:text-amber-400 leading-tight">{subMessage}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface MiniStatProps {
-  title: string;
-  value: string | number;
-  icon?: React.ReactNode;
-  color?: "default" | "blue" | "green" | "yellow" | "red" | "purple" | "orange";
-}
-
-function MiniStat({ title, value, icon, color = "default" }: MiniStatProps) {
-  const colorStyles = {
-    default: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
-    blue: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
-    green: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-    yellow: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
-    red: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-    purple: "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300",
-    orange: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300",
-  };
-
-  return (
-    <div className={`rounded-lg p-3 ${colorStyles[color]} transition-all hover:opacity-90 cursor-pointer`}>
-      <div className="flex items-center gap-2 mb-1">
-        {icon && <span className="opacity-70">{icon}</span>}
-        <span className="text-xs font-medium opacity-80">{title}</span>
-      </div>
-      <span className="text-lg font-bold">{value}</span>
-    </div>
+    <span className={`flex items-center justify-center w-6 h-6 rounded-full ${color} text-white text-xs font-bold shrink-0`}>
+      {number}
+    </span>
   );
 }
 
@@ -235,6 +147,13 @@ export default function AdminDashboard() {
     weekday: "long",
   });
 
+  const formattedDateShort = today.toLocaleDateString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).replace(/\. /g, "-").replace(".", "");
+
   if (usersLoading || ordersLoading || membersLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -243,7 +162,6 @@ export default function AdminDashboard() {
     );
   }
 
-  
   const activeMembers = members.filter(m => m.status === "활성").length;
   const pendingMembers = members.filter(m => m.grade === "PENDING").length;
   
@@ -255,16 +173,65 @@ export default function AdminDashboard() {
   };
 
   const sampleEvents = [
-    { company: "농협", period: "01.15 - 01.31", item: "제주 감귤", code: "EVT001", coupon: "10%" },
-    { company: "이마트", period: "01.20 - 02.05", item: "청송 사과", code: "EVT002", coupon: "15%" },
-    { company: "롯데마트", period: "02.01 - 02.14", item: "성주 참외", code: "EVT003", coupon: "20%" },
+    { company: "농협", period: "01.15 - 01.31", item: "제주 감귤", code: "EVT001", coupon: "10%", status: "ended" as const },
+    { company: "이마트", period: "01.20 - 02.05", item: "청송 사과", code: "EVT002", coupon: "15%", status: "ending" as const },
+    { company: "롯데마트", period: "02.01 - 02.14", item: "성주 참외", code: "EVT003", coupon: "20%", status: "active" as const },
+  ];
+
+  const activeEventsCount = sampleEvents.filter(e => e.status === "active" || e.status === "ending").length;
+
+  const sampleNotices = [
+    { type: "긴급", title: "2월 설 연휴 배송 일정 안내", date: "02-10", typeColor: "bg-red-500" },
+    { type: "안내", title: "신규 회원 가입 이벤트 진행", date: "02-05", typeColor: "bg-blue-500" },
+    { type: "안내", title: "2월 행사 상품 업데이트 안내", date: "02-01", typeColor: "bg-blue-500" },
+    { type: "점검", title: "시스템 정기 점검 안내 (2/15)", date: "01-28", typeColor: "bg-amber-500" },
+    { type: "안내", title: "1월 정산 완료 안내", date: "01-15", typeColor: "bg-blue-500" },
+  ];
+
+  const buildStatusMessage = (counts: { pending: number; preparing: number; readyToShip: number } | undefined, timeLabel: string): string | undefined => {
+    if (!counts) return undefined;
+    const parts: string[] = [];
+    if (counts.preparing > 0) parts.push(`상품준비중 ${counts.preparing}건`);
+    if (counts.readyToShip > 0) parts.push(`배송준비중 ${counts.readyToShip}건`);
+    if (counts.pending > 0) parts.push(`대기 ${counts.pending}건`);
+    if (parts.length === 0) return undefined;
+    return `${timeLabel} ${parts.join(', ')}이 남아있습니다`;
+  };
+
+  const orderCardDefs = [
+    { label: "전체주문", value: orderStats?.total || 0, icon: <Package className="h-3.5 w-3.5" />, bg: "bg-yellow-50", border: "border-yellow-200", text: "text-blue-700", iconColor: "text-blue-500" },
+    { label: "주문대기", value: orderStats?.pending || 0, icon: <Clock className="h-3.5 w-3.5" />, bg: "bg-yellow-50", border: "border-yellow-200", text: "text-red-600", iconColor: "text-red-500" },
+    { label: "주문조정", value: orderStats?.adjustment || 0, icon: <AlertCircle className="h-3.5 w-3.5" />, bg: "bg-yellow-50", border: "border-yellow-200", text: "text-blue-700", iconColor: "text-blue-500" },
+    { label: "상품준비중", value: orderStats?.preparing || 0, icon: <Package className="h-3.5 w-3.5" />, bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", iconColor: "text-purple-500" },
+    { label: "배송준비중", value: orderStats?.readyToShip || 0, icon: <Truck className="h-3.5 w-3.5" />, bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", iconColor: "text-blue-500", sub: "운송장미등록건 · 직접배송건전용" },
+    { label: "취합/취소", value: orderStats?.memberCancelled || 0, icon: <XCircle className="h-3.5 w-3.5" />, bg: "bg-red-50", border: "border-red-200", text: "text-red-600", iconColor: "text-red-500" },
+    { label: "배송중", value: orderStats?.shipping || 0, icon: <CheckCircle2 className="h-3.5 w-3.5" />, bg: "bg-green-50", border: "border-green-200", text: "text-green-700", iconColor: "text-green-500" },
+  ];
+
+  const memberCardDefs = [
+    { label: "총회원수", value: activeMembers, unit: "명", color: "text-blue-600", bg: "bg-blue-100", border: "border-blue-300", icon: <Users className="h-4 w-4" /> },
+    { label: "승인대기", value: pendingMembers, unit: "명", color: "text-amber-600", bg: "bg-amber-100", border: "border-amber-300", icon: <UserPlus className="h-4 w-4" /> },
+    { label: "준회원", value: tierCounts.ASSOCIATE, unit: "명", color: "text-gray-600", bg: "bg-gray-100", border: "border-gray-300", icon: <UserCheck className="h-4 w-4" /> },
+    { label: "Start회원", value: tierCounts.START, unit: "명", color: "text-yellow-600", bg: "bg-yellow-100", border: "border-yellow-300", icon: <Star className="h-4 w-4" /> },
+    { label: "Driving회원", value: tierCounts.DRIVING, unit: "명", color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-300", icon: <Zap className="h-4 w-4" /> },
+    { label: "Top회원", value: tierCounts.TOP, unit: "명", color: "text-emerald-600", bg: "bg-emerald-100", border: "border-emerald-300", icon: <Crown className="h-4 w-4" /> },
+  ];
+
+  const inquiryCardDefs = [
+    { label: "일반 문의", value: 0, icon: <HelpCircle className="h-4 w-4" />, border: "border-blue-300", text: "text-blue-600" },
+    { label: "상품 CS/미수", value: 0, icon: <AlertCircle className="h-4 w-4" />, border: "border-red-300", text: "text-red-600" },
+    { label: "정산/계산서", value: 0, icon: <FileText className="h-4 w-4" />, border: "border-yellow-300", text: "text-yellow-600" },
+    { label: "회원정보(등급)", value: 0, icon: <Users className="h-4 w-4" />, border: "border-orange-300", text: "text-orange-600" },
+    { label: "행사특가/변경", value: 0, icon: <Gift className="h-4 w-4" />, border: "border-green-300", text: "text-green-600" },
+    { label: "기타", value: 0, icon: <MessageSquare className="h-4 w-4" />, border: "border-gray-300", text: "text-gray-600" },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-8">
+      {/* 페이지 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="text-xl md:text-2xl font-bold">대시보드</h1>
-        <div className="flex items-center gap-2 flex-wrap">
+        <h1 className="text-xl md:text-2xl font-bold text-indigo-900 dark:text-indigo-300" data-testid="text-dashboard-title">관리자 대시보드</h1>
+        <div className="flex items-center gap-3 flex-wrap">
           {isSuperOwner && (
             <Button
               variant="outline"
@@ -284,324 +251,276 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">회원 현황</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard
-              title="총회원수"
-              value={`${activeMembers}명`}
-              icon={<Users className="h-4 w-4" />}
-              variant="primary"
-            />
-            <StatCard
-              title="승인대기"
-              value={`${pendingMembers}명`}
-              icon={<UserPlus className="h-4 w-4" />}
-              variant={pendingMembers > 0 ? "warning" : "default"}
-            />
-            <StatCard
-              title="준회원"
-              value={`${tierCounts.ASSOCIATE}명`}
-              icon={<UserCheck className="h-4 w-4" />}
-            />
-            <StatCard
-              title="Start회원"
-              value={`${tierCounts.START}명`}
-              icon={<Star className="h-4 w-4" />}
-            />
-            <StatCard
-              title="Driving회원"
-              value={`${tierCounts.DRIVING}명`}
-              icon={<Zap className="h-4 w-4" />}
-            />
-            <StatCard
-              title="Top회원"
-              value={`${tierCounts.TOP}명`}
-              icon={<Crown className="h-4 w-4" />}
-              variant="success"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-emerald-600" />
-            <CardTitle className="text-base">매출 현황</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">확정매출</span>
-              <span className="text-xs text-muted-foreground">(배송중 전환 완료)</span>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard
-                title="금일 확정매출"
-                value={`${(salesStats?.confirmed?.today || 0).toLocaleString("ko-KR")}원`}
-                icon={<TrendingUp className="h-4 w-4" />}
-                variant="success"
-                trend={salesStats?.trendPercent != null ? (salesStats.trendPercent >= 0 ? "up" : "down") : undefined}
-                trendValue={salesStats?.trendPercent != null ? `${salesStats.trendPercent >= 0 ? "+" : ""}${salesStats.trendPercent}%` : undefined}
-              />
-              <StatCard
-                title="전일 확정매출"
-                value={`${(salesStats?.confirmed?.yesterday || 0).toLocaleString("ko-KR")}원`}
-                icon={<Clock className="h-4 w-4" />}
-              />
-              <StatCard
-                title="전월 확정매출"
-                value={`${(salesStats?.confirmed?.lastMonth || 0).toLocaleString("ko-KR")}원`}
-                icon={<Calendar className="h-4 w-4" />}
-              />
-              <StatCard
-                title="이번달 확정매출"
-                value={`${(salesStats?.confirmed?.thisMonth || 0).toLocaleString("ko-KR")}원`}
-                icon={<TrendingUp className="h-4 w-4" />}
-                variant="primary"
-              />
-            </div>
-          </div>
-          {(() => {
-            const buildStatusMessage = (counts: { pending: number; preparing: number; readyToShip: number } | undefined, timeLabel: string): string | undefined => {
-              if (!counts) return undefined;
-              const parts: string[] = [];
-              if (counts.preparing > 0) parts.push(`상품준비중 ${counts.preparing}건`);
-              if (counts.readyToShip > 0) parts.push(`배송준비중 ${counts.readyToShip}건`);
-              if (counts.pending > 0) parts.push(`대기 ${counts.pending}건`);
-              if (parts.length === 0) return undefined;
-              return `${timeLabel} ${parts.join(', ')}이 남아있습니다`;
-            };
-
-            const todayMsg = (salesStats?.projected?.today || 0) > 0
-              ? buildStatusMessage(salesStats?.projectedStatusCounts?.today, '오늘')
-              : undefined;
-            const yesterdayMsg = (salesStats?.projected?.yesterday || 0) > 0
-              ? buildStatusMessage(salesStats?.projectedStatusCounts?.yesterday, '어제')
-              : undefined;
-            const lastMonthMsg = (salesStats?.projected?.lastMonth || 0) > 0
-              ? buildStatusMessage(salesStats?.projectedStatusCounts?.lastMonth, '전월')
-              : undefined;
-            const thisMonthMsg = (salesStats?.projected?.thisMonth || 0) > 0
-              ? buildStatusMessage(salesStats?.projectedStatusCounts?.thisMonth, '이번달')
-              : undefined;
-
-            return (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">예상매출</span>
-                  <span className="text-xs text-muted-foreground">(대기~배송준비중, 정산 전)</span>
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <StatCard
-                    title="금일 예상매출"
-                    value={`${(salesStats?.projected?.today || 0).toLocaleString("ko-KR")}원`}
-                    icon={<TrendingUp className="h-4 w-4" />}
-                    variant="warning"
-                    subMessage={todayMsg}
-                  />
-                  <StatCard
-                    title="전일 예상매출"
-                    value={`${(salesStats?.projected?.yesterday || 0).toLocaleString("ko-KR")}원`}
-                    icon={<Clock className="h-4 w-4" />}
-                    subMessage={yesterdayMsg}
-                  />
-                  <StatCard
-                    title="전월 예상매출"
-                    value={`${(salesStats?.projected?.lastMonth || 0).toLocaleString("ko-KR")}원`}
-                    icon={<Calendar className="h-4 w-4" />}
-                    subMessage={lastMonthMsg}
-                  />
-                  <StatCard
-                    title="이번달 예상매출"
-                    value={`${(salesStats?.projected?.thisMonth || 0).toLocaleString("ko-KR")}원`}
-                    icon={<TrendingUp className="h-4 w-4" />}
-                    subMessage={thisMonthMsg}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      {/* ════════════════════════════════════════════════════════ */}
+      {/* 1행: 주문/배송 현황 — 전체 너비 (크림색)                   */}
+      {/* ════════════════════════════════════════════════════════ */}
+        <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl px-5 pt-5 pb-12 border-2 border-amber-300 dark:border-amber-700 shadow-lg" data-testid="section-order-status">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
-              <CardTitle className="text-base">주문/배송 현황</CardTitle>
+              <SectionBadge number={1} color="bg-amber-500" />
+              <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">주문/배송 현황</h2>
             </div>
-            <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+            <div className="flex flex-col items-end gap-1">
+              <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                <Calendar className="h-3 w-3 inline mr-1" />
+                {formattedDateShort} (오늘)
+              </span>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            <MiniStat
-              title="전체주문"
-              value={`${orderStats?.total || 0}건`}
-              icon={<Package className="h-3.5 w-3.5" />}
-              color="blue"
-            />
-            <MiniStat
-              title="주문대기"
-              value={`${orderStats?.pending || 0}건`}
-              icon={<Clock className="h-3.5 w-3.5" />}
-              color="yellow"
-            />
-            <MiniStat
-              title="주문조정"
-              value={`${orderStats?.adjustment || 0}건`}
-              icon={<AlertCircle className="h-3.5 w-3.5" />}
-              color="orange"
-            />
-            <MiniStat
-              title="상품준비중"
-              value={`${orderStats?.preparing || 0}건`}
-              icon={<Package className="h-3.5 w-3.5" />}
-              color="purple"
-            />
-            <div className="rounded-lg p-3 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 transition-all hover:opacity-90 cursor-pointer">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="opacity-70"><Truck className="h-3.5 w-3.5" /></span>
-                <span className="text-xs font-medium opacity-80">배송준비중</span>
+          <div className="flex gap-2">
+            {orderCardDefs.map((item, i) => (
+              <div key={i} className={`flex-1 ${item.bg} dark:bg-opacity-20 rounded-lg overflow-hidden shadow-sm border ${item.border} dark:border-opacity-40 p-3.5 cursor-pointer transition-all hover:shadow-md`} data-testid={`card-order-${item.label}`}>
+                <div className="flex items-center gap-1 mb-1.5">
+                  <span className={`${item.iconColor}`}>{item.icon}</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">{item.label}</span>
+                </div>
+                <div className={`text-xl font-bold ${item.text}`}>
+                  {item.value}<span className="text-sm font-normal ml-0.5">건</span>
+                </div>
+                {item.sub && <div className="text-xs text-gray-400 mt-1 truncate">{item.sub}</div>}
               </div>
-              <span className="text-lg font-bold">{orderStats?.readyToShip || 0}건</span>
-              <div className="mt-1 text-[10px] opacity-70 leading-tight">
-                운송장파일다운 · 회원취소건등록
+            ))}
+          </div>
+        </div>
+
+        {/* ════════════════════════════════════════════════════════ */}
+        {/* 2행: 회원 현황 + 문의 현황 — 가로 2열                      */}
+        {/* ════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* 회원 현황 — 다크 네이비 */}
+          <div className="bg-slate-600 dark:bg-slate-700 rounded-xl px-5 py-5" data-testid="section-member-status">
+            <div className="flex items-center gap-2 mb-4">
+              <SectionBadge number={2} color="bg-blue-500" />
+              <h2 className="text-white font-bold text-sm">회원 현황</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {memberCardDefs.map((item, i) => (
+                <div key={i} className={`${item.bg} border ${item.border} rounded-lg p-3.5 cursor-pointer transition-all hover:shadow-md`} data-testid={`card-member-${item.label}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-gray-600 font-medium">{item.label}</span>
+                    <span className="text-muted-foreground">{item.icon}</span>
+                  </div>
+                  <div className={`text-xl font-bold ${item.color}`}>
+                    {item.value}<span className="text-xs font-normal ml-0.5 text-gray-500">{item.unit}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 문의 현황 — 연보라 */}
+          <div className="bg-violet-50 dark:bg-violet-950/30 rounded-xl px-5 py-5 border-2 border-violet-300 dark:border-violet-700 shadow-lg" data-testid="section-inquiry-status">
+            <div className="flex items-center gap-2 mb-3">
+              <SectionBadge number={3} color="bg-violet-500" />
+              <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">문의 현황</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {inquiryCardDefs.map((item, i) => (
+                <div key={i} className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${item.border} dark:border-opacity-40 p-3.5 text-center cursor-pointer transition-all hover:shadow-md`} data-testid={`card-inquiry-${item.label}`}>
+                  <div className="flex justify-center mb-1 text-muted-foreground">{item.icon}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 truncate">{item.label}</div>
+                  <div className={`text-lg font-bold ${item.text}`}>{item.value}<span className="text-xs ml-0.5">개</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ════════════════════════════════════════════════════════ */}
+        {/* 3행: 매출 현황 — 전체 너비 (흰색 + 초록 하단보더)           */}
+        {/* ════════════════════════════════════════════════════════ */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border-b-4 border-emerald-400 px-5 py-5 shadow-lg" data-testid="section-sales-status">
+          <div className="flex items-center gap-2 mb-3">
+            <SectionBadge number={4} color="bg-emerald-500" />
+            <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">매출 현황</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* 확정매출 */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-white">확정매출</span>
+                <span className="text-xs text-gray-400">배송중 전환 완료</span>
+                <div className="h-px flex-1 bg-emerald-100 dark:bg-emerald-800"></div>
+              </div>
+              <div className="flex gap-2">
+                {["금일", "전일", "전월", "이번달"].map((label, i) => {
+                  const values = [
+                    salesStats?.confirmed?.today || 0,
+                    salesStats?.confirmed?.yesterday || 0,
+                    salesStats?.confirmed?.lastMonth || 0,
+                    salesStats?.confirmed?.thisMonth || 0,
+                  ];
+                  const icons = [<TrendingUp key="i0" className="h-3 w-3" />, <Clock key="i1" className="h-3 w-3" />, <Calendar key="i2" className="h-3 w-3" />, <TrendingUp key="i3" className="h-3 w-3" />];
+                  return (
+                    <div key={i} className={`flex-1 rounded-lg p-3.5 ${i === 0 ? "bg-emerald-500 text-white" : "bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-700"}`} data-testid={`card-confirmed-sales-${label}`}>
+                      <div className={`text-xs font-medium mb-1 flex items-center gap-1 ${i === 0 ? "text-emerald-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {label} {icons[i]}
+                      </div>
+                      <div className={`text-lg font-bold ${i === 0 ? "text-white" : "text-emerald-800 dark:text-emerald-300"}`}>
+                        {values[i].toLocaleString("ko-KR")}<span className="text-xs font-normal ml-0.5">원</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <MiniStat
-              title="회원취소"
-              value={`${orderStats?.memberCancelled || 0}건`}
-              icon={<XCircle className="h-3.5 w-3.5" />}
-              color="red"
-            />
-            <MiniStat
-              title="배송중"
-              value={`${orderStats?.shipping || 0}건`}
-              icon={<Truck className="h-3.5 w-3.5" />}
-              color="green"
-            />
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-purple-600" />
-            <CardTitle className="text-base">문의 현황</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <MiniStat
-              title="일반 문의"
-              value="0개"
-              icon={<HelpCircle className="h-3.5 w-3.5" />}
-              color="default"
-            />
-            <MiniStat
-              title="상품 CS/이슈"
-              value="0개"
-              icon={<AlertCircle className="h-3.5 w-3.5" />}
-              color="red"
-            />
-            <MiniStat
-              title="정산/계산서/예치금/후불"
-              value="0개"
-              icon={<FileText className="h-3.5 w-3.5" />}
-              color="blue"
-            />
-            <MiniStat
-              title="회원정보(등급) 관련"
-              value="0개"
-              icon={<Users className="h-3.5 w-3.5" />}
-              color="purple"
-            />
-            <MiniStat
-              title="행사특가문의/접수"
-              value="0개"
-              icon={<Gift className="h-3.5 w-3.5" />}
-              color="orange"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Gift className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-base">행사진행 현황</CardTitle>
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              {sampleEvents.length}개 진행중
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border table-scroll-container">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
-                <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold">업체</TableHead>
-                  <TableHead className="font-semibold">기간</TableHead>
-                  <TableHead className="font-semibold">행사품목</TableHead>
-                  <TableHead className="font-semibold">상품코드</TableHead>
-                  <TableHead className="font-semibold">쿠폰</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sampleEvents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      진행 중인 행사가 없습니다
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sampleEvents.map((event, index) => (
-                    <TableRow key={index} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{event.company}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          {event.period}
+            {/* 예상매출 */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-400 text-white">예상매출</span>
+                <span className="text-xs text-gray-400">대기~배송준비중, 정산 전</span>
+                <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+              </div>
+              <div className="flex gap-2">
+                {["금일", "전일", "전월", "이번달"].map((label, i) => {
+                  const values = [
+                    salesStats?.projected?.today || 0,
+                    salesStats?.projected?.yesterday || 0,
+                    salesStats?.projected?.lastMonth || 0,
+                    salesStats?.projected?.thisMonth || 0,
+                  ];
+                  const icons = [<TrendingUp key="i0" className="h-3 w-3" />, <Clock key="i1" className="h-3 w-3" />, <Calendar key="i2" className="h-3 w-3" />, <TrendingUp key="i3" className="h-3 w-3" />];
+                  const statusMsgs = [
+                    buildStatusMessage(salesStats?.projectedStatusCounts?.today, '오늘'),
+                    buildStatusMessage(salesStats?.projectedStatusCounts?.yesterday, '어제'),
+                    buildStatusMessage(salesStats?.projectedStatusCounts?.lastMonth, '전월'),
+                    buildStatusMessage(salesStats?.projectedStatusCounts?.thisMonth, '이번달'),
+                  ];
+                  return (
+                    <div key={i} className="flex-1 rounded-lg p-3.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid={`card-projected-sales-${label}`}>
+                      <div className="text-xs font-medium mb-1 text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        {label} {icons[i]}
+                      </div>
+                      <div className="text-lg font-bold text-gray-700 dark:text-gray-200">
+                        {values[i].toLocaleString("ko-KR")}<span className="text-xs font-normal ml-0.5">원</span>
+                      </div>
+                      {statusMsgs[i] && values[i] > 0 && (
+                        <div className="mt-1 flex items-start gap-1">
+                          <AlertCircle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight">{statusMsgs[i]}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>{event.item}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {event.code}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200">
-                          <Percent className="h-3 w-3 mr-1" />
-                          {event.coupon}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
+        {/* ════════════════════════════════════════════════════════ */}
+        {/* 4행: 행사진행 현황 + 공지사항 — 가로 2열                    */}
+        {/* ════════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* 행사진행 현황 — 연핑크 */}
+          <div className="bg-rose-50 dark:bg-rose-950/30 rounded-xl px-5 py-5 border border-rose-200 dark:border-rose-800" data-testid="section-event-status">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <SectionBadge number={5} color="bg-rose-500" />
+                <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">행사진행 현황</h2>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500 text-white" data-testid="badge-active-events">{activeEventsCount}개 진행중</span>
+            </div>
+            <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-rose-200 dark:border-rose-800">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-xs">
+                    <th className="px-3 py-2 text-left font-semibold">업체</th>
+                    <th className="px-3 py-2 text-left font-semibold">기간</th>
+                    <th className="px-3 py-2 text-left font-semibold">행사품목</th>
+                    <th className="px-3 py-2 text-left font-semibold">쿠폰</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sampleEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center text-muted-foreground py-8">
+                        진행 중인 행사가 없습니다
+                      </td>
+                    </tr>
+                  ) : (
+                    sampleEvents.map((row, i) => (
+                      <tr key={i} className={`border-t border-rose-100 dark:border-rose-900 ${
+                        row.status === "active" ? "bg-green-50 dark:bg-green-950/20" :
+                        row.status === "ending" ? "bg-amber-50 dark:bg-amber-950/20" :
+                        "bg-gray-50 dark:bg-gray-800 text-gray-400"
+                      }`} data-testid={`row-event-${i}`}>
+                        <td className="px-3 py-2 font-semibold">{row.company}</td>
+                        <td className="px-3 py-2 text-xs">{row.period}</td>
+                        <td className="px-3 py-2">{row.item}</td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                            row.status === "active" ? "bg-green-500 text-white" :
+                            row.status === "ending" ? "bg-amber-400 text-white" :
+                            "bg-gray-300 text-white"
+                          }`}>
+                            {row.coupon}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 공지사항 (신규) — 연파랑 */}
+          <div className="bg-sky-50 dark:bg-sky-950/30 rounded-xl px-5 py-5 border border-sky-200 dark:border-sky-800" data-testid="section-notices">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <SectionBadge number={6} color="bg-sky-500" />
+                <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">공지사항</h2>
+              </div>
+              <Button
+                size="sm"
+                className="bg-sky-500 hover:bg-sky-600 text-white text-xs"
+                data-testid="button-new-notice"
+              >
+                <Megaphone className="h-3.5 w-3.5 mr-1" />
+                새 공지
+              </Button>
+            </div>
+            <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-sky-200 dark:border-sky-800">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-xs">
+                    <th className="px-3 py-2 text-left font-semibold w-16">구분</th>
+                    <th className="px-3 py-2 text-left font-semibold">제목</th>
+                    <th className="px-3 py-2 text-left font-semibold w-24">등록일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sampleNotices.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-center text-muted-foreground py-8">
+                        등록된 공지가 없습니다
+                      </td>
+                    </tr>
+                  ) : (
+                    sampleNotices.map((item, i) => (
+                      <tr key={i} className="border-t border-sky-100 dark:border-sky-900 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer" data-testid={`row-notice-${i}`}>
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold text-white ${item.typeColor}`}>
+                            {item.type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 font-medium">{item.title}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-400">{item.date}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 초기화 다이얼로그 1단계 */}
       <Dialog open={resetStep === 1} onOpenChange={(open) => { if (!open) { setResetStep(0); setConfirmText(""); } }}>
         <DialogContent>
           <DialogHeader>
@@ -631,6 +550,7 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* 초기화 다이얼로그 2단계 */}
       <Dialog open={resetStep === 2} onOpenChange={(open) => { if (!open) { setResetStep(0); setConfirmText(""); } }}>
         <DialogContent>
           <DialogHeader>
