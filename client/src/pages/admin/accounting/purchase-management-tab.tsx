@@ -15,10 +15,14 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard, Download } from "lucide-react";
+import { Loader2, Search, Plus, Trash2, X, ChevronDown, CreditCard, Download, Building2, ShoppingCart } from "lucide-react";
 import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
+import VendorManagementTab from "./vendor-management-tab";
 
 const materialTypeLabels: Record<string, string> = {
   raw: "원물",
@@ -516,6 +520,17 @@ export default function PurchaseManagementTab() {
 
   return (
     <div className="space-y-5">
+      <Tabs defaultValue="purchase-ledger">
+        <TabsList className="mb-4">
+          <TabsTrigger value="purchase-ledger" className="gap-1" data-testid="tab-purchase-ledger">
+            <ShoppingCart className="h-4 w-4" />매입장부
+          </TabsTrigger>
+          <TabsTrigger value="vendor-management-sub" className="gap-1" data-testid="tab-vendor-management-sub">
+            <Building2 className="h-4 w-4" />매입업체 관리
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="purchase-ledger">
       <Card className="bg-muted/30 dark:bg-muted/10">
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap items-end gap-2 justify-between">
@@ -1381,6 +1396,12 @@ export default function PurchaseManagementTab() {
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="vendor-management-sub">
+          <VendorManagementTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

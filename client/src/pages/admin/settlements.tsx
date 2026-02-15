@@ -31,10 +31,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, Building2, ShoppingCart, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, ShoppingCart, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
-import VendorManagementTab from "./accounting/vendor-management-tab";
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
 import SalesOverviewTab from "./accounting/sales-overview-tab";
 import ProfitLossTab from "./accounting/profit-loss-tab";
@@ -575,9 +574,6 @@ export default function SettlementsPage() {
           <TabsTrigger value="member-settlement" className="gap-1" data-testid="tab-member-settlement">
             <Wallet className="h-4 w-4" />회원정산 관리
           </TabsTrigger>
-          <TabsTrigger value="vendor-management" className="gap-1" data-testid="tab-vendor-management">
-            <Building2 className="h-4 w-4" />매입업체 관리
-          </TabsTrigger>
           <TabsTrigger value="purchase-management" className="gap-1" data-testid="tab-purchase-management">
             <ShoppingCart className="h-4 w-4" />매입관리
           </TabsTrigger>
@@ -591,10 +587,6 @@ export default function SettlementsPage() {
 
         <TabsContent value="member-settlement">
           <MemberSettlementTab />
-        </TabsContent>
-
-        <TabsContent value="vendor-management">
-          <VendorManagementTab />
         </TabsContent>
 
         <TabsContent value="purchase-management">
