@@ -7255,13 +7255,13 @@ export async function registerRoutes(
 
     try {
       const file = req.file;
-      const courier = req.body.courier as "lotte" | "postoffice";
+      const courier = req.body.courier as "lotte" | "postoffice" | "default";
 
       if (!file) {
         return res.status(400).json({ message: "파일을 업로드해주세요" });
       }
 
-      if (!courier || !["lotte", "postoffice"].includes(courier)) {
+      if (!courier || !["lotte", "postoffice", "default"].includes(courier)) {
         return res.status(400).json({ message: "택배사를 선택해주세요" });
       }
 
@@ -7275,22 +7275,43 @@ export async function registerRoutes(
         return res.status(400).json({ message: "파일에 데이터가 없습니다" });
       }
 
-      // 택배사별 컬럼 인덱스 설정
-      // 롯데: 주문번호(인덱스 9), 운송장번호(인덱스 6)
-      // 우체국: 주문번호(인덱스 20), 등기번호(인덱스 1)
-      const orderNumberIndex = courier === "lotte" ? 9 : 20;
-      const trackingNumberIndex = courier === "lotte" ? 6 : 1;
-      const courierCompanyName = courier === "lotte" ? "롯데택배" : "우체국";
+      let orderNumberIndex: number;
+      let trackingNumberIndex: number;
+      let courierCompanyName: string;
+      let courierColumnIndex: number | null = null;
+
+      if (courier === "default") {
+        const headerRow = rows[0].map((h: any) => String(h || "").trim());
+        orderNumberIndex = headerRow.findIndex((h: string) => h === "주문번호");
+        trackingNumberIndex = headerRow.findIndex((h: string) => h === "운송장번호");
+        courierColumnIndex = headerRow.findIndex((h: string) => h === "택배사");
+        courierCompanyName = "";
+
+        if (orderNumberIndex === -1 || trackingNumberIndex === -1) {
+          return res.status(400).json({ message: "기본 양식에서 '주문번호' 또는 '운송장번호' 컬럼을 찾을 수 없습니다" });
+        }
+      } else if (courier === "lotte") {
+        orderNumberIndex = 9;
+        trackingNumberIndex = 6;
+        courierCompanyName = "롯데택배";
+      } else {
+        orderNumberIndex = 20;
+        trackingNumberIndex = 1;
+        courierCompanyName = "우체국";
+      }
 
       // 파일에서 주문번호-운송장번호 쌍 추출 (헤더 제외)
-      const waybillPairs: Array<{ orderNumber: string; trackingNumber: string; rowIndex: number }> = [];
+      const waybillPairs: Array<{ orderNumber: string; trackingNumber: string; rowIndex: number; rowCourier?: string }> = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const orderNumber = String(row[orderNumberIndex] || "").trim();
         const trackingNumber = String(row[trackingNumberIndex] || "").trim();
+        const rowCourier = courierColumnIndex !== null && courierColumnIndex >= 0
+          ? String(row[courierColumnIndex] || "").trim()
+          : "";
         
         if (orderNumber) {
-          waybillPairs.push({ orderNumber, trackingNumber, rowIndex: i });
+          waybillPairs.push({ orderNumber, trackingNumber, rowIndex: i, rowCourier });
         }
       }
 
@@ -7363,10 +7384,13 @@ export async function registerRoutes(
           const targetOrder = dbOrders[i];
           
           try {
+            const effectiveCourier = courier === "default" 
+              ? (waybill.rowCourier || "기타택배")
+              : courierCompanyName;
             await db.update(pendingOrders)
               .set({
                 trackingNumber: waybill.trackingNumber,
-                courierCompany: courierCompanyName,
+                courierCompany: effectiveCourier,
                 updatedAt: new Date()
               })
               .where(eq(pendingOrders.id, targetOrder.id));
