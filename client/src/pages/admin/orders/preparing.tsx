@@ -956,19 +956,19 @@ export default function OrdersPreparingPage() {
                 </div>
               </RadioGroup>
             </div>
-            <div className="space-y-2">
-              <Label>파일 선택</Label>
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-2">
+              <Label className="text-blue-800 dark:text-blue-300">파일 선택</Label>
               <div className="flex items-center gap-2">
                 <input
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={(e) => setWaybillFile(e.target.files?.[0] || null)}
-                  className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-white file:text-blue-700 hover:file:bg-blue-100"
                   data-testid="input-waybill-file"
                 />
               </div>
               {waybillFile && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
                   선택된 파일: {waybillFile.name}
                 </p>
               )}
