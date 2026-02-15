@@ -981,6 +981,29 @@ export default function OrdersPreparingPage() {
                 </p>
               )}
             </div>
+            <div className="space-y-2">
+              <Label>양식 다운로드</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("/api/admin/orders/waybill-template?format=lotte", "_blank")}
+                  data-testid="button-download-lotte-template"
+                >
+                  <FileDown className="h-3.5 w-3.5 mr-1" />
+                  롯데택배 양식
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("/api/admin/orders/waybill-template?format=postoffice", "_blank")}
+                  data-testid="button-download-postoffice-template"
+                >
+                  <FileDown className="h-3.5 w-3.5 mr-1" />
+                  우체국택배 양식
+                </Button>
+              </div>
+            </div>
             <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 border border-amber-200">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />

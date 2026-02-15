@@ -7242,6 +7242,70 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Download waybill upload template (운송장 업로드 양식 다운로드)
+  app.get('/api/admin/orders/waybill-template', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const format = req.query.format as string;
+      const XLSX = await import("xlsx");
+      let wsData: any[][];
+      let fileName: string;
+
+      if (format === "lotte") {
+        // 롯데택배 업로드 양식: 주문번호 = 인덱스9 (10번째 열), 운송장번호 = 인덱스6 (7번째 열)
+        wsData = [
+          ["보내는분이름", "보내는분전화번호", "보내는분주소", "보내는분상세주소", "받는분이름", "받는분전화번호", "운송장번호", "받는분핸드폰", "받는분주소", "주문번호", "배송메세지"]
+        ];
+        wsData.push(["홍길동", "02-1234-5678", "서울시 강남구 테헤란로 1", "101호", "김철수", "02-9876-5432", "1234567890", "010-1234-5678", "부산시 해운대구 해운대로 100", "ORD-001", "문 앞에 놔주세요"]);
+        fileName = "운송장_롯데택배_양식.xlsx";
+      } else if (format === "postoffice") {
+        // 우체국택배 업로드 양식: 주문번호 = 인덱스20 (21번째 열), 등기번호 = 인덱스1 (2번째 열)
+        const headers = new Array(22).fill("");
+        headers[0] = "접수일자";
+        headers[1] = "등기번호";
+        headers[2] = "보내는분";
+        headers[3] = "보내는분전화";
+        headers[4] = "받는분";
+        headers[5] = "받는분전화";
+        headers[6] = "받는분주소";
+        headers[20] = "주문번호";
+        headers[21] = "비고";
+        wsData = [headers];
+        const sampleRow = new Array(22).fill("");
+        sampleRow[0] = "2025-01-01";
+        sampleRow[1] = "1234567890123";
+        sampleRow[2] = "홍길동";
+        sampleRow[3] = "02-1234-5678";
+        sampleRow[4] = "김철수";
+        sampleRow[5] = "010-1234-5678";
+        sampleRow[6] = "서울시 강남구 테헤란로 1";
+        sampleRow[20] = "ORD-001";
+        wsData.push(sampleRow);
+        fileName = "운송장_우체국택배_양식.xlsx";
+      } else {
+        return res.status(400).json({ message: "format 파라미터가 필요합니다 (lotte 또는 postoffice)" });
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, "양식");
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "양식 다운로드 중 오류가 발생했습니다" });
+    }
+  });
+
   // Admin: Upload waybill file (운송장 파일 업로드)
   const waybillUpload = multer({ storage: multer.memoryStorage() });
   app.post('/api/admin/orders/upload-waybill', waybillUpload.single('file'), async (req, res) => {
