@@ -83,7 +83,7 @@ export default function OrdersPreparingPage() {
   const [isTransferring, setIsTransferring] = useState(false);
   
   const [showWaybillUploadDialog, setShowWaybillUploadDialog] = useState(false);
-  const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice" | "default">("default");
+  const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice">("lotte");
   const [waybillFile, setWaybillFile] = useState<File | null>(null);
   const [isUploadingWaybill, setIsUploadingWaybill] = useState(false);
   const [showWaybillResultDialog, setShowWaybillResultDialog] = useState(false);
@@ -928,24 +928,16 @@ export default function OrdersPreparingPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>양식 선택</Label>
+                <Label>택배사 선택</Label>
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300" data-testid="badge-selected-courier">
-                  {waybillCourier === "default" ? "기본 양식" : waybillCourier === "lotte" ? "롯데택배" : "우체국택배"} 선택됨
+                  {waybillCourier === "lotte" ? "롯데택배" : "우체국택배"} 선택됨
                 </Badge>
               </div>
               <RadioGroup
                 value={waybillCourier}
-                onValueChange={(value) => setWaybillCourier(value as "lotte" | "postoffice" | "default")}
+                onValueChange={(value) => setWaybillCourier(value as "lotte" | "postoffice")}
                 className="flex flex-wrap gap-3"
               >
-                <div 
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md cursor-pointer border transition-colors ${waybillCourier === "default" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}`}
-                  onClick={() => setWaybillCourier("default")}
-                  data-testid="option-courier-default"
-                >
-                  <RadioGroupItem value="default" id="courier-default" data-testid="radio-courier-default" />
-                  <Label htmlFor="courier-default" className="font-normal cursor-pointer">기본 양식</Label>
-                </div>
                 <div 
                   className={`flex items-center space-x-2 px-3 py-2 rounded-md cursor-pointer border transition-colors ${waybillCourier === "lotte" ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setWaybillCourier("lotte")}
@@ -981,8 +973,8 @@ export default function OrdersPreparingPage() {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>양식 다운로드</Label>
+            <div className="rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 p-3 space-y-2">
+              <Label className="text-orange-800 dark:text-orange-300">양식 다운로드</Label>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
@@ -1010,7 +1002,6 @@ export default function OrdersPreparingPage() {
                 <div>
                   <p className="font-medium">주의사항</p>
                   <ul className="list-disc list-inside mt-1 text-xs space-y-1">
-                    <li>기본 양식: 다운로드한 파일 그대로 업로드 (헤더의 "주문번호", "운송장번호", "택배사" 컬럼 자동 인식)</li>
                     <li>롯데택배: 롯데택배 전용 양식 (주문번호 10번째, 운송장번호 7번째 컬럼)</li>
                     <li>우체국택배: 우체국 전용 양식 (주문번호 21번째, 등기번호 2번째 컬럼)</li>
                     <li>동일 주문번호가 여러 건인 경우 순서대로 매핑됩니다.</li>
