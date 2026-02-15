@@ -571,16 +571,16 @@ export default function SettlementsPage() {
 
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
         <TabsList className="flex-wrap mb-4 bg-emerald-50 dark:bg-emerald-950/30">
-          <TabsTrigger value="member-settlement" className="gap-1" data-testid="tab-member-settlement">
+          <TabsTrigger value="member-settlement" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-member-settlement">
             <Wallet className="h-4 w-4" />회원정산 관리
           </TabsTrigger>
-          <TabsTrigger value="purchase-management" className="gap-1" data-testid="tab-purchase-management">
+          <TabsTrigger value="purchase-management" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-purchase-management">
             <ShoppingCart className="h-4 w-4" />매입관리
           </TabsTrigger>
-          <TabsTrigger value="sales-overview" className="gap-1" data-testid="tab-sales-overview">
+          <TabsTrigger value="sales-overview" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-sales-overview">
             <DollarSign className="h-4 w-4" />매출 관리
           </TabsTrigger>
-          <TabsTrigger value="profit-loss" className="gap-1" data-testid="tab-profit-loss">
+          <TabsTrigger value="profit-loss" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-profit-loss">
             <TrendingUp className="h-4 w-4" />손익 현황
           </TabsTrigger>
         </TabsList>
