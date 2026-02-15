@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import OrderStatsBanner from "@/components/order-stats-banner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,7 @@ export default function OrdersPreparingPage() {
     searchFilter: "선택 없음",
     searchTerm: "",
   });
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<"all" | "self" | "vendor">("all");
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -146,7 +148,9 @@ export default function OrdersPreparingPage() {
 
   const categoryFilteredOrders = useAdminCategoryFilter(preparingOrders, filters, getFields);
   
-  const filteredOrders = categoryFilteredOrders;
+  const filteredOrders = fulfillmentFilter === "all"
+    ? categoryFilteredOrders
+    : categoryFilteredOrders.filter(o => (o.fulfillmentType || "self") === fulfillmentFilter);
   
   const totalPages = tablePageSize === "all" ? 1 : Math.ceil(filteredOrders.length / tablePageSize);
   const displayedOrders = tablePageSize === "all" 
@@ -415,6 +419,23 @@ export default function OrdersPreparingPage() {
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"
+            beforeSearchFilters={
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium whitespace-nowrap min-w-[50px]">발송처</label>
+                  <Select value={fulfillmentFilter} onValueChange={(v) => { setFulfillmentFilter(v as "all" | "self" | "vendor"); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-8 w-[120px]" data-testid="select-fulfillment-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="self">자체</SelectItem>
+                      <SelectItem value="vendor">외주</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            }
           />
 
           <div className="flex items-center justify-between flex-wrap gap-2">

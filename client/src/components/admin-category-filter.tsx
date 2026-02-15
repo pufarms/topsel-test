@@ -28,6 +28,7 @@ interface AdminCategoryFilterProps {
   searchOptions?: { value: string; label: string }[];
   showMemberFilter?: boolean;
   additionalFilters?: React.ReactNode;
+  beforeSearchFilters?: React.ReactNode;
 }
 
 const defaultSearchOptions = [
@@ -44,6 +45,7 @@ export function AdminCategoryFilter({
   searchOptions = defaultSearchOptions,
   showMemberFilter = true,
   additionalFilters,
+  beforeSearchFilters,
 }: AdminCategoryFilterProps) {
   const [memberId, setMemberId] = useState("");
   const [memberSearchMode, setMemberSearchMode] = useState<"search" | "select">("select"); // 검색/선택 모드
@@ -342,6 +344,8 @@ export function AdminCategoryFilter({
           </Select>
         </div>
       </div>
+
+      {beforeSearchFilters}
 
       {/* 3행: 검색 필터 + 추가 필터 */}
       <div className="flex flex-wrap items-center gap-3">
