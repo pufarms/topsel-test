@@ -1728,6 +1728,8 @@ export const directSales = pgTable("direct_sales", {
   categoryL: varchar("category_l", { length: 100 }),
   categoryM: varchar("category_m", { length: 100 }),
   categoryS: varchar("category_s", { length: 100 }),
+  taxType: text("tax_type").notNull().default("exempt"),
+  memberId: varchar("member_id", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
