@@ -579,7 +579,7 @@ export default function SettlementsPage() {
             <Building2 className="h-4 w-4" />매입업체 관리
           </TabsTrigger>
           <TabsTrigger value="purchase-management" className="gap-1" data-testid="tab-purchase-management">
-            <ShoppingCart className="h-4 w-4" />매입장부 관리
+            <ShoppingCart className="h-4 w-4" />매입관리
           </TabsTrigger>
           <TabsTrigger value="sales-overview" className="gap-1" data-testid="tab-sales-overview">
             <DollarSign className="h-4 w-4" />매출 현황
