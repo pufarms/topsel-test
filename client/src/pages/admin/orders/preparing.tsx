@@ -83,7 +83,7 @@ export default function OrdersPreparingPage() {
   const [isTransferring, setIsTransferring] = useState(false);
   
   const [showWaybillUploadDialog, setShowWaybillUploadDialog] = useState(false);
-  const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice">("lotte");
+  const [waybillCourier, setWaybillCourier] = useState<"lotte" | "postoffice" | "default">("default");
   const [waybillFile, setWaybillFile] = useState<File | null>(null);
   const [isUploadingWaybill, setIsUploadingWaybill] = useState(false);
   const [showWaybillResultDialog, setShowWaybillResultDialog] = useState(false);
