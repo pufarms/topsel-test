@@ -570,7 +570,7 @@ export default function SettlementsPage() {
       </div>
 
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
-        <TabsList className="flex-wrap mb-4">
+        <TabsList className="flex-wrap mb-4 bg-emerald-50 dark:bg-emerald-950/30">
           <TabsTrigger value="member-settlement" className="gap-1" data-testid="tab-member-settlement">
             <Wallet className="h-4 w-4" />회원정산 관리
           </TabsTrigger>
