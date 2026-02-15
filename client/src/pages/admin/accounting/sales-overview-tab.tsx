@@ -90,6 +90,7 @@ type MemberOrderDetail = {
   pointerUsed: number;
   depositUsed: number;
   taxType: string;
+  isDirectSale?: boolean;
 };
 
 type MemberDetailData = {
@@ -119,6 +120,8 @@ type DirectSaleRow = {
   description: string;
   amount: number;
   memo: string | null;
+  taxType: string;
+  memberId: string | null;
 };
 
 function SectionHeader({ number, title, icon: Icon, color, children }: {
@@ -494,9 +497,14 @@ function MonthlySalesSummary() {
                   </thead>
                   <tbody>
                     {memberDetail.orders.map((o, idx) => (
-                      <tr key={idx} className="border-b" data-testid={`row-detail-order-${idx}`}>
+                      <tr key={idx} className={`border-b ${o.isDirectSale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`} data-testid={`row-detail-order-${idx}`}>
                         <td className="py-2 px-3 text-center whitespace-nowrap">{o.orderDate}</td>
-                        <td className="py-2 px-3 whitespace-nowrap">{o.productName}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">
+                          <span className="flex items-center gap-1.5 flex-wrap">
+                            {o.productName}
+                            {o.isDirectSale && <Badge variant="outline" className="text-xs border-amber-400 text-amber-600 dark:text-amber-400">직접매출</Badge>}
+                          </span>
+                        </td>
                         <td className="py-2 px-3 text-center whitespace-nowrap">
                           <Badge variant={o.taxType === 'taxable' ? 'default' : 'secondary'} className="text-xs">
                             {o.taxType === 'taxable' ? '과세' : '면세'}
@@ -721,6 +729,11 @@ function DirectSalesManagement() {
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const clientSearchRef = useRef<HTMLDivElement>(null);
   const [addMemo, setAddMemo] = useState("");
+  const [addTaxType, setAddTaxType] = useState("exempt");
+  const [addMemberId, setAddMemberId] = useState("");
+  const [memberSearchText, setMemberSearchText] = useState("");
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+  const memberSearchRef = useRef<HTMLDivElement>(null);
   const [addItems, setAddItems] = useState<DSItemRow[]>([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
   const [productSuggestionIdx, setProductSuggestionIdx] = useState<number | null>(null);
   const [suggestionHighlight, setSuggestionHighlight] = useState(-1);
@@ -730,7 +743,7 @@ function DirectSalesManagement() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dropdownHighlight, setDropdownHighlight] = useState(-1);
 
-  const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "" });
+  const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "", taxType: "exempt", memberId: "" });
   const [stockWarningDialog, setStockWarningDialog] = useState<{ open: boolean; insufficientItems: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number }[]; validItems: DSItemRow[]; clientName: string }>({ open: false, insufficientItems: [], validItems: [], clientName: "" });
   const [stockChecking, setStockChecking] = useState(false);
 
@@ -817,6 +830,9 @@ function DirectSalesManagement() {
       if (clientSearchRef.current && !clientSearchRef.current.contains(e.target as Node)) {
         setClientDropdownOpen(false);
       }
+      if (memberSearchRef.current && !memberSearchRef.current.contains(e.target as Node)) {
+        setMemberDropdownOpen(false);
+      }
       if (spreadsheetRef.current && !spreadsheetRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
       }
@@ -871,6 +887,27 @@ function DirectSalesManagement() {
     },
   });
   const allCurrentProducts = currentProductsData || [];
+
+  const { data: membersData } = useQuery<any[]>({
+    queryKey: ["/api/admin/members"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/members", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const allMembers = membersData || [];
+
+  const filteredMembers = useMemo(() => {
+    const active = allMembers.filter((m: any) => m.grade && m.grade !== "PENDING");
+    if (!memberSearchText.trim()) return active.slice(0, 30);
+    const term = memberSearchText.toLowerCase();
+    return active.filter((m: any) =>
+      (m.companyName || "").toLowerCase().includes(term) ||
+      (m.name || "").toLowerCase().includes(term) ||
+      (m.memberId || "").toLowerCase().includes(term)
+    ).slice(0, 30);
+  }, [allMembers, memberSearchText]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearchText.trim()) return dropdownItems;
@@ -1034,6 +1071,10 @@ function DirectSalesManagement() {
     setClientSearchText("");
     setClientDropdownOpen(false);
     setAddMemo("");
+    setAddTaxType("exempt");
+    setAddMemberId("");
+    setMemberSearchText("");
+    setMemberDropdownOpen(false);
     setAddItems([{ materialType: "__all__", productName: "", materialCode: "", quantity: "", unit: "박스", unitPrice: "" }]);
     setProductSuggestionIdx(null);
     setActiveCell(null);
@@ -1056,6 +1097,8 @@ function DirectSalesManagement() {
         categoryL: item.categoryL || null,
         categoryM: item.categoryM || null,
         categoryS: item.categoryS || null,
+        taxType: addTaxType,
+        memberId: addMemberId || null,
         stockItems: item.materialCode ? [{
           materialCode: item.materialCode,
           materialType: item.materialType,
@@ -1131,7 +1174,7 @@ function DirectSalesManagement() {
 
   const handleEditSubmit = () => {
     if (!editDialog) return;
-    const payload = { ...editFormData, amount: parseInt(editFormData.amount) || 0 };
+    const payload = { ...editFormData, amount: parseInt(editFormData.amount) || 0, memberId: editFormData.memberId || null };
     if (!payload.saleDate || !payload.clientName || !payload.description || payload.amount < 1) {
       toast({ title: "필수 항목을 입력해주세요", variant: "destructive" });
       return;
@@ -1147,6 +1190,8 @@ function DirectSalesManagement() {
       description: row.description,
       amount: String(row.amount),
       memo: row.memo || "",
+      taxType: row.taxType || "exempt",
+      memberId: row.memberId || "",
     });
   };
 
@@ -1177,6 +1222,7 @@ function DirectSalesManagement() {
                   <th className="text-left py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">거래처명</th>
                   <th className="text-left py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">내용</th>
                   <th className="text-right py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">금액</th>
+                  <th className="text-center py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">과세</th>
                   <th className="text-left py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">메모</th>
                   <th className="text-center py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">관리</th>
                 </tr>
@@ -1188,6 +1234,11 @@ function DirectSalesManagement() {
                     <td className="py-2 px-3 whitespace-nowrap">{d.clientName}</td>
                     <td className="py-2 px-3">{d.description}</td>
                     <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(d.amount)}</td>
+                    <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <Badge variant={d.taxType === "taxable" ? "default" : "secondary"} className="text-xs">
+                        {d.taxType === "taxable" ? "과세" : "면세"}
+                      </Badge>
+                    </td>
                     <td className="py-2 px-3 text-muted-foreground">{d.memo || "-"}</td>
                     <td className="py-2 px-3 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">
@@ -1206,7 +1257,7 @@ function DirectSalesManagement() {
                 <tr className="bg-muted/50 font-semibold border-t-2">
                   <td className="py-2.5 px-3" colSpan={3}>합계 ({directList.length}건)</td>
                   <td className="py-2.5 px-3 text-right">{formatCurrency(totalAmount)}</td>
-                  <td className="py-2.5 px-3" colSpan={2}></td>
+                  <td className="py-2.5 px-3" colSpan={3}></td>
                 </tr>
               </tfoot>
             </table>
@@ -1220,7 +1271,7 @@ function DirectSalesManagement() {
             <DialogTitle>매출 등록</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>매출일</Label>
                 <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} data-testid="input-sale-date" />
@@ -1286,6 +1337,82 @@ function DirectSalesManagement() {
                   )}
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>과세구분</Label>
+                <Select value={addTaxType} onValueChange={setAddTaxType}>
+                  <SelectTrigger data-testid="select-tax-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="exempt">면세</SelectItem>
+                    <SelectItem value="taxable">과세</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2" ref={memberSearchRef}>
+                <Label>회원 연결 (선택)</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    value={addMemberId ? (allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || addMemberId) : memberSearchText}
+                    onChange={(e) => {
+                      if (addMemberId) setAddMemberId("");
+                      setMemberSearchText(e.target.value);
+                      setMemberDropdownOpen(true);
+                    }}
+                    onFocus={() => {
+                      if (addMemberId) {
+                        const label = allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || "";
+                        setMemberSearchText(label);
+                        setAddMemberId("");
+                      }
+                      setMemberDropdownOpen(true);
+                    }}
+                    placeholder="회원 검색 (업체명/이름)"
+                    className="pl-8 pr-8"
+                    data-testid="input-member-search"
+                  />
+                  {(addMemberId || memberSearchText) ? (
+                    <button
+                      type="button"
+                      onClick={() => { setAddMemberId(""); setMemberSearchText(""); setMemberDropdownOpen(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-member"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  )}
+                  {memberDropdownOpen && !addMemberId && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                      {filteredMembers.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                      ) : (
+                        filteredMembers.map((m: any) => (
+                          <button
+                            key={m.memberId}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setAddMemberId(m.memberId);
+                              setMemberSearchText("");
+                              setMemberDropdownOpen(false);
+                            }}
+                            data-testid={`option-member-${m.memberId}`}
+                          >
+                            <span className="font-medium">{m.companyName || m.name}</span>
+                            <span className="text-muted-foreground ml-2 text-xs">({m.memberId})</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>메모 (선택)</Label>
                 <Input value={addMemo} onChange={(e) => setAddMemo(e.target.value)} placeholder="메모" data-testid="input-sale-memo" />
@@ -1676,6 +1803,34 @@ function DirectSalesManagement() {
             <div className="space-y-1">
               <Label>금액 *</Label>
               <Input type="number" value={editFormData.amount} onChange={(e) => setEditFormData(p => ({ ...p, amount: e.target.value }))} placeholder="금액 입력" data-testid="input-edit-amount" />
+            </div>
+            <div className="space-y-1">
+              <Label>과세구분</Label>
+              <Select value={editFormData.taxType} onValueChange={(v) => setEditFormData(p => ({ ...p, taxType: v }))}>
+                <SelectTrigger data-testid="select-edit-tax-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exempt">면세</SelectItem>
+                  <SelectItem value="taxable">과세</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>회원 연결 (선택)</Label>
+              <Select value={editFormData.memberId || "__none__"} onValueChange={(v) => setEditFormData(p => ({ ...p, memberId: v === "__none__" ? "" : v }))}>
+                <SelectTrigger data-testid="select-edit-member">
+                  <SelectValue placeholder="회원 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">연결 안함</SelectItem>
+                  {allMembers.filter((m: any) => m.grade && m.grade !== "PENDING").map((m: any) => (
+                    <SelectItem key={m.memberId} value={m.memberId}>
+                      {m.companyName || m.name} ({m.memberId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label>메모</Label>

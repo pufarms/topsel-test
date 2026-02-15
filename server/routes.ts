@@ -14661,6 +14661,24 @@ export async function registerRoutes(
         )
         .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
 
+      const monthStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay2 = new Date(nextYear, nextMonth - 1, 0).getDate();
+      const monthEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay2).padStart(2, '0')}`;
+
+      const directSaleRows = await db.select({
+        memberId: directSales.memberId,
+        taxType: directSales.taxType,
+        totalAmount: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+        saleCount: sql<number>`COUNT(*)::int`,
+      })
+        .from(directSales)
+        .where(and(
+          isNotNull(directSales.memberId),
+          gte(directSales.saleDate, monthStartDate),
+          lte(directSales.saleDate, monthEndDate),
+        ))
+        .groupBy(directSales.memberId, directSales.taxType);
+
       const memberMap: Record<string, any> = {};
       for (const r of memberRows) {
         if (!memberMap[r.memberId]) {
@@ -14690,6 +14708,46 @@ export async function registerRoutes(
           m.taxableVat += r.depositUsed - Math.round(r.depositUsed / 1.1);
         } else {
           m.exemptAmount += r.depositUsed;
+        }
+      }
+
+      for (const ds of directSaleRows) {
+        if (!ds.memberId) continue;
+        if (!memberMap[ds.memberId]) {
+          const memberInfo = await db.select({
+            id: members.id,
+            name: members.username,
+            companyName: members.companyName,
+            businessNumber: members.businessNumber,
+            representative: members.representative,
+          }).from(members).where(eq(members.id, ds.memberId)).limit(1);
+          const mi = memberInfo[0];
+          if (!mi) continue;
+          memberMap[ds.memberId] = {
+            memberId: ds.memberId,
+            memberName: mi.name,
+            businessName: mi.companyName || mi.name,
+            businessNumber: mi.businessNumber || '',
+            representative: mi.representative || '',
+            orderCount: 0,
+            totalOrderAmount: 0,
+            pointerUsed: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const m = memberMap[ds.memberId];
+        m.orderCount += ds.saleCount;
+        m.totalOrderAmount += ds.totalAmount;
+
+        if (ds.taxType === 'taxable') {
+          m.taxableAmount += ds.totalAmount;
+          m.taxableSupply += Math.round(ds.totalAmount / 1.1);
+          m.taxableVat += ds.totalAmount - Math.round(ds.totalAmount / 1.1);
+        } else {
+          m.exemptAmount += ds.totalAmount;
         }
       }
 
@@ -14786,10 +14844,52 @@ export async function registerRoutes(
         ))
         .orderBy(sql`${settlementHistory.createdAt} ASC`);
 
-      const totalOrderAmount = orderRows.reduce((s, r) => s + (r.totalAmount || 0), 0);
-      const pointerUsed = orderRows.reduce((s, r) => s + (r.pointerUsed || 0), 0);
-      const exemptDeposit = orderRows.filter(r => (r.taxType || 'exempt') !== 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
-      const taxableDeposit = orderRows.filter(r => r.taxType === 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
+      const monthStartDate2 = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay3 = new Date(nextYear, nextMonth - 1, 0).getDate();
+      const monthEndDate2 = `${year}-${String(month).padStart(2, '0')}-${String(lastDay3).padStart(2, '0')}`;
+
+      const directSaleRows2 = await db.select()
+        .from(directSales)
+        .where(and(
+          eq(directSales.memberId, memberId),
+          gte(directSales.saleDate, monthStartDate2),
+          lte(directSales.saleDate, monthEndDate2),
+        ))
+        .orderBy(sql`${directSales.saleDate} ASC`);
+
+      const allItems = [
+        ...orderRows.map(r => ({
+          orderId: r.orderId,
+          orderDate: r.orderDate,
+          productName: r.productName,
+          productCode: r.productCode,
+          unitPrice: r.supplyPrice || 0,
+          quantity: 1,
+          amount: r.totalAmount || 0,
+          pointerUsed: r.pointerUsed || 0,
+          depositUsed: r.depositUsed || 0,
+          taxType: r.taxType || 'exempt',
+          isDirectSale: false,
+        })),
+        ...directSaleRows2.map(ds => ({
+          orderId: `DS-${ds.id}`,
+          orderDate: ds.saleDate,
+          productName: ds.productName || ds.description,
+          productCode: ds.productCode || '',
+          unitPrice: ds.unitPrice || ds.amount,
+          quantity: ds.quantity || 1,
+          amount: ds.amount,
+          pointerUsed: 0,
+          depositUsed: ds.amount,
+          taxType: ds.taxType || 'exempt',
+          isDirectSale: true,
+        })),
+      ].sort((a, b) => a.orderDate.localeCompare(b.orderDate));
+
+      const totalOrderAmount = allItems.reduce((s, r) => s + (r.amount || 0), 0);
+      const pointerUsed = allItems.reduce((s, r) => s + (r.pointerUsed || 0), 0);
+      const exemptDeposit = allItems.filter(r => (r.taxType || 'exempt') !== 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
+      const taxableDeposit = allItems.filter(r => r.taxType === 'taxable').reduce((s, r) => s + (r.depositUsed || 0), 0);
       const taxableSupply = Math.round(taxableDeposit / 1.1);
       const taxableVat = taxableDeposit - taxableSupply;
 
@@ -14803,18 +14903,7 @@ export async function registerRoutes(
           representative: mi.representative || '',
           phone: mi.phone || '',
         },
-        orders: orderRows.map(r => ({
-          orderId: r.orderId,
-          orderDate: r.orderDate,
-          productName: r.productName,
-          productCode: r.productCode,
-          unitPrice: r.supplyPrice || 0,
-          quantity: 1,
-          amount: r.totalAmount || 0,
-          pointerUsed: r.pointerUsed || 0,
-          depositUsed: r.depositUsed || 0,
-          taxType: r.taxType || 'exempt',
-        })),
+        orders: allItems,
         summary: { totalOrderAmount, pointerUsed, exemptAmount: exemptDeposit, taxableAmount: taxableDeposit, taxableSupply, taxableVat },
       });
     } catch (error: any) {
@@ -14859,6 +14948,24 @@ export async function registerRoutes(
         .groupBy(members.companyName, members.businessNumber, members.representative, pendingOrders.taxType)
         .orderBy(sql`COALESCE(SUM(${settlementHistory.depositAmount}), 0) DESC`);
 
+      const monthStartDate3 = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay4 = new Date(nextYear, nextMonth - 1, 0).getDate();
+      const monthEndDate3 = `${year}-${String(month).padStart(2, '0')}-${String(lastDay4).padStart(2, '0')}`;
+
+      const directSaleExportRows = await db.select({
+        memberId: directSales.memberId,
+        taxType: directSales.taxType,
+        totalAmount: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+        saleCount: sql<number>`COUNT(*)::int`,
+      })
+        .from(directSales)
+        .where(and(
+          isNotNull(directSales.memberId),
+          gte(directSales.saleDate, monthStartDate3),
+          lte(directSales.saleDate, monthEndDate3),
+        ))
+        .groupBy(directSales.memberId, directSales.taxType);
+
       const excelMap: Record<string, any> = {};
       for (const r of memberRows) {
         const key = r.companyName || '';
@@ -14886,6 +14993,42 @@ export async function registerRoutes(
           m.taxableVat += r.depositUsed - Math.round(r.depositUsed / 1.1);
         } else {
           m.exemptAmount += r.depositUsed;
+        }
+      }
+
+      for (const ds of directSaleExportRows) {
+        if (!ds.memberId) continue;
+        const memberInfo = await db.select({
+          companyName: members.companyName,
+          businessNumber: members.businessNumber,
+          representative: members.representative,
+        }).from(members).where(eq(members.id, ds.memberId)).limit(1);
+        const mi = memberInfo[0];
+        if (!mi) continue;
+        const key = mi.companyName || '';
+        if (!excelMap[key]) {
+          excelMap[key] = {
+            companyName: mi.companyName || '',
+            businessNumber: mi.businessNumber || '',
+            representative: mi.representative || '',
+            orderCount: 0,
+            totalOrderAmount: 0,
+            pointerUsed: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const m = excelMap[key];
+        m.orderCount += ds.saleCount;
+        m.totalOrderAmount += ds.totalAmount;
+        if (ds.taxType === 'taxable') {
+          m.taxableAmount += ds.totalAmount;
+          m.taxableSupply += Math.round(ds.totalAmount / 1.1);
+          m.taxableVat += ds.totalAmount - Math.round(ds.totalAmount / 1.1);
+        } else {
+          m.exemptAmount += ds.totalAmount;
         }
       }
 
@@ -15000,7 +15143,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { saleDate, clientName, description, amount, memo, stockItems, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS } = req.body;
+      const { saleDate, clientName, description, amount, memo, stockItems, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요 (매출일, 거래처명, 내용, 금액)" });
       }
@@ -15014,6 +15157,8 @@ export async function registerRoutes(
         categoryL: categoryL || null,
         categoryM: categoryM || null,
         categoryS: categoryS || null,
+        taxType: taxType || "exempt",
+        memberId: memberId || null,
       }).returning();
 
       if (stockItems && Array.isArray(stockItems)) {
@@ -15086,7 +15231,7 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
-      const { saleDate, clientName, description, amount, memo, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS } = req.body;
+      const { saleDate, clientName, description, amount, memo, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요" });
       }
@@ -15101,6 +15246,8 @@ export async function registerRoutes(
           categoryL: categoryL || null,
           categoryM: categoryM || null,
           categoryS: categoryS || null,
+          taxType: taxType || "exempt",
+          memberId: memberId || null,
           updatedAt: new Date(),
         })
         .where(eq(directSales.id, id))
