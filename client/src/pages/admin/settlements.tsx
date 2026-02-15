@@ -582,7 +582,7 @@ export default function SettlementsPage() {
             <ShoppingCart className="h-4 w-4" />매입관리
           </TabsTrigger>
           <TabsTrigger value="sales-overview" className="gap-1" data-testid="tab-sales-overview">
-            <DollarSign className="h-4 w-4" />매출 현황
+            <DollarSign className="h-4 w-4" />매출 관리
           </TabsTrigger>
           <TabsTrigger value="profit-loss" className="gap-1" data-testid="tab-profit-loss">
             <TrendingUp className="h-4 w-4" />손익 현황
