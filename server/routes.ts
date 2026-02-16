@@ -11079,7 +11079,7 @@ export async function registerRoutes(
           type: "payment",
           date: row.paymentDate + " 00:00:00",
           companyName,
-          productName: `[입금] ${row.memo || row.paymentMethod || ''}`,
+          productName: `[입금] ${row.memo || ({ transfer: '계좌이체', card: '카드', product_offset: '상품상계' } as Record<string, string>)[row.paymentMethod] || row.paymentMethod || ''}`,
           productCode: "",
           quantity: 0,
           unitPrice: 0,
