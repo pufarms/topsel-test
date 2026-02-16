@@ -133,6 +133,15 @@ function MemberSettlementTab() {
   const [detailSearchText, setDetailSearchText] = useState("");
   const [detailSearchOpen, setDetailSearchOpen] = useState(false);
   const [detailSelectedLabel, setDetailSelectedLabel] = useState("");
+  const [vendorPaymentDialog, setVendorPaymentDialog] = useState(false);
+  const [vendorPaymentAmount, setVendorPaymentAmount] = useState("");
+  const [vendorPaymentDate, setVendorPaymentDate] = useState(() => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().split("T")[0];
+  });
+  const [vendorPaymentMethod, setVendorPaymentMethod] = useState("transfer");
+  const [vendorPaymentMemo, setVendorPaymentMemo] = useState("");
 
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
@@ -227,6 +236,43 @@ function MemberSettlementTab() {
       toast({ title: "지급 실패", description: error.message, variant: "destructive" });
     },
   });
+
+  const vendorPaymentMutation = useMutation({
+    mutationFn: async ({ vendorId, amount, paymentDate, paymentMethod, memo }: { vendorId: number; amount: number; paymentDate: string; paymentMethod: string; memo: string }) => {
+      const res = await apiRequest("POST", "/api/admin/vendor-payments", { vendorId, amount, paymentDate, paymentMethod, memo });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "입금 등록 완료", description: "매입업체 입금이 등록되었습니다." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/vendor-settlement-view"] });
+      setVendorPaymentDialog(false);
+      setVendorPaymentAmount("");
+      setVendorPaymentMemo("");
+      setVendorPaymentMethod("transfer");
+    },
+    onError: (error: any) => {
+      toast({ title: "입금 등록 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleVendorPayment = () => {
+    const amount = parseInt(vendorPaymentAmount);
+    if (!amount || amount <= 0) {
+      toast({ title: "금액 오류", description: "올바른 금액을 입력해주세요", variant: "destructive" });
+      return;
+    }
+    if (!vendorPaymentDate) {
+      toast({ title: "날짜 오류", description: "입금일을 입력해주세요", variant: "destructive" });
+      return;
+    }
+    vendorPaymentMutation.mutate({
+      vendorId: parseInt(detailMemberFilter),
+      amount,
+      paymentDate: vendorPaymentDate,
+      paymentMethod: vendorPaymentMethod,
+      memo: vendorPaymentMemo,
+    });
+  };
 
   const handleAction = () => {
     if (!selectedMember || !actionDialog) return;
@@ -615,6 +661,11 @@ function MemberSettlementTab() {
                       </SelectContent>
                     </Select>
                   )}
+                  {detailMemberFilter && isVendorMode && (
+                    <Button size="sm" variant="default" className="gap-1" onClick={() => setVendorPaymentDialog(true)} data-testid="button-vendor-payment">
+                      <Plus className="h-4 w-4" />입금 등록
+                    </Button>
+                  )}
                   {detailMemberFilter && allItems.length > 0 && (
                     <Button size="sm" variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-excel-download">
                       <Download className="h-4 w-4" />엑셀 다운로드
@@ -814,6 +865,61 @@ function MemberSettlementTab() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={vendorPaymentDialog} onOpenChange={(open) => { if (!open) { setVendorPaymentDialog(false); setVendorPaymentAmount(""); setVendorPaymentMemo(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              매입업체 입금 등록
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              대상: <span className="font-medium text-foreground">{detailSelectedLabel}</span>
+            </div>
+            {vendorSettlementView && (
+              <div className="text-sm flex flex-wrap gap-4">
+                <span>직접매출: <strong>{formatCurrency(vendorSettlementView.totalDirectSaleAmount)}</strong></span>
+                <span>입금: <strong>{formatCurrency(vendorSettlementView.totalPaymentAmount)}</strong></span>
+                <span>미수금: <strong className="text-red-600 dark:text-red-400">{formatCurrency(vendorSettlementView.balance)}</strong></span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>입금일</Label>
+              <Input type="date" value={vendorPaymentDate} onChange={(e) => setVendorPaymentDate(e.target.value)} data-testid="input-vendor-payment-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>입금액</Label>
+              <Input type="number" value={vendorPaymentAmount} onChange={(e) => setVendorPaymentAmount(e.target.value)} placeholder="금액을 입력하세요" data-testid="input-vendor-payment-amount" />
+            </div>
+            <div className="space-y-2">
+              <Label>결제 방법</Label>
+              <Select value={vendorPaymentMethod} onValueChange={setVendorPaymentMethod}>
+                <SelectTrigger data-testid="select-vendor-payment-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="transfer">계좌이체</SelectItem>
+                  <SelectItem value="card">카드</SelectItem>
+                  <SelectItem value="product_offset">상품상계</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>메모 (선택)</Label>
+              <Textarea value={vendorPaymentMemo} onChange={(e) => setVendorPaymentMemo(e.target.value)} placeholder="메모를 입력하세요" data-testid="input-vendor-payment-memo" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setVendorPaymentDialog(false); setVendorPaymentAmount(""); setVendorPaymentMemo(""); }} data-testid="button-vendor-payment-cancel">취소</Button>
+              <Button onClick={handleVendorPayment} disabled={vendorPaymentMutation.isPending} data-testid="button-vendor-payment-confirm">
+                {vendorPaymentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                입금 등록
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
