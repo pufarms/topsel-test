@@ -16,7 +16,7 @@ import path from "path";
 import fs from "fs";
 import { uploadImage, deleteImage } from "./r2";
 import { db } from "./db";
-import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, gte, lte, lt, gt, count } from "drizzle-orm";
+import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, isNull, gte, lte, lt, gt, count } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
 
@@ -10992,7 +10992,14 @@ export async function registerRoutes(
       const companyName = vendorInfo[0].companyName;
 
       const directSaleConditions: any[] = [
-        eq(directSales.vendorId, vendorId),
+        or(
+          eq(directSales.vendorId, vendorId),
+          and(
+            eq(directSales.clientType, 'vendor'),
+            eq(directSales.clientName, companyName),
+            isNull(directSales.vendorId),
+          ),
+        ),
       ];
       if (startDate && endDate) {
         directSaleConditions.push(gte(directSales.saleDate, startDate));
