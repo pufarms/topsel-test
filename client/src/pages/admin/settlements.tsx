@@ -76,6 +76,33 @@ interface MemberSettlementViewResponse {
   totalPointerChange: number;
 }
 
+interface VendorSettlementViewItem {
+  type: "direct_sale" | "payment";
+  date: string;
+  companyName: string;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  paymentAmount: number;
+  description?: string;
+  balance: number;
+}
+
+interface VendorSettlementViewResponse {
+  items: VendorSettlementViewItem[];
+  companyName: string;
+  totalDirectSaleAmount: number;
+  totalPaymentAmount: number;
+  balance: number;
+}
+
+interface VendorOption {
+  id: number;
+  companyName: string;
+}
+
 const gradeLabels: Record<string, string> = {
   START: "스타트",
   DRIVING: "드라이빙",
@@ -100,11 +127,17 @@ function MemberSettlementTab() {
 
   const detailDateRange = useDateRange("month");
   const [detailMemberFilter, setDetailMemberFilter] = useState("");
+  const [detailClientType, setDetailClientType] = useState<"member" | "vendor">("member");
   const [detailPage, setDetailPage] = useState(1);
   const [detailTypeFilter, setDetailTypeFilter] = useState("all");
 
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
+  });
+
+  const { data: vendorList = [] } = useQuery<VendorOption[]>({
+    queryKey: ["/api/admin/vendors"],
+    select: (data: any[]) => data.map((v: any) => ({ id: v.id, companyName: v.companyName })),
   });
 
   const { data: settlementView, isLoading: settlementViewLoading } = useQuery<MemberSettlementViewResponse>({
@@ -118,7 +151,21 @@ function MemberSettlementTab() {
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
-    enabled: !!detailMemberFilter,
+    enabled: !!detailMemberFilter && detailClientType === "member",
+  });
+
+  const { data: vendorSettlementView, isLoading: vendorSettlementViewLoading } = useQuery<VendorSettlementViewResponse>({
+    queryKey: ["/api/admin/vendor-settlement-view", detailMemberFilter, detailDateRange.dateRange.startDate, detailDateRange.dateRange.endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("vendorId", detailMemberFilter);
+      if (detailDateRange.dateRange.startDate) params.set("startDate", detailDateRange.dateRange.startDate);
+      if (detailDateRange.dateRange.endDate) params.set("endDate", detailDateRange.dateRange.endDate);
+      const res = await fetch(`/api/admin/vendor-settlement-view?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("조회 실패");
+      return res.json();
+    },
+    enabled: !!detailMemberFilter && detailClientType === "vendor",
   });
 
   const depositChargeMutation = useMutation({
@@ -198,14 +245,21 @@ function MemberSettlementTab() {
     return m.companyName.toLowerCase().includes(term) || m.username.toLowerCase().includes(term);
   });
 
-  const memberOptions = memberList.map(m => ({ id: m.id, label: `${m.companyName} (${m.username})` }));
+  const memberOptions = memberList.map(m => ({ id: m.id, label: `[회원] ${m.companyName} (${m.username})`, type: "member" as const }));
+  const vendorOptions = vendorList.map(v => ({ id: String(v.id), label: `[매입업체] ${v.companyName}`, type: "vendor" as const }));
+  const allOptions = [...vendorOptions, ...memberOptions];
 
-  const allItems = settlementView?.items || [];
-  const filteredItems = detailTypeFilter === "all" ? allItems : allItems.filter(i => {
+  const isVendorMode = detailClientType === "vendor";
+  const currentView = isVendorMode ? vendorSettlementView : settlementView;
+  const currentLoading = isVendorMode ? vendorSettlementViewLoading : settlementViewLoading;
+
+  const allItems: any[] = currentView?.items || [];
+  const filteredItems = detailTypeFilter === "all" ? allItems : allItems.filter((i: any) => {
     if (detailTypeFilter === "order") return i.type === "order";
     if (detailTypeFilter === "direct_sale") return i.type === "direct_sale";
     if (detailTypeFilter === "deposit") return i.type === "deposit";
     if (detailTypeFilter === "pointer") return i.type === "pointer";
+    if (detailTypeFilter === "payment") return i.type === "payment";
     return true;
   });
   const detailTotalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
@@ -214,10 +268,45 @@ function MemberSettlementTab() {
   const isLastPage = detailPage >= detailTotalPages || detailTotalPages <= 1;
 
   const handleExcelDownload = () => {
-    if (!settlementView || !allItems.length) return;
-    const cn = settlementView.companyName || "전체";
+    if (!allItems.length) return;
     const sd = detailDateRange.dateRange.startDate || "";
     const ed = detailDateRange.dateRange.endDate || "";
+
+    if (isVendorMode && vendorSettlementView) {
+      const cn = vendorSettlementView.companyName;
+      const excelData: any[] = [];
+      for (const item of allItems) {
+        excelData.push({
+          "적용날짜": item.date,
+          "상호명": item.companyName,
+          "내역(상품명)": item.productName,
+          "수량": item.quantity || "",
+          "단가": item.type === "direct_sale" ? item.unitPrice : "",
+          "합계": item.type === "direct_sale" ? item.subtotal : "",
+          "입금액": item.paymentAmount > 0 ? formatCurrency(item.paymentAmount) : "",
+          "미수금 잔액": formatCurrency(item.balance),
+        });
+      }
+      excelData.push({
+        "적용날짜": "-",
+        "상호명": cn,
+        "내역(상품명)": "합계",
+        "수량": "",
+        "단가": "",
+        "합계": formatCurrency(vendorSettlementView.totalDirectSaleAmount),
+        "입금액": formatCurrency(vendorSettlementView.totalPaymentAmount),
+        "미수금 잔액": formatCurrency(vendorSettlementView.balance),
+      });
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "업체별정산내역");
+      XLSX.writeFile(wb, `업체별정산내역_${cn}_${sd}~${ed}.xlsx`);
+      toast({ title: "다운로드 완료", description: "엑셀 파일이 다운로드되었습니다." });
+      return;
+    }
+
+    if (!settlementView) return;
+    const cn = settlementView.companyName || "전체";
 
     const excelData: any[] = [];
     excelData.push({
@@ -381,14 +470,32 @@ function MemberSettlementTab() {
                   <DateRangeFilter onChange={(range) => { detailDateRange.setDateRange(range); setDetailPage(1); }} defaultPreset="month" />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select value={detailMemberFilter || "none"} onValueChange={(v) => { setDetailMemberFilter(v === "none" ? "" : v); setDetailPage(1); }}>
-                    <SelectTrigger className="w-[240px]" data-testid="select-detail-member">
-                      <SelectValue placeholder="상호명 선택" />
+                  <Select
+                    value={detailMemberFilter ? `${detailClientType}:${detailMemberFilter}` : "none"}
+                    onValueChange={(v) => {
+                      if (v === "none") {
+                        setDetailMemberFilter("");
+                        setDetailClientType("member");
+                      } else {
+                        const [type, ...idParts] = v.split(":");
+                        const id = idParts.join(":");
+                        setDetailClientType(type as "member" | "vendor");
+                        setDetailMemberFilter(id);
+                      }
+                      setDetailPage(1);
+                      setDetailTypeFilter("all");
+                    }}
+                  >
+                    <SelectTrigger className="w-[280px]" data-testid="select-detail-client">
+                      <SelectValue placeholder="업체/회원 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">상호명 선택</SelectItem>
-                      {memberOptions.map(m => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      <SelectItem value="none">업체/회원 선택</SelectItem>
+                      {vendorOptions.length > 0 && vendorOptions.map(v => (
+                        <SelectItem key={`vendor:${v.id}`} value={`vendor:${v.id}`}>{v.label}</SelectItem>
+                      ))}
+                      {memberOptions.length > 0 && memberOptions.map(m => (
+                        <SelectItem key={`member:${m.id}`} value={`member:${m.id}`}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -399,10 +506,19 @@ function MemberSettlementTab() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">전체</SelectItem>
-                        <SelectItem value="order">주문정산</SelectItem>
-                        <SelectItem value="direct_sale">직접매출</SelectItem>
-                        <SelectItem value="deposit">입금/환급</SelectItem>
-                        <SelectItem value="pointer">포인터</SelectItem>
+                        {isVendorMode ? (
+                          <>
+                            <SelectItem value="direct_sale">직접매출</SelectItem>
+                            <SelectItem value="payment">입금</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="order">주문정산</SelectItem>
+                            <SelectItem value="direct_sale">직접매출</SelectItem>
+                            <SelectItem value="deposit">입금/환급</SelectItem>
+                            <SelectItem value="pointer">포인터</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   )}
@@ -421,11 +537,19 @@ function MemberSettlementTab() {
                   <p className="text-base font-medium">상호명을 선택해주세요</p>
                   <p className="text-sm mt-1">업체를 선택하면 해당 업체의 정산 내역을 확인할 수 있습니다.</p>
                 </div>
-              ) : settlementViewLoading ? (
+              ) : currentLoading ? (
                 <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : (
                 <>
-                  {settlementView && (
+                  {isVendorMode && vendorSettlementView && (
+                    <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
+                      <span className="text-muted-foreground">총 {filteredItems.length}건{detailTypeFilter !== "all" ? ` (전체 ${allItems.length}건)` : ""}</span>
+                      <span className="font-semibold text-amber-700 dark:text-amber-400">직접매출 합계: {formatCurrency(vendorSettlementView.totalDirectSaleAmount)}</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">입금 합계: {formatCurrency(vendorSettlementView.totalPaymentAmount)}</span>
+                      <span className="font-semibold">미수금: {formatCurrency(vendorSettlementView.balance)}</span>
+                    </div>
+                  )}
+                  {!isVendorMode && settlementView && (
                     <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
                       <span className="text-muted-foreground">총 {filteredItems.length}건{detailTypeFilter !== "all" ? ` (전체 ${allItems.length}건)` : ""}</span>
                       <span className="font-semibold">주문합계: {formatCurrency(settlementView.totalOrderAmount)}</span>
@@ -435,7 +559,7 @@ function MemberSettlementTab() {
                   )}
 
                   <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
-                    <table className="w-full text-sm min-w-[1000px]">
+                    <table className="w-full text-sm min-w-[800px]">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b bg-muted/30">
                           <th className="text-center py-2 px-3 whitespace-nowrap">적용날짜</th>
@@ -444,13 +568,22 @@ function MemberSettlementTab() {
                           <th className="text-right py-2 px-3 whitespace-nowrap">수량</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">단가</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">합계</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap">포인터</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap">예치금</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap">예치금+포인터 잔액</th>
+                          {isVendorMode ? (
+                            <>
+                              <th className="text-right py-2 px-3 whitespace-nowrap">입금액</th>
+                              <th className="text-right py-2 px-3 whitespace-nowrap">미수금 잔액</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="text-right py-2 px-3 whitespace-nowrap">포인터</th>
+                              <th className="text-right py-2 px-3 whitespace-nowrap">예치금</th>
+                              <th className="text-right py-2 px-3 whitespace-nowrap">예치금+포인터 잔액</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
-                        {isFirstPage && settlementView && (
+                        {!isVendorMode && isFirstPage && settlementView && (
                           <tr className="border-b bg-blue-50 dark:bg-blue-950/30" data-testid="row-starting-balance">
                             <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
                             <td className="py-2 px-3 whitespace-nowrap">{settlementView.companyName}</td>
@@ -462,13 +595,13 @@ function MemberSettlementTab() {
                         )}
                         {allItems.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 내역이 없습니다</td>
+                            <td colSpan={isVendorMode ? 8 : 9} className="text-center py-8 text-muted-foreground">선택한 기간에 정산 내역이 없습니다</td>
                           </tr>
                         ) : (
-                          pagedItems.map((item, idx) => (
+                          pagedItems.map((item: any, idx: number) => (
                             <tr
-                              key={`${item.type}-${item.date}-${item.productCode}-${idx}`}
-                              className={`border-b ${item.type === "direct_sale" ? "bg-amber-50/50 dark:bg-amber-950/20" : item.type !== "order" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
+                              key={`${item.type}-${item.date}-${item.productCode || ''}-${idx}`}
+                              className={`border-b ${item.type === "direct_sale" ? "bg-amber-50/50 dark:bg-amber-950/20" : item.type === "payment" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : item.type !== "order" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
                               data-testid={`row-detail-${idx}`}
                             >
                               <td className="py-2 px-3 text-center whitespace-nowrap">{item.date}</td>
@@ -478,6 +611,8 @@ function MemberSettlementTab() {
                                   item.productName
                                 ) : item.type === "direct_sale" ? (
                                   <span className="text-amber-700 dark:text-amber-400 font-medium">{item.productName}</span>
+                                ) : item.type === "payment" ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">{item.productName}</span>
                                 ) : (
                                   <span className={item.type === "deposit" ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
                                     {item.productName}
@@ -493,19 +628,30 @@ function MemberSettlementTab() {
                               <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
                                 {(item.type === "order" || item.type === "direct_sale") ? formatCurrency(item.subtotal) : ""}
                               </td>
-                              <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.pointerChange > 0 ? "text-amber-600 dark:text-amber-400" : item.pointerChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                                {item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : ""}
-                              </td>
-                              <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.depositChange > 0 ? "text-emerald-600 dark:text-emerald-400" : item.depositChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                                {item.depositChange !== 0 ? (item.depositChange > 0 ? `+${formatCurrency(item.depositChange)}` : `-${formatCurrency(Math.abs(item.depositChange))}`) : ""}
-                              </td>
-                              <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
+                              {isVendorMode ? (
+                                <>
+                                  <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.paymentAmount > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
+                                    {item.paymentAmount > 0 ? formatCurrency(item.paymentAmount) : ""}
+                                  </td>
+                                  <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.pointerChange > 0 ? "text-amber-600 dark:text-amber-400" : item.pointerChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                    {item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : ""}
+                                  </td>
+                                  <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.depositChange > 0 ? "text-emerald-600 dark:text-emerald-400" : item.depositChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                    {item.depositChange !== 0 ? (item.depositChange > 0 ? `+${formatCurrency(item.depositChange)}` : `-${formatCurrency(Math.abs(item.depositChange))}`) : ""}
+                                  </td>
+                                  <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(item.balance)}</td>
+                                </>
+                              )}
                             </tr>
                           ))
                         )}
                       </tbody>
                       <tfoot>
-                        {isLastPage && settlementView && (
+                        {!isVendorMode && isLastPage && settlementView && (
                           <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold" data-testid="row-ending-balance">
                             <td className="py-2 px-3 text-center text-muted-foreground">-</td>
                             <td className="py-2 px-3">{settlementView.companyName}</td>
@@ -521,7 +667,7 @@ function MemberSettlementTab() {
 
                   {detailTotalPages > 1 && (
                     <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                      <p className="text-sm text-muted-foreground">총 {allItems.length}건</p>
+                      <p className="text-sm text-muted-foreground">총 {filteredItems.length}건</p>
                       <div className="flex items-center gap-1">
                         <Button size="sm" variant="outline" disabled={detailPage <= 1} onClick={() => setDetailPage(p => p - 1)} data-testid="button-detail-prev">
                           <ChevronLeft className="h-4 w-4" />

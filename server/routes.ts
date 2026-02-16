@@ -10974,6 +10974,143 @@ export async function registerRoutes(
     }
   });
 
+  // 관리자: 매입업체별 정산 내역 조회
+  app.get('/api/admin/vendor-settlement-view', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const vendorId = parseInt(req.query.vendorId as string);
+      if (!vendorId) return res.status(400).json({ message: "vendorId 필수" });
+
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      const vendorInfo = await db.select().from(vendors).where(eq(vendors.id, vendorId)).limit(1);
+      if (!vendorInfo.length) return res.status(404).json({ message: "업체를 찾을 수 없습니다" });
+      const companyName = vendorInfo[0].companyName;
+
+      const directSaleConditions: any[] = [
+        eq(directSales.vendorId, vendorId),
+      ];
+      if (startDate && endDate) {
+        directSaleConditions.push(gte(directSales.saleDate, startDate));
+        directSaleConditions.push(lte(directSales.saleDate, endDate));
+      }
+
+      const paymentConditions: any[] = [
+        eq(vendorPayments.vendorId, vendorId),
+      ];
+      if (startDate && endDate) {
+        paymentConditions.push(gte(vendorPayments.paymentDate, startDate));
+        paymentConditions.push(lte(vendorPayments.paymentDate, endDate));
+      }
+
+      const [directSaleRows, paymentRows] = await Promise.all([
+        db.select({
+          id: directSales.id,
+          saleDate: directSales.saleDate,
+          clientName: directSales.clientName,
+          clientType: directSales.clientType,
+          description: directSales.description,
+          amount: directSales.amount,
+          productName: directSales.productName,
+          productCode: directSales.productCode,
+          quantity: directSales.quantity,
+          unitPrice: directSales.unitPrice,
+          taxType: directSales.taxType,
+          memo: directSales.memo,
+        })
+          .from(directSales)
+          .where(and(...directSaleConditions)),
+        db.select({
+          id: vendorPayments.id,
+          paymentDate: vendorPayments.paymentDate,
+          amount: vendorPayments.amount,
+          paymentMethod: vendorPayments.paymentMethod,
+          memo: vendorPayments.memo,
+        })
+          .from(vendorPayments)
+          .where(and(...paymentConditions)),
+      ]);
+
+      type VendorSettlementRow = {
+        type: "direct_sale" | "payment";
+        date: string;
+        companyName: string;
+        productName: string;
+        productCode: string;
+        quantity: number;
+        unitPrice: number;
+        subtotal: number;
+        paymentAmount: number;
+        description?: string;
+        balance: number;
+      };
+
+      const items: VendorSettlementRow[] = [];
+
+      for (const row of directSaleRows) {
+        items.push({
+          type: "direct_sale",
+          date: row.saleDate + " 00:00:00",
+          companyName,
+          productName: `[직접매출] ${row.description || row.productName || ''}`,
+          productCode: row.productCode || "",
+          quantity: row.quantity || 1,
+          unitPrice: row.unitPrice || row.amount,
+          subtotal: row.amount,
+          paymentAmount: 0,
+          description: row.memo || undefined,
+          balance: 0,
+        });
+      }
+
+      for (const row of paymentRows) {
+        items.push({
+          type: "payment",
+          date: row.paymentDate + " 00:00:00",
+          companyName,
+          productName: `[입금] ${row.memo || row.paymentMethod || ''}`,
+          productCode: "",
+          quantity: 0,
+          unitPrice: 0,
+          subtotal: 0,
+          paymentAmount: row.amount,
+          description: row.memo || undefined,
+          balance: 0,
+        });
+      }
+
+      items.sort((a, b) => a.date.localeCompare(b.date));
+
+      let runningBalance = 0;
+      for (const item of items) {
+        if (item.type === "direct_sale") {
+          runningBalance += item.subtotal;
+        } else if (item.type === "payment") {
+          runningBalance -= item.paymentAmount;
+        }
+        item.balance = runningBalance;
+      }
+
+      const totalDirectSaleAmount = items.filter(i => i.type === "direct_sale").reduce((s, i) => s + i.subtotal, 0);
+      const totalPaymentAmount = items.filter(i => i.type === "payment").reduce((s, i) => s + i.paymentAmount, 0);
+
+      res.json({
+        items,
+        companyName,
+        totalDirectSaleAmount,
+        totalPaymentAmount,
+        balance: totalDirectSaleAmount - totalPaymentAmount,
+      });
+    } catch (error: any) {
+      console.error("Admin vendor settlement view error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // 회원: 내 정산 이력 조회
   app.get('/api/member/my-settlements', async (req, res) => {
     try {
@@ -14856,6 +14993,56 @@ export async function registerRoutes(
         }
       }
 
+      const vendorDirectSaleRows = await db.select({
+        vendorId: directSales.vendorId,
+        vendorName: vendors.companyName,
+        businessNumber: vendors.businessNumber,
+        taxType: directSales.taxType,
+        totalAmount: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+        saleCount: sql<number>`COUNT(*)::int`,
+      })
+        .from(directSales)
+        .innerJoin(vendors, eq(directSales.vendorId, vendors.id))
+        .where(and(
+          isNotNull(directSales.vendorId),
+          eq(directSales.clientType, 'vendor'),
+          gte(directSales.saleDate, monthStartDate),
+          lte(directSales.saleDate, monthEndDate),
+        ))
+        .groupBy(directSales.vendorId, vendors.companyName, vendors.businessNumber, directSales.taxType);
+
+      const vendorMap: Record<number, any> = {};
+      for (const vds of vendorDirectSaleRows) {
+        if (!vds.vendorId) continue;
+        if (!vendorMap[vds.vendorId]) {
+          vendorMap[vds.vendorId] = {
+            vendorId: vds.vendorId,
+            vendorName: vds.vendorName,
+            businessNumber: vds.businessNumber || '',
+            orderCount: 0,
+            totalAmount: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const v = vendorMap[vds.vendorId];
+        v.orderCount += vds.saleCount;
+        v.totalAmount += vds.totalAmount;
+        if (vds.taxType === 'taxable') {
+          v.taxableAmount += vds.totalAmount;
+          v.taxableSupply += Math.round(vds.totalAmount / 1.1);
+          v.taxableVat += vds.totalAmount - Math.round(vds.totalAmount / 1.1);
+        } else {
+          v.exemptAmount += vds.totalAmount;
+        }
+      }
+
+      const vendorData = Object.values(vendorMap).sort((a: any, b: any) =>
+        (b.exemptAmount + b.taxableAmount) - (a.exemptAmount + a.taxableAmount)
+      );
+
       const memberData = Object.values(memberMap).sort((a: any, b: any) => 
         (b.exemptAmount + b.taxableAmount) - (a.exemptAmount + a.taxableAmount)
       );
@@ -14867,6 +15054,14 @@ export async function registerRoutes(
         taxableAmount: memberData.reduce((s: number, m: any) => s + m.taxableAmount, 0),
         taxableSupply: memberData.reduce((s: number, m: any) => s + m.taxableSupply, 0),
         taxableVat: memberData.reduce((s: number, m: any) => s + m.taxableVat, 0),
+      };
+
+      const vendorTotals = {
+        totalAmount: vendorData.reduce((s: number, v: any) => s + v.totalAmount, 0),
+        exemptAmount: vendorData.reduce((s: number, v: any) => s + v.exemptAmount, 0),
+        taxableAmount: vendorData.reduce((s: number, v: any) => s + v.taxableAmount, 0),
+        taxableSupply: vendorData.reduce((s: number, v: any) => s + v.taxableSupply, 0),
+        taxableVat: vendorData.reduce((s: number, v: any) => s + v.taxableVat, 0),
       };
 
       const KST_OFFSET = 9 * 60 * 60 * 1000;
@@ -14893,7 +15088,9 @@ export async function registerRoutes(
       res.json({
         year, month, closingStatus, deadline,
         members: memberData,
+        vendors: vendorData,
         totals,
+        vendorTotals,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

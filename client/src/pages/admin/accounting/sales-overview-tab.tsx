@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
@@ -63,15 +63,35 @@ type MemberTaxRow = {
   taxableVat: number;
 };
 
+type VendorTaxRow = {
+  vendorId: number;
+  vendorName: string;
+  businessNumber: string;
+  orderCount: number;
+  totalAmount: number;
+  exemptAmount: number;
+  taxableAmount: number;
+  taxableSupply: number;
+  taxableVat: number;
+};
+
 type MonthlyByMemberData = {
   year: number;
   month: number;
   closingStatus: string;
   deadline: string;
   members: MemberTaxRow[];
+  vendors?: VendorTaxRow[];
   totals: {
     totalOrderAmount: number;
     pointerUsed: number;
+    exemptAmount: number;
+    taxableAmount: number;
+    taxableSupply: number;
+    taxableVat: number;
+  };
+  vendorTotals?: {
+    totalAmount: number;
     exemptAmount: number;
     taxableAmount: number;
     taxableSupply: number;
@@ -382,7 +402,7 @@ function MonthlySalesSummary() {
 
           {monthlyLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : monthlyData && monthlyData.members.length > 0 ? (
+          ) : monthlyData && (monthlyData.members.length > 0 || (monthlyData.vendors && monthlyData.vendors.length > 0)) ? (
             <>
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-3 text-xs text-amber-800 dark:text-amber-200 mb-3">
                 면세(농산물): 계산서 발행 (공급가 = 예치금, 부가세 없음) | 과세: 세금계산서 발행 (공급가 = 예치금/1.1, 부가세 별도). 포인터 사용분은 발행 대상에서 제외됩니다.
@@ -451,11 +471,69 @@ function MonthlySalesSummary() {
                   </tfoot>
                 </table>
               </div>
-              <div className="flex justify-end mt-3">
-                <Button variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-tax-excel">
-                  <Download className="h-4 w-4" />계산서 엑셀 다운로드
-                </Button>
-              </div>
+              {monthlyData.members.length > 0 && (
+                <div className="flex justify-end mt-3">
+                  <Button variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-tax-excel">
+                    <Download className="h-4 w-4" />회원 계산서 엑셀 다운로드
+                  </Button>
+                </div>
+              )}
+
+              {monthlyData.vendors && monthlyData.vendors.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <h4 className="text-sm font-semibold text-foreground">매입업체별 계산서 / 세금계산서 내역</h4>
+                  </div>
+                  <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[400px]">
+                    <table className="w-full text-sm min-w-[800px]">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>업체명</th>
+                          <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
+                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>건수</th>
+                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총금액</th>
+                          <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세(계산서)</th>
+                          <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
+                        </tr>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/50 dark:bg-green-950/20 text-xs font-medium">공급가액</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">공급가액</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">부가세</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">합계</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyData.vendors.map((v) => (
+                          <tr key={v.vendorId} className="border-b" data-testid={`row-vendor-tax-${v.vendorId}`}>
+                            <td className="py-2.5 px-3 whitespace-nowrap font-medium">{v.vendorName}</td>
+                            <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">{v.businessNumber || "-"}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap">{v.orderCount}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(v.totalAmount)}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/30 dark:bg-green-950/10">{v.exemptAmount > 0 ? formatCurrency(v.exemptAmount) : "-"}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/30 dark:bg-violet-950/10">{v.taxableSupply > 0 ? formatCurrency(v.taxableSupply) : "-"}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{v.taxableVat > 0 ? formatCurrency(v.taxableVat) : "-"}</td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10 font-medium">{v.taxableAmount > 0 ? formatCurrency(v.taxableAmount) : "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      {monthlyData.vendorTotals && (
+                        <tfoot>
+                          <tr className="bg-muted/50 font-semibold border-t-2">
+                            <td className="py-2.5 px-3" colSpan={2}>합계</td>
+                            <td className="py-2.5 px-3 text-right">{monthlyData.vendors.reduce((s, v) => s + v.orderCount, 0)}</td>
+                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.totalAmount)}</td>
+                            <td className="py-2.5 px-3 text-right border-l-2 border-l-green-400/30 dark:border-l-green-600/30">{formatCurrency(monthlyData.vendorTotals.exemptAmount)}</td>
+                            <td className="py-2.5 px-3 text-right border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30">{formatCurrency(monthlyData.vendorTotals.taxableSupply)}</td>
+                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.taxableVat)}</td>
+                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.taxableAmount)}</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="py-6 text-center text-muted-foreground text-sm">
