@@ -253,6 +253,23 @@ function MonthlySalesSummary() {
     }
   };
 
+  const handleVendorExcelDownload = async () => {
+    try {
+      const res = await fetch(`/api/admin/accounting/sales/vendor-tax-invoice-export?year=${selectedYear}&month=${selectedMonth}`, { credentials: "include" });
+      if (!res.ok) throw new Error("다운로드 실패");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `업체계산서_${selectedYear}년${selectedMonth}월.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "다운로드 완료" });
+    } catch (e: any) {
+      toast({ title: "다운로드 실패", description: e.message, variant: "destructive" });
+    }
+  };
+
   const years = Array.from({ length: 3 }, (_, i) => kstNow.getFullYear() - 1 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -556,6 +573,11 @@ function MonthlySalesSummary() {
                         </tfoot>
                       )}
                     </table>
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button variant="outline" className="gap-1" onClick={handleVendorExcelDownload} data-testid="button-vendor-tax-excel">
+                      <Download className="h-4 w-4" />업체 계산서 엑셀 다운로드
+                    </Button>
                   </div>
                 </div>
               )}

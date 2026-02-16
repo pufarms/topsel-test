@@ -15369,6 +15369,92 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/accounting/sales/vendor-tax-invoice-export', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+
+      const monthStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const lastDay = new Date(nextYear, nextMonth - 1, 0).getDate();
+      const monthEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      const vendorDirectSaleRows = await db.select({
+        vendorId: directSales.vendorId,
+        vendorName: vendors.companyName,
+        businessNumber: vendors.businessNumber,
+        taxType: directSales.taxType,
+        totalAmount: sql<number>`COALESCE(SUM(${directSales.amount}), 0)::int`,
+        saleCount: sql<number>`COUNT(*)::int`,
+      })
+        .from(directSales)
+        .innerJoin(vendors, eq(directSales.vendorId, vendors.id))
+        .where(and(
+          isNotNull(directSales.vendorId),
+          eq(directSales.clientType, 'vendor'),
+          gte(directSales.saleDate, monthStartDate),
+          lte(directSales.saleDate, monthEndDate),
+        ))
+        .groupBy(directSales.vendorId, vendors.companyName, vendors.businessNumber, directSales.taxType);
+
+      const vendorMap: Record<number, any> = {};
+      for (const vds of vendorDirectSaleRows) {
+        if (!vds.vendorId) continue;
+        if (!vendorMap[vds.vendorId]) {
+          vendorMap[vds.vendorId] = {
+            vendorName: vds.vendorName,
+            businessNumber: vds.businessNumber || '',
+            orderCount: 0,
+            totalAmount: 0,
+            exemptAmount: 0,
+            taxableAmount: 0,
+            taxableSupply: 0,
+            taxableVat: 0,
+          };
+        }
+        const v = vendorMap[vds.vendorId];
+        v.orderCount += vds.saleCount;
+        v.totalAmount += vds.totalAmount;
+        if (vds.taxType === 'taxable') {
+          v.taxableAmount += vds.totalAmount;
+          v.taxableSupply += Math.round(vds.totalAmount / 1.1);
+          v.taxableVat += vds.totalAmount - Math.round(vds.totalAmount / 1.1);
+        } else {
+          v.exemptAmount += vds.totalAmount;
+        }
+      }
+
+      const XLSX = await import('xlsx');
+      const data = Object.values(vendorMap).map((r: any) => ({
+        '업체명': r.vendorName,
+        '사업자번호': r.businessNumber,
+        '건수': r.orderCount,
+        '총금액': r.totalAmount,
+        '면세금액(계산서)': r.exemptAmount,
+        '과세금액(세금계산서)': r.taxableAmount,
+        '과세공급가액': r.taxableSupply,
+        '부가세': r.taxableVat,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '업체계산서');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = encodeURIComponent(`업체계산서_${year}년${month}월.xlsx`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // 1-6. 직접 매출 CRUD
   app.get('/api/admin/direct-sales', async (req, res) => {
     try {
