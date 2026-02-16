@@ -15207,7 +15207,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { saleDate, clientName, description, amount, memo, stockItems, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId } = req.body;
+      const { saleDate, clientName, description, amount, memo, stockItems, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId, clientType, vendorId } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요 (매출일, 거래처명, 내용, 금액)" });
       }
@@ -15223,6 +15223,8 @@ export async function registerRoutes(
         categoryS: categoryS || null,
         taxType: taxType || "exempt",
         memberId: memberId || null,
+        clientType: clientType || "vendor",
+        vendorId: vendorId ? parseInt(vendorId) : null,
       }).returning();
 
       if (stockItems && Array.isArray(stockItems)) {
@@ -15295,7 +15297,7 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const id = parseInt(req.params.id);
-      const { saleDate, clientName, description, amount, memo, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId } = req.body;
+      const { saleDate, clientName, description, amount, memo, productCode, productName, quantity, unitPrice, categoryL, categoryM, categoryS, taxType, memberId, clientType, vendorId } = req.body;
       if (!saleDate || !clientName || !description || !amount || amount < 1) {
         return res.status(400).json({ message: "필수 항목을 입력해주세요" });
       }
@@ -15312,6 +15314,8 @@ export async function registerRoutes(
           categoryS: categoryS || null,
           taxType: taxType || "exempt",
           memberId: memberId || null,
+          clientType: clientType || "vendor",
+          vendorId: vendorId ? parseInt(vendorId) : null,
           updatedAt: new Date(),
         })
         .where(eq(directSales.id, id))
