@@ -10740,7 +10740,15 @@ export async function registerRoutes(
         settlementConditions.push(lte(settlementHistory.createdAt, endUTC));
       }
 
-      const [orderSettlementRows, depositRows, pointerRows, depositAllNet, pointerAllNet, depositNetAfterEnd, pointerNetAfterEnd] = await Promise.all([
+      const directSaleConditions: any[] = [
+        eq(directSales.memberId, memberId),
+      ];
+      if (startDate && endDate) {
+        directSaleConditions.push(gte(directSales.saleDate, startDate));
+        directSaleConditions.push(lte(directSales.saleDate, endDate));
+      }
+
+      const [orderSettlementRows, depositRows, pointerRows, directSaleRows, depositAllNet, pointerAllNet, depositNetAfterEnd, pointerNetAfterEnd] = await Promise.all([
         db.select({
           settlementDate: sql<string>`TO_CHAR(${settlementHistory.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI:SS')`,
           productName: pendingOrders.productName,
@@ -10778,6 +10786,22 @@ export async function registerRoutes(
         })
           .from(pointerHistory)
           .where(and(...pointerConditions)),
+        db.select({
+          id: directSales.id,
+          saleDate: directSales.saleDate,
+          clientName: directSales.clientName,
+          clientType: directSales.clientType,
+          description: directSales.description,
+          amount: directSales.amount,
+          productName: directSales.productName,
+          productCode: directSales.productCode,
+          quantity: directSales.quantity,
+          unitPrice: directSales.unitPrice,
+          taxType: directSales.taxType,
+          memo: directSales.memo,
+        })
+          .from(directSales)
+          .where(and(...directSaleConditions)),
         startUTC
           ? db.select({
               netChange: sql<number>`COALESCE(SUM(CASE WHEN ${depositHistory.type} = 'charge' THEN ${depositHistory.amount} WHEN ${depositHistory.type} = 'refund' THEN -${depositHistory.amount} WHEN ${depositHistory.type} = 'deduct' THEN -${depositHistory.amount} ELSE 0 END), 0)::int`,
@@ -10828,7 +10852,7 @@ export async function registerRoutes(
       const endingPointerBalance = currentPointer - pointerNetAfter;
 
       type AdminSettlementRow = {
-        type: "order" | "deposit" | "pointer";
+        type: "order" | "deposit" | "pointer" | "direct_sale";
         date: string;
         companyName: string;
         productName: string;
@@ -10892,6 +10916,23 @@ export async function registerRoutes(
           pointerChange: row.amount,
           depositChange: 0,
           description: row.description || undefined,
+          balance: 0,
+        });
+      }
+
+      for (const row of directSaleRows) {
+        items.push({
+          type: "direct_sale" as any,
+          date: row.saleDate + " 00:00:00",
+          companyName,
+          productName: `[직접매출] ${row.description || row.productName || ''}`,
+          productCode: row.productCode || "",
+          quantity: row.quantity || 1,
+          unitPrice: row.unitPrice || row.amount,
+          subtotal: row.amount,
+          pointerChange: 0,
+          depositChange: 0,
+          description: row.memo || undefined,
           balance: 0,
         });
       }

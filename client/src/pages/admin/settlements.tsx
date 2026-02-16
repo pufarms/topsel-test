@@ -48,7 +48,7 @@ interface MemberBalance {
 }
 
 interface MemberSettlementViewItem {
-  type: "order" | "deposit" | "pointer";
+  type: "order" | "deposit" | "pointer" | "direct_sale";
   date: string;
   companyName: string;
   productName: string;
@@ -101,6 +101,7 @@ function MemberSettlementTab() {
   const detailDateRange = useDateRange("month");
   const [detailMemberFilter, setDetailMemberFilter] = useState("");
   const [detailPage, setDetailPage] = useState(1);
+  const [detailTypeFilter, setDetailTypeFilter] = useState("all");
 
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
@@ -200,8 +201,15 @@ function MemberSettlementTab() {
   const memberOptions = memberList.map(m => ({ id: m.id, label: `${m.companyName} (${m.username})` }));
 
   const allItems = settlementView?.items || [];
-  const detailTotalPages = Math.max(1, Math.ceil(allItems.length / ITEMS_PER_PAGE));
-  const pagedItems = allItems.slice((detailPage - 1) * ITEMS_PER_PAGE, detailPage * ITEMS_PER_PAGE);
+  const filteredItems = detailTypeFilter === "all" ? allItems : allItems.filter(i => {
+    if (detailTypeFilter === "order") return i.type === "order";
+    if (detailTypeFilter === "direct_sale") return i.type === "direct_sale";
+    if (detailTypeFilter === "deposit") return i.type === "deposit";
+    if (detailTypeFilter === "pointer") return i.type === "pointer";
+    return true;
+  });
+  const detailTotalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const pagedItems = filteredItems.slice((detailPage - 1) * ITEMS_PER_PAGE, detailPage * ITEMS_PER_PAGE);
   const isFirstPage = detailPage === 1;
   const isLastPage = detailPage >= detailTotalPages || detailTotalPages <= 1;
 
@@ -230,8 +238,8 @@ function MemberSettlementTab() {
         "상호명": item.companyName,
         "내역(상품명)": item.productName,
         "수량": item.quantity || "",
-        "단가": item.type === "order" ? item.unitPrice : "",
-        "합계": item.type === "order" ? item.subtotal : "",
+        "단가": (item.type === "order" || item.type === "direct_sale") ? item.unitPrice : "",
+        "합계": (item.type === "order" || item.type === "direct_sale") ? item.subtotal : "",
         "포인터": item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : "",
         "예치금": item.depositChange !== 0 ? (item.depositChange > 0 ? `+${formatCurrency(item.depositChange)}` : `-${formatCurrency(Math.abs(item.depositChange))}`) : "",
         "예치금+포인터 잔액": formatCurrency(item.balance),
@@ -384,6 +392,20 @@ function MemberSettlementTab() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {detailMemberFilter && (
+                    <Select value={detailTypeFilter} onValueChange={(v) => { setDetailTypeFilter(v); setDetailPage(1); }}>
+                      <SelectTrigger className="w-[140px]" data-testid="select-detail-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체</SelectItem>
+                        <SelectItem value="order">주문정산</SelectItem>
+                        <SelectItem value="direct_sale">직접매출</SelectItem>
+                        <SelectItem value="deposit">입금/환급</SelectItem>
+                        <SelectItem value="pointer">포인터</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                   {detailMemberFilter && allItems.length > 0 && (
                     <Button size="sm" variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-excel-download">
                       <Download className="h-4 w-4" />엑셀 다운로드
@@ -405,7 +427,7 @@ function MemberSettlementTab() {
                 <>
                   {settlementView && (
                     <div className="flex flex-wrap gap-4 items-center text-sm border rounded-md p-2 bg-muted/20">
-                      <span className="text-muted-foreground">총 {allItems.length}건</span>
+                      <span className="text-muted-foreground">총 {filteredItems.length}건{detailTypeFilter !== "all" ? ` (전체 ${allItems.length}건)` : ""}</span>
                       <span className="font-semibold">주문합계: {formatCurrency(settlementView.totalOrderAmount)}</span>
                       <span className="font-semibold text-emerald-600 dark:text-emerald-400">예치금 변동: {settlementView.totalDepositChange >= 0 ? "+" : ""}{formatCurrency(settlementView.totalDepositChange)}</span>
                       <span className="font-semibold text-amber-600 dark:text-amber-400">포인터 변동: {settlementView.totalPointerChange >= 0 ? "+" : ""}{settlementView.totalPointerChange.toLocaleString()}P</span>
@@ -446,7 +468,7 @@ function MemberSettlementTab() {
                           pagedItems.map((item, idx) => (
                             <tr
                               key={`${item.type}-${item.date}-${item.productCode}-${idx}`}
-                              className={`border-b ${item.type !== "order" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
+                              className={`border-b ${item.type === "direct_sale" ? "bg-amber-50/50 dark:bg-amber-950/20" : item.type !== "order" ? "bg-emerald-50/50 dark:bg-emerald-950/20" : ""}`}
                               data-testid={`row-detail-${idx}`}
                             >
                               <td className="py-2 px-3 text-center whitespace-nowrap">{item.date}</td>
@@ -454,6 +476,8 @@ function MemberSettlementTab() {
                               <td className="py-2 px-3 whitespace-nowrap">
                                 {item.type === "order" ? (
                                   item.productName
+                                ) : item.type === "direct_sale" ? (
+                                  <span className="text-amber-700 dark:text-amber-400 font-medium">{item.productName}</span>
                                 ) : (
                                   <span className={item.type === "deposit" ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
                                     {item.productName}
@@ -464,10 +488,10 @@ function MemberSettlementTab() {
                                 {item.quantity || ""}
                               </td>
                               <td className="py-2 px-3 text-right whitespace-nowrap">
-                                {item.type === "order" ? formatCurrency(item.unitPrice) : ""}
+                                {(item.type === "order" || item.type === "direct_sale") ? formatCurrency(item.unitPrice) : ""}
                               </td>
                               <td className="py-2 px-3 text-right whitespace-nowrap font-medium">
-                                {item.type === "order" ? formatCurrency(item.subtotal) : ""}
+                                {(item.type === "order" || item.type === "direct_sale") ? formatCurrency(item.subtotal) : ""}
                               </td>
                               <td className={`py-2 px-3 text-right whitespace-nowrap font-medium ${item.pointerChange > 0 ? "text-amber-600 dark:text-amber-400" : item.pointerChange < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                                 {item.pointerChange !== 0 ? (item.pointerChange > 0 ? `+${item.pointerChange.toLocaleString()}P` : `${item.pointerChange.toLocaleString()}P`) : ""}

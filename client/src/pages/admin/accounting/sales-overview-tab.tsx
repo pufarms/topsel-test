@@ -117,11 +117,13 @@ type DirectSaleRow = {
   id: number;
   saleDate: string;
   clientName: string;
+  clientType: string;
   description: string;
   amount: number;
   memo: string | null;
   taxType: string;
   memberId: string | null;
+  vendorId: number | null;
 };
 
 function SectionHeader({ number, title, icon: Icon, color, children }: {
@@ -724,6 +726,7 @@ function DirectSalesManagement() {
   const todayStr = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, '0')}-${String(kstNow.getDate()).padStart(2, '0')}`;
 
   const [addDate, setAddDate] = useState(todayStr);
+  const [addClientType, setAddClientType] = useState<"vendor" | "member">("vendor");
   const [addClientValue, setAddClientValue] = useState("");
   const [clientSearchText, setClientSearchText] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
@@ -743,7 +746,7 @@ function DirectSalesManagement() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dropdownHighlight, setDropdownHighlight] = useState(-1);
 
-  const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "", taxType: "exempt", memberId: "" });
+  const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "", taxType: "exempt", memberId: "", clientType: "vendor" as string, vendorId: null as number | null });
   const [stockWarningDialog, setStockWarningDialog] = useState<{ open: boolean; insufficientItems: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number }[]; validItems: DSItemRow[]; clientName: string }>({ open: false, insufficientItems: [], validItems: [], clientName: "" });
   const [stockChecking, setStockChecking] = useState(false);
 
@@ -1067,6 +1070,7 @@ function DirectSalesManagement() {
   const resetAddForm = () => {
     setShowAddDialog(false);
     setAddDate(todayStr);
+    setAddClientType("vendor");
     setAddClientValue("");
     setClientSearchText("");
     setClientDropdownOpen(false);
@@ -1082,11 +1086,14 @@ function DirectSalesManagement() {
   };
 
   const doRegister = (validItems: DSItemRow[], clientName: string) => {
+    const selectedVendor = addClientType === "vendor" ? dropdownItems.find(d => d.value === addClientValue) : null;
     const promises = validItems.map(item => {
       const amt = itemTotal(item);
       return createMutation.mutateAsync({
         saleDate: addDate,
         clientName,
+        clientType: addClientType,
+        vendorId: selectedVendor?.vendorId || null,
         description: item.productName,
         amount: amt,
         memo: addMemo || null,
@@ -1098,7 +1105,7 @@ function DirectSalesManagement() {
         categoryM: item.categoryM || null,
         categoryS: item.categoryS || null,
         taxType: addTaxType,
-        memberId: addMemberId || null,
+        memberId: addClientType === "member" ? addMemberId : null,
         stockItems: item.materialCode ? [{
           materialCode: item.materialCode,
           materialType: item.materialType,
@@ -1119,8 +1126,12 @@ function DirectSalesManagement() {
   };
 
   const handleSubmit = async () => {
-    if (!addClientValue) {
-      toast({ title: "거래처를 선택해주세요", variant: "destructive" });
+    if (addClientType === "vendor" && !addClientValue) {
+      toast({ title: "매입업체를 선택해주세요", variant: "destructive" });
+      return;
+    }
+    if (addClientType === "member" && !addMemberId) {
+      toast({ title: "회원을 선택해주세요", variant: "destructive" });
       return;
     }
     const itemsWithInput = addItems.filter(item => item.productName || item.quantity || item.unitPrice);
@@ -1134,8 +1145,14 @@ function DirectSalesManagement() {
       return;
     }
 
-    const selectedClient = dropdownItems.find(d => d.value === addClientValue);
-    const clientName = selectedClient?.label || addClientValue;
+    let clientName = "";
+    if (addClientType === "vendor") {
+      const selectedClient = dropdownItems.find(d => d.value === addClientValue);
+      clientName = selectedClient?.label || addClientValue;
+    } else {
+      const selectedMember = allMembers.find((m: any) => m.memberId === addMemberId);
+      clientName = selectedMember?.companyName || selectedMember?.name || addMemberId;
+    }
 
     const itemsWithCode = validItems.filter(item => item.materialCode);
     if (itemsWithCode.length > 0) {
@@ -1174,7 +1191,12 @@ function DirectSalesManagement() {
 
   const handleEditSubmit = () => {
     if (!editDialog) return;
-    const payload = { ...editFormData, amount: parseInt(editFormData.amount) || 0, memberId: editFormData.memberId || null };
+    const payload = {
+      ...editFormData,
+      amount: parseInt(editFormData.amount) || 0,
+      memberId: editFormData.clientType === "member" ? (editFormData.memberId || null) : null,
+      vendorId: editFormData.vendorId || null,
+    };
     if (!payload.saleDate || !payload.clientName || !payload.description || payload.amount < 1) {
       toast({ title: "필수 항목을 입력해주세요", variant: "destructive" });
       return;
@@ -1192,6 +1214,8 @@ function DirectSalesManagement() {
       memo: row.memo || "",
       taxType: row.taxType || "exempt",
       memberId: row.memberId || "",
+      clientType: row.clientType || "vendor",
+      vendorId: row.vendorId || null,
     });
   };
 
@@ -1219,6 +1243,7 @@ function DirectSalesManagement() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-center py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">날짜</th>
+                  <th className="text-center py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">구분</th>
                   <th className="text-left py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">거래처명</th>
                   <th className="text-left py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">내용</th>
                   <th className="text-right py-2.5 px-3 whitespace-nowrap text-xs font-semibold uppercase tracking-wider">금액</th>
@@ -1231,6 +1256,11 @@ function DirectSalesManagement() {
                 {directList.map((d) => (
                   <tr key={d.id} className="border-b" data-testid={`row-direct-sale-${d.id}`}>
                     <td className="py-2 px-3 text-center whitespace-nowrap">{d.saleDate}</td>
+                    <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <Badge variant="outline" className={`text-xs no-default-active-elevate ${d.clientType === "member" ? "border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400" : "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400"}`}>
+                        {d.clientType === "member" ? "회원" : "매입업체"}
+                      </Badge>
+                    </td>
                     <td className="py-2 px-3 whitespace-nowrap">{d.clientName}</td>
                     <td className="py-2 px-3">{d.description}</td>
                     <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(d.amount)}</td>
@@ -1255,7 +1285,7 @@ function DirectSalesManagement() {
               </tbody>
               <tfoot>
                 <tr className="bg-muted/50 font-semibold border-t-2">
-                  <td className="py-2.5 px-3" colSpan={3}>합계 ({directList.length}건)</td>
+                  <td className="py-2.5 px-3" colSpan={4}>합계 ({directList.length}건)</td>
                   <td className="py-2.5 px-3 text-right">{formatCurrency(totalAmount)}</td>
                   <td className="py-2.5 px-3" colSpan={3}></td>
                 </tr>
@@ -1276,67 +1306,161 @@ function DirectSalesManagement() {
                 <Label>매출일</Label>
                 <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} data-testid="input-sale-date" />
               </div>
-              <div className="space-y-2" ref={clientSearchRef}>
-                <Label>거래처</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                  <Input
-                    value={addClientValue ? (dropdownItems.find(d => d.value === addClientValue)?.label || "") : clientSearchText}
-                    onChange={(e) => {
-                      if (addClientValue) setAddClientValue("");
-                      setClientSearchText(e.target.value);
-                      setClientDropdownOpen(true);
-                    }}
-                    onFocus={() => {
-                      if (addClientValue) {
-                        const label = dropdownItems.find(d => d.value === addClientValue)?.label || "";
-                        setClientSearchText(label);
-                        setAddClientValue("");
-                      }
-                      setClientDropdownOpen(true);
-                    }}
-                    placeholder="거래처명 검색"
-                    className="pl-8 pr-8"
-                    data-testid="input-client-search"
-                  />
-                  {(addClientValue || clientSearchText) ? (
-                    <button
-                      type="button"
-                      onClick={() => { setAddClientValue(""); setClientSearchText(""); setClientDropdownOpen(false); }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      data-testid="button-clear-client"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  )}
-                  {clientDropdownOpen && !addClientValue && (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
-                      {filteredClients.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
-                      ) : (
-                        filteredClients.map(d => (
-                          <button
-                            key={d.value}
-                            type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setAddClientValue(d.value);
-                              setClientSearchText("");
-                              setClientDropdownOpen(false);
-                            }}
-                            data-testid={`option-client-${d.value}`}
-                          >
-                            {d.label}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
+              <div className="space-y-2">
+                <Label>거래처 구분</Label>
+                <div className="flex items-center gap-4 min-h-9">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="clientType"
+                      checked={addClientType === "vendor"}
+                      onChange={() => { setAddClientType("vendor"); setAddMemberId(""); setMemberSearchText(""); }}
+                      className="accent-amber-600"
+                      data-testid="radio-client-vendor"
+                    />
+                    <Building2 className="h-3.5 w-3.5 text-amber-600" />
+                    매입업체
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="clientType"
+                      checked={addClientType === "member"}
+                      onChange={() => { setAddClientType("member"); setAddClientValue(""); setClientSearchText(""); }}
+                      className="accent-blue-600"
+                      data-testid="radio-client-member"
+                    />
+                    <Store className="h-3.5 w-3.5 text-blue-600" />
+                    회원
+                  </label>
                 </div>
               </div>
+              {addClientType === "vendor" ? (
+                <div className="space-y-2" ref={clientSearchRef}>
+                  <Label>매입업체 선택</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                    <Input
+                      value={addClientValue ? (dropdownItems.find(d => d.value === addClientValue)?.label || "") : clientSearchText}
+                      onChange={(e) => {
+                        if (addClientValue) setAddClientValue("");
+                        setClientSearchText(e.target.value);
+                        setClientDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (addClientValue) {
+                          const label = dropdownItems.find(d => d.value === addClientValue)?.label || "";
+                          setClientSearchText(label);
+                          setAddClientValue("");
+                        }
+                        setClientDropdownOpen(true);
+                      }}
+                      placeholder="매입업체 검색"
+                      className="pl-8 pr-8"
+                      data-testid="input-client-search"
+                    />
+                    {(addClientValue || clientSearchText) ? (
+                      <button
+                        type="button"
+                        onClick={() => { setAddClientValue(""); setClientSearchText(""); setClientDropdownOpen(false); }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        data-testid="button-clear-client"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    )}
+                    {clientDropdownOpen && !addClientValue && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                        {filteredClients.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                        ) : (
+                          filteredClients.map(d => (
+                            <button
+                              key={d.value}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setAddClientValue(d.value);
+                                setClientSearchText("");
+                                setClientDropdownOpen(false);
+                              }}
+                              data-testid={`option-client-${d.value}`}
+                            >
+                              {d.label}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2" ref={memberSearchRef}>
+                  <Label>회원 선택</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                    <Input
+                      value={addMemberId ? (allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || addMemberId) : memberSearchText}
+                      onChange={(e) => {
+                        if (addMemberId) setAddMemberId("");
+                        setMemberSearchText(e.target.value);
+                        setMemberDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (addMemberId) {
+                          const label = allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || "";
+                          setMemberSearchText(label);
+                          setAddMemberId("");
+                        }
+                        setMemberDropdownOpen(true);
+                      }}
+                      placeholder="회원 검색 (업체명/이름)"
+                      className="pl-8 pr-8"
+                      data-testid="input-member-search"
+                    />
+                    {(addMemberId || memberSearchText) ? (
+                      <button
+                        type="button"
+                        onClick={() => { setAddMemberId(""); setMemberSearchText(""); setMemberDropdownOpen(false); }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        data-testid="button-clear-member"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    )}
+                    {memberDropdownOpen && !addMemberId && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
+                        {filteredMembers.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
+                        ) : (
+                          filteredMembers.map((m: any) => (
+                            <button
+                              key={m.memberId}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setAddMemberId(m.memberId);
+                                setMemberSearchText("");
+                                setMemberDropdownOpen(false);
+                              }}
+                              data-testid={`option-member-${m.memberId}`}
+                            >
+                              <span className="font-medium">{m.companyName || m.name}</span>
+                              <span className="text-muted-foreground ml-2 text-xs">({m.memberId})</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>과세구분</Label>
                 <Select value={addTaxType} onValueChange={setAddTaxType}>
@@ -1348,68 +1472,6 @@ function DirectSalesManagement() {
                     <SelectItem value="taxable">과세</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2" ref={memberSearchRef}>
-                <Label>회원 연결 (선택)</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                  <Input
-                    value={addMemberId ? (allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || addMemberId) : memberSearchText}
-                    onChange={(e) => {
-                      if (addMemberId) setAddMemberId("");
-                      setMemberSearchText(e.target.value);
-                      setMemberDropdownOpen(true);
-                    }}
-                    onFocus={() => {
-                      if (addMemberId) {
-                        const label = allMembers.find((m: any) => m.memberId === addMemberId)?.companyName || "";
-                        setMemberSearchText(label);
-                        setAddMemberId("");
-                      }
-                      setMemberDropdownOpen(true);
-                    }}
-                    placeholder="회원 검색 (업체명/이름)"
-                    className="pl-8 pr-8"
-                    data-testid="input-member-search"
-                  />
-                  {(addMemberId || memberSearchText) ? (
-                    <button
-                      type="button"
-                      onClick={() => { setAddMemberId(""); setMemberSearchText(""); setMemberDropdownOpen(false); }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      data-testid="button-clear-member"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  )}
-                  {memberDropdownOpen && !addMemberId && (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-[200px] overflow-y-auto">
-                      {filteredMembers.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">검색 결과가 없습니다</div>
-                      ) : (
-                        filteredMembers.map((m: any) => (
-                          <button
-                            key={m.memberId}
-                            type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover-elevate cursor-pointer"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setAddMemberId(m.memberId);
-                              setMemberSearchText("");
-                              setMemberDropdownOpen(false);
-                            }}
-                            data-testid={`option-member-${m.memberId}`}
-                          >
-                            <span className="font-medium">{m.companyName || m.name}</span>
-                            <span className="text-muted-foreground ml-2 text-xs">({m.memberId})</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
             <div className="grid grid-cols-4 gap-4">
@@ -1805,6 +1867,15 @@ function DirectSalesManagement() {
               <Input type="number" value={editFormData.amount} onChange={(e) => setEditFormData(p => ({ ...p, amount: e.target.value }))} placeholder="금액 입력" data-testid="input-edit-amount" />
             </div>
             <div className="space-y-1">
+              <Label>거래처 구분</Label>
+              <div className="flex items-center gap-2 text-sm py-1">
+                <Badge variant="outline" className={`no-default-active-elevate ${editFormData.clientType === "member" ? "border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400" : "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400"}`}>
+                  {editFormData.clientType === "member" ? "회원" : "매입업체"}
+                </Badge>
+                <span className="text-muted-foreground text-xs">(구분은 변경 불가)</span>
+              </div>
+            </div>
+            <div className="space-y-1">
               <Label>과세구분</Label>
               <Select value={editFormData.taxType} onValueChange={(v) => setEditFormData(p => ({ ...p, taxType: v }))}>
                 <SelectTrigger data-testid="select-edit-tax-type">
@@ -1813,22 +1884,6 @@ function DirectSalesManagement() {
                 <SelectContent>
                   <SelectItem value="exempt">면세</SelectItem>
                   <SelectItem value="taxable">과세</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>회원 연결 (선택)</Label>
-              <Select value={editFormData.memberId || "__none__"} onValueChange={(v) => setEditFormData(p => ({ ...p, memberId: v === "__none__" ? "" : v }))}>
-                <SelectTrigger data-testid="select-edit-member">
-                  <SelectValue placeholder="회원 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">연결 안함</SelectItem>
-                  {allMembers.filter((m: any) => m.grade && m.grade !== "PENDING").map((m: any) => (
-                    <SelectItem key={m.memberId} value={m.memberId}>
-                      {m.companyName || m.name} ({m.memberId})
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
