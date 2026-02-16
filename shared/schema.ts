@@ -1718,6 +1718,7 @@ export const directSales = pgTable("direct_sales", {
   id: serial("id").primaryKey(),
   saleDate: date("sale_date").notNull(),
   clientName: varchar("client_name", { length: 200 }).notNull(),
+  clientType: text("client_type").notNull().default("vendor"),
   description: text("description").notNull(),
   amount: integer("amount").notNull(),
   memo: text("memo"),
@@ -1730,6 +1731,7 @@ export const directSales = pgTable("direct_sales", {
   categoryS: varchar("category_s", { length: 100 }),
   taxType: text("tax_type").notNull().default("exempt"),
   memberId: varchar("member_id", { length: 50 }),
+  vendorId: integer("vendor_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
