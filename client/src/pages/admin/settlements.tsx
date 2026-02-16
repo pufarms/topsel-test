@@ -31,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, ShoppingCart, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, Search, Plus, Minus, ArrowUpDown, FileText, BookOpen, ShoppingCart, TrendingUp, DollarSign, Settings, ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
@@ -130,6 +130,9 @@ function MemberSettlementTab() {
   const [detailClientType, setDetailClientType] = useState<"member" | "vendor">("member");
   const [detailPage, setDetailPage] = useState(1);
   const [detailTypeFilter, setDetailTypeFilter] = useState("all");
+  const [detailSearchText, setDetailSearchText] = useState("");
+  const [detailSearchOpen, setDetailSearchOpen] = useState(false);
+  const [detailSelectedLabel, setDetailSelectedLabel] = useState("");
 
   const { data: memberList = [], isLoading: membersLoading } = useQuery<MemberBalance[]>({
     queryKey: ["/api/admin/members-balance"],
@@ -245,9 +248,6 @@ function MemberSettlementTab() {
     return m.companyName.toLowerCase().includes(term) || m.username.toLowerCase().includes(term);
   });
 
-  const memberOptions = memberList.map(m => ({ id: m.id, label: `[회원] ${m.companyName} (${m.username})`, type: "member" as const }));
-  const vendorOptions = vendorList.map(v => ({ id: String(v.id), label: `[매입업체] ${v.companyName}`, type: "vendor" as const }));
-  const allOptions = [...vendorOptions, ...memberOptions];
 
   const isVendorMode = detailClientType === "vendor";
   const currentView = isVendorMode ? vendorSettlementView : settlementView;
@@ -471,34 +471,127 @@ function MemberSettlementTab() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Select
-                    value={detailMemberFilter ? `${detailClientType}:${detailMemberFilter}` : "none"}
+                    value={detailClientType}
                     onValueChange={(v) => {
-                      if (v === "none") {
-                        setDetailMemberFilter("");
-                        setDetailClientType("member");
-                      } else {
-                        const [type, ...idParts] = v.split(":");
-                        const id = idParts.join(":");
-                        setDetailClientType(type as "member" | "vendor");
-                        setDetailMemberFilter(id);
-                      }
+                      setDetailClientType(v as "member" | "vendor");
+                      setDetailMemberFilter("");
+                      setDetailSearchText("");
+                      setDetailSelectedLabel("");
                       setDetailPage(1);
                       setDetailTypeFilter("all");
                     }}
                   >
-                    <SelectTrigger className="w-[280px]" data-testid="select-detail-client">
-                      <SelectValue placeholder="업체/회원 선택" />
+                    <SelectTrigger className="w-[120px]" data-testid="select-detail-client-type">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">업체/회원 선택</SelectItem>
-                      {vendorOptions.length > 0 && vendorOptions.map(v => (
-                        <SelectItem key={`vendor:${v.id}`} value={`vendor:${v.id}`}>{v.label}</SelectItem>
-                      ))}
-                      {memberOptions.length > 0 && memberOptions.map(m => (
-                        <SelectItem key={`member:${m.id}`} value={`member:${m.id}`}>{m.label}</SelectItem>
-                      ))}
+                      <SelectItem value="member">회원</SelectItem>
+                      <SelectItem value="vendor">매입업체</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                    <Input
+                      placeholder={detailClientType === "member" ? "회원 검색 (상호명/아이디)" : "매입업체 검색"}
+                      value={detailSelectedLabel || detailSearchText}
+                      onChange={(e) => {
+                        setDetailSearchText(e.target.value);
+                        setDetailSelectedLabel("");
+                        setDetailMemberFilter("");
+                        setDetailSearchOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (!detailSelectedLabel && detailSearchText.trim()) setDetailSearchOpen(true);
+                      }}
+                      onBlur={() => setTimeout(() => setDetailSearchOpen(false), 200)}
+                      className="pl-8 pr-8 w-[240px]"
+                      data-testid="input-detail-search"
+                    />
+                    {(detailSelectedLabel || detailSearchText) && (
+                      <button
+                        onClick={() => {
+                          setDetailSearchText("");
+                          setDetailSelectedLabel("");
+                          setDetailMemberFilter("");
+                          setDetailSearchOpen(false);
+                          setDetailPage(1);
+                          setDetailTypeFilter("all");
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
+                        data-testid="button-clear-detail-search"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                    {detailSearchOpen && detailSearchText.trim() && !detailSelectedLabel && (() => {
+                      const q = detailSearchText.trim().toLowerCase();
+                      if (detailClientType === "member") {
+                        const suggestions = memberList.filter((m) =>
+                          m.companyName?.toLowerCase().includes(q) ||
+                          m.username?.toLowerCase().includes(q)
+                        ).slice(0, 20);
+                        if (suggestions.length === 0) return (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 p-3 text-sm text-muted-foreground text-center">
+                            검색 결과가 없습니다
+                          </div>
+                        );
+                        return (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                            {suggestions.map((m) => (
+                              <button
+                                key={m.id}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setDetailMemberFilter(m.id);
+                                  setDetailSelectedLabel(m.companyName);
+                                  setDetailSearchText("");
+                                  setDetailSearchOpen(false);
+                                  setDetailPage(1);
+                                  setDetailTypeFilter("all");
+                                }}
+                                data-testid={`suggestion-member-${m.id}`}
+                              >
+                                <span className="font-medium truncate">{m.companyName}</span>
+                                <span className="text-xs text-muted-foreground shrink-0">{m.username}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      } else {
+                        const suggestions = vendorList.filter((v) =>
+                          v.companyName?.toLowerCase().includes(q)
+                        ).slice(0, 20);
+                        if (suggestions.length === 0) return (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 p-3 text-sm text-muted-foreground text-center">
+                            검색 결과가 없습니다
+                          </div>
+                        );
+                        return (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                            {suggestions.map((v) => (
+                              <button
+                                key={v.id}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setDetailMemberFilter(String(v.id));
+                                  setDetailSelectedLabel(v.companyName);
+                                  setDetailSearchText("");
+                                  setDetailSearchOpen(false);
+                                  setDetailPage(1);
+                                  setDetailTypeFilter("all");
+                                }}
+                                data-testid={`suggestion-vendor-${v.id}`}
+                              >
+                                <span className="font-medium">{v.companyName}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
                   {detailMemberFilter && (
                     <Select value={detailTypeFilter} onValueChange={(v) => { setDetailTypeFilter(v); setDetailPage(1); }}>
                       <SelectTrigger className="w-[140px]" data-testid="select-detail-type">
