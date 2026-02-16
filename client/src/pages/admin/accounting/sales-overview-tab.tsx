@@ -267,7 +267,7 @@ function MonthlySalesSummary() {
 
   return (
     <>
-      <div className="rounded-lg border-l-4 border-l-blue-500 border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border-l-4 border-l-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 shadow-md overflow-hidden">
         <div className="p-5">
           <SectionHeader number="1" title="월별 매출 요약" icon={BarChart3} color="blue">
             <div className="flex items-center gap-2">
@@ -671,7 +671,7 @@ function DailySalesDetail() {
   const totalDirect = daily.reduce((s, d) => s + d.directSales, 0);
 
   return (
-    <div className="rounded-lg border-l-4 border-l-emerald-500 border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border-l-4 border-l-emerald-500 border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-md overflow-hidden">
       <div className="p-5">
         <SectionHeader number="2" title="일별 매출 상세" icon={Calendar} color="emerald">
           <div className="flex items-center gap-2">
@@ -1300,7 +1300,7 @@ function DirectSalesManagement() {
   const totalAmount = directList.reduce((s, d) => s + d.amount, 0);
 
   return (
-    <div className="rounded-lg border-l-4 border-l-amber-500 border border-border bg-card">
+    <div className="rounded-lg border-l-4 border-l-amber-500 border border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 shadow-md">
       <div className="p-5">
         <SectionHeader number="3" title="직접 매출 관리" icon={Handshake} color="amber">
           <div className="flex items-center gap-2">
@@ -1984,7 +1984,7 @@ function DirectSalesManagement() {
 
 export default function SalesOverviewTab() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <MonthlySalesSummary />
       <DailySalesDetail />
       <DirectSalesManagement />
