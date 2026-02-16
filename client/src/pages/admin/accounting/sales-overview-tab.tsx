@@ -408,7 +408,18 @@ function MonthlySalesSummary() {
                 면세(농산물): 계산서 발행 (공급가 = 예치금, 부가세 없음) | 과세: 세금계산서 발행 (공급가 = 예치금/1.1, 부가세 별도). 포인터 사용분은 발행 대상에서 제외됩니다.
               </div>
               <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[500px]">
-                <table className="w-full text-sm min-w-[1100px]">
+                <table className="w-full text-sm min-w-[1100px] table-fixed">
+                  <colgroup>
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                  </colgroup>
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b bg-muted/50">
                       <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>회원명(업체명)</th>
@@ -486,14 +497,25 @@ function MonthlySalesSummary() {
                     <h4 className="text-sm font-semibold text-foreground">매입업체별 계산서 / 세금계산서 내역</h4>
                   </div>
                   <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[400px]">
-                    <table className="w-full text-sm min-w-[1100px]">
+                    <table className="w-full text-sm min-w-[1100px] table-fixed">
+                      <colgroup>
+                        <col style={{ width: "18%" }} />
+                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "8%" }} />
+                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "10%" }} />
+                        <col style={{ width: "10%" }} />
+                        <col style={{ width: "10%" }} />
+                        <col style={{ width: "10%" }} />
+                        <col style={{ width: "10%" }} />
+                      </colgroup>
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b bg-muted/50">
                           <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>업체명</th>
                           <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
                           <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>주문건수</th>
                           <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총주문액</th>
-                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider text-muted-foreground/50" rowSpan={2}></th>
+                          <th className="py-2.5 px-3" rowSpan={2}></th>
                           <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세(계산서)</th>
                           <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
                         </tr>
