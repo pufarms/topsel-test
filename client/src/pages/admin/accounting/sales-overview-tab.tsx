@@ -486,13 +486,14 @@ function MonthlySalesSummary() {
                     <h4 className="text-sm font-semibold text-foreground">매입업체별 계산서 / 세금계산서 내역</h4>
                   </div>
                   <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[400px]">
-                    <table className="w-full text-sm min-w-[800px]">
+                    <table className="w-full text-sm min-w-[1100px]">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b bg-muted/50">
                           <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>업체명</th>
                           <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
-                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>건수</th>
-                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총금액</th>
+                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>주문건수</th>
+                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총주문액</th>
+                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider text-muted-foreground/50" rowSpan={2}></th>
                           <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세(계산서)</th>
                           <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
                         </tr>
@@ -510,6 +511,7 @@ function MonthlySalesSummary() {
                             <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">{v.businessNumber || "-"}</td>
                             <td className="py-2.5 px-3 text-right whitespace-nowrap">{v.orderCount}</td>
                             <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(v.totalAmount)}</td>
+                            <td className="py-2.5 px-3"></td>
                             <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/30 dark:bg-green-950/10">{v.exemptAmount > 0 ? formatCurrency(v.exemptAmount) : "-"}</td>
                             <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/30 dark:bg-violet-950/10">{v.taxableSupply > 0 ? formatCurrency(v.taxableSupply) : "-"}</td>
                             <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{v.taxableVat > 0 ? formatCurrency(v.taxableVat) : "-"}</td>
@@ -523,6 +525,7 @@ function MonthlySalesSummary() {
                             <td className="py-2.5 px-3" colSpan={2}>합계</td>
                             <td className="py-2.5 px-3 text-right">{monthlyData.vendors.reduce((s, v) => s + v.orderCount, 0)}</td>
                             <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.totalAmount)}</td>
+                            <td className="py-2.5 px-3"></td>
                             <td className="py-2.5 px-3 text-right border-l-2 border-l-green-400/30 dark:border-l-green-600/30">{formatCurrency(monthlyData.vendorTotals.exemptAmount)}</td>
                             <td className="py-2.5 px-3 text-right border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30">{formatCurrency(monthlyData.vendorTotals.taxableSupply)}</td>
                             <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.taxableVat)}</td>
