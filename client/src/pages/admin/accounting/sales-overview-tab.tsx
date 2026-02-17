@@ -593,19 +593,22 @@ function MonthlySalesSummary() {
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
                         {r.issuedStatus === 'issued' ? (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Badge variant="default" className="text-xs bg-green-600">발행</Badge>
+                            <Badge variant="default" className="text-xs bg-green-600">발행완료</Badge>
                             <span className="text-[10px] text-muted-foreground">{r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ko-KR') : ''}</span>
                           </div>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs gap-1"
-                            onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
-                            data-testid={`button-issue-${idx}`}
-                          >
-                            <FileText className="h-3 w-3" />발행
-                          </Button>
+                          <div className="flex flex-col items-center gap-1">
+                            <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">미발행</Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs gap-1 h-6 px-2"
+                              onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
+                              data-testid={`button-issue-${idx}`}
+                            >
+                              <FileText className="h-3 w-3" />발행하기
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
