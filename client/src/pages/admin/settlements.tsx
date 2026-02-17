@@ -513,7 +513,7 @@ function MemberSettlementTab() {
                   <CardTitle className="text-base flex items-center gap-2">
                     <FileText className="h-5 w-5" />업체별 정산 내역
                   </CardTitle>
-                  <DateRangeFilter onChange={(range) => { detailDateRange.setDateRange(range); setDetailPage(1); }} defaultPreset="month" />
+                  <DateRangeFilter onChange={(range) => { detailDateRange.setDateRange(range); setDetailPage(1); }} defaultPreset="month" controlledPreset={detailDateRange.activePreset} onPresetChange={detailDateRange.setActivePreset} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Select

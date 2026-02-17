@@ -1053,7 +1053,7 @@ function OrderDetailDialog({
 }
 
 export default function AdminStatsPage() {
-  const { dateRange, setDateRange } = useDateRange("month");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("month");
   const [activeTab, setActiveTab] = useState("overview");
   const [orderDialog, setOrderDialog] = useState<{
     open: boolean;
@@ -1081,7 +1081,7 @@ export default function AdminStatsPage() {
             <TabsTrigger value="by-member" data-testid="tab-by-member">회원별 매출</TabsTrigger>
             <TabsTrigger value="by-product" data-testid="tab-by-product">상품별 매출</TabsTrigger>
           </TabsList>
-          <DateRangeFilter onChange={setDateRange} defaultPreset="month" className="mr-8" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="month" controlledPreset={activePreset} onPresetChange={setActivePreset} className="mr-8" />
         </div>
 
         <TabsContent value="overview" className="mt-4">

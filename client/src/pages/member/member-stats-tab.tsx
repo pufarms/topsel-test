@@ -578,7 +578,7 @@ function OrderListDialog({
 }
 
 export default function MemberStatsTab() {
-  const { dateRange, setDateRange } = useDateRange("month");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("month");
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
@@ -597,6 +597,8 @@ export default function MemberStatsTab() {
           <DateRangeFilter
             onChange={setDateRange}
             defaultPreset="month"
+            controlledPreset={activePreset}
+            onPresetChange={setActivePreset}
             showLabel={false}
           />
         </div>

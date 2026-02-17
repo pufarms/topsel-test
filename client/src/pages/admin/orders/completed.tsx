@@ -31,7 +31,7 @@ export default function OrdersCompletedPage() {
     searchTerm: "",
   });
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/orders", dateRange.startDate, dateRange.endDate],
@@ -89,7 +89,7 @@ export default function OrdersCompletedPage() {
           <CardTitle>배송완료 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

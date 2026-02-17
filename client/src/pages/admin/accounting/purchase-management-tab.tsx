@@ -535,7 +535,7 @@ export default function PurchaseManagementTab() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap items-end gap-2 justify-between">
             <div className="flex flex-wrap items-end gap-2">
-              <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" />
+              <DateRangeFilter onChange={dateRange.setDateRange} defaultPreset="month" controlledPreset={dateRange.activePreset} onPresetChange={dateRange.setActivePreset} />
               <div className="relative w-[200px]" ref={filterVendorRef}>
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
                 <Input

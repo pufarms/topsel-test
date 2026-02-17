@@ -47,7 +47,7 @@ export default function OrdersReadyToShipPage() {
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const [showTransferAllDialog, setShowTransferAllDialog] = useState(false);
   const [showTransferFilteredDialog, setShowTransferFilteredDialog] = useState(false);
@@ -244,7 +244,7 @@ export default function OrdersReadyToShipPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

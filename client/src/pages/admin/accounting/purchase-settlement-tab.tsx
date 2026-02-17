@@ -185,7 +185,7 @@ export default function PurchaseSettlementTab() {
                 {sourceBadge(selectedVendor.source)}
               </div>
               <div className="flex items-center gap-2">
-                <DateRangeFilter onChange={detailDateRange.setDateRange} defaultPreset="3months" />
+                <DateRangeFilter onChange={detailDateRange.setDateRange} defaultPreset="3months" controlledPreset={detailDateRange.activePreset} onPresetChange={detailDateRange.setActivePreset} />
                 <Button size="sm" onClick={() => setShowPaymentDialog(true)} data-testid="button-add-payment">
                   <Plus className="h-4 w-4 mr-1" />입금 등록
                 </Button>

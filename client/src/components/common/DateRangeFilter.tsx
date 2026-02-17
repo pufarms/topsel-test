@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,6 +20,8 @@ export interface DateRangeState {
 interface DateRangeFilterProps {
   onChange: (range: DateRangeState) => void;
   defaultPreset?: DatePreset;
+  controlledPreset?: DatePreset;
+  onPresetChange?: (preset: DatePreset) => void;
   showAllOption?: boolean;
   showLabel?: boolean;
   className?: string;
@@ -28,17 +30,29 @@ interface DateRangeFilterProps {
 export function DateRangeFilter({
   onChange,
   defaultPreset = "today",
+  controlledPreset,
+  onPresetChange,
   showAllOption = false,
   showLabel = true,
   className,
 }: DateRangeFilterProps) {
-  const [activePreset, setActivePreset] = useState<DatePreset>(defaultPreset);
+  const [localPreset, setLocalPreset] = useState<DatePreset>(defaultPreset);
   const [customStart, setCustomStart] = useState<Date | undefined>(undefined);
   const [customEnd, setCustomEnd] = useState<Date | undefined>(undefined);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  const isControlled = controlledPreset !== undefined;
+  const activePreset = isControlled ? controlledPreset : localPreset;
+  const setActivePreset = useCallback((preset: DatePreset) => {
+    if (!isControlled) {
+      setLocalPreset(preset);
+    }
+    onPresetChange?.(preset);
+  }, [onPresetChange, isControlled]);
+
   useEffect(() => {
+    if (controlledPreset !== undefined) return;
     if (defaultPreset !== "custom") {
       const range = getDateRangeFromPreset(defaultPreset);
       if (range) {
@@ -203,5 +217,6 @@ export function useDateRange(defaultPreset: DatePreset = "today") {
   const [dateRange, setDateRange] = useState<DateRangeState>(
     range || { startDate: "", endDate: "" }
   );
-  return { dateRange, setDateRange };
+  const [activePreset, setActivePreset] = useState<DatePreset>(defaultPreset);
+  return { dateRange, setDateRange, activePreset, setActivePreset };
 }

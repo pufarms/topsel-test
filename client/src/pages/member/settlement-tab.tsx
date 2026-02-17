@@ -145,6 +145,8 @@ function DepositHistoryTab({ dateRange }: { dateRange: any }) {
           <DateRangeFilter
             onChange={(range) => { dateRange.setDateRange(range); setPage(1); }}
             defaultPreset="month"
+            controlledPreset={dateRange.activePreset}
+            onPresetChange={dateRange.setActivePreset}
           />
         </div>
       </CardHeader>
@@ -373,6 +375,8 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
           <DateRangeFilter
             onChange={(range) => { dateRange.setDateRange(range); setPage(1); }}
             defaultPreset="month"
+            controlledPreset={dateRange.activePreset}
+            onPresetChange={dateRange.setActivePreset}
           />
         </div>
       </CardHeader>
@@ -663,6 +667,8 @@ export default function MemberSettlementTab() {
                 <DateRangeFilter
                   onChange={(range) => { settlementDateRange.setDateRange(range); setSettlementPage(1); }}
                   defaultPreset="month"
+                  controlledPreset={settlementDateRange.activePreset}
+                  onPresetChange={settlementDateRange.setActivePreset}
                 />
               </div>
             </CardHeader>

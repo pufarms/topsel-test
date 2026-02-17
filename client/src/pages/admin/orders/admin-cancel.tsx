@@ -103,7 +103,7 @@ export default function OrdersAdminCancelPage() {
   const { toast } = useToast();
   useSSE();
 
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
@@ -1158,7 +1158,7 @@ export default function OrdersAdminCancelPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} />
+          <DateRangeFilter onChange={setDateRange} controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

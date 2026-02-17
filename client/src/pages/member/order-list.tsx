@@ -23,7 +23,7 @@ export default function MemberOrderList({ canOrder = true }: MemberOrderListProp
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const { data: allOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/member/pending-orders", dateRange.startDate, dateRange.endDate],
@@ -115,7 +115,7 @@ export default function MemberOrderList({ canOrder = true }: MemberOrderListProp
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <MemberOrderFilter
             onFilterChange={handleFilterChange}
             showSearchField={true}

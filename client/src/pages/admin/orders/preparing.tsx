@@ -53,7 +53,7 @@ export default function OrdersPreparingPage() {
   const { toast } = useToast();
   useSSE();
 
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const [filters, setFilters] = useState<AdminCategoryFilterState>({
     memberId: "",
@@ -415,7 +415,7 @@ export default function OrdersPreparingPage() {
           <CardTitle>상품준비중 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} />
+          <DateRangeFilter onChange={setDateRange} controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

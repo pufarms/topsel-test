@@ -51,7 +51,7 @@ export default function AdminDashboard() {
   useSSE();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
   const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
   const [confirmText, setConfirmText] = useState("");
 
@@ -265,7 +265,7 @@ export default function AdminDashboard() {
               <h2 className="text-gray-900 dark:text-gray-100 font-bold text-sm">주문/배송 현황</h2>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+              <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 <Calendar className="h-3 w-3 inline mr-1" />
                 {formattedDateShort} (오늘)

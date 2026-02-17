@@ -861,7 +861,7 @@ function DailySalesDetail() {
                 <SelectItem value="direct">직접 매출</SelectItem>
               </SelectContent>
             </Select>
-            <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" />
+            <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" controlledPreset={dateRange.activePreset} onPresetChange={dateRange.setActivePreset} />
           </div>
         </SectionHeader>
 
@@ -1484,7 +1484,7 @@ function DirectSalesManagement() {
             <Button size="sm" className="gap-1" onClick={() => { resetAddForm(); setShowAddDialog(true); setAddDate(todayStr); }} data-testid="button-create-direct-sale">
               <Plus className="h-4 w-4" />등록
             </Button>
-            <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" />
+            <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" controlledPreset={dateRange.activePreset} onPresetChange={dateRange.setActivePreset} />
           </div>
         </SectionHeader>
 

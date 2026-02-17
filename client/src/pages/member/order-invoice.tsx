@@ -28,7 +28,7 @@ export default function MemberOrderInvoice({ canOrder = true }: MemberOrderInvoi
   useSSE();
   const { toast } = useToast();
 
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
   const [filters, setFilters] = useState<MemberOrderFilterState | null>(null);
   const [pageSize, setPageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -242,7 +242,7 @@ export default function MemberOrderInvoice({ canOrder = true }: MemberOrderInvoi
           </div>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <MemberOrderFilter
             onFilterChange={handleFilterChange}
             showSearchField={true}

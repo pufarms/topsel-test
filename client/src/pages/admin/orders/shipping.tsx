@@ -33,7 +33,7 @@ export default function OrdersShippingPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [tablePageSize, setTablePageSize] = useState<number | "all">(30);
   const [currentPage, setCurrentPage] = useState(1);
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
@@ -100,7 +100,7 @@ export default function OrdersShippingPage() {
           <CardTitle>배송중 목록</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-hidden">
-          <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+          <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
           <AdminCategoryFilter
             onFilterChange={setFilters}
             searchPlaceholder="검색어를 입력하세요"

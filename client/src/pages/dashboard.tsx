@@ -266,7 +266,7 @@ export default function Dashboard() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   
-  const { dateRange, setDateRange } = useDateRange("today");
+  const { dateRange, setDateRange, activePreset, setActivePreset } = useDateRange("today");
   
   const urlParams = new URLSearchParams(window.location.search);
   const isPreviewMode = urlParams.get("preview") === "true";
@@ -956,7 +956,7 @@ export default function Dashboard() {
                       <ShoppingCart className="h-5 w-5 text-primary" />
                       <CardTitle className="text-base">주문현황</CardTitle>
                     </div>
-                    <DateRangeFilter onChange={setDateRange} defaultPreset="today" />
+                    <DateRangeFilter onChange={setDateRange} defaultPreset="today" controlledPreset={activePreset} onPresetChange={setActivePreset} />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
