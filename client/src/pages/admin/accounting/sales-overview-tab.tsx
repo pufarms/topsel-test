@@ -146,12 +146,14 @@ type DirectSaleRow = {
   vendorId: number | null;
 };
 
-function SectionHeader({ number, title, icon: Icon, color, children }: {
+function SectionHeader({ number, title, icon: Icon, color, children, isOpen, onToggle }: {
   number: string;
   title: string;
   icon: any;
   color: "blue" | "emerald" | "amber";
   children?: React.ReactNode;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }) {
   const colorMap = {
     blue: {
@@ -174,10 +176,15 @@ function SectionHeader({ number, title, icon: Icon, color, children }: {
     },
   };
   const c = colorMap[color];
+  const toggleable = typeof isOpen !== 'undefined' && onToggle;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div className="flex items-center gap-3">
+    <div className={`flex flex-wrap items-center justify-between gap-3 ${isOpen !== false ? 'mb-4' : 'mb-0'}`}>
+      <div
+        className={`flex items-center gap-3 ${toggleable ? 'cursor-pointer select-none' : ''}`}
+        onClick={onToggle}
+        data-testid={`toggle-section-${number}`}
+      >
         <div className={`flex items-center justify-center w-8 h-8 rounded-md ${c.bg} text-white font-bold text-sm`}>
           {number}
         </div>
@@ -185,8 +192,11 @@ function SectionHeader({ number, title, icon: Icon, color, children }: {
           <Icon className={`h-5 w-5 ${c.iconText}`} />
         </div>
         <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+        {toggleable && (
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+        )}
       </div>
-      {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
+      {isOpen !== false && children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
     </div>
   );
 }
@@ -248,6 +258,7 @@ function MonthlySalesSummary() {
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
   const [issueDialogRow, setIssueDialogRow] = useState<InvoiceSummaryRow | null>(null);
   const [issueMemo, setIssueMemo] = useState("");
+  const [sectionOpen, setSectionOpen] = useState(true);
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
   const nextM = selectedMonth === 12 ? 1 : selectedMonth + 1;
@@ -376,7 +387,7 @@ function MonthlySalesSummary() {
     <>
       <div className="rounded-lg border-l-4 border-l-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 shadow-md overflow-hidden">
         <div className="p-5">
-          <SectionHeader number="1" title="월별 매출 요약" icon={BarChart3} color="blue">
+          <SectionHeader number="1" title="월별 매출 요약" icon={BarChart3} color="blue" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
             <div className="flex items-center gap-2">
               <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
                 <SelectTrigger className="w-[100px]" data-testid="select-year">
@@ -397,7 +408,7 @@ function MonthlySalesSummary() {
             </div>
           </SectionHeader>
 
-          {salesLoading ? (
+          {sectionOpen && (salesLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : salesData ? (
             <div className="grid sm:grid-cols-3 gap-4">
@@ -435,10 +446,10 @@ function MonthlySalesSummary() {
                 </div>
               </div>
             </div>
-          ) : null}
+          ) : null)}
         </div>
 
-        <div className="border-t border-border bg-muted/20 px-5 py-4">
+        {sectionOpen && <div className="border-t border-border bg-muted/20 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -636,7 +647,7 @@ function MonthlySalesSummary() {
               해당 월에 계산서 발행 대상 데이터가 없습니다.
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       <Dialog open={!!issueDialogRow} onOpenChange={(open) => { if (!open) { setIssueDialogRow(null); setIssueMemo(""); } }}>
@@ -829,6 +840,7 @@ function DailySalesDetail() {
   });
 
   const [filter, setFilter] = useState<"all" | "site" | "direct">("all");
+  const [sectionOpen, setSectionOpen] = useState(true);
   const daily = data?.daily || [];
 
   const totalSite = daily.reduce((s, d) => s + d.siteSales, 0);
@@ -837,7 +849,7 @@ function DailySalesDetail() {
   return (
     <div className="rounded-lg border-l-4 border-l-emerald-500 border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-md overflow-hidden">
       <div className="p-5">
-        <SectionHeader number="2" title="일별 매출 상세" icon={Calendar} color="emerald">
+        <SectionHeader number="2" title="일별 매출 상세" icon={Calendar} color="emerald" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
           <div className="flex items-center gap-2">
             <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
               <SelectTrigger className="w-[120px]" data-testid="select-daily-filter">
@@ -853,7 +865,7 @@ function DailySalesDetail() {
           </div>
         </SectionHeader>
 
-        {isLoading ? (
+        {sectionOpen && (isLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : daily.length === 0 ? (
           <div className="py-6 text-center text-muted-foreground text-sm">해당 기간에 매출 데이터가 없습니다.</div>
@@ -898,7 +910,7 @@ function DailySalesDetail() {
               </tfoot>
             </table>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -991,6 +1003,7 @@ function DirectSalesManagement() {
   const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "", taxType: "exempt", memberId: "", clientType: "vendor" as string, vendorId: null as number | null });
   const [stockWarningDialog, setStockWarningDialog] = useState<{ open: boolean; insufficientItems: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number }[]; validItems: DSItemRow[]; clientName: string }>({ open: false, insufficientItems: [], validItems: [], clientName: "" });
   const [stockChecking, setStockChecking] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(true);
 
   const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
 
@@ -1466,7 +1479,7 @@ function DirectSalesManagement() {
   return (
     <div className="rounded-lg border-l-4 border-l-amber-500 border border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 shadow-md">
       <div className="p-5">
-        <SectionHeader number="3" title="직접 매출 관리" icon={Handshake} color="amber">
+        <SectionHeader number="3" title="직접 매출 관리" icon={Handshake} color="amber" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
           <div className="flex items-center gap-2">
             <Button size="sm" className="gap-1" onClick={() => { resetAddForm(); setShowAddDialog(true); setAddDate(todayStr); }} data-testid="button-create-direct-sale">
               <Plus className="h-4 w-4" />등록
@@ -1475,7 +1488,7 @@ function DirectSalesManagement() {
           </div>
         </SectionHeader>
 
-        {isLoading ? (
+        {sectionOpen && (isLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : directList.length === 0 ? (
           <div className="py-6 text-center text-muted-foreground text-sm">등록된 직접 매출이 없습니다.</div>
@@ -1534,7 +1547,7 @@ function DirectSalesManagement() {
               </tfoot>
             </table>
           </div>
-        )}
+        ))}
       </div>
 
       <Dialog open={showAddDialog} onOpenChange={() => resetAddForm()}>
