@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2, UserPlus, Mail } from "lucide-react";
+import { Loader2, Download, Users, Clock, UserCheck, Rocket, Car, Crown, Trash2, UserPlus, Mail, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -290,7 +290,10 @@ export default function MembersPage() {
     { key: "username", label: "아이디", className: "text-muted-foreground" },
     { key: "memberName", label: "회원명", render: (m) => m.memberName || "-" },
     { key: "grade", label: "등급", render: (m) => (
-      <Badge className={gradeColors[m.grade]}>{memberGradeLabels[m.grade as MemberGrade]}</Badge>
+      <Badge className={gradeColors[m.grade]}>
+        {m.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
+        {memberGradeLabels[m.grade as MemberGrade]}
+      </Badge>
     )},
     { key: "representative", label: "대표자", render: (m) => m.representative || "-" },
     { key: "phone", label: "대표연락처", render: (m) => m.phone || "-" },
@@ -563,6 +566,7 @@ export default function MembersPage() {
               <span className="font-medium truncate">{member.companyName}</span>
               <div className="flex items-center gap-2">
                 <Badge className={gradeColors[member.grade]}>
+                  {member.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
                   {memberGradeLabels[member.grade as MemberGrade]}
                 </Badge>
                 <Button

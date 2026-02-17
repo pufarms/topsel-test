@@ -1767,6 +1767,66 @@ export async function registerRoutes(
     }
   });
 
+  // 관리자: 회원 등급 고정 설정/해제
+  app.post("/api/admin/members/:memberId/grade-lock", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "Admin access required" });
+
+    try {
+      const { memberId } = req.params;
+      const { gradeLocked, lockedGrade, gradeLockReason } = req.body;
+
+      const member = await storage.getMember(memberId);
+      if (!member) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      if (gradeLocked && !['START', 'DRIVING', 'TOP'].includes(lockedGrade)) {
+        return res.status(400).json({ message: "고정 등급은 START, DRIVING, TOP 중 하나여야 합니다" });
+      }
+
+      const updateData: any = {
+        gradeLocked: !!gradeLocked,
+        updatedAt: new Date(),
+      };
+
+      if (gradeLocked) {
+        updateData.lockedGrade = lockedGrade;
+        updateData.gradeLockReason = gradeLockReason || null;
+        updateData.gradeLockSetBy = user.id;
+        updateData.gradeLockSetAt = new Date();
+        if (lockedGrade !== member.grade) {
+          updateData.grade = lockedGrade;
+        }
+      } else {
+        updateData.lockedGrade = null;
+        updateData.gradeLockReason = null;
+        updateData.gradeLockSetBy = null;
+        updateData.gradeLockSetAt = null;
+      }
+
+      const updatedMember = await storage.updateMember(memberId, updateData);
+
+      const action = gradeLocked ? `등급 고정 설정 (${lockedGrade})` : '등급 고정 해제';
+      const desc = gradeLocked
+        ? `등급 고정: ${lockedGrade}${gradeLockReason ? ', 사유: ' + gradeLockReason : ''}`
+        : `등급 고정 해제 (이전 고정: ${member.lockedGrade || member.grade})`;
+
+      await storage.createMemberLog({
+        memberId,
+        changedBy: user.id,
+        changeType: '등급고정',
+        previousValue: member.gradeLocked ? `고정(${member.lockedGrade})` : '미고정',
+        newValue: gradeLocked ? `고정(${lockedGrade})` : '미고정',
+        description: desc,
+      });
+
+      const { password, ...memberWithoutPassword } = updatedMember!;
+      res.json({ success: true, message: `${action} 완료`, member: memberWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/admin/members/bulk-update", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -16823,6 +16883,266 @@ export async function registerRoutes(
       res.setHeader('Content-Disposition', `attachment; filename=invoice_${year}_${month}.xlsx`);
       await workbook.xlsx.write(res);
       res.end();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== 회원 등급 자동 조정 시스템 ==========
+  
+  async function adjustMemberGrades(targetYear?: number, targetMonth?: number): Promise<{
+    total: number;
+    upgraded: number;
+    downgraded: number;
+    maintained: number;
+    locked: number;
+    details: Array<{ memberId: string; memberName: string; companyName: string; previousGrade: string; newGrade: string; salesAmount: number; reason: string }>;
+  }> {
+    const now = new Date();
+    const year = targetYear ?? (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+    const month = targetMonth ?? (now.getMonth() === 0 ? 12 : now.getMonth());
+    
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    
+    console.log(`[등급조정] 전월 거래 기간: ${startDate.toISOString().slice(0,10)} ~ ${endDate.toISOString().slice(0,10)}`);
+    
+    const activeMembers = await db.select().from(members)
+      .where(and(
+        inArray(members.grade, ['START', 'DRIVING', 'TOP']),
+        eq(members.status, '활성')
+      ));
+    
+    if (activeMembers.length === 0) {
+      console.log('[등급조정] 조정 대상 회원 없음');
+      return { total: 0, upgraded: 0, downgraded: 0, maintained: 0, locked: 0, details: [] };
+    }
+    
+    const memberIds = activeMembers.map(m => m.id);
+    const salesData = await db.select({
+      memberId: pendingOrders.memberId,
+      totalSales: sql<number>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`.as('total_sales'),
+    })
+      .from(pendingOrders)
+      .where(and(
+        inArray(pendingOrders.memberId, memberIds),
+        eq(pendingOrders.status, '배송중'),
+        eq(pendingOrders.priceConfirmed, true),
+        gte(pendingOrders.createdAt, startDate),
+        lte(pendingOrders.createdAt, endDate),
+      ))
+      .groupBy(pendingOrders.memberId);
+    
+    const salesMap = new Map(salesData.map(s => [s.memberId, Number(s.totalSales)]));
+    
+    function determineGrade(salesAmount: number): string {
+      if (salesAmount >= 3000000) return 'TOP';
+      if (salesAmount >= 1000000) return 'DRIVING';
+      return 'START';
+    }
+    
+    let upgraded = 0, downgraded = 0, maintained = 0, locked = 0;
+    const details: Array<{ memberId: string; memberName: string; companyName: string; previousGrade: string; newGrade: string; salesAmount: number; reason: string }> = [];
+    
+    for (const member of activeMembers) {
+      if (member.gradeLocked) {
+        locked++;
+        details.push({
+          memberId: member.id,
+          memberName: member.memberName || '',
+          companyName: member.companyName,
+          previousGrade: member.grade,
+          newGrade: member.grade,
+          salesAmount: salesMap.get(member.id) || 0,
+          reason: `등급 고정 (${member.lockedGrade})`,
+        });
+        continue;
+      }
+      
+      const salesAmount = salesMap.get(member.id) || 0;
+      const newGrade = determineGrade(salesAmount);
+      
+      if (newGrade === member.grade) {
+        maintained++;
+        details.push({
+          memberId: member.id,
+          memberName: member.memberName || '',
+          companyName: member.companyName,
+          previousGrade: member.grade,
+          newGrade,
+          salesAmount,
+          reason: '유지',
+        });
+        continue;
+      }
+      
+      const gradeOrder = { START: 1, DRIVING: 2, TOP: 3 } as Record<string, number>;
+      const isUpgrade = gradeOrder[newGrade] > gradeOrder[member.grade];
+      
+      await db.update(members).set({
+        grade: newGrade,
+        updatedAt: new Date(),
+      }).where(eq(members.id, member.id));
+      
+      await storage.createMemberLog({
+        memberId: member.id,
+        changedBy: 'system',
+        changeType: '등급변경',
+        previousValue: member.grade,
+        newValue: newGrade,
+        description: `월별 자동 등급 조정 (${year}년 ${month}월 거래금액: ${salesAmount.toLocaleString()}원) - ${isUpgrade ? '승급' : '하향'}`,
+      });
+      
+      if (isUpgrade) upgraded++;
+      else downgraded++;
+      
+      details.push({
+        memberId: member.id,
+        memberName: member.memberName || '',
+        companyName: member.companyName,
+        previousGrade: member.grade,
+        newGrade,
+        salesAmount,
+        reason: isUpgrade ? '승급' : '하향',
+      });
+      
+      console.log(`[등급조정] ${member.companyName}(${member.memberName}): ${member.grade} → ${newGrade} (거래금액: ${salesAmount.toLocaleString()}원)`);
+    }
+    
+    console.log(`[등급조정] 완료 - 대상: ${activeMembers.length}명, 승급: ${upgraded}, 하향: ${downgraded}, 유지: ${maintained}, 고정: ${locked}`);
+    
+    return { total: activeMembers.length, upgraded, downgraded, maintained, locked, details };
+  }
+  
+  // 매월 1일 0시(KST) 자동 등급 조정 스케줄러
+  function scheduleMonthlyGradeAdjustment() {
+    function getNextFirstDayMidnightKST(): number {
+      const now = new Date();
+      const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const kstYear = kstNow.getUTCFullYear();
+      const kstMonth = kstNow.getUTCMonth();
+      
+      let nextFirst = new Date(Date.UTC(kstYear, kstMonth + 1, 1, 0, 0, 0, 0));
+      nextFirst = new Date(nextFirst.getTime() - 9 * 60 * 60 * 1000);
+      
+      if (nextFirst.getTime() <= now.getTime()) {
+        nextFirst = new Date(Date.UTC(kstYear, kstMonth + 2, 1, 0, 0, 0, 0));
+        nextFirst = new Date(nextFirst.getTime() - 9 * 60 * 60 * 1000);
+      }
+      
+      return nextFirst.getTime() - now.getTime();
+    }
+    
+    function scheduleNext() {
+      const msUntilNext = getNextFirstDayMidnightKST();
+      const hoursUntil = Math.round(msUntilNext / (1000 * 60 * 60));
+      console.log(`[등급조정] 다음 자동 등급 조정: ${hoursUntil}시간 후 (약 ${Math.round(hoursUntil / 24)}일 후)`);
+      
+      setTimeout(async () => {
+        console.log('[등급조정] 월별 자동 등급 조정 실행');
+        try {
+          const result = await adjustMemberGrades();
+          console.log(`[등급조정] 자동 조정 완료 - 대상: ${result.total}, 승급: ${result.upgraded}, 하향: ${result.downgraded}, 유지: ${result.maintained}, 고정: ${result.locked}`);
+        } catch (err: any) {
+          console.error('[등급조정] 자동 조정 실패:', err.message);
+        }
+        scheduleNext();
+      }, msUntilNext);
+    }
+    
+    scheduleNext();
+  }
+  
+  scheduleMonthlyGradeAdjustment();
+  
+  // 관리자: 수동 등급 조정 실행 API
+  app.post('/api/admin/members/grade-adjustment/run', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'SUPER_ADMIN') return res.status(403).json({ message: "최고관리자만 실행할 수 있습니다" });
+    
+    try {
+      const { year, month } = req.body;
+      console.log(`[등급조정] 관리자 수동 실행 (${year || '전월'}년 ${month || '전월'}월)`);
+      const result = await adjustMemberGrades(year, month);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // 관리자: 등급 조정 미리보기 API (실제 변경 없이 결과만 확인)
+  app.get('/api/admin/members/grade-adjustment/preview', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "Admin access required" });
+    
+    try {
+      const now = new Date();
+      const year = req.query.year ? parseInt(req.query.year as string) : (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+      const month = req.query.month ? parseInt(req.query.month as string) : (now.getMonth() === 0 ? 12 : now.getMonth());
+      
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+      
+      const activeMembers = await db.select().from(members)
+        .where(and(
+          inArray(members.grade, ['START', 'DRIVING', 'TOP']),
+          eq(members.status, '활성')
+        ));
+      
+      const memberIds = activeMembers.map(m => m.id);
+      const salesData = memberIds.length > 0 ? await db.select({
+        memberId: pendingOrders.memberId,
+        totalSales: sql<number>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`.as('total_sales'),
+      })
+        .from(pendingOrders)
+        .where(and(
+          inArray(pendingOrders.memberId, memberIds),
+          eq(pendingOrders.status, '배송중'),
+          eq(pendingOrders.priceConfirmed, true),
+          gte(pendingOrders.createdAt, startDate),
+          lte(pendingOrders.createdAt, endDate),
+        ))
+        .groupBy(pendingOrders.memberId) : [];
+      
+      const salesMap = new Map(salesData.map(s => [s.memberId, Number(s.totalSales)]));
+      
+      const determineGradePreview = (salesAmount: number): string => {
+        if (salesAmount >= 3000000) return 'TOP';
+        if (salesAmount >= 1000000) return 'DRIVING';
+        return 'START';
+      };
+      
+      const preview = activeMembers.map(m => {
+        const salesAmount = salesMap.get(m.id) || 0;
+        const newGrade = m.gradeLocked ? m.grade : determineGradePreview(salesAmount);
+        return {
+          memberId: m.id,
+          memberName: m.memberName || '',
+          companyName: m.companyName,
+          currentGrade: m.grade,
+          predictedGrade: newGrade,
+          salesAmount,
+          gradeLocked: m.gradeLocked,
+          lockedGrade: m.lockedGrade,
+          willChange: !m.gradeLocked && newGrade !== m.grade,
+        };
+      });
+      
+      res.json({
+        period: `${year}년 ${month}월`,
+        startDate: startDate.toISOString().slice(0, 10),
+        endDate: endDate.toISOString().slice(0, 10),
+        members: preview,
+        summary: {
+          total: preview.length,
+          willUpgrade: preview.filter(p => p.willChange && ({'START':1,'DRIVING':2,'TOP':3} as any)[p.predictedGrade] > ({'START':1,'DRIVING':2,'TOP':3} as any)[p.currentGrade]).length,
+          willDowngrade: preview.filter(p => p.willChange && ({'START':1,'DRIVING':2,'TOP':3} as any)[p.predictedGrade] < ({'START':1,'DRIVING':2,'TOP':3} as any)[p.currentGrade]).length,
+          willMaintain: preview.filter(p => !p.willChange && !p.gradeLocked).length,
+          locked: preview.filter(p => p.gradeLocked).length,
+        },
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

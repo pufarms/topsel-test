@@ -278,6 +278,11 @@ export const members = pgTable("members", {
   profileImageUrl: text("profile_image_url"),
   signatureData: text("signature_data"),
   postOfficeEnabled: boolean("post_office_enabled").notNull().default(false),
+  gradeLocked: boolean("grade_locked").notNull().default(false),
+  lockedGrade: text("locked_grade"),
+  gradeLockReason: text("grade_lock_reason"),
+  gradeLockSetBy: varchar("grade_lock_set_by"),
+  gradeLockSetAt: timestamp("grade_lock_set_at"),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
   lastLoginAt: timestamp("last_login_at"),
@@ -287,6 +292,11 @@ export const members = pgTable("members", {
 
 export const insertMemberSchema = createInsertSchema(members).omit({
   id: true,
+  gradeLocked: true,
+  lockedGrade: true,
+  gradeLockReason: true,
+  gradeLockSetBy: true,
+  gradeLockSetAt: true,
   approvedAt: true,
   approvedBy: true,
   lastLoginAt: true,

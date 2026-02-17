@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -53,6 +54,11 @@ export default function MemberDetailPage() {
 
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [gradeLockData, setGradeLockData] = useState<{
+    gradeLocked: boolean;
+    lockedGrade: string;
+    gradeLockReason: string;
+  }>({ gradeLocked: false, lockedGrade: 'START', gradeLockReason: '' });
 
   const [formData, setFormData] = useState<{
     grade: string;
@@ -156,6 +162,21 @@ export default function MemberDetailPage() {
     },
   });
 
+  const gradeLockMutation = useMutation({
+    mutationFn: async (data: { gradeLocked: boolean; lockedGrade: string; gradeLockReason: string }) => {
+      const res = await apiRequest("POST", `/api/admin/members/${memberId}/grade-lock`, data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members", memberId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      toast({ title: data.message || "등급 고정 설정이 저장되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "등급 고정 설정 실패", variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
     if (!member) return;
 
@@ -227,6 +248,7 @@ export default function MemberDetailPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-bold">{member.companyName}</h1>
             <Badge className={gradeColors[displayGrade] || ""}>
+              {member.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
               {memberGradeLabels[displayGrade as MemberGrade] || displayGrade}
             </Badge>
           </div>
@@ -640,6 +662,82 @@ export default function MemberDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {['START', 'DRIVING', 'TOP'].includes(member.grade) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  {member.gradeLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                  등급 고정 설정
+                </CardTitle>
+                <CardDescription>
+                  고정 시 월별 자동 등급 조정에서 제외됩니다
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">등급 고정</Label>
+                  <Switch
+                    checked={gradeLockData.gradeLocked !== undefined ? gradeLockData.gradeLocked : (member.gradeLocked ?? false)}
+                    onCheckedChange={(checked) => setGradeLockData({
+                      ...gradeLockData,
+                      gradeLocked: checked,
+                      lockedGrade: checked ? (gradeLockData.lockedGrade || member.lockedGrade || member.grade) : gradeLockData.lockedGrade,
+                    })}
+                    data-testid="switch-grade-lock"
+                  />
+                </div>
+                {(gradeLockData.gradeLocked !== undefined ? gradeLockData.gradeLocked : member.gradeLocked) && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-sm">고정 등급</Label>
+                      <Select
+                        value={gradeLockData.lockedGrade || member.lockedGrade || member.grade}
+                        onValueChange={(v) => setGradeLockData({ ...gradeLockData, lockedGrade: v })}
+                      >
+                        <SelectTrigger data-testid="select-locked-grade">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="START">Start회원</SelectItem>
+                          <SelectItem value="DRIVING">Driving회원</SelectItem>
+                          <SelectItem value="TOP">Top회원</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm">고정 사유 (선택)</Label>
+                      <Input
+                        value={gradeLockData.gradeLockReason || (member.gradeLockReason ?? '')}
+                        onChange={(e) => setGradeLockData({ ...gradeLockData, gradeLockReason: e.target.value })}
+                        placeholder="예: VIP 고객, 특별 계약"
+                        data-testid="input-grade-lock-reason"
+                      />
+                    </div>
+                    {member.gradeLockSetAt && (
+                      <p className="text-xs text-muted-foreground">
+                        설정일: {formatDateTime(member.gradeLockSetAt)}
+                      </p>
+                    )}
+                  </>
+                )}
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => gradeLockMutation.mutate({
+                    gradeLocked: gradeLockData.gradeLocked !== undefined ? gradeLockData.gradeLocked : (member.gradeLocked ?? false),
+                    lockedGrade: gradeLockData.lockedGrade || member.lockedGrade || member.grade,
+                    gradeLockReason: gradeLockData.gradeLockReason || (member.gradeLockReason ?? ''),
+                  })}
+                  disabled={gradeLockMutation.isPending}
+                  data-testid="button-save-grade-lock"
+                >
+                  {gradeLockMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Lock className="h-4 w-4 mr-2" />}
+                  등급 고정 저장
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

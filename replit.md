@@ -1,22 +1,18 @@
 # Order Management System
 
 ## Overview
-
-This project is a Korean-language order management system designed to streamline operations for sellers and administrators. Its primary purpose is to allow sellers to efficiently submit orders and provide administrators with comprehensive tools for managing all orders and users. Key capabilities include robust role-based authentication, separate dashboards tailored for sellers and administrators, intuitive order entry forms, detailed order history tracking, and extensive user management functionalities. The system aims to enhance efficiency, reduce manual errors, and provide a centralized platform for order and user data, with a strong emphasis on critical business rules for pricing, responsive design, and integrated category management, along with advanced features like smart address validation and an outsourcing/vendor system for order fulfillment.
+This project is a Korean-language order management system designed to streamline operations for sellers and administrators. Its primary purpose is to allow sellers to efficiently submit orders and provide administrators with comprehensive tools for managing all orders and users. Key capabilities include robust role-based authentication, separate dashboards for sellers and administrators, intuitive order entry forms, detailed order history tracking, and extensive user management functionalities. The system aims to enhance efficiency, reduce manual errors, and provide a centralized platform for order and user data. It features critical business rules for pricing, a responsive design, integrated category management, smart address validation, and an outsourcing/vendor system for order fulfillment. The project's vision is to become the leading order management solution in the Korean market, known for its reliability, comprehensive features, and user-friendly experience, ultimately driving significant efficiency gains for e-commerce businesses.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ### 개발 원칙 (CRITICAL - 절대 잊지 말 것!)
-
 1.  **새 기능 추가/수정 시 기존 기능 손상 금지**: 다른 기능을 추가하거나 수정할 때 이미 작동하던 기능이 깨지지 않도록 반드시 확인
 2.  **수정 전 영향 범위 분석**: 코드 수정 전에 해당 코드가 어디서 사용되는지 확인하고, 관련된 모든 부분이 계속 작동하는지 검증
 3.  **SSE 실시간 업데이트 유지**: 주문 관련 기능 수정 시 SSE 이벤트 발송 및 쿼리 무효화 로직이 유지되는지 확인
 4.  **API 호출 일관성 유지**: pending_orders 관련 페이지는 모두 `/api/admin/pending-orders` 또는 `/api/member/pending-orders` 사용
 
 ### 주문 상태 워크플로우 (4단계 + 예외)
-
 **정상 흐름 (4단계):**
 1.  대기 (주문조정 단계) → pending.tsx
 2.  상품준비중 (운송장 출력 단계) → preparing.tsx
@@ -34,7 +30,6 @@ Preferred communication style: Simple, everyday language.
 4.  **상태값**: `["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소"]`
 
 ### 핵심 비즈니스 규칙 (CRITICAL - 절대 잊지 말 것!)
-
 **상품가격 체계 및 기준:**
 1.  **현재공급가가 모든 기준!**: 주문관리, 정산, 통계 등 모든 실제 운영의 기준은 **현재공급가(current_products)** 테이블입니다.
 2.  **상품등록/예상공급가는 준비 단계일 뿐**:
@@ -58,8 +53,31 @@ Preferred communication style: Simple, everyday language.
     -   확정 주문 (배송중): "배송중 전환" 시점에 가격 확정 (priceConfirmed=true), 이후 가격 변동 없음
     -   통계 API: 확정 주문은 저장된 가격, 미확정 주문은 실시간 계산 (하이브리드 방식)
 
-### 정산 시스템 (Settlement System)
+### 회원 등급 자동 조정 시스템
+**등급 기준 (전월 거래금액 = 배송중 확정 매출 기준):**
+-   START: 100만원 미만
+-   DRIVING: 100만원 이상 ~ 300만원 미만
+-   TOP: 300만원 이상
 
+**조정 규칙:**
+-   매월 1일 0시(KST) 자동 실행 (서버 시작 시 스케줄러 등록)
+-   전월 1일~말일 배송중 확정 주문 금액 합산 (priceConfirmed=true, 상태='배송중')
+-   최저 등급 보호: START 밑으로는 하향 불가
+-   등급 고정 회원: gradeLocked=true이면 자동 조정 제외
+-   관리자 수동 실행 가능: `/api/admin/members/grade-adjustment/run` (SUPER_ADMIN)
+-   미리보기 API: `/api/admin/members/grade-adjustment/preview`
+
+**등급 고정 기능:**
+-   members 테이블: gradeLocked, lockedGrade, gradeLockReason, gradeLockSetBy, gradeLockSetAt
+-   API: `/api/admin/members/:memberId/grade-lock` (POST)
+-   관리자 회원 상세 페이지에 등급 고정 UI 제공
+-   회원 목록에서 잠금 아이콘으로 표시
+
+**예치금 충전 시 자동 승급:**
+-   ASSOCIATE → START 자동 승급 (3개 경로: 뱅크다 자동매칭, 수동매칭, 관리자 직접충전)
+-   트랜잭션 내 원자적 처리, memberLogs에 이력 기록
+
+### 정산 시스템 (Settlement System)
 **잔액 구조:**
 -   예치금(deposit): 계좌이체 후 관리자가 충전, 주문 정산 시 차감
 -   포인터(point): 관리자가 지급, 주문 정산 시 우선 차감
@@ -96,7 +114,6 @@ Preferred communication style: Simple, everyday language.
 -   회원: 대시보드 예치금충전 탭 (잔액 현황, 정산/예치금/포인터 이력 탭)
 
 ### 주문 등록 알림 UI 통합 설계
-
 **잔액 배너 3단계 (주문등록 화면 상단):**
 -   ≥10만원: 파란 배경 (정상)
 -   <5만원: 주황 배경 + "잔액이 적습니다" 안내
@@ -127,8 +144,7 @@ Preferred communication style: Simple, everyday language.
 -   **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS.
 -   **Form Handling**: React Hook Form with Zod validation.
 -   **Build Tool**: Vite.
--   **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography.
--   **Design Requirements**: All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
+-   **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography. All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
 
 ### Backend
 -   **Framework**: Express 5 on Node.js with TypeScript.
@@ -145,11 +161,11 @@ Preferred communication style: Simple, everyday language.
 -   **User Portals**: Member Mypage, Admin dashboards, and Partner Portal.
 -   **Product & Inventory Management**: Tools for categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
 -   **Admin Design System**: Standardized components and design rules.
--   **Filter Components**: `AdminCategoryFilter` and `MemberOrderFilter`, `DateRangeFilter` (KST timezone, server-side SQL filtering).
+-   **Filter Components**: `AdminCategoryFilter`, `MemberOrderFilter`, `DateRangeFilter` (KST timezone, server-side SQL filtering).
 -   **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
 -   **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management.
 -   **Legal Compliance**: Term Agreement Record Keeping.
--   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms, categorizing addresses as `VALID`, `WARNING`, or `INVALID`. Includes AI Address Learning Management.
+-   **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms. Categorizes addresses as `VALID`, `WARNING`, or `INVALID` and includes AI Address Learning Management.
 -   **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
 -   **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
 -   **Outsourcing/Vendor System**: Manages vendors and product mapping, with stock logic differentiating between vendor and self-fulfilled orders.
@@ -158,7 +174,7 @@ Preferred communication style: Simple, everyday language.
 -   **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view merging order and payment rows.
 -   **Inquiry Board System (문의 게시판)**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features for both admin and members, integrated with dashboards for notifications.
 -   **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with overview, member-specific, and product-specific sales data, including charts, tables, and Excel export, all sourced from `priceConfirmed=true` orders.
--   **Invoice Management System (계산서/세금계산서 관리)**: Monthly invoice tracking with `invoice_records` table. Unified summary view combining members and vendors with issue status (issued/not_issued). Manual invoice issuance with duplicate prevention via `orderIds` tracking. Separate rows for same entity when issued at different times. `isAutoIssued` flag for future automated issuance. APIs: `/api/admin/accounting/invoice-summary`, `/api/admin/accounting/invoice-issue`, `/api/admin/accounting/invoice-targets`, `/api/admin/accounting/invoice-summary-export`.
+-   **Invoice Management System (계산서/세금계산서 관리)**: Monthly invoice tracking with `invoice_records` table, unified summary view, manual invoice issuance, and `isAutoIssued` flag for future automation.
 
 ## External Dependencies
 
@@ -175,7 +191,7 @@ Preferred communication style: Simple, everyday language.
 -   **recharts**
 
 ### Session Storage
--   **memorystore** (development)
+-   **memorystore**
 
 ### Image Storage
 -   **Cloudflare R2**
