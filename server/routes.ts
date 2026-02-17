@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -16164,6 +16164,527 @@ export async function registerRoutes(
       }).returning();
 
       res.json(attachment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 계산서/세금계산서 통합 조회 API =====
+  app.get('/api/admin/accounting/invoice-summary', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+      const filterType = (req.query.filterType as string) || 'all';
+      const searchId = req.query.searchId as string;
+
+      const startKST = `${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endKST = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00+09:00`;
+      const monthStartUTC = new Date(startKST);
+      const monthEndUTC = new Date(endKST);
+
+      const monthStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay2 = new Date(nextYear, nextMonth - 1, 0).getDate();
+      const monthEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay2).padStart(2, '0')}`;
+
+      const existingInvoices = await db.select().from(invoiceRecords)
+        .where(and(
+          eq(invoiceRecords.year, year),
+          eq(invoiceRecords.month, month),
+        ));
+
+      const issuedOrderIds = new Set<string>();
+      const invoicesByTarget: Record<string, any[]> = {};
+      for (const inv of existingInvoices) {
+        const orderIdsArr = (inv.orderIds || []) as string[];
+        orderIdsArr.forEach(id => issuedOrderIds.add(id));
+        const key = `${inv.targetType}_${inv.targetId}`;
+        if (!invoicesByTarget[key]) invoicesByTarget[key] = [];
+        invoicesByTarget[key].push(inv);
+      }
+
+      const rows: any[] = [];
+
+      if (filterType === 'all' || filterType === 'member') {
+        const memberSettlements = await db.select({
+          memberId: settlementHistory.memberId,
+          orderId: settlementHistory.orderId,
+          memberName: members.username,
+          companyName: members.companyName,
+          businessNumber: members.businessNumber,
+          taxType: pendingOrders.taxType,
+          totalAmount: settlementHistory.totalAmount,
+          pointerAmount: settlementHistory.pointerAmount,
+          depositAmount: settlementHistory.depositAmount,
+        })
+          .from(settlementHistory)
+          .innerJoin(members, eq(settlementHistory.memberId, members.id))
+          .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+          .where(and(
+            gte(settlementHistory.createdAt, monthStartUTC),
+            lt(settlementHistory.createdAt, monthEndUTC),
+            ...(searchId && filterType === 'member' ? [eq(settlementHistory.memberId, searchId)] : []),
+          ));
+
+        const directSaleMember = await db.select({
+          memberId: directSales.memberId,
+          taxType: directSales.taxType,
+          amount: directSales.amount,
+          id: directSales.id,
+        })
+          .from(directSales)
+          .where(and(
+            isNotNull(directSales.memberId),
+            gte(directSales.saleDate, monthStartDate),
+            lte(directSales.saleDate, monthEndDate),
+            ...(searchId && filterType === 'member' ? [eq(directSales.memberId, searchId)] : []),
+          ));
+
+        const memberOrderMap: Record<string, { info: any; orders: { id: string; taxType: string; depositAmount: number; pointerAmount: number; totalAmount: number }[] }> = {};
+
+        for (const s of memberSettlements) {
+          if (!memberOrderMap[s.memberId]) {
+            memberOrderMap[s.memberId] = {
+              info: {
+                id: s.memberId,
+                name: s.companyName || s.memberName,
+                businessNumber: s.businessNumber || '',
+              },
+              orders: [],
+            };
+          }
+          memberOrderMap[s.memberId].orders.push({
+            id: s.orderId,
+            taxType: s.taxType || 'exempt',
+            depositAmount: s.depositAmount || 0,
+            pointerAmount: s.pointerAmount || 0,
+            totalAmount: s.totalAmount || 0,
+          });
+        }
+
+        for (const ds of directSaleMember) {
+          if (!ds.memberId) continue;
+          if (!memberOrderMap[ds.memberId]) {
+            const memberInfo = await db.select({
+              id: members.id,
+              name: members.username,
+              companyName: members.companyName,
+              businessNumber: members.businessNumber,
+            }).from(members).where(eq(members.id, ds.memberId)).limit(1);
+            const mi = memberInfo[0];
+            if (!mi) continue;
+            memberOrderMap[ds.memberId] = {
+              info: {
+                id: ds.memberId,
+                name: mi.companyName || mi.name,
+                businessNumber: mi.businessNumber || '',
+              },
+              orders: [],
+            };
+          }
+          memberOrderMap[ds.memberId].orders.push({
+            id: `ds_${ds.id}`,
+            taxType: ds.taxType || 'exempt',
+            depositAmount: ds.amount || 0,
+            pointerAmount: 0,
+            totalAmount: ds.amount || 0,
+          });
+        }
+
+        for (const [memberId, data] of Object.entries(memberOrderMap)) {
+          const key = `member_${memberId}`;
+          const issuedInvoices = invoicesByTarget[key] || [];
+
+          const issuedOrderIdsForTarget = new Set<string>();
+          for (const inv of issuedInvoices) {
+            ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+          }
+
+          for (const inv of issuedInvoices) {
+            rows.push({
+              type: 'member',
+              targetId: memberId,
+              targetName: data.info.name,
+              businessNumber: data.info.businessNumber,
+              invoiceId: inv.id,
+              invoiceType: inv.invoiceType,
+              orderCount: inv.orderCount,
+              totalOrderAmount: inv.totalAmount,
+              pointerUsed: 0,
+              exemptAmount: inv.invoiceType === 'exempt' ? inv.supplyAmount : 0,
+              taxableSupply: inv.invoiceType === 'taxable' ? inv.supplyAmount : 0,
+              taxableVat: inv.invoiceType === 'taxable' ? inv.vatAmount : 0,
+              taxableAmount: inv.invoiceType === 'taxable' ? inv.totalAmount : 0,
+              issuedStatus: 'issued',
+              issuedAt: inv.issuedAt,
+              isAutoIssued: inv.isAutoIssued,
+              memo: inv.memo,
+              orderIds: inv.orderIds,
+            });
+          }
+
+          const unissuedOrders = data.orders.filter(o => !issuedOrderIdsForTarget.has(o.id));
+          if (unissuedOrders.length > 0) {
+            let pointerUsed = 0;
+            let exemptAmount = 0;
+            let taxableAmount = 0;
+            let taxableSupply = 0;
+            let taxableVat = 0;
+            let totalOrderAmount = 0;
+
+            for (const o of unissuedOrders) {
+              totalOrderAmount += o.totalAmount;
+              pointerUsed += o.pointerAmount;
+              if (o.taxType === 'taxable') {
+                taxableAmount += o.depositAmount;
+                taxableSupply += Math.round(o.depositAmount / 1.1);
+                taxableVat += o.depositAmount - Math.round(o.depositAmount / 1.1);
+              } else {
+                exemptAmount += o.depositAmount;
+              }
+            }
+
+            rows.push({
+              type: 'member',
+              targetId: memberId,
+              targetName: data.info.name,
+              businessNumber: data.info.businessNumber,
+              invoiceId: null,
+              invoiceType: null,
+              orderCount: unissuedOrders.length,
+              totalOrderAmount,
+              pointerUsed,
+              exemptAmount,
+              taxableSupply,
+              taxableVat,
+              taxableAmount,
+              issuedStatus: 'not_issued',
+              issuedAt: null,
+              isAutoIssued: false,
+              memo: null,
+              orderIds: unissuedOrders.map(o => o.id),
+            });
+          }
+        }
+      }
+
+      if (filterType === 'all' || filterType === 'vendor') {
+        const vendorDirectSales = await db.select({
+          vendorId: directSales.vendorId,
+          vendorName: vendors.companyName,
+          businessNumber: vendors.businessNumber,
+          taxType: directSales.taxType,
+          amount: directSales.amount,
+          id: directSales.id,
+        })
+          .from(directSales)
+          .innerJoin(vendors, eq(directSales.vendorId, vendors.id))
+          .where(and(
+            isNotNull(directSales.vendorId),
+            eq(directSales.clientType, 'vendor'),
+            gte(directSales.saleDate, monthStartDate),
+            lte(directSales.saleDate, monthEndDate),
+            ...(searchId && filterType === 'vendor' ? [eq(directSales.vendorId, parseInt(searchId))] : []),
+          ));
+
+        const vendorOrderMap: Record<number, { info: any; orders: { id: string; taxType: string; amount: number }[] }> = {};
+        for (const vds of vendorDirectSales) {
+          if (!vds.vendorId) continue;
+          if (!vendorOrderMap[vds.vendorId]) {
+            vendorOrderMap[vds.vendorId] = {
+              info: {
+                id: vds.vendorId,
+                name: vds.vendorName,
+                businessNumber: vds.businessNumber || '',
+              },
+              orders: [],
+            };
+          }
+          vendorOrderMap[vds.vendorId].orders.push({
+            id: `vds_${vds.id}`,
+            taxType: vds.taxType || 'exempt',
+            amount: vds.amount || 0,
+          });
+        }
+
+        for (const [vendorIdStr, data] of Object.entries(vendorOrderMap)) {
+          const vendorId = parseInt(vendorIdStr);
+          const key = `vendor_${vendorId}`;
+          const issuedInvoices = invoicesByTarget[key] || [];
+
+          const issuedOrderIdsForTarget = new Set<string>();
+          for (const inv of issuedInvoices) {
+            ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+          }
+
+          for (const inv of issuedInvoices) {
+            rows.push({
+              type: 'vendor',
+              targetId: String(vendorId),
+              targetName: data.info.name,
+              businessNumber: data.info.businessNumber,
+              invoiceId: inv.id,
+              invoiceType: inv.invoiceType,
+              orderCount: inv.orderCount,
+              totalOrderAmount: inv.totalAmount,
+              pointerUsed: 0,
+              exemptAmount: inv.invoiceType === 'exempt' ? inv.supplyAmount : 0,
+              taxableSupply: inv.invoiceType === 'taxable' ? inv.supplyAmount : 0,
+              taxableVat: inv.invoiceType === 'taxable' ? inv.vatAmount : 0,
+              taxableAmount: inv.invoiceType === 'taxable' ? inv.totalAmount : 0,
+              issuedStatus: 'issued',
+              issuedAt: inv.issuedAt,
+              isAutoIssued: inv.isAutoIssued,
+              memo: inv.memo,
+              orderIds: inv.orderIds,
+            });
+          }
+
+          const unissuedOrders = data.orders.filter(o => !issuedOrderIdsForTarget.has(o.id));
+          if (unissuedOrders.length > 0) {
+            let exemptAmount = 0;
+            let taxableAmount = 0;
+            let taxableSupply = 0;
+            let taxableVat = 0;
+            let totalOrderAmount = 0;
+
+            for (const o of unissuedOrders) {
+              totalOrderAmount += o.amount;
+              if (o.taxType === 'taxable') {
+                taxableAmount += o.amount;
+                taxableSupply += Math.round(o.amount / 1.1);
+                taxableVat += o.amount - Math.round(o.amount / 1.1);
+              } else {
+                exemptAmount += o.amount;
+              }
+            }
+
+            rows.push({
+              type: 'vendor',
+              targetId: String(vendorId),
+              targetName: data.info.name,
+              businessNumber: data.info.businessNumber,
+              invoiceId: null,
+              invoiceType: null,
+              orderCount: unissuedOrders.length,
+              totalOrderAmount,
+              pointerUsed: 0,
+              exemptAmount,
+              taxableSupply,
+              taxableVat,
+              taxableAmount,
+              issuedStatus: 'not_issued',
+              issuedAt: null,
+              isAutoIssued: false,
+              memo: null,
+              orderIds: unissuedOrders.map(o => o.id),
+            });
+          }
+        }
+      }
+
+      rows.sort((a, b) => {
+        if (a.issuedStatus === 'issued' && b.issuedStatus !== 'issued') return -1;
+        if (a.issuedStatus !== 'issued' && b.issuedStatus === 'issued') return 1;
+        return (b.exemptAmount + b.taxableAmount) - (a.exemptAmount + a.taxableAmount);
+      });
+
+      const totals = {
+        totalOrderAmount: rows.reduce((s, r) => s + (r.totalOrderAmount || 0), 0),
+        pointerUsed: rows.reduce((s, r) => s + (r.pointerUsed || 0), 0),
+        exemptAmount: rows.reduce((s, r) => s + (r.exemptAmount || 0), 0),
+        taxableSupply: rows.reduce((s, r) => s + (r.taxableSupply || 0), 0),
+        taxableVat: rows.reduce((s, r) => s + (r.taxableVat || 0), 0),
+        taxableAmount: rows.reduce((s, r) => s + (r.taxableAmount || 0), 0),
+        issuedCount: rows.filter(r => r.issuedStatus === 'issued').length,
+        notIssuedCount: rows.filter(r => r.issuedStatus === 'not_issued').length,
+      };
+
+      res.json({ year, month, rows, totals });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 계산서/세금계산서 수동 발행 API =====
+  app.post('/api/admin/accounting/invoice-issue', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, supplyAmount, vatAmount, totalAmount, memo } = req.body;
+
+      if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
+        return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
+      }
+
+      const existingInvoices = await db.select().from(invoiceRecords)
+        .where(and(
+          eq(invoiceRecords.year, year),
+          eq(invoiceRecords.month, month),
+        ));
+
+      const alreadyIssuedIds = new Set<string>();
+      for (const inv of existingInvoices) {
+        ((inv.orderIds || []) as string[]).forEach(id => alreadyIssuedIds.add(id));
+      }
+
+      const duplicateIds = orderIds.filter((id: string) => alreadyIssuedIds.has(id));
+      if (duplicateIds.length > 0) {
+        return res.status(400).json({
+          message: `이미 발행된 주문이 ${duplicateIds.length}건 포함되어 있습니다. 중복 발행은 불가합니다.`,
+          duplicateIds,
+        });
+      }
+
+      const [record] = await db.insert(invoiceRecords).values({
+        targetType,
+        targetId: String(targetId),
+        targetName,
+        businessNumber: businessNumber || null,
+        invoiceType,
+        year,
+        month,
+        orderIds,
+        orderCount: orderIds.length,
+        supplyAmount: supplyAmount || 0,
+        vatAmount: vatAmount || 0,
+        totalAmount: totalAmount || 0,
+        isAutoIssued: false,
+        memo: memo || null,
+        issuedAt: new Date(),
+        issuedBy: user.name || user.username,
+      }).returning();
+
+      res.json({ success: true, record });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 계산서/세금계산서 검색용 목록 (회원/매입업체) =====
+  app.get('/api/admin/accounting/invoice-targets', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const type = req.query.type as string;
+      const search = (req.query.search as string || '').trim().toLowerCase();
+
+      if (type === 'member') {
+        let query = db.select({
+          id: members.id,
+          name: members.username,
+          companyName: members.companyName,
+          businessNumber: members.businessNumber,
+        }).from(members);
+
+        const memberList = await query;
+        const filtered = search
+          ? memberList.filter(m =>
+            (m.companyName || '').toLowerCase().includes(search) ||
+            (m.name || '').toLowerCase().includes(search) ||
+            (m.businessNumber || '').includes(search)
+          )
+          : memberList;
+
+        res.json(filtered.slice(0, 30).map(m => ({
+          id: m.id,
+          name: m.companyName || m.name,
+          businessNumber: m.businessNumber || '',
+        })));
+      } else if (type === 'vendor') {
+        const vendorList = await db.select({
+          id: vendors.id,
+          name: vendors.companyName,
+          businessNumber: vendors.businessNumber,
+        }).from(vendors);
+
+        const filtered = search
+          ? vendorList.filter(v =>
+            (v.name || '').toLowerCase().includes(search) ||
+            (v.businessNumber || '').includes(search)
+          )
+          : vendorList;
+
+        res.json(filtered.slice(0, 30).map(v => ({
+          id: String(v.id),
+          name: v.name || '',
+          businessNumber: v.businessNumber || '',
+        })));
+      } else {
+        res.json([]);
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 계산서/세금계산서 통합 엑셀 다운로드 =====
+  app.post('/api/admin/accounting/invoice-summary-export', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { rows: dataRows, year: yearParam, month: monthParam } = req.body;
+      if (!dataRows || !Array.isArray(dataRows) || dataRows.length === 0) {
+        return res.status(400).json({ message: "데이터가 없습니다" });
+      }
+      const year = yearParam || new Date().getFullYear();
+      const month = monthParam || (new Date().getMonth() + 1);
+
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('계산서내역');
+
+      sheet.columns = [
+        { header: '구분', key: 'type', width: 12 },
+        { header: '업체명(회원명)', key: 'targetName', width: 25 },
+        { header: '사업자번호', key: 'businessNumber', width: 15 },
+        { header: '주문건수', key: 'orderCount', width: 10 },
+        { header: '총주문액', key: 'totalOrderAmount', width: 15 },
+        { header: '포인터사용', key: 'pointerUsed', width: 12 },
+        { header: '면세(공급가액)', key: 'exemptAmount', width: 15 },
+        { header: '과세(공급가액)', key: 'taxableSupply', width: 15 },
+        { header: '부가세', key: 'taxableVat', width: 12 },
+        { header: '과세합계', key: 'taxableAmount', width: 15 },
+        { header: '발행상태', key: 'issuedStatus', width: 15 },
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+      for (const row of dataRows) {
+        sheet.addRow({
+          type: row.type === 'member' ? '회원' : '매입업체',
+          targetName: row.targetName,
+          businessNumber: row.businessNumber || '',
+          orderCount: row.orderCount,
+          totalOrderAmount: row.totalOrderAmount,
+          pointerUsed: row.pointerUsed || 0,
+          exemptAmount: row.exemptAmount,
+          taxableSupply: row.taxableSupply,
+          taxableVat: row.taxableVat,
+          taxableAmount: row.taxableAmount,
+          issuedStatus: row.issuedStatus === 'issued'
+            ? `발행 (${row.issuedAt ? new Date(row.issuedAt).toLocaleDateString('ko-KR') : ''})`
+            : '미발행',
+        });
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=invoice_${year}_${month}.xlsx`);
+      await workbook.xlsx.write(res);
+      res.end();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
