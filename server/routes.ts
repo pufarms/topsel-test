@@ -16919,7 +16919,7 @@ export async function registerRoutes(
     }
     
     const memberIds = activeMembers.map(m => m.id);
-    const salesData = await db.select({
+    const orderSalesData = await db.select({
       memberId: pendingOrders.memberId,
       totalSales: sql<number>`COALESCE(SUM(${pendingOrders.supplyPrice}), 0)`.as('total_sales'),
     })
@@ -16933,7 +16933,33 @@ export async function registerRoutes(
       ))
       .groupBy(pendingOrders.memberId);
     
-    const salesMap = new Map(salesData.map(s => [s.memberId, Number(s.totalSales)]));
+    const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDay = new Date(year, month, 0).getDate();
+    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    const directSalesData = await db.select({
+      memberId: directSales.memberId,
+      totalSales: sql<number>`COALESCE(SUM(${directSales.amount}), 0)`.as('total_direct_sales'),
+    })
+      .from(directSales)
+      .where(and(
+        isNotNull(directSales.memberId),
+        eq(directSales.clientType, 'member'),
+        gte(directSales.saleDate, startDateStr),
+        lte(directSales.saleDate, endDateStr),
+      ))
+      .groupBy(directSales.memberId);
+    
+    const salesMap = new Map<string, number>();
+    for (const s of orderSalesData) {
+      salesMap.set(s.memberId, (salesMap.get(s.memberId) || 0) + Number(s.totalSales));
+    }
+    for (const s of directSalesData) {
+      if (s.memberId && memberIds.includes(s.memberId)) {
+        salesMap.set(s.memberId, (salesMap.get(s.memberId) || 0) + Number(s.totalSales));
+      }
+    }
+    
+    console.log(`[등급조정] 주문 매입금: ${orderSalesData.length}건, 직접매출: ${directSalesData.length}건`);
     
     function determineGrade(salesAmount: number): string {
       if (salesAmount >= 3000000) return 'TOP';

@@ -54,7 +54,7 @@ Preferred communication style: Simple, everyday language.
     - 통계 API: 확정 주문은 저장된 가격, 미확정 주문은 실시간 계산 (하이브리드 방식)
 
 ### 회원 등급 자동 조정 시스템
-**등급 기준 (전월 매입금 = 배송중 확정 주문의 공급가 합계 기준, 예치금/포인터와 무관):**
+**등급 기준 (전월 매입금 = 배송중 확정 주문의 공급가 합계 + 회원 직접매출 합계 기준, 예치금/포인터와 무관):**
 - START: 100만원 미만
 - DRIVING: 100만원 이상 ~ 300만원 미만
 - TOP: 300만원 이상
@@ -62,6 +62,7 @@ Preferred communication style: Simple, everyday language.
 **조정 규칙:**
 - 매월 1일 0시(KST) 자동 실행 (서버 시작 시 스케줄러 등록)
 - 전월 1일~말일 배송중 확정 주문 금액 합산 (priceConfirmed=true, 상태='배송중')
+- 전월 1일~말일 회원 직접매출(clientType='member') 금액도 매입금에 합산 (매입업체 직접매출은 제외)
 - 최저 등급 보호: START 밑으로는 하향 불가
 - 등급 고정 회원: gradeLocked=true이면 자동 조정 제외
 - 관리자 수동 실행 가능: `/api/admin/members/grade-adjustment/run` (SUPER_ADMIN)
