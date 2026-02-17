@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs } from "@shared/schema";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -10126,10 +10126,31 @@ export async function registerRoutes(
 
       const result = await db.transaction(async (tx) => {
         const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
-        if (!lockedMember) return { error: true, message: "회원을 찾을 수 없습니다" } as const;
+        if (!lockedMember) return { error: true, message: "회원을 찾을 수 없습니다", gradeChanged: false } as const;
 
         const newDeposit = lockedMember.deposit + amount;
-        await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+        const updateData: any = { deposit: newDeposit, updatedAt: new Date() };
+        let gradeChanged = false;
+
+        if (lockedMember.grade === 'ASSOCIATE') {
+          updateData.grade = 'START';
+          gradeChanged = true;
+          console.log(`[등급자동변경] 준회원 → START 자동 승급: 회원ID=${memberId}, 회원명=${lockedMember.memberName}, 충전금액=${amount}원 (관리자 직접충전)`);
+        }
+
+        await tx.update(members).set(updateData).where(eq(members.id, memberId));
+
+        if (gradeChanged) {
+          await tx.insert(memberLogs).values({
+            memberId,
+            changedBy: req.session.userId || 'system',
+            changeType: '등급변경',
+            previousValue: 'ASSOCIATE',
+            newValue: 'START',
+            description: '예치금 충전으로 자동 등급 변경 (관리자 직접충전)',
+          });
+        }
+
         await tx.insert(depositHistory).values({
           memberId,
           type: "charge",
@@ -10138,13 +10159,14 @@ export async function registerRoutes(
           description: description || `관리자 예치금 충전`,
           adminId: req.session.userId,
         });
-        return { error: false, newDeposit } as const;
+        return { error: false, newDeposit, gradeChanged } as const;
       });
 
       if (result.error) {
         return res.status(404).json({ message: result.message });
       }
-      res.json({ success: true, message: `${result.newDeposit.toLocaleString()}원 충전 완료`, newDeposit: result.newDeposit });
+      const gradeMsg = result.gradeChanged ? ' (준회원 → START회원 자동 승급)' : '';
+      res.json({ success: true, message: `${result.newDeposit.toLocaleString()}원 충전 완료${gradeMsg}`, newDeposit: result.newDeposit, gradeChanged: result.gradeChanged });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -12416,7 +12438,26 @@ export async function registerRoutes(
               if (!lockedMember) throw new Error('회원 없음');
 
               const newDeposit = lockedMember.deposit + inputAmount;
-              await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, matchedMemberId!));
+              const updateData: any = { deposit: newDeposit, updatedAt: new Date() };
+
+              if (lockedMember.grade === 'ASSOCIATE') {
+                updateData.grade = 'START';
+                console.log(`[등급자동변경] 준회원 → START 자동 승급: 회원ID=${matchedMemberId}, 회원명=${lockedMember.memberName}, 충전금액=${inputAmount}원 (뱅크다 자동매칭)`);
+              }
+
+              await tx.update(members).set(updateData).where(eq(members.id, matchedMemberId!));
+
+              if (lockedMember.grade === 'ASSOCIATE') {
+                await tx.insert(memberLogs).values({
+                  memberId: matchedMemberId!,
+                  changedBy: 'system',
+                  changeType: '등급변경',
+                  previousValue: 'ASSOCIATE',
+                  newValue: 'START',
+                  description: '예치금 충전으로 자동 등급 변경 (뱅크다 자동입금)',
+                });
+              }
+
               const [dh] = await tx.insert(depositHistory).values({
                 memberId: matchedMemberId!,
                 type: 'charge',
@@ -12662,13 +12703,34 @@ export async function registerRoutes(
       if (txn.depositCharged) return res.status(400).json({ message: "이미 충전된 거래입니다" });
 
       const inputAmount = txn.bkinput || 0;
+      let gradeChanged = false;
 
       await db.transaction(async (tx) => {
         const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
         if (!lockedMember) throw new Error('회원을 찾을 수 없습니다');
 
         const newDeposit = lockedMember.deposit + inputAmount;
-        await tx.update(members).set({ deposit: newDeposit, updatedAt: new Date() }).where(eq(members.id, memberId));
+        const updateData: any = { deposit: newDeposit, updatedAt: new Date() };
+
+        if (lockedMember.grade === 'ASSOCIATE') {
+          updateData.grade = 'START';
+          gradeChanged = true;
+          console.log(`[등급자동변경] 준회원 → START 자동 승급: 회원ID=${memberId}, 회원명=${lockedMember.memberName}, 충전금액=${inputAmount}원 (뱅크다 수동매칭)`);
+        }
+
+        await tx.update(members).set(updateData).where(eq(members.id, memberId));
+
+        if (gradeChanged) {
+          await tx.insert(memberLogs).values({
+            memberId,
+            changedBy: req.session.userId || 'system',
+            changeType: '등급변경',
+            previousValue: 'ASSOCIATE',
+            newValue: 'START',
+            description: '예치금 충전으로 자동 등급 변경 (뱅크다 수동매칭)',
+          });
+        }
+
         const [dh] = await tx.insert(depositHistory).values({
           memberId,
           type: 'charge',
@@ -12688,7 +12750,8 @@ export async function registerRoutes(
         }).where(eq(bankdaTransactions.id, txnId));
       });
 
-      res.json({ success: true, message: `${inputAmount.toLocaleString()}원 수동 매칭 충전 완료` });
+      const gradeMsg = gradeChanged ? ' (준회원 → START회원 자동 승급)' : '';
+      res.json({ success: true, message: `${inputAmount.toLocaleString()}원 수동 매칭 충전 완료${gradeMsg}`, gradeChanged });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
