@@ -8115,7 +8115,7 @@ export async function registerRoutes(
       const failedOrders: { memberId: string; companyName: string; shortage: number; count: number }[] = [];
 
       // 회원별로 순차 정산 처리 (트랜잭션으로 데이터 일관성 보장)
-      for (const [memberId, memberOrders] of ordersByMember) {
+      for (const [memberId, memberOrders] of Array.from(ordersByMember)) {
         const memberInfo = memberMap.get(memberId);
         if (!memberInfo) continue;
 
@@ -8513,7 +8513,7 @@ export async function registerRoutes(
         .returning();
 
       // 삭제된 주문의 상품코드별로 배분 데이터 정리
-      const deletedProductCodes = [...new Set(deleted.map(d => d.productCode).filter(Boolean))];
+      const deletedProductCodes = Array.from(new Set(deleted.map(d => d.productCode).filter(Boolean)));
       if (deletedProductCodes.length > 0) {
         await db.transaction(async (tx) => {
           for (const productCode of deletedProductCodes) {
@@ -8529,7 +8529,7 @@ export async function registerRoutes(
                 await tx.delete(orderAllocations).where(eq(orderAllocations.id, allocation.id));
                 console.log(`선택 삭제 - 배분 데이터 정리: ${productCode} 배분 삭제`);
               } else {
-                const totalQty = remainingOrders.reduce((sum, o) => sum + (o.quantity || 1), 0);
+                const totalQty = remainingOrders.length;
                 await tx.update(orderAllocations)
                   .set({ 
                     totalQuantity: totalQty,
@@ -8568,7 +8568,7 @@ export async function registerRoutes(
           .groupBy(allocationDetails.vendorId);
         
         for (const detail of relatedVendorDetails) {
-          sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
+          if (detail.vendorId !== null) sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
             type: "orders-deleted",
             productCodes: deletedProductCodes,
           });
@@ -8668,7 +8668,7 @@ export async function registerRoutes(
 
       // SSE: 관련 파트너(외주업체)에게도 배분 삭제 알림
       for (const vendor of affectedVendors) {
-        sseManager.sendToPartner(vendor.vendorId, "allocation-updated", {
+        if (vendor.vendorId !== null) sseManager.sendToPartner(vendor.vendorId, "allocation-updated", {
           type: "orders-deleted-all",
         });
       }
@@ -8740,7 +8740,7 @@ export async function registerRoutes(
               await tx.delete(orderAllocations).where(eq(orderAllocations.id, allocation.id));
               console.log(`개별 삭제 - 배분 데이터 정리: ${deletedOrder.productCode} 배분 삭제`);
             } else {
-              const totalQty = remainingOrders.reduce((sum, o) => sum + (o.quantity || 1), 0);
+              const totalQty = remainingOrders.length;
               await tx.update(orderAllocations)
                 .set({ 
                   totalQuantity: totalQty,
@@ -8762,7 +8762,7 @@ export async function registerRoutes(
           .groupBy(allocationDetails.vendorId);
         
         for (const detail of relatedVendorDetails) {
-          sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
+          if (detail.vendorId !== null) sseManager.sendToPartner(detail.vendorId, "allocation-updated", {
             type: "order-deleted",
             productCode: deleted.productCode,
           });
@@ -8919,7 +8919,8 @@ export async function registerRoutes(
 
     try {
       // 기존 양식 확인
-      const [existing] = await db.select().from(formTemplates).where(eq(formTemplates.id, req.params.id));
+      const templateId = typeof req.params.id === 'string' ? req.params.id : String(req.params.id);
+      const [existing] = await db.select().from(formTemplates).where(eq(formTemplates.id, templateId));
       if (!existing) {
         return res.status(404).json({ message: "양식을 찾을 수 없습니다" });
       }
@@ -8946,7 +8947,7 @@ export async function registerRoutes(
           uploadedBy: req.session.userId,
           updatedAt: new Date(),
         })
-        .where(eq(formTemplates.id, req.params.id))
+        .where(eq(formTemplates.id, templateId))
         .returning();
 
       res.json(template);
@@ -11648,14 +11649,14 @@ export async function registerRoutes(
       const vendorProductCodes = await db.select({ productCode: productVendors.productCode })
         .from(productVendors)
         .where(eq(productVendors.isActive, true));
-      const vpCodes = [...new Set(vendorProductCodes.map(v => v.productCode))];
+      const vpCodes = Array.from(new Set(vendorProductCodes.map(v => v.productCode)));
 
       const regVendorProducts = await db.select({ productCode: productRegistrations.productCode })
         .from(productRegistrations)
         .where(eq(productRegistrations.isVendorProduct, true));
       const regCodes = regVendorProducts.map(r => r.productCode);
 
-      const allVendorCodes = [...new Set([...vpCodes, ...regCodes])];
+      const allVendorCodes = Array.from(new Set([...vpCodes, ...regCodes]));
       if (allVendorCodes.length === 0) {
         return res.json({ date, totalProducts: 0, allocations: [] });
       }
@@ -12963,7 +12964,7 @@ export async function registerRoutes(
         dsOverIdx++;
         if (p.productCode) {
           let found = false;
-          for (const [k, v] of productMap) {
+          for (const [k, v] of Array.from(productMap)) {
             if (v.productCode === p.productCode) {
               v.revenue += Number(p.revenue);
               v.quantity += Number(p.quantity);
@@ -13368,7 +13369,7 @@ export async function registerRoutes(
       const dsLargeCategories = await db.selectDistinct({ value: directSales.categoryL })
         .from(directSales)
         .where(and(gte(directSales.saleDate, byProdStartStr), lte(directSales.saleDate, byProdEndStr), isNotNull(directSales.categoryL)));
-      const allLarge = [...new Set([...largeCategories.map(c => c.value), ...dsLargeCategories.map(c => c.value)].filter(Boolean))] as string[];
+      const allLarge = Array.from(new Set([...largeCategories.map(c => c.value), ...dsLargeCategories.map(c => c.value)].filter(Boolean))) as string[];
 
       const mediumConditions = [...baseCatConditions, isNotNull(pendingOrders.categoryMedium)];
       if (categoryLarge && categoryLarge.trim()) mediumConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
@@ -13380,7 +13381,7 @@ export async function registerRoutes(
       const dsMediumCategories = await db.selectDistinct({ value: directSales.categoryM })
         .from(directSales)
         .where(and(...dsMedConditions));
-      const allMedium = [...new Set([...mediumCategories.map(c => c.value), ...dsMediumCategories.map(c => c.value)].filter(Boolean))] as string[];
+      const allMedium = Array.from(new Set([...mediumCategories.map(c => c.value), ...dsMediumCategories.map(c => c.value)].filter(Boolean))) as string[];
 
       const smallConditions = [...baseCatConditions, isNotNull(pendingOrders.categorySmall)];
       if (categoryLarge && categoryLarge.trim()) smallConditions.push(eq(pendingOrders.categoryLarge, categoryLarge.trim()));
@@ -13394,7 +13395,7 @@ export async function registerRoutes(
       const dsSmallCategories = await db.selectDistinct({ value: directSales.categoryS })
         .from(directSales)
         .where(and(...dsSmConditions));
-      const allSmall = [...new Set([...smallCategories.map(c => c.value), ...dsSmallCategories.map(c => c.value)].filter(Boolean))] as string[];
+      const allSmall = Array.from(new Set([...smallCategories.map(c => c.value), ...dsSmallCategories.map(c => c.value)].filter(Boolean))) as string[];
 
       res.json({
         products: allProducts,
@@ -15902,7 +15903,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(typeof req.params.id === 'string' ? req.params.id : String(req.params.id));
       const [inquiry] = await db.select().from(inquiries).where(eq(inquiries.id, id));
       if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
 
@@ -16146,7 +16147,7 @@ export async function registerRoutes(
       const member = await storage.getMember(req.session.userId);
       if (!member) return res.status(401).json({ message: "회원 정보를 찾을 수 없습니다" });
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(typeof req.params.id === 'string' ? req.params.id : String(req.params.id));
       const [inquiry] = await db.select().from(inquiries)
         .where(and(eq(inquiries.id, id), eq(inquiries.memberId, member.id)));
       if (!inquiry) return res.status(404).json({ message: "문의를 찾을 수 없습니다" });
