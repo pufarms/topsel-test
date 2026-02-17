@@ -1832,3 +1832,31 @@ export const insertInquiryAttachmentSchema = createInsertSchema(inquiryAttachmen
 });
 export type InquiryAttachment = typeof inquiryAttachments.$inferSelect;
 export type NewInquiryAttachment = z.infer<typeof insertInquiryAttachmentSchema>;
+
+export const invoiceRecords = pgTable("invoice_records", {
+  id: serial("id").primaryKey(),
+  targetType: varchar("target_type", { length: 20 }).notNull(),
+  targetId: varchar("target_id", { length: 100 }).notNull(),
+  targetName: varchar("target_name", { length: 200 }).notNull(),
+  businessNumber: varchar("business_number", { length: 50 }),
+  invoiceType: varchar("invoice_type", { length: 20 }).notNull(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  orderIds: jsonb("order_ids").$type<string[]>().default([]),
+  orderCount: integer("order_count").notNull().default(0),
+  supplyAmount: integer("supply_amount").notNull().default(0),
+  vatAmount: integer("vat_amount").notNull().default(0),
+  totalAmount: integer("total_amount").notNull().default(0),
+  isAutoIssued: boolean("is_auto_issued").notNull().default(false),
+  memo: text("memo"),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+  issuedBy: varchar("issued_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInvoiceRecordSchema = createInsertSchema(invoiceRecords).omit({
+  id: true,
+  createdAt: true,
+});
+export type InvoiceRecord = typeof invoiceRecords.$inferSelect;
+export type NewInvoiceRecord = z.infer<typeof insertInvoiceRecordSchema>;
