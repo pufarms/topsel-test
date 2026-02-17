@@ -57,7 +57,14 @@ export function getLastMonthRange(): { start: string; end: string } {
   return { start: formatDateToYYYYMMDD(start), end: formatDateToYYYYMMDD(end) };
 }
 
-export type DatePreset = "today" | "yesterday" | "week" | "lastWeek" | "month" | "lastMonth" | "all" | "custom";
+export function getLast3MonthsRange(): { start: string; end: string } {
+  const kst = getKSTDate();
+  const start = new Date(kst.getFullYear(), kst.getMonth() - 2, 1);
+  const end = new Date(kst.getFullYear(), kst.getMonth() + 1, 0);
+  return { start: formatDateToYYYYMMDD(start), end: formatDateToYYYYMMDD(end) };
+}
+
+export type DatePreset = "today" | "yesterday" | "week" | "lastWeek" | "month" | "lastMonth" | "3months" | "all" | "custom";
 
 export function getDateRangeFromPreset(preset: DatePreset): { startDate: string; endDate: string } | null {
   switch (preset) {
@@ -83,6 +90,10 @@ export function getDateRangeFromPreset(preset: DatePreset): { startDate: string;
     }
     case "lastMonth": {
       const range = getLastMonthRange();
+      return { startDate: range.start, endDate: range.end };
+    }
+    case "3months": {
+      const range = getLast3MonthsRange();
       return { startDate: range.start, endDate: range.end };
     }
     case "all":

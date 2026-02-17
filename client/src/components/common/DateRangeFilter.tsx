@@ -104,6 +104,7 @@ export function DateRangeFilter({
       case "lastWeek": return "지난주";
       case "month": return "이번 달";
       case "lastMonth": return "지난달";
+      case "3months": return "최근 3개월";
       case "all": return "전체";
       case "custom": return "직접 선택";
     }
