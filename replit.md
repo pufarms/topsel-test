@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 **정상 흐름 (4단계):**
 1.  대기 (주문조정 단계) → pending.tsx
 2.  상품준비중 (운송장 출력 단계) → preparing.tsx
-3.  배송준비중 (회원취소건 접수 단계) → ready-to-ship.tsx
+3  배송준비중 (회원취소건 접수 단계) → ready-to-ship.tsx
 4.  배송중 → shipping.tsx
 
 **예외 상태:**
