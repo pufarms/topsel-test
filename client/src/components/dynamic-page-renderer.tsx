@@ -2099,7 +2099,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   marginBottom: '10px',
                   display: 'block'
                 }}
-                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'subtitle', data.subtitle, 'text'); } : undefined}
+                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'subtitle', data.subtitle || '', 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-subtitle`}
               >
                 {data.subtitle}
@@ -2114,7 +2114,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   marginBottom: '10px',
                   color: isLight ? 'var(--navy)' : '#ffffff'
                 }}
-                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'title', data.title, 'text'); } : undefined}
+                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'title', data.title || '', 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-title`}
               >
                 {renderHtmlText(data.title)}
@@ -2128,7 +2128,7 @@ function IconCardsSection({ data, sectionId, isEditing, onClick, onFieldEdit }: 
                   padding: 0,
                   color: isLight ? undefined : 'rgba(255,255,255,0.7)'
                 }}
-                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'description', data.description, 'text'); } : undefined}
+                onClick={isEditing && onFieldEdit ? (e) => { e.stopPropagation(); onFieldEdit(sectionId, 'description', data.description || '', 'text'); } : undefined}
                 data-testid={`editable-${sectionId}-description`}
               >
                 {renderHtmlText(data.description)}

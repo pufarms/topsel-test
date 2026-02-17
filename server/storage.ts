@@ -1628,13 +1628,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPage(data: InsertPage): Promise<Page> {
-    const [page] = await db.insert(pages).values(data).returning();
+    const [page] = await db.insert(pages).values(data as any).returning();
     return page;
   }
 
   async updatePage(id: string, data: Partial<InsertPage>): Promise<Page | undefined> {
     const [page] = await db.update(pages)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: new Date() } as any)
       .where(eq(pages.id, id))
       .returning();
     return page;

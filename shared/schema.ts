@@ -965,9 +965,16 @@ export interface PageSection {
       iconColor?: string;
       link?: string;
     }>;
+    // Section-level padding
+    paddingTop?: string;
+    paddingBottom?: string;
     // Content Two Blocks section
     block1Bg?: string;
     block2Bg?: string;
+    block1PaddingTop?: string;
+    block1PaddingBottom?: string;
+    block2PaddingTop?: string;
+    block2PaddingBottom?: string;
     block1?: {
       label?: string;
       title?: string;

@@ -68,6 +68,9 @@ const sectionTypeLabels: Record<PageSectionType, { label: string; icon: React.Re
   icon_cards: { label: "아이콘 카드", icon: <Zap className="w-4 h-4" /> },
   cta: { label: "CTA (행동유도)", icon: <Megaphone className="w-4 h-4" /> },
   cta_advanced: { label: "고급 CTA (혜택)", icon: <Sparkles className="w-4 h-4" /> },
+  hero_slider: { label: "히어로 슬라이더", icon: <Layout className="w-4 h-4" /> },
+  announcement_marquee: { label: "공지 마퀴", icon: <Megaphone className="w-4 h-4" /> },
+  content_two_blocks: { label: "2단 콘텐츠 블록", icon: <LayoutGrid className="w-4 h-4" /> },
 };
 
 function generateId() {
@@ -199,6 +202,26 @@ function getDefaultSectionData(type: PageSectionType): PageSection["data"] {
         secondaryButtonLink: "/contact",
         promoBadge: "프로모션 배지",
         benefits: ["혜택 1", "혜택 2", "혜택 3", "혜택 4"],
+      };
+    case "hero_slider":
+      return {
+        slides: [
+          { id: generateId(), imageUrl: "", imageAlt: "슬라이드 1" },
+          { id: generateId(), imageUrl: "", imageAlt: "슬라이드 2" },
+        ],
+        autoPlay: true,
+        slideDuration: 5000,
+        buttonText: "시작하기",
+        buttonLink: "/register",
+      };
+    case "announcement_marquee":
+      return {};
+    case "content_two_blocks":
+      return {
+        block1Bg: "#FFFFFF",
+        block2Bg: "#F3F4F6",
+        block1: { label: "LABEL", title: "블록 1 제목", description: "블록 1 설명", items: ["항목 1", "항목 2"] },
+        block2: { label: "LABEL", title: "블록 2 제목", description: "블록 2 설명", items: ["항목 1", "항목 2"] },
       };
     default:
       return {};
