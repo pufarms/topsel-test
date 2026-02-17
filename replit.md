@@ -139,7 +139,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 -   **ORM**: Drizzle ORM with PostgreSQL dialect.
 -   **Schema**: Shared `shared/schema.ts` with Zod schemas generated from Drizzle.
--   **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, `siteSettings`, `vendors`, `product_vendors`, `order_allocations`, `allocation_details`, `vendor_payments`, `inquiries`, `inquiry_messages`, `inquiry_fields`, `inquiry_attachments`.
+-   **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, `siteSettings`, `vendors`, `product_vendors`, `order_allocations`, `allocation_details`, `vendor_payments`, `inquiries`, `inquiry_messages`, `inquiry_fields`, `inquiry_attachments`, `invoice_records`.
 
 ### Core Features
 -   **User Portals**: Member Mypage, Admin dashboards, and Partner Portal.
@@ -158,6 +158,7 @@ Preferred communication style: Simple, everyday language.
 -   **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view merging order and payment rows.
 -   **Inquiry Board System (문의 게시판)**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features for both admin and members, integrated with dashboards for notifications.
 -   **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with overview, member-specific, and product-specific sales data, including charts, tables, and Excel export, all sourced from `priceConfirmed=true` orders.
+-   **Invoice Management System (계산서/세금계산서 관리)**: Monthly invoice tracking with `invoice_records` table. Unified summary view combining members and vendors with issue status (issued/not_issued). Manual invoice issuance with duplicate prevention via `orderIds` tracking. Separate rows for same entity when issued at different times. `isAutoIssued` flag for future automated issuance. APIs: `/api/admin/accounting/invoice-summary`, `/api/admin/accounting/invoice-issue`, `/api/admin/accounting/invoice-targets`, `/api/admin/accounting/invoice-summary-export`.
 
 ## External Dependencies
 

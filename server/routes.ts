@@ -16169,17 +16169,7 @@ export async function registerRoutes(
     }
   });
 
-  // ===== 계산서/세금계산서 통합 조회 API =====
-  app.get('/api/admin/accounting/invoice-summary', async (req, res) => {
-    try {
-      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
-      const user = await storage.getUser(req.session.userId);
-      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
-
-      const year = parseInt(req.query.year as string) || new Date().getFullYear();
-      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
-      const filterType = (req.query.filterType as string) || 'all';
-      const searchId = req.query.searchId as string;
+  async function getInvoiceSummaryData(year: number, month: number, filterType: string, searchId?: string) {
 
       const startKST = `${year}-${String(month).padStart(2, '0')}-01T00:00:00+09:00`;
       const nextMonth = month === 12 ? 1 : month + 1;
@@ -16505,20 +16495,36 @@ export async function registerRoutes(
         notIssuedCount: rows.filter(r => r.issuedStatus === 'not_issued').length,
       };
 
-      res.json({ year, month, rows, totals });
+      return { year, month, rows, totals };
+  }
+
+  // ===== 계산서/세금계산서 통합 조회 API =====
+  app.get('/api/admin/accounting/invoice-summary', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+      const filterType = (req.query.filterType as string) || 'all';
+      const searchId = req.query.searchId as string;
+
+      const result = await getInvoiceSummaryData(year, month, filterType, searchId);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // ===== 계산서/세금계산서 수동 발행 API =====
+  // ===== 계산서/세금계산서 수동 발행 API (서버 측 금액 재계산) =====
   app.post('/api/admin/accounting/invoice-issue', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, supplyAmount, vatAmount, totalAmount, memo } = req.body;
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo } = req.body;
 
       if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
@@ -16543,6 +16549,74 @@ export async function registerRoutes(
         });
       }
 
+      let serverSupplyAmount = 0;
+      let serverVatAmount = 0;
+      let serverTotalAmount = 0;
+
+      if (targetType === 'member') {
+        for (const oid of orderIds as string[]) {
+          if (oid.startsWith('ds_')) {
+            const dsId = parseInt(oid.replace('ds_', ''));
+            const [ds] = await db.select({ amount: directSales.amount, taxType: directSales.taxType })
+              .from(directSales).where(eq(directSales.id, dsId)).limit(1);
+            if (ds) {
+              const amt = ds.amount || 0;
+              if (ds.taxType === 'taxable') {
+                const supply = Math.round(amt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += amt - supply;
+                serverTotalAmount += amt;
+              } else {
+                serverSupplyAmount += amt;
+                serverTotalAmount += amt;
+              }
+            }
+          } else {
+            const [sh] = await db.select({
+              depositAmount: settlementHistory.depositAmount,
+              pointerAmount: settlementHistory.pointerAmount,
+              totalAmount: settlementHistory.totalAmount,
+            }).from(settlementHistory)
+              .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+              .where(eq(settlementHistory.orderId, oid)).limit(1);
+            if (sh) {
+              const [po] = await db.select({ taxType: pendingOrders.taxType })
+                .from(pendingOrders).where(eq(pendingOrders.id, oid)).limit(1);
+              const depositAmt = sh.depositAmount || 0;
+              if (po && po.taxType === 'taxable') {
+                const supply = Math.round(depositAmt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += depositAmt - supply;
+                serverTotalAmount += depositAmt;
+              } else {
+                serverSupplyAmount += depositAmt;
+                serverTotalAmount += depositAmt;
+              }
+            }
+          }
+        }
+      } else if (targetType === 'vendor') {
+        for (const oid of orderIds as string[]) {
+          if (oid.startsWith('vds_')) {
+            const dsId = parseInt(oid.replace('vds_', ''));
+            const [ds] = await db.select({ amount: directSales.amount, taxType: directSales.taxType })
+              .from(directSales).where(eq(directSales.id, dsId)).limit(1);
+            if (ds) {
+              const amt = ds.amount || 0;
+              if (ds.taxType === 'taxable') {
+                const supply = Math.round(amt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += amt - supply;
+                serverTotalAmount += amt;
+              } else {
+                serverSupplyAmount += amt;
+                serverTotalAmount += amt;
+              }
+            }
+          }
+        }
+      }
+
       const [record] = await db.insert(invoiceRecords).values({
         targetType,
         targetId: String(targetId),
@@ -16553,9 +16627,9 @@ export async function registerRoutes(
         month,
         orderIds,
         orderCount: orderIds.length,
-        supplyAmount: supplyAmount || 0,
-        vatAmount: vatAmount || 0,
-        totalAmount: totalAmount || 0,
+        supplyAmount: serverSupplyAmount,
+        vatAmount: serverVatAmount,
+        totalAmount: serverTotalAmount,
         isAutoIssued: false,
         memo: memo || null,
         issuedAt: new Date(),
@@ -16627,19 +16701,19 @@ export async function registerRoutes(
     }
   });
 
-  // ===== 계산서/세금계산서 통합 엑셀 다운로드 =====
-  app.post('/api/admin/accounting/invoice-summary-export', async (req, res) => {
+  // ===== 계산서/세금계산서 통합 엑셀 다운로드 (공유 함수로 직접 데이터 조회) =====
+  app.get('/api/admin/accounting/invoice-summary-export', async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { rows: dataRows, year: yearParam, month: monthParam } = req.body;
-      if (!dataRows || !Array.isArray(dataRows) || dataRows.length === 0) {
-        return res.status(400).json({ message: "데이터가 없습니다" });
-      }
-      const year = yearParam || new Date().getFullYear();
-      const month = monthParam || (new Date().getMonth() + 1);
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+      const filterType = (req.query.filterType as string) || 'all';
+      const searchId = req.query.searchId as string;
+
+      const summaryData = await getInvoiceSummaryData(year, month, filterType, searchId);
 
       const ExcelJS = (await import('exceljs')).default;
       const workbook = new ExcelJS.Workbook();
@@ -16663,7 +16737,7 @@ export async function registerRoutes(
       headerRow.font = { bold: true };
       headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
-      for (const row of dataRows) {
+      for (const row of summaryData.rows || []) {
         sheet.addRow({
           type: row.type === 'member' ? '회원' : '매입업체',
           targetName: row.targetName,

@@ -191,6 +191,49 @@ function SectionHeader({ number, title, icon: Icon, color, children }: {
   );
 }
 
+type InvoiceSummaryRow = {
+  type: 'member' | 'vendor';
+  targetId: string;
+  targetName: string;
+  businessNumber: string;
+  invoiceId: number | null;
+  invoiceType: string | null;
+  orderCount: number;
+  totalOrderAmount: number;
+  pointerUsed: number;
+  exemptAmount: number;
+  taxableSupply: number;
+  taxableVat: number;
+  taxableAmount: number;
+  issuedStatus: 'issued' | 'not_issued';
+  issuedAt: string | null;
+  isAutoIssued: boolean;
+  memo: string | null;
+  orderIds: string[];
+};
+
+type InvoiceSummaryData = {
+  year: number;
+  month: number;
+  rows: InvoiceSummaryRow[];
+  totals: {
+    totalOrderAmount: number;
+    pointerUsed: number;
+    exemptAmount: number;
+    taxableSupply: number;
+    taxableVat: number;
+    taxableAmount: number;
+    issuedCount: number;
+    notIssuedCount: number;
+  };
+};
+
+type TargetOption = {
+  id: string;
+  name: string;
+  businessNumber: string;
+};
+
 function MonthlySalesSummary() {
   const { toast } = useToast();
   const now = new Date();
@@ -198,9 +241,13 @@ function MonthlySalesSummary() {
   const [selectedYear, setSelectedYear] = useState(kstNow.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(kstNow.getMonth() + 1);
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [memberSearchOpen, setMemberSearchOpen] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
+  const [filterType, setFilterType] = useState<'all' | 'member' | 'vendor'>('all');
+  const [searchText, setSearchText] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
+  const [issueDialogRow, setIssueDialogRow] = useState<InvoiceSummaryRow | null>(null);
+  const [issueMemo, setIssueMemo] = useState("");
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
   const nextM = selectedMonth === 12 ? 1 : selectedMonth + 1;
@@ -217,13 +264,32 @@ function MonthlySalesSummary() {
     },
   });
 
-  const { data: monthlyData, isLoading: monthlyLoading } = useQuery<MonthlyByMemberData>({
-    queryKey: ["/api/admin/accounting/sales/monthly-by-member", selectedYear, selectedMonth],
+  const { data: invoiceSummary, isLoading: invoiceLoading } = useQuery<InvoiceSummaryData>({
+    queryKey: ["/api/admin/accounting/invoice-summary", selectedYear, selectedMonth, filterType, selectedSearchId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/accounting/sales/monthly-by-member?year=${selectedYear}&month=${selectedMonth}`, { credentials: "include" });
+      const params = new URLSearchParams({
+        year: String(selectedYear),
+        month: String(selectedMonth),
+        filterType,
+      });
+      if (selectedSearchId) params.set("searchId", selectedSearchId);
+      const res = await fetch(`/api/admin/accounting/invoice-summary?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("조회 실패");
       return res.json();
     },
+  });
+
+  const searchTargetType = filterType === 'all' ? null : filterType;
+  const { data: targetOptions } = useQuery<TargetOption[]>({
+    queryKey: ["/api/admin/accounting/invoice-targets", searchTargetType, searchText],
+    queryFn: async () => {
+      if (!searchTargetType) return [];
+      const params = new URLSearchParams({ type: searchTargetType, search: searchText });
+      const res = await fetch(`/api/admin/accounting/invoice-targets?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!searchTargetType && searchText.trim().length > 0,
   });
 
   const { data: memberDetail, isLoading: detailLoading } = useQuery<MemberDetailData>({
@@ -236,32 +302,62 @@ function MonthlySalesSummary() {
     enabled: !!detailMemberId,
   });
 
-  const handleExcelDownload = async () => {
-    try {
-      const res = await fetch(`/api/admin/accounting/sales/tax-invoice-export?year=${selectedYear}&month=${selectedMonth}`, { credentials: "include" });
-      if (!res.ok) throw new Error("다운로드 실패");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `계산서_${selectedYear}년${selectedMonth}월.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast({ title: "다운로드 완료" });
-    } catch (e: any) {
-      toast({ title: "다운로드 실패", description: e.message, variant: "destructive" });
-    }
+  const issueMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/accounting/invoice-issue", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "계산서 발행 완료" });
+      setIssueDialogRow(null);
+      setIssueMemo("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "발행 실패", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const handleIssue = () => {
+    if (!issueDialogRow) return;
+    const r = issueDialogRow;
+    issueMutation.mutate({
+      targetType: r.type,
+      targetId: r.targetId,
+      targetName: r.targetName,
+      businessNumber: r.businessNumber,
+      invoiceType: r.exemptAmount > 0 && r.taxableAmount > 0 ? 'mixed' : r.taxableAmount > 0 ? 'taxable' : 'exempt',
+      year: selectedYear,
+      month: selectedMonth,
+      orderIds: r.orderIds,
+      supplyAmount: r.exemptAmount + r.taxableSupply,
+      vatAmount: r.taxableVat,
+      totalAmount: r.exemptAmount + r.taxableAmount,
+      memo: issueMemo || null,
+    });
   };
 
-  const handleVendorExcelDownload = async () => {
+  const handleExcelDownload = async () => {
+    if (!invoiceSummary || invoiceSummary.rows.length === 0) {
+      toast({ title: "다운로드할 데이터가 없습니다", variant: "destructive" });
+      return;
+    }
     try {
-      const res = await fetch(`/api/admin/accounting/sales/vendor-tax-invoice-export?year=${selectedYear}&month=${selectedMonth}`, { credentials: "include" });
+      const params = new URLSearchParams({
+        year: String(selectedYear),
+        month: String(selectedMonth),
+        filterType,
+      });
+      if (selectedSearchId) params.set("searchId", selectedSearchId);
+      const res = await fetch(`/api/admin/accounting/invoice-summary-export?${params.toString()}`, {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error("다운로드 실패");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `업체계산서_${selectedYear}년${selectedMonth}월.xlsx`;
+      a.download = `계산서내역_${selectedYear}년${selectedMonth}월.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
       toast({ title: "다운로드 완료" });
@@ -273,14 +369,8 @@ function MonthlySalesSummary() {
   const years = Array.from({ length: 3 }, (_, i) => kstNow.getFullYear() - 1 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const closingBadge = (status: string) => {
-    switch (status) {
-      case "open": return <Badge variant="secondary" data-testid="badge-closing-open">진행중</Badge>;
-      case "warning": return <Badge variant="destructive" data-testid="badge-closing-warning">발행 기한 임박</Badge>;
-      case "overdue": return <Badge variant="destructive" data-testid="badge-closing-overdue">기한 초과</Badge>;
-      default: return <Badge variant="outline" data-testid="badge-closing-closed">마감 완료</Badge>;
-    }
-  };
+  const rows = invoiceSummary?.rows || [];
+  const totals = invoiceSummary?.totals;
 
   return (
     <>
@@ -304,14 +394,13 @@ function MonthlySalesSummary() {
                   {months.map(m => <SelectItem key={m} value={String(m)}>{m}월</SelectItem>)}
                 </SelectContent>
               </Select>
-              {monthlyData && closingBadge(monthlyData.closingStatus)}
             </div>
           </SectionHeader>
 
           {salesLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : salesData ? (
-            <div className="grid sm:grid-cols-3 gap-4 mb-5">
+            <div className="grid sm:grid-cols-3 gap-4">
               <div className="rounded-lg bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border border-blue-200/60 dark:border-blue-800/40 p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-blue-500 rounded-lg">
@@ -353,235 +442,192 @@ function MonthlySalesSummary() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <h4 className="text-sm font-semibold text-foreground">회원별 계산서 / 세금계산서 내역</h4>
+              <h4 className="text-sm font-semibold text-foreground">계산서 / 세금계산서 내역</h4>
+              {totals && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <Badge variant="secondary" className="text-xs">{totals.issuedCount}건 발행</Badge>
+                  <Badge variant="outline" className="text-xs">{totals.notIssuedCount}건 미발행</Badge>
+                </div>
+              )}
             </div>
-            {monthlyData && monthlyData.members.length > 0 && (
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                <Input
-                  placeholder="업체명 검색"
-                  value={memberSearch}
-                  onChange={(e) => {
-                    setMemberSearch(e.target.value);
-                    setMemberSearchOpen(true);
-                    setSelectedMemberId(null);
-                  }}
-                  onFocus={() => { if (memberSearch.trim() && !selectedMemberId) setMemberSearchOpen(true); }}
-                  onBlur={() => setTimeout(() => setMemberSearchOpen(false), 200)}
-                  className="pl-8 pr-8 w-[240px]"
-                  data-testid="input-member-search"
-                />
-                {(memberSearch || selectedMemberId) && (
-                  <button
-                    onClick={() => { setMemberSearch(""); setSelectedMemberId(null); setMemberSearchOpen(false); }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
-                    data-testid="button-clear-member-search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-                {memberSearchOpen && memberSearch.trim() && (() => {
-                  const q = memberSearch.trim().toLowerCase();
-                  const suggestions = monthlyData.members.filter((m) =>
-                    m.businessName?.toLowerCase().includes(q) ||
-                    m.memberName?.toLowerCase().includes(q) ||
-                    m.businessNumber?.includes(q)
-                  );
-                  if (suggestions.length === 0) return (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 p-3 text-sm text-muted-foreground text-center">
-                      검색 결과가 없습니다
-                    </div>
-                  );
-                  return (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={filterType} onValueChange={(v) => {
+                setFilterType(v as any);
+                setSearchText("");
+                setSelectedSearchId(null);
+                setSearchOpen(false);
+              }}>
+                <SelectTrigger className="w-[120px]" data-testid="select-invoice-filter-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="member">회원</SelectItem>
+                  <SelectItem value="vendor">매입업체</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {filterType !== 'all' && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                  <Input
+                    placeholder={filterType === 'member' ? "회원/업체명 검색" : "업체명 검색"}
+                    value={searchText}
+                    onChange={(e) => {
+                      setSearchText(e.target.value);
+                      setSearchOpen(true);
+                      setSelectedSearchId(null);
+                    }}
+                    onFocus={() => { if (searchText.trim() && !selectedSearchId) setSearchOpen(true); }}
+                    onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                    className="pl-8 pr-8 w-[240px]"
+                    data-testid="input-invoice-search"
+                  />
+                  {(searchText || selectedSearchId) && (
+                    <button
+                      onClick={() => { setSearchText(""); setSelectedSearchId(null); setSearchOpen(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
+                      data-testid="button-clear-invoice-search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {searchOpen && searchText.trim() && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 max-h-[200px] overflow-y-auto">
-                      {suggestions.map((m) => (
-                        <button
-                          key={m.memberId}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setSelectedMemberId(m.memberId);
-                            setMemberSearch(m.businessName);
-                            setMemberSearchOpen(false);
-                          }}
-                          data-testid={`suggestion-member-${m.memberId}`}
-                        >
-                          <span className="font-medium truncate">{m.businessName}</span>
-                          <span className="text-xs text-muted-foreground shrink-0">{m.businessNumber || m.memberName}</span>
-                        </button>
-                      ))}
+                      {(!targetOptions || targetOptions.length === 0) ? (
+                        <div className="p-3 text-sm text-muted-foreground text-center">검색 결과가 없습니다</div>
+                      ) : (
+                        targetOptions.map((t) => (
+                          <button
+                            key={t.id}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between gap-2"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setSelectedSearchId(t.id);
+                              setSearchText(t.name);
+                              setSearchOpen(false);
+                            }}
+                            data-testid={`suggestion-target-${t.id}`}
+                          >
+                            <span className="font-medium truncate">{t.name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">{t.businessNumber}</span>
+                          </button>
+                        ))
+                      )}
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+
+              <Button variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-invoice-excel">
+                <Download className="h-4 w-4" />엑셀
+              </Button>
+            </div>
           </div>
 
-          {monthlyLoading ? (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-3 text-xs text-amber-800 dark:text-amber-200 mb-3">
+            면세(농산물): 계산서 발행 (공급가 = 예치금, 부가세 없음) | 과세: 세금계산서 발행 (공급가 = 예치금/1.1, 부가세 별도). 포인터 사용분은 발행 대상에서 제외됩니다.
+          </div>
+
+          {invoiceLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : monthlyData && (monthlyData.members.length > 0 || (monthlyData.vendors && monthlyData.vendors.length > 0)) ? (
-            <>
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-3 text-xs text-amber-800 dark:text-amber-200 mb-3">
-                면세(농산물): 계산서 발행 (공급가 = 예치금, 부가세 없음) | 과세: 세금계산서 발행 (공급가 = 예치금/1.1, 부가세 별도). 포인터 사용분은 발행 대상에서 제외됩니다.
-              </div>
-              <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[500px]">
-                <table className="w-full text-sm min-w-[1100px] table-fixed">
-                  <colgroup>
-                    <col style={{ width: "18%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "8%" }} />
-                    <col style={{ width: "12%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} />
-                  </colgroup>
-                  <thead className="sticky top-0 z-10">
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>회원명(업체명)</th>
-                      <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
-                      <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>주문건수</th>
-                      <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총주문액</th>
-                      <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>포인터사용</th>
-                      <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세(계산서)</th>
-                      <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
+          ) : rows.length > 0 ? (
+            <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[500px]">
+              <table className="w-full text-sm min-w-[1200px] table-fixed">
+                <colgroup>
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "9%" }} />
+                  <col style={{ width: "9%" }} />
+                </colgroup>
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-center py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>구분</th>
+                    <th className="text-left py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>업체명(회원명)</th>
+                    <th className="text-left py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
+                    <th className="text-right py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>건수</th>
+                    <th className="text-right py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총주문액</th>
+                    <th className="text-right py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>포인터</th>
+                    <th className="text-center py-2 px-2 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세</th>
+                    <th className="text-center py-2 px-2 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
+                    <th className="text-center py-2.5 px-2 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>발행상태</th>
+                  </tr>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-right py-2 px-2 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 bg-green-50/50 dark:bg-green-950/20 text-xs font-medium">공급가액</th>
+                    <th className="text-right py-2 px-2 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">공급가액</th>
+                    <th className="text-right py-2 px-2 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">부가세</th>
+                    <th className="text-right py-2 px-2 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">합계</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, idx) => (
+                    <tr
+                      key={`${r.targetId}-${r.invoiceId || 'new'}-${idx}`}
+                      className={`border-b ${r.type === 'member' ? 'hover-elevate cursor-pointer' : ''} ${r.issuedStatus === 'issued' ? 'bg-green-50/20 dark:bg-green-950/10' : ''}`}
+                      onClick={() => { if (r.type === 'member') setDetailMemberId(r.targetId); }}
+                      data-testid={`row-invoice-${idx}`}
+                    >
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                        <Badge variant={r.type === 'member' ? 'secondary' : 'outline'} className="text-xs">
+                          {r.type === 'member' ? '회원' : '업체'}
+                        </Badge>
+                      </td>
+                      <td className={`py-2.5 px-2 whitespace-nowrap font-medium ${r.type === 'member' ? 'text-blue-600 dark:text-blue-400 underline' : ''}`}>
+                        {r.targetName}
+                      </td>
+                      <td className="py-2.5 px-2 whitespace-nowrap text-muted-foreground">{r.businessNumber || "-"}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap">{r.orderCount}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap font-medium">{formatCurrency(r.totalOrderAmount)}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap text-amber-600 dark:text-amber-400">{r.pointerUsed > 0 ? `-${formatCurrency(r.pointerUsed)}` : "-"}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/30 dark:bg-green-950/10">{r.exemptAmount > 0 ? formatCurrency(r.exemptAmount) : "-"}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/30 dark:bg-violet-950/10">{r.taxableSupply > 0 ? formatCurrency(r.taxableSupply) : "-"}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{r.taxableVat > 0 ? formatCurrency(r.taxableVat) : "-"}</td>
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10 font-medium">{r.taxableAmount > 0 ? formatCurrency(r.taxableAmount) : "-"}</td>
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                        {r.issuedStatus === 'issued' ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge variant="default" className="text-xs bg-green-600">발행</Badge>
+                            <span className="text-[10px] text-muted-foreground">{r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ko-KR') : ''}</span>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs gap-1"
+                            onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
+                            data-testid={`button-issue-${idx}`}
+                          >
+                            <FileText className="h-3 w-3" />발행
+                          </Button>
+                        )}
+                      </td>
                     </tr>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 bg-green-50/50 dark:bg-green-950/20 text-xs font-medium">공급가액</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">공급가액</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">부가세</th>
-                      <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">합계</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthlyData.members
-                      .filter((m) => {
-                        if (selectedMemberId) return m.memberId === selectedMemberId;
-                        if (!memberSearch.trim()) return true;
-                        const q = memberSearch.trim().toLowerCase();
-                        return (
-                          m.businessName?.toLowerCase().includes(q) ||
-                          m.memberName?.toLowerCase().includes(q) ||
-                          m.businessNumber?.includes(q)
-                        );
-                      })
-                      .map((m) => (
-                      <tr
-                        key={m.memberId}
-                        className="border-b hover-elevate cursor-pointer"
-                        onClick={() => setDetailMemberId(m.memberId)}
-                        data-testid={`row-member-tax-${m.memberId}`}
-                      >
-                        <td className="py-2.5 px-3 whitespace-nowrap font-medium text-blue-600 dark:text-blue-400 underline">{m.businessName}</td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">{m.businessNumber || "-"}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap">{m.orderCount}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(m.totalOrderAmount)}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap text-amber-600 dark:text-amber-400">-{formatCurrency(m.pointerUsed)}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/30 dark:bg-green-950/10">{m.exemptAmount > 0 ? formatCurrency(m.exemptAmount) : "-"}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/30 dark:bg-violet-950/10">{m.taxableSupply > 0 ? formatCurrency(m.taxableSupply) : "-"}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{m.taxableVat > 0 ? formatCurrency(m.taxableVat) : "-"}</td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10 font-medium">{m.taxableAmount > 0 ? formatCurrency(m.taxableAmount) : "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
+                  ))}
+                </tbody>
+                {totals && (
                   <tfoot>
                     <tr className="bg-muted/50 font-semibold border-t-2">
-                      <td className="py-2.5 px-3" colSpan={2}>합계</td>
-                      <td className="py-2.5 px-3 text-right">{monthlyData.members.reduce((s, m) => s + m.orderCount, 0)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.totals.totalOrderAmount)}</td>
-                      <td className="py-2.5 px-3 text-right text-amber-600 dark:text-amber-400">-{formatCurrency(monthlyData.totals.pointerUsed)}</td>
-                      <td className="py-2.5 px-3 text-right border-l-2 border-l-green-400/30 dark:border-l-green-600/30">{formatCurrency(monthlyData.totals.exemptAmount)}</td>
-                      <td className="py-2.5 px-3 text-right border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30">{formatCurrency(monthlyData.totals.taxableSupply)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.totals.taxableVat)}</td>
-                      <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.totals.taxableAmount)}</td>
+                      <td className="py-2.5 px-2" colSpan={3}>합계</td>
+                      <td className="py-2.5 px-2 text-right">{rows.reduce((s, r) => s + r.orderCount, 0)}</td>
+                      <td className="py-2.5 px-2 text-right">{formatCurrency(totals.totalOrderAmount)}</td>
+                      <td className="py-2.5 px-2 text-right text-amber-600 dark:text-amber-400">{totals.pointerUsed > 0 ? `-${formatCurrency(totals.pointerUsed)}` : "-"}</td>
+                      <td className="py-2.5 px-2 text-right border-l-2 border-l-green-400/30 dark:border-l-green-600/30">{formatCurrency(totals.exemptAmount)}</td>
+                      <td className="py-2.5 px-2 text-right border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30">{formatCurrency(totals.taxableSupply)}</td>
+                      <td className="py-2.5 px-2 text-right">{formatCurrency(totals.taxableVat)}</td>
+                      <td className="py-2.5 px-2 text-right">{formatCurrency(totals.taxableAmount)}</td>
+                      <td className="py-2.5 px-2"></td>
                     </tr>
                   </tfoot>
-                </table>
-              </div>
-              {monthlyData.members.length > 0 && (
-                <div className="flex justify-end mt-3">
-                  <Button variant="outline" className="gap-1" onClick={handleExcelDownload} data-testid="button-tax-excel">
-                    <Download className="h-4 w-4" />회원 계산서 엑셀 다운로드
-                  </Button>
-                </div>
-              )}
-
-              {monthlyData.vendors && monthlyData.vendors.length > 0 && (
-                <div className="mt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Truck className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <h4 className="text-sm font-semibold text-foreground">매입업체별 계산서 / 세금계산서 내역</h4>
-                  </div>
-                  <div className="rounded-md border overflow-x-auto overflow-y-auto max-h-[400px]">
-                    <table className="w-full text-sm min-w-[1100px] table-fixed">
-                      <colgroup>
-                        <col style={{ width: "18%" }} />
-                        <col style={{ width: "12%" }} />
-                        <col style={{ width: "8%" }} />
-                        <col style={{ width: "12%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "10%" }} />
-                      </colgroup>
-                      <thead className="sticky top-0 z-10">
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>업체명</th>
-                          <th className="text-left py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>사업자번호</th>
-                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>주문건수</th>
-                          <th className="text-right py-2.5 px-3 whitespace-nowrap font-semibold text-xs uppercase tracking-wider" rowSpan={2}>총주문액</th>
-                          <th className="py-2.5 px-3" rowSpan={2}></th>
-                          <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400 dark:border-l-green-600 border-b bg-green-50/80 dark:bg-green-950/40 font-semibold text-xs text-green-700 dark:text-green-400" colSpan={1}>면세(계산서)</th>
-                          <th className="text-center py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400 dark:border-l-violet-600 border-b bg-violet-50/80 dark:bg-violet-950/40 font-semibold text-xs text-violet-700 dark:text-violet-400" colSpan={3}>과세(세금계산서)</th>
-                        </tr>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/50 dark:bg-green-950/20 text-xs font-medium">공급가액</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">공급가액</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">부가세</th>
-                          <th className="text-right py-2 px-3 whitespace-nowrap bg-violet-50/50 dark:bg-violet-950/20 text-xs font-medium">합계</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyData.vendors.map((v) => (
-                          <tr key={v.vendorId} className="border-b" data-testid={`row-vendor-tax-${v.vendorId}`}>
-                            <td className="py-2.5 px-3 whitespace-nowrap font-medium">{v.vendorName}</td>
-                            <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">{v.businessNumber || "-"}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap">{v.orderCount}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(v.totalAmount)}</td>
-                            <td className="py-2.5 px-3"></td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-green-400/30 dark:border-l-green-600/30 bg-green-50/30 dark:bg-green-950/10">{v.exemptAmount > 0 ? formatCurrency(v.exemptAmount) : "-"}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30 bg-violet-50/30 dark:bg-violet-950/10">{v.taxableSupply > 0 ? formatCurrency(v.taxableSupply) : "-"}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{v.taxableVat > 0 ? formatCurrency(v.taxableVat) : "-"}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10 font-medium">{v.taxableAmount > 0 ? formatCurrency(v.taxableAmount) : "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      {monthlyData.vendorTotals && (
-                        <tfoot>
-                          <tr className="bg-muted/50 font-semibold border-t-2">
-                            <td className="py-2.5 px-3" colSpan={2}>합계</td>
-                            <td className="py-2.5 px-3 text-right">{monthlyData.vendors.reduce((s, v) => s + v.orderCount, 0)}</td>
-                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.totalAmount)}</td>
-                            <td className="py-2.5 px-3"></td>
-                            <td className="py-2.5 px-3 text-right border-l-2 border-l-green-400/30 dark:border-l-green-600/30">{formatCurrency(monthlyData.vendorTotals.exemptAmount)}</td>
-                            <td className="py-2.5 px-3 text-right border-l-2 border-l-violet-400/30 dark:border-l-violet-600/30">{formatCurrency(monthlyData.vendorTotals.taxableSupply)}</td>
-                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.taxableVat)}</td>
-                            <td className="py-2.5 px-3 text-right">{formatCurrency(monthlyData.vendorTotals.taxableAmount)}</td>
-                          </tr>
-                        </tfoot>
-                      )}
-                    </table>
-                  </div>
-                  <div className="flex justify-end mt-3">
-                    <Button variant="outline" className="gap-1" onClick={handleVendorExcelDownload} data-testid="button-vendor-tax-excel">
-                      <Download className="h-4 w-4" />업체 계산서 엑셀 다운로드
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
+                )}
+              </table>
+            </div>
           ) : (
             <div className="py-6 text-center text-muted-foreground text-sm">
               해당 월에 계산서 발행 대상 데이터가 없습니다.
@@ -589,6 +635,74 @@ function MonthlySalesSummary() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!issueDialogRow} onOpenChange={(open) => { if (!open) { setIssueDialogRow(null); setIssueMemo(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />계산서 수동 발행
+            </DialogTitle>
+          </DialogHeader>
+          {issueDialogRow && (
+            <div className="space-y-4">
+              <div className="rounded-md bg-muted/30 border p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">대상</span>
+                  <span className="font-medium">{issueDialogRow.targetName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">구분</span>
+                  <Badge variant={issueDialogRow.type === 'member' ? 'secondary' : 'outline'} className="text-xs">
+                    {issueDialogRow.type === 'member' ? '회원' : '매입업체'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">사업자번호</span>
+                  <span>{issueDialogRow.businessNumber || "-"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">주문 건수</span>
+                  <span className="font-medium">{issueDialogRow.orderCount}건</span>
+                </div>
+                {issueDialogRow.exemptAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-700 dark:text-green-400">면세 공급가액</span>
+                    <span className="font-medium text-green-700 dark:text-green-400">{formatCurrency(issueDialogRow.exemptAmount)}</span>
+                  </div>
+                )}
+                {issueDialogRow.taxableAmount > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-violet-700 dark:text-violet-400">과세 공급가액</span>
+                      <span className="font-medium text-violet-700 dark:text-violet-400">{formatCurrency(issueDialogRow.taxableSupply)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-violet-700 dark:text-violet-400">부가세</span>
+                      <span className="font-medium text-violet-700 dark:text-violet-400">{formatCurrency(issueDialogRow.taxableVat)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>메모 (선택)</Label>
+                <Textarea
+                  value={issueMemo}
+                  onChange={(e) => setIssueMemo(e.target.value)}
+                  placeholder="발행 메모 (선택)"
+                  rows={2}
+                  data-testid="input-issue-memo"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIssueDialogRow(null); setIssueMemo(""); }}>취소</Button>
+            <Button onClick={handleIssue} disabled={issueMutation.isPending} data-testid="button-confirm-issue">
+              {issueMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}발행 확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!detailMemberId} onOpenChange={(open) => { if (!open) setDetailMemberId(null); }}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
