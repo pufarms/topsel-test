@@ -20,8 +20,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Search, Plus, Trash2, Pencil, Check, ChevronLeft, ChevronRight,
   Download, Upload, List, Grid3X3, CalendarClock, BookOpen, Save,
-  TrendingUp, TrendingDown, X,
+  TrendingUp, TrendingDown, X, Building2,
 } from "lucide-react";
+import LoanManagementDialog from "./loan-management-dialog";
 import * as XLSX from "xlsx";
 import {
   PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis,
@@ -160,6 +161,7 @@ export default function ExpenseManagementTab() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showKeywordDialog, setShowKeywordDialog] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
+  const [showLoanDialog, setShowLoanDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1003,6 +1005,9 @@ export default function ExpenseManagementTab() {
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowRecurringDialog(true)} className="gap-1" data-testid="button-recurring-manage">
             <CalendarClock className="h-4 w-4" />정기비용 관리
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowLoanDialog(true)} className="gap-1" data-testid="button-loan-manage">
+            <Building2 className="h-4 w-4" />대출관리
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowKeywordDialog(true)} className="gap-1" data-testid="button-keyword-dict">
             <BookOpen className="h-4 w-4" />키워드 사전
@@ -2331,6 +2336,8 @@ export default function ExpenseManagementTab() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <LoanManagementDialog open={showLoanDialog} onOpenChange={setShowLoanDialog} />
     </div>
   );
 }

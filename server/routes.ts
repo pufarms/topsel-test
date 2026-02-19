@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable, loans, loanRepayments } from "@shared/schema";
 import XLSX from "xlsx";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
@@ -18869,6 +18869,314 @@ export async function registerRoutes(
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
+  });
+
+  // =========================================
+  // Loan Management APIs
+  // =========================================
+
+  const adminAuthCheck = async (req: any, res: any) => {
+    if (!req.session.userId) { res.status(401).json({ message: "Not authenticated" }); return null; }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) { res.status(403).json({ message: "권한이 없습니다" }); return null; }
+    return user;
+  };
+
+  function calcMonthlyPayment(principal: number, annualRate: number, months: number, type: string): number {
+    const r = annualRate / 100 / 12;
+    if (type === 'equal_payment') {
+      if (r === 0) return Math.round(principal / months);
+      return Math.round(principal * r * Math.pow(1 + r, months) / (Math.pow(1 + r, months) - 1));
+    } else if (type === 'equal_principal') {
+      return Math.round(principal / months + principal * r);
+    } else if (type === 'interest_only') {
+      return Math.round(principal * r);
+    }
+    return 0;
+  }
+
+  // GET /api/admin/accounting/loans
+  app.get("/api/admin/accounting/loans", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanList = await db.select().from(loans).orderBy(
+        sql`CASE WHEN ${loans.status} = 'active' THEN 0 WHEN ${loans.status} = 'completed' THEN 1 ELSE 2 END`,
+        desc(loans.createdAt)
+      );
+      const result = [];
+      for (const loan of loanList) {
+        const repaymentsList = await db.select().from(loanRepayments).where(eq(loanRepayments.loanId, loan.id));
+        const totalRepaid = repaymentsList.reduce((s, r) => s + r.principalAmount, 0);
+        const totalInterestPaid = repaymentsList.reduce((s, r) => s + r.interestAmount, 0);
+        result.push({ ...loan, totalRepaid, totalInterestPaid, repaymentCount: repaymentsList.length });
+      }
+      res.json(result);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // POST /api/admin/accounting/loans
+  app.post("/api/admin/accounting/loans", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const { loanName, bankName, loanType, loanAmount, annualRate, loanStartDate, loanEndDate, loanTermMonths, repaymentType, repaymentDay, monthlyPayment: manualMonthly, memo } = req.body;
+      if (!loanName || !bankName || !loanAmount || !annualRate || !loanStartDate) {
+        return res.status(400).json({ message: "필수 항목을 입력해주세요" });
+      }
+      const amount = Number(loanAmount);
+      const rate = Number(annualRate);
+      const months = loanTermMonths ? Number(loanTermMonths) : null;
+      let computedMonthly = manualMonthly ? Number(manualMonthly) : 0;
+      if (repaymentType !== 'custom' && months && months > 0) {
+        computedMonthly = calcMonthlyPayment(amount, rate, months, repaymentType || 'equal_payment');
+      }
+      const [inserted] = await db.insert(loans).values({
+        loanName, bankName, loanType: loanType || 'term',
+        loanAmount: amount,
+        annualRate: String(rate),
+        loanStartDate, loanEndDate: loanEndDate || null,
+        loanTermMonths: months,
+        repaymentType: repaymentType || 'equal_payment',
+        monthlyPayment: computedMonthly || null,
+        repaymentDay: repaymentDay || 1,
+        remainingBalance: amount,
+        status: 'active', memo: memo || null,
+      }).returning();
+      res.json(inserted);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // PUT /api/admin/accounting/loans/:id
+  app.put("/api/admin/accounting/loans/:id", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const existing = await db.select().from(loans).where(eq(loans.id, loanId)).limit(1);
+      if (existing.length === 0) return res.status(404).json({ message: "대출을 찾을 수 없습니다" });
+      const repayments = await db.select().from(loanRepayments).where(eq(loanRepayments.loanId, loanId));
+      const updates: any = {};
+      const { loanName, bankName, loanType, annualRate, loanEndDate, loanTermMonths, repaymentType, repaymentDay, monthlyPayment, memo, loanAmount } = req.body;
+      if (loanName) updates.loanName = loanName;
+      if (bankName) updates.bankName = bankName;
+      if (loanType) updates.loanType = loanType;
+      if (annualRate !== undefined) updates.annualRate = String(Number(annualRate));
+      if (loanEndDate !== undefined) updates.loanEndDate = loanEndDate || null;
+      if (loanTermMonths !== undefined) updates.loanTermMonths = loanTermMonths ? Number(loanTermMonths) : null;
+      if (repaymentType) updates.repaymentType = repaymentType;
+      if (repaymentDay) updates.repaymentDay = Number(repaymentDay);
+      if (memo !== undefined) updates.memo = memo || null;
+      if (repayments.length === 0 && loanAmount !== undefined) {
+        updates.loanAmount = Number(loanAmount);
+        updates.remainingBalance = Number(loanAmount);
+      }
+      if (monthlyPayment !== undefined) updates.monthlyPayment = Number(monthlyPayment) || null;
+      updates.updatedAt = new Date();
+      const [updated] = await db.update(loans).set(updates).where(eq(loans.id, loanId)).returning();
+      res.json(updated);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // DELETE /api/admin/accounting/loans/:id
+  app.delete("/api/admin/accounting/loans/:id", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const repayments = await db.select().from(loanRepayments).where(eq(loanRepayments.loanId, loanId));
+      if (repayments.length > 0) {
+        return res.status(400).json({ message: "상환 내역이 있는 대출은 삭제할 수 없습니다" });
+      }
+      await db.delete(loans).where(eq(loans.id, loanId));
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // PATCH /api/admin/accounting/loans/:id/close
+  app.patch("/api/admin/accounting/loans/:id/close", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const [updated] = await db.update(loans).set({
+        status: 'completed', remainingBalance: 0, updatedAt: new Date(),
+      }).where(eq(loans.id, loanId)).returning();
+      res.json(updated);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // GET /api/admin/accounting/loans/:id/repayments
+  app.get("/api/admin/accounting/loans/:id/repayments", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const repaymentList = await db.select().from(loanRepayments)
+        .where(eq(loanRepayments.loanId, loanId))
+        .orderBy(desc(loanRepayments.repaymentDate), desc(loanRepayments.id));
+      res.json(repaymentList);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // POST /api/admin/accounting/loans/:id/repayments
+  app.post("/api/admin/accounting/loans/:id/repayments", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const loan = await db.select().from(loans).where(eq(loans.id, loanId)).limit(1);
+      if (loan.length === 0) return res.status(404).json({ message: "대출을 찾을 수 없습니다" });
+      const currentLoan = loan[0];
+      const { repaymentDate, totalAmount, principalAmount, interestAmount, isExtraPayment, memo } = req.body;
+      const principal = Number(principalAmount);
+      const interest = Number(interestAmount);
+      const total = Number(totalAmount);
+      if (!repaymentDate || isNaN(principal) || isNaN(interest) || isNaN(total)) {
+        return res.status(400).json({ message: "필수 항목을 입력해주세요" });
+      }
+      if (principal < 0 || interest < 0) {
+        return res.status(400).json({ message: "금액은 0 이상이어야 합니다" });
+      }
+      if (principal > (currentLoan.remainingBalance || 0)) {
+        return res.status(400).json({ message: `원금 상환액이 잔액(${(currentLoan.remainingBalance || 0).toLocaleString()}원)을 초과합니다` });
+      }
+      const remainingAfter = (currentLoan.remainingBalance || 0) - principal;
+
+      let expenseId: number | null = null;
+      if (interest > 0) {
+        const finCat = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, '금융비용')).limit(1);
+        const interestSub = finCat.length > 0
+          ? await db.select().from(expenseSubCategoryTable).where(and(eq(expenseSubCategoryTable.categoryId, finCat[0].id), eq(expenseSubCategoryTable.name, '이자비용'))).limit(1)
+          : [];
+        const [expenseRow] = await db.insert(expenses).values({
+          expenseDate: repaymentDate,
+          itemName: `${currentLoan.loanName} 이자`,
+          category: '금융비용',
+          subCategory: '이자비용',
+          categoryId: finCat.length > 0 ? finCat[0].id : null,
+          subCategoryId: interestSub.length > 0 ? interestSub[0].id : null,
+          amount: interest,
+          taxType: 'exempt',
+          supplyAmount: interest,
+          vatAmount: 0,
+          paymentMethod: '계좌이체',
+          memo: `대출 상환 자동 등록 (${currentLoan.bankName})`,
+          createdBy: user.username,
+        }).returning();
+        expenseId = expenseRow.id;
+      }
+
+      const [repayment] = await db.insert(loanRepayments).values({
+        loanId, repaymentDate, totalAmount: total,
+        principalAmount: principal, interestAmount: interest,
+        remainingAfter: Math.max(0, remainingAfter),
+        expenseId, isExtraPayment: isExtraPayment || false,
+        memo: memo || null,
+      }).returning();
+
+      const newStatus = remainingAfter <= 0 ? 'completed' : 'active';
+      await db.update(loans).set({
+        remainingBalance: Math.max(0, remainingAfter),
+        status: newStatus, updatedAt: new Date(),
+      }).where(eq(loans.id, loanId));
+
+      res.json(repayment);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // DELETE /api/admin/accounting/loans/:id/repayments/:repaymentId
+  app.delete("/api/admin/accounting/loans/:id/repayments/:repaymentId", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const repaymentId = parseInt(req.params.repaymentId);
+      const repayment = await db.select().from(loanRepayments)
+        .where(and(eq(loanRepayments.id, repaymentId), eq(loanRepayments.loanId, loanId)))
+        .limit(1);
+      if (repayment.length === 0) return res.status(404).json({ message: "상환 내역을 찾을 수 없습니다" });
+      const rep = repayment[0];
+      if (rep.expenseId) {
+        await db.delete(expenses).where(eq(expenses.id, rep.expenseId));
+      }
+      await db.delete(loanRepayments).where(eq(loanRepayments.id, repaymentId));
+      const loan = await db.select().from(loans).where(eq(loans.id, loanId)).limit(1);
+      if (loan.length > 0) {
+        const newBalance = (loan[0].remainingBalance || 0) + rep.principalAmount;
+        await db.update(loans).set({
+          remainingBalance: newBalance,
+          status: newBalance > 0 ? 'active' : 'completed',
+          updatedAt: new Date(),
+        }).where(eq(loans.id, loanId));
+      }
+      res.json({ success: true });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // POST /api/admin/accounting/loans/:id/calculate
+  app.post("/api/admin/accounting/loans/:id/calculate", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const loanId = parseInt(req.params.id);
+      const loan = await db.select().from(loans).where(eq(loans.id, loanId)).limit(1);
+      if (loan.length === 0) return res.status(404).json({ message: "대출을 찾을 수 없습니다" });
+      const l = loan[0];
+      const balance = l.remainingBalance || 0;
+      const r = Number(l.annualRate) / 100 / 12;
+      let principal = 0, interest = 0, total = 0;
+      let method = '';
+      if (l.repaymentType === 'equal_payment') {
+        method = '원리금균등상환';
+        interest = Math.round(balance * r);
+        principal = (l.monthlyPayment || 0) - interest;
+        if (principal < 0) principal = 0;
+        total = (l.monthlyPayment || 0);
+      } else if (l.repaymentType === 'equal_principal') {
+        method = '원금균등상환';
+        principal = Math.round(l.loanAmount / (l.loanTermMonths || 1));
+        interest = Math.round(balance * r);
+        total = principal + interest;
+      } else if (l.repaymentType === 'interest_only') {
+        method = '만기일시상환';
+        principal = 0;
+        interest = Math.round(balance * r);
+        total = interest;
+      } else {
+        method = '자유상환';
+        interest = Math.round(balance * r);
+        principal = 0;
+        total = interest;
+      }
+      res.json({
+        totalAmount: total, principalAmount: principal, interestAmount: interest,
+        remainingAfter: Math.max(0, balance - principal),
+        calculationMethod: method,
+      });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // GET /api/admin/accounting/loans/summary
+  app.get("/api/admin/accounting/loans/summary", async (req, res) => {
+    try {
+      const user = await adminAuthCheck(req, res); if (!user) return;
+      const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+      const activeLoanList = await db.select().from(loans).where(eq(loans.status, 'active'));
+      const allRepayments = await db.select().from(loanRepayments)
+        .where(sql`${loanRepayments.repaymentDate}::text LIKE ${month + '%'}`);
+      const totalPrincipal = allRepayments.reduce((s, r) => s + r.principalAmount, 0);
+      const totalInterest = allRepayments.reduce((s, r) => s + r.interestAmount, 0);
+      const totalRemaining = activeLoanList.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+      const loanSummaries = [];
+      for (const l of activeLoanList) {
+        const monthReps = allRepayments.filter(r => r.loanId === l.id);
+        const mPrincipal = monthReps.reduce((s, r) => s + r.principalAmount, 0);
+        const mInterest = monthReps.reduce((s, r) => s + r.interestAmount, 0);
+        const progress = l.loanAmount > 0 ? Math.round(((l.loanAmount - (l.remainingBalance || 0)) / l.loanAmount) * 1000) / 10 : 0;
+        loanSummaries.push({
+          id: l.id, loan_name: l.loanName, bank_name: l.bankName,
+          remaining_balance: l.remainingBalance, monthly_principal: mPrincipal,
+          monthly_interest: mInterest, progress_percent: progress,
+        });
+      }
+      res.json({
+        activeLoans: activeLoanList.length, totalRemainingBalance: totalRemaining,
+        monthlyRepayment: { total: totalPrincipal + totalInterest, principal: totalPrincipal, interest: totalInterest },
+        loans: loanSummaries,
+      });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
   });
 
   return httpServer;
