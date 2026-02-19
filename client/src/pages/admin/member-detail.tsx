@@ -78,8 +78,6 @@ export default function MemberDetailPage() {
     manager3Name: string;
     manager3Phone: string;
     email: string;
-    depositAdjust: string;
-    pointAdjust: string;
     status: string;
     memo: string;
     password: string;
@@ -97,8 +95,6 @@ export default function MemberDetailPage() {
     manager3Name: "",
     manager3Phone: "",
     email: "",
-    depositAdjust: "",
-    pointAdjust: "",
     status: "",
     memo: "",
     password: "",
@@ -219,14 +215,7 @@ export default function MemberDetailPage() {
     if (formData.memo !== (member.memo || "")) updateData.memo = formData.memo;
     if (formData.password && formData.password.length >= 6) updateData.password = formData.password;
     
-    if (formData.depositAdjust) {
-      const adjust = parseInt(formData.depositAdjust);
-      if (!isNaN(adjust)) updateData.deposit = member.deposit + adjust;
-    }
-    if (formData.pointAdjust) {
-      const adjust = parseInt(formData.pointAdjust);
-      if (!isNaN(adjust)) updateData.point = member.point + adjust;
-    }
+
 
     if (Object.keys(updateData).length === 0) {
       toast({ title: "변경된 내용이 없습니다" });
@@ -545,35 +534,6 @@ export default function MemberDetailPage() {
                     value={formData.businessAddress !== "" ? formData.businessAddress : (member.businessAddress || "")}
                     onChange={(e) => setFormData({...formData, businessAddress: e.target.value})}
                     data-testid="input-address"
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm">예치금 조정 (+/-)</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">현재: {member.deposit.toLocaleString()}원</span>
-                  </div>
-                  <Input 
-                    placeholder="예: 10000 또는 -5000"
-                    value={formData.depositAdjust}
-                    onChange={(e) => setFormData({...formData, depositAdjust: e.target.value})}
-                    data-testid="input-deposit-adjust"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm">포인트 조정 (+/-)</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">현재: {member.point.toLocaleString()}P</span>
-                  </div>
-                  <Input 
-                    placeholder="예: 1000 또는 -500"
-                    value={formData.pointAdjust}
-                    onChange={(e) => setFormData({...formData, pointAdjust: e.target.value})}
-                    data-testid="input-point-adjust"
                   />
                 </div>
               </div>
