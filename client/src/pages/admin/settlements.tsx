@@ -952,7 +952,7 @@ export default function SettlementsPage() {
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
         <TabsList className="flex-wrap mb-4 bg-emerald-50 dark:bg-emerald-950/30">
           <TabsTrigger value="member-settlement" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-member-settlement">
-            <Wallet className="h-4 w-4" />회원정산 관리
+            <Wallet className="h-4 w-4" />회원 매출/정산 관리
           </TabsTrigger>
           <TabsTrigger value="purchase-management" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-purchase-management">
             <ShoppingCart className="h-4 w-4" />매입관리
