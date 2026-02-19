@@ -387,7 +387,7 @@ function MonthlySalesSummary() {
     <>
       <div className="rounded-lg border-l-4 border-l-blue-500 border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 shadow-md overflow-hidden">
         <div className="p-5">
-          <SectionHeader number="1" title="월별 매출 요약" icon={BarChart3} color="blue" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
+          <SectionHeader number="1" title="월별 계산서(세금) 발행 내역" icon={BarChart3} color="blue" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
             <div className="flex items-center gap-2">
               <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
                 <SelectTrigger className="w-[100px]" data-testid="select-year">
