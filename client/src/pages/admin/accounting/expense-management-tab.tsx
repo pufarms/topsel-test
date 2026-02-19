@@ -18,7 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Loader2, Search, Plus, Trash2, Pencil, ChevronLeft, ChevronRight,
+  Loader2, Search, Plus, Trash2, Pencil, Check, ChevronLeft, ChevronRight,
   Download, Upload, List, Grid3X3, CalendarClock, BookOpen, Save,
   TrendingUp, TrendingDown, X,
 } from "lucide-react";
@@ -110,6 +110,7 @@ interface SpreadsheetRow {
   itemName: string;
   amount: string;
   category: string;
+  categoryId: number | null;
   taxType: string;
   paymentMethod: string;
   vendorName: string;
@@ -122,6 +123,7 @@ function emptySpreadsheetRow(): SpreadsheetRow {
     itemName: '',
     amount: '',
     category: '기타',
+    categoryId: null,
     taxType: 'taxable',
     paymentMethod: '카드',
     vendorName: '',
@@ -133,6 +135,7 @@ export default function ExpenseManagementTab() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(() =>
@@ -158,16 +161,21 @@ export default function ExpenseManagementTab() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteIndex, setAutocompleteIndex] = useState(-1);
   const [similarKeywords, setSimilarKeywords] = useState<any[]>([]);
+  const [autoClassifyLabel, setAutoClassifyLabel] = useState<string | null>(null);
+  const [formAmountDisplay, setFormAmountDisplay] = useState('');
 
   const [spreadsheetRows, setSpreadsheetRows] = useState<SpreadsheetRow[]>([emptySpreadsheetRow()]);
 
   const [recurringForm, setRecurringForm] = useState({
     itemName: '', categoryId: null as number | null, amount: '', dayOfMonth: '1', cycle: 'monthly',
   });
+  const [editingRecurringId, setEditingRecurringId] = useState<number | null>(null);
 
   const [keywordForm, setKeywordForm] = useState({
     keyword: '', categoryId: null as number | null, subCategoryId: null as number | null, matchType: 'exact',
   });
+  const [keywordSearch, setKeywordSearch] = useState('');
+  const [keywordSourceFilter, setKeywordSourceFilter] = useState<string>('all');
 
   const monthYear = selectedMonth.split('-');
   const monthLabel = `${monthYear[0]}년 ${parseInt(monthYear[1])}월`;
@@ -234,7 +242,7 @@ export default function ExpenseManagementTab() {
     enabled: showKeywordDialog,
   });
 
-  const { data: autocompleteData } = useQuery<{ item_name: string; category: string; sub_category?: string; category_id?: number; sub_category_id?: number; last_amount: number; source?: string }[]>({
+  const { data: autocompleteData } = useQuery<{ item_name: string; category: string; sub_category?: string; category_id?: number; category_name?: string; category_color?: string; sub_category_id?: number; sub_category_name?: string; last_amount: number; source?: string }[]>({
     queryKey: ['/api/admin/accounting/expenses/autocomplete', formItemName],
     queryFn: async () => {
       const res = await fetch(`/api/admin/accounting/expenses/autocomplete?q=${encodeURIComponent(formItemName)}`, { credentials: 'include' });
@@ -246,7 +254,18 @@ export default function ExpenseManagementTab() {
 
   const expenses = expensesData?.expenses || [];
   const recurringExpenses = recurringData || [];
-  const keywords = keywordsData || [];
+  const allKeywords = keywordsData || [];
+  const keywords = useMemo(() => {
+    let filtered = allKeywords;
+    if (keywordSearch) {
+      const q = keywordSearch.toLowerCase();
+      filtered = filtered.filter(k => k.keyword.toLowerCase().includes(q) || k.category?.toLowerCase().includes(q));
+    }
+    if (keywordSourceFilter !== 'all') {
+      filtered = filtered.filter(k => k.source === keywordSourceFilter);
+    }
+    return filtered;
+  }, [allKeywords, keywordSearch, keywordSourceFilter]);
   const autocompleteItems = autocompleteData || [];
 
   const createMutation = useMutation({
@@ -352,6 +371,19 @@ export default function ExpenseManagementTab() {
     },
   });
 
+  const recurringUpdateMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const { id, ...data } = body;
+      const res = await apiRequest('PATCH', `/api/admin/accounting/expenses/recurring/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: '수정 완료' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/recurring'] });
+      setEditingRecurringId(null);
+    },
+  });
+
   const generateRecurringMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/admin/accounting/expenses/recurring/generate', { month: selectedMonth });
@@ -393,12 +425,49 @@ export default function ExpenseManagementTab() {
     },
   });
 
+  const formatAmountWithComma = (val: string) => {
+    const num = val.replace(/[^\d]/g, '');
+    if (!num) return '';
+    return Number(num).toLocaleString();
+  };
+
+  const parseAmountFromDisplay = (display: string) => {
+    return display.replace(/[^\d]/g, '');
+  };
+
+  const handleAmountChange = (val: string) => {
+    const raw = val.replace(/[^\d]/g, '');
+    setFormAmount(raw);
+    setFormAmountDisplay(raw ? Number(raw).toLocaleString() : '');
+  };
+
+  const selectAutocompleteItem = (item: any) => {
+    setFormItemName(item.item_name);
+    if (item.category_id) {
+      setFormCategoryId(item.category_id);
+    } else if (item.category) {
+      const cat = getCategoryByName(item.category);
+      if (cat) setFormCategoryId(cat.id);
+    }
+    if (item.sub_category_id) {
+      setFormSubCategoryId(item.sub_category_id);
+    }
+    if (item.last_amount) {
+      setFormAmount(String(item.last_amount));
+      setFormAmountDisplay(Number(item.last_amount).toLocaleString());
+    }
+    setShowAutocomplete(false);
+    setAutoClassifyLabel(null);
+    setTimeout(() => amountInputRef.current?.focus(), 50);
+  };
+
   const resetForm = () => {
     setShowAddDialog(false);
     setEditingExpense(null);
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormItemName('');
     setFormAmount('');
+    setFormAmountDisplay('');
     setFormCategoryId(null);
     setFormSubCategoryId(null);
     setFormTaxType('taxable');
@@ -406,6 +475,7 @@ export default function ExpenseManagementTab() {
     setFormVendorName('');
     setFormMemo('');
     setShowAutocomplete(false);
+    setAutoClassifyLabel(null);
   };
 
   const openEditDialog = (expense: Expense) => {
@@ -413,6 +483,8 @@ export default function ExpenseManagementTab() {
     setFormDate(expense.expenseDate);
     setFormItemName(expense.itemName);
     setFormAmount(String(expense.amount));
+    setFormAmountDisplay(expense.amount ? Number(expense.amount).toLocaleString() : '');
+    setAutoClassifyLabel(null);
     if (expense.categoryId) {
       setFormCategoryId(expense.categoryId);
     } else {
@@ -499,17 +571,20 @@ export default function ExpenseManagementTab() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/trend'] });
       setFormItemName('');
       setFormAmount('');
+      setFormAmountDisplay('');
+      setFormCategoryId(null);
       setFormSubCategoryId(null);
       setFormVendorName('');
       setFormMemo('');
       setShowAutocomplete(false);
+      setAutoClassifyLabel(null);
     } catch (error: any) {
       toast({ title: '등록 실패', description: error.message, variant: 'destructive' });
     }
   };
 
   const handleAutoClassify = async () => {
-    if (!formItemName.trim()) return;
+    if (!formItemName.trim() || formCategoryId) return;
     try {
       const res = await apiRequest('POST', '/api/admin/accounting/expenses/classify', { item_name: formItemName });
       const data = await res.json();
@@ -523,12 +598,14 @@ export default function ExpenseManagementTab() {
         if (data.sub_category_id) {
           setFormSubCategoryId(data.sub_category_id);
         }
-        toast({ title: '자동 분류 완료', description: `${data.category} / ${data.sub_category || ''}` });
+        const catName = data.category_name || data.category || '';
+        const subName = data.sub_category_name || data.sub_category || '';
+        setAutoClassifyLabel(`${catName}${subName ? ' > ' + subName : ''}`);
       } else {
-        toast({ title: '자동 분류 실패', description: '매칭되는 분류를 찾지 못했습니다.' });
+        setAutoClassifyLabel(null);
       }
     } catch {
-      toast({ title: '분류 요청 실패', variant: 'destructive' });
+      setAutoClassifyLabel(null);
     }
   };
 
@@ -572,16 +649,20 @@ export default function ExpenseManagementTab() {
       toast({ title: '저장할 데이터가 없습니다', variant: 'destructive' });
       return;
     }
-    bulkMutation.mutate(validRows.map(r => ({
-      expenseDate: r.expenseDate,
-      itemName: r.itemName.trim(),
-      amount: parseInt(r.amount) || 0,
-      category: r.category,
-      taxType: r.taxType,
-      paymentMethod: r.paymentMethod,
-      vendorName: r.vendorName.trim(),
-      memo: r.memo.trim(),
-    })));
+    bulkMutation.mutate(validRows.map(r => {
+      const cat = r.categoryId ? getCategoryById(r.categoryId) : null;
+      return {
+        expenseDate: r.expenseDate,
+        itemName: r.itemName.trim(),
+        amount: parseInt(r.amount.replace(/[^\d]/g, '')) || 0,
+        category: cat?.name || r.category || '기타',
+        categoryId: r.categoryId,
+        taxType: r.taxType,
+        paymentMethod: r.paymentMethod,
+        vendorName: r.vendorName.trim(),
+        memo: r.memo.trim(),
+      };
+    }));
   };
 
   const updateSpreadsheetRow = (idx: number, field: keyof SpreadsheetRow, value: string) => {
@@ -955,13 +1036,25 @@ export default function ExpenseManagementTab() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Select value={row.category} onValueChange={(v) => updateSpreadsheetRow(idx, 'category', v)}>
+                        <Select
+                          value={row.categoryId ? String(row.categoryId) : ''}
+                          onValueChange={(v) => {
+                            const catId = parseInt(v);
+                            const cat = getCategoryById(catId);
+                            setSpreadsheetRows(prev => prev.map((r, i) => i === idx ? { ...r, categoryId: catId, category: cat?.name || r.category } : r));
+                          }}
+                        >
                           <SelectTrigger data-testid={`select-ss-category-${idx}`}>
-                            <SelectValue />
+                            <SelectValue placeholder="분류" />
                           </SelectTrigger>
                           <SelectContent>
                             {categories.map(c => (
-                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                              <SelectItem key={c.id} value={String(c.id)}>
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: c.color || '#6B7280' }} />
+                                  {c.name}
+                                </span>
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1004,6 +1097,12 @@ export default function ExpenseManagementTab() {
                           onChange={(e) => updateSpreadsheetRow(idx, 'memo', e.target.value)}
                           placeholder="메모"
                           data-testid={`input-ss-memo-${idx}`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Tab' && !e.shiftKey && idx === spreadsheetRows.length - 1) {
+                              e.preventDefault();
+                              setSpreadsheetRows(prev => [...prev, emptySpreadsheetRow()]);
+                            }
+                          }}
                         />
                       </TableCell>
                       <TableCell>
@@ -1041,27 +1140,46 @@ export default function ExpenseManagementTab() {
           <CardContent className="pt-4 pb-4">
             <div className="text-sm font-medium mb-3">카테고리별 비용 비율</div>
             {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString()}원`} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={100}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {pieData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => `${value.toLocaleString()}원`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" data-testid="text-donut-center-total">
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground">총 비용</div>
+                    <div className="text-sm font-bold">{(summary?.totalExpense || 0).toLocaleString()}원</div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-[260px] text-muted-foreground">데이터 없음</div>
+            )}
+            {pieData.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1">
+                {pieData.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs" data-testid={`legend-category-${i}`}>
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="truncate">{item.name}</span>
+                    <span className="ml-auto text-muted-foreground flex-shrink-0">{item.value.toLocaleString()}원</span>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1110,34 +1228,22 @@ export default function ExpenseManagementTab() {
                 value={formItemName}
                 onChange={(e) => {
                   setFormItemName(e.target.value);
+                  setAutoClassifyLabel(null);
                   if (e.target.value.length >= 1) setShowAutocomplete(true);
                   else setShowAutocomplete(false);
                 }}
                 onFocus={() => { if (formItemName.length >= 1) setShowAutocomplete(true); }}
                 onBlur={() => { setTimeout(() => handleAutoClassify(), 300); }}
                 onKeyDown={(e) => {
-                  if (!showAutocomplete || autocompleteItems.length === 0) return;
-                  if (e.key === 'ArrowDown') {
+                  if (e.key === 'ArrowDown' && showAutocomplete && autocompleteItems.length > 0) {
                     e.preventDefault();
                     setAutocompleteIndex(prev => (prev + 1) % autocompleteItems.length);
-                  } else if (e.key === 'ArrowUp') {
+                  } else if (e.key === 'ArrowUp' && showAutocomplete && autocompleteItems.length > 0) {
                     e.preventDefault();
                     setAutocompleteIndex(prev => (prev - 1 + autocompleteItems.length) % autocompleteItems.length);
-                  } else if (e.key === 'Enter' && autocompleteIndex >= 0) {
+                  } else if (e.key === 'Enter' && showAutocomplete && autocompleteIndex >= 0) {
                     e.preventDefault();
-                    const item = autocompleteItems[autocompleteIndex];
-                    setFormItemName(item.item_name);
-                    if (item.category_id) {
-                      setFormCategoryId(item.category_id);
-                    } else if (item.category) {
-                      const cat = getCategoryByName(item.category);
-                      if (cat) setFormCategoryId(cat.id);
-                    }
-                    if (item.sub_category_id) {
-                      setFormSubCategoryId(item.sub_category_id);
-                    }
-                    if (item.last_amount) setFormAmount(String(item.last_amount));
-                    setShowAutocomplete(false);
+                    selectAutocompleteItem(autocompleteItems[autocompleteIndex]);
                   } else if (e.key === 'Escape') {
                     setShowAutocomplete(false);
                   }
@@ -1145,43 +1251,49 @@ export default function ExpenseManagementTab() {
                 placeholder="항목명을 입력하세요"
                 data-testid="input-expense-item-name"
               />
+              {autoClassifyLabel && (
+                <div className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1" data-testid="text-auto-classify-label">
+                  <span>자동 분류: {autoClassifyLabel}</span>
+                </div>
+              )}
               {showAutocomplete && autocompleteItems.length > 0 && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="dropdown-autocomplete">
-                  {autocompleteItems.map((item, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`w-full text-left px-3 py-2 hover-elevate text-sm flex items-center justify-between ${i === autocompleteIndex ? 'bg-accent' : ''}`}
-                      onClick={() => {
-                        setFormItemName(item.item_name);
-                        if (item.category_id) {
-                          setFormCategoryId(item.category_id);
-                        } else if (item.category) {
-                          const cat = getCategoryByName(item.category);
-                          if (cat) setFormCategoryId(cat.id);
-                        }
-                        if (item.sub_category_id) {
-                          setFormSubCategoryId(item.sub_category_id);
-                        }
-                        if (item.last_amount) setFormAmount(String(item.last_amount));
-                        setShowAutocomplete(false);
-                      }}
-                      data-testid={`button-autocomplete-${i}`}
-                    >
-                      <span>{item.item_name}</span>
-                      <span className="text-muted-foreground text-xs">{item.category} / {item.last_amount?.toLocaleString()}원</span>
-                    </button>
-                  ))}
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-52 overflow-y-auto" data-testid="dropdown-autocomplete">
+                  {autocompleteItems.map((item, i) => {
+                    const catColor = item.category_color || '#6B7280';
+                    const catName = item.category_name || item.category || '';
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 hover-elevate text-sm flex items-center gap-2 ${i === autocompleteIndex ? 'bg-accent' : ''}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectAutocompleteItem(item)}
+                        data-testid={`button-autocomplete-${i}`}
+                      >
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: catColor }} />
+                        <span className="flex-1 truncate">{item.item_name}</span>
+                        <span className="flex items-center gap-2 flex-shrink-0">
+                          {item.last_amount ? (
+                            <span className="text-muted-foreground text-xs">{Number(item.last_amount).toLocaleString()}원</span>
+                          ) : null}
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 no-default-active-elevate">
+                            {item.source === 'history' ? '이력' : '키워드'}
+                          </Badge>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
             <div>
               <Label>금액</Label>
               <Input
-                type="number"
-                value={formAmount}
-                onChange={(e) => setFormAmount(e.target.value)}
+                ref={amountInputRef}
+                value={formAmountDisplay}
+                onChange={(e) => handleAmountChange(e.target.value)}
                 placeholder="금액을 입력하세요"
+                inputMode="numeric"
                 data-testid="input-expense-amount"
               />
               {formAmount && (
@@ -1340,37 +1452,142 @@ export default function ExpenseManagementTab() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    recurringExpenses.map((r) => (
-                      <TableRow key={r.id} data-testid={`row-recurring-${r.id}`}>
-                        <TableCell className="font-medium">{r.itemName}</TableCell>
-                        <TableCell>{r.category}</TableCell>
-                        <TableCell className="text-right">{r.amount.toLocaleString()}원</TableCell>
-                        <TableCell>매월 {r.dayOfMonth}일</TableCell>
-                        <TableCell>{r.cycle === 'monthly' ? '월간' : r.cycle === 'yearly' ? '연간' : r.cycle}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={r.isActive ? 'default' : 'secondary'}
-                            className="cursor-pointer"
-                            onClick={() => recurringToggleMutation.mutate({ id: r.id })}
-                            data-testid={`badge-recurring-status-${r.id}`}
-                          >
-                            {r.isActive ? '활성' : '비활성'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => recurringDeleteMutation.mutate(r.id)}
-                              data-testid={`button-delete-recurring-${r.id}`}
+                    recurringExpenses.map((r) => {
+                      const isEditing = editingRecurringId === r.id;
+                      if (isEditing) {
+                        return (
+                          <TableRow key={r.id} data-testid={`row-recurring-${r.id}`}>
+                            <TableCell>
+                              <Input
+                                defaultValue={r.itemName}
+                                id={`edit-recurring-name-${r.id}`}
+                                className="h-8 text-sm"
+                                data-testid={`input-edit-recurring-name-${r.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Select defaultValue={r.categoryId ? String(r.categoryId) : ''}>
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-edit-recurring-cat-${r.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map(c => (
+                                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                defaultValue={String(r.amount)}
+                                id={`edit-recurring-amount-${r.id}`}
+                                className="h-8 text-sm text-right"
+                                inputMode="numeric"
+                                data-testid={`input-edit-recurring-amount-${r.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                defaultValue={String(r.dayOfMonth)}
+                                id={`edit-recurring-day-${r.id}`}
+                                type="number"
+                                min="1"
+                                max="31"
+                                className="h-8 text-sm w-16"
+                                data-testid={`input-edit-recurring-day-${r.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Select defaultValue={r.cycle}>
+                                <SelectTrigger className="h-8 text-sm" data-testid={`select-edit-recurring-cycle-${r.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="monthly">월간</SelectItem>
+                                  <SelectItem value="yearly">연간</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={r.isActive ? 'default' : 'secondary'}>{r.isActive ? '활성' : '비활성'}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const nameEl = document.getElementById(`edit-recurring-name-${r.id}`) as HTMLInputElement;
+                                    const amountEl = document.getElementById(`edit-recurring-amount-${r.id}`) as HTMLInputElement;
+                                    const dayEl = document.getElementById(`edit-recurring-day-${r.id}`) as HTMLInputElement;
+                                    const updatedCat = getCategoryById(r.categoryId);
+                                    recurringUpdateMutation.mutate({
+                                      id: r.id,
+                                      itemName: nameEl?.value || r.itemName,
+                                      amount: parseInt(amountEl?.value?.replace(/[^\d]/g, '') || String(r.amount)),
+                                      dayOfMonth: parseInt(dayEl?.value || String(r.dayOfMonth)),
+                                      category: updatedCat?.name || r.category,
+                                    });
+                                  }}
+                                  data-testid={`button-save-recurring-${r.id}`}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setEditingRecurringId(null)}
+                                  data-testid={`button-cancel-recurring-${r.id}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+                      return (
+                        <TableRow key={r.id} data-testid={`row-recurring-${r.id}`}>
+                          <TableCell className="font-medium">{r.itemName}</TableCell>
+                          <TableCell>{r.category}</TableCell>
+                          <TableCell className="text-right">{r.amount.toLocaleString()}원</TableCell>
+                          <TableCell>매월 {r.dayOfMonth}일</TableCell>
+                          <TableCell>{r.cycle === 'monthly' ? '월간' : r.cycle === 'yearly' ? '연간' : r.cycle}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={r.isActive ? 'default' : 'secondary'}
+                              className="cursor-pointer"
+                              onClick={() => recurringToggleMutation.mutate({ id: r.id })}
+                              data-testid={`badge-recurring-status-${r.id}`}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                              {r.isActive ? '활성' : '비활성'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingRecurringId(r.id);
+                                }}
+                                data-testid={`button-edit-recurring-${r.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => recurringDeleteMutation.mutate(r.id)}
+                                data-testid={`button-delete-recurring-${r.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -1473,6 +1690,32 @@ export default function ExpenseManagementTab() {
             <DialogTitle data-testid="dialog-title-keywords">키워드 사전</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={keywordSearch}
+                  onChange={(e) => setKeywordSearch(e.target.value)}
+                  placeholder="키워드 검색..."
+                  className="pl-8"
+                  data-testid="input-keyword-search"
+                />
+              </div>
+              <Select value={keywordSourceFilter} onValueChange={setKeywordSourceFilter}>
+                <SelectTrigger className="w-[120px]" data-testid="select-keyword-source-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="system">시스템</SelectItem>
+                  <SelectItem value="admin">관리자</SelectItem>
+                  <SelectItem value="learned">학습</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground" data-testid="text-keyword-count">
+                {keywords.length}개 / 총 {allKeywords.length}개
+              </div>
+            </div>
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>

@@ -17324,7 +17324,7 @@ export async function registerRoutes(
   });
 
   // ========== Expense classify helper function ==========
-  async function classifyExpenseItem(itemName: string): Promise<{ category: string | null; subCategory: string | null; confidence: string }> {
+  async function classifyExpenseItem(itemName: string): Promise<{ category: string | null; subCategory: string | null; categoryId: number | null; subCategoryId: number | null; confidence: string }> {
     // Step 1: Exact match or high-priority keyword found in item_name
     const highPriorityKeywords = await db.select().from(expenseKeywords)
       .where(
@@ -17337,10 +17337,10 @@ export async function registerRoutes(
 
     for (const kw of highPriorityKeywords) {
       if (kw.matchType === 'exact' && kw.keyword === itemName) {
-        return { category: kw.category, subCategory: kw.subCategory, confidence: 'high' };
+        return { category: kw.category, subCategory: kw.subCategory, categoryId: kw.categoryId, subCategoryId: kw.subCategoryId, confidence: 'high' };
       }
       if (kw.priority >= 50 && itemName.includes(kw.keyword)) {
-        return { category: kw.category, subCategory: kw.subCategory, confidence: 'high' };
+        return { category: kw.category, subCategory: kw.subCategory, categoryId: kw.categoryId, subCategoryId: kw.subCategoryId, confidence: 'high' };
       }
     }
 
@@ -17350,12 +17350,12 @@ export async function registerRoutes(
 
     for (const kw of allKeywords) {
       if (itemName.includes(kw.keyword)) {
-        return { category: kw.category, subCategory: kw.subCategory, confidence: 'medium' };
+        return { category: kw.category, subCategory: kw.subCategory, categoryId: kw.categoryId, subCategoryId: kw.subCategoryId, confidence: 'medium' };
       }
     }
 
     // Step 3: No match
-    return { category: null, subCategory: null, confidence: 'none' };
+    return { category: null, subCategory: null, categoryId: null, subCategoryId: null, confidence: 'none' };
   }
 
   // ========== Expense Management Routes ==========
@@ -17708,18 +17708,44 @@ export async function registerRoutes(
         createdBy: user.username,
       }).returning();
 
-      // Keyword learning logic (4-step dedup per spec)
+      // Keyword learning logic (4-step dedup per spec, with improved word extraction)
       try {
+        const STOP_WORDS = new Set([
+          '비', '건', '월', '원', '개', '회', '차', '분', '용', '의', '에', '를', '을',
+          '이', '가', '는', '은', '로', '으로', '에서', '까지', '부터', '도', '만',
+          '및', '등', '외', '총', '각', '당', '년', '일', '시', '것', '수', '중',
+          '대', '위', '내', '후', '전', '상', '하', '기', '제', '그', '저', '이것',
+          'kg', 'km', 'ml', 'ea', '세트', '박스', '팩', '봉', '통',
+        ]);
+
+        const extractMeaningfulWords = (name: string): string[] => {
+          const cleaned = name
+            .replace(/\d+[월일년회차건개원비kg팩봉통세트박스]+/g, '')
+            .replace(/\(\d+\)/g, '')
+            .replace(/[()[\]{}]/g, ' ')
+            .trim();
+          return cleaned.split(/[\s/·,_-]+/)
+            .map(w => w.trim())
+            .filter(w => w.length >= 2 && !STOP_WORDS.has(w) && !/^\d+$/.test(w));
+        };
+
         const exactMatch = await db.select().from(expenseKeywords)
           .where(eq(expenseKeywords.keyword, itemName))
           .limit(1);
 
         if (exactMatch.length > 0) {
           await db.update(expenseKeywords)
-            .set({ useCount: sql`${expenseKeywords.useCount} + 1`, lastAmount: amount })
+            .set({
+              useCount: sql`${expenseKeywords.useCount} + 1`,
+              lastAmount: amount,
+              categoryId: categoryId || exactMatch[0].categoryId,
+              subCategoryId: subCategoryId || exactMatch[0].subCategoryId,
+              category: category || exactMatch[0].category,
+              subCategory: subCategory || exactMatch[0].subCategory,
+            })
             .where(eq(expenseKeywords.id, exactMatch[0].id));
         } else {
-          const words = itemName.split(/\s+/).filter((w: string) => w.length >= 2);
+          const words = extractMeaningfulWords(itemName);
           let wordMatched = false;
           for (const word of words) {
             const matchCondition = categoryId
@@ -17761,7 +17787,7 @@ export async function registerRoutes(
                 priority: 50, source: 'learned', lastAmount: amount, useCount: 1,
               });
               for (const word of words) {
-                if (word !== itemName) {
+                if (word !== itemName && word.length >= 2) {
                   const existing = await db.select().from(expenseKeywords)
                     .where(eq(expenseKeywords.keyword, word)).limit(1);
                   if (existing.length === 0) {
@@ -18142,12 +18168,12 @@ export async function registerRoutes(
       }
 
       const result = await classifyExpenseItem(item_name);
-      let category_id: number | null = null;
+      let category_id: number | null = result.categoryId;
       let category_name: string | null = result.category;
-      let sub_category_id: number | null = null;
+      let sub_category_id: number | null = result.subCategoryId;
       let sub_category_name: string | null = result.subCategory;
 
-      if (result.category) {
+      if (!category_id && result.category) {
         const catRow = await db.select().from(expenseCategoryTable)
           .where(eq(expenseCategoryTable.name, result.category)).limit(1);
         if (catRow.length > 0) {
@@ -18155,7 +18181,7 @@ export async function registerRoutes(
           category_name = catRow[0].name;
         }
       }
-      if (result.subCategory && category_id) {
+      if (!sub_category_id && result.subCategory && category_id) {
         const subRow = await db.select().from(expenseSubCategoryTable)
           .where(and(
             eq(expenseSubCategoryTable.categoryId, category_id),
@@ -18487,6 +18513,41 @@ export async function registerRoutes(
         return res.status(404).json({ message: "정기 비용을 찾을 수 없습니다" });
       }
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/admin/accounting/expenses/recurring/:id
+  app.patch("/api/admin/accounting/expenses/recurring/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { itemName, category, categoryId, amount, dayOfMonth, cycle } = req.body;
+
+      const updateData: any = { updatedAt: new Date() };
+      if (itemName !== undefined) updateData.itemName = itemName;
+      if (category !== undefined) updateData.category = category;
+      if (categoryId !== undefined) updateData.categoryId = categoryId;
+      if (amount !== undefined) updateData.amount = amount;
+      if (dayOfMonth !== undefined) updateData.dayOfMonth = dayOfMonth;
+      if (cycle !== undefined) updateData.cycle = cycle;
+
+      const [updated] = await db.update(expenseRecurring)
+        .set(updateData)
+        .where(eq(expenseRecurring.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "정기 비용을 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
