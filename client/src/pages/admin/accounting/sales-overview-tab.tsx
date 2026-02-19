@@ -267,7 +267,7 @@ function MonthlySalesSummary() {
   const [customTotal, setCustomTotal] = useState<string>("");
   const [useCustomAmount, setUseCustomAmount] = useState(false);
   const [cancelDialogRow, setCancelDialogRow] = useState<InvoiceSummaryRow | null>(null);
-  const [sectionOpen, setSectionOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
   const nextM = selectedMonth === 12 ? 1 : selectedMonth + 1;
@@ -1025,7 +1025,7 @@ function DailySalesDetail() {
   });
 
   const [filter, setFilter] = useState<"all" | "site" | "direct">("all");
-  const [sectionOpen, setSectionOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
   const daily = data?.daily || [];
 
   const totalSite = daily.reduce((s, d) => s + d.siteSales, 0);
@@ -1188,7 +1188,7 @@ function DirectSalesManagement() {
   const [editFormData, setEditFormData] = useState({ saleDate: "", clientName: "", description: "", amount: "", memo: "", taxType: "exempt", memberId: "", clientType: "vendor" as string, vendorId: null as number | null });
   const [stockWarningDialog, setStockWarningDialog] = useState<{ open: boolean; insufficientItems: { itemCode: string; itemName: string; itemType: string; requestedQty: number; currentStock: number }[]; validItems: DSItemRow[]; clientName: string }>({ open: false, insufficientItems: [], validItems: [], clientName: "" });
   const [stockChecking, setStockChecking] = useState(false);
-  const [sectionOpen, setSectionOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
 
   const COLUMNS = ["type", "product", "quantity", "unit", "unitPrice"] as const;
 
