@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategories } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable } from "@shared/schema";
 import XLSX from "xlsx";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
@@ -17360,6 +17360,225 @@ export async function registerRoutes(
 
   // ========== Expense Management Routes ==========
 
+  // GET /api/admin/accounting/expense-categories
+  app.get("/api/admin/accounting/expense-categories", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const categories = await db.select().from(expenseCategoryTable)
+        .orderBy(asc(expenseCategoryTable.sortOrder));
+
+      const result = [];
+      for (const cat of categories) {
+        const subCategories = await db.select().from(expenseSubCategoryTable)
+          .where(eq(expenseSubCategoryTable.categoryId, cat.id));
+        result.push({ ...cat, subCategories });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expense-categories
+  app.post("/api/admin/accounting/expense-categories", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { name, color, defaultTaxType, sortOrder } = req.body;
+
+      const existing = await db.select().from(expenseCategoryTable)
+        .where(eq(expenseCategoryTable.name, name)).limit(1);
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "이미 존재하는 카테고리명입니다" });
+      }
+
+      const [inserted] = await db.insert(expenseCategoryTable).values({
+        name,
+        color: color || 'gray',
+        defaultTaxType: defaultTaxType || 'taxable',
+        sortOrder: sortOrder ?? 0,
+      }).returning();
+
+      await db.insert(expenseSubCategoryTable).values({
+        categoryId: inserted.id,
+        name: '기타',
+      });
+
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/expense-categories/:id
+  app.put("/api/admin/accounting/expense-categories/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const updateData: any = {};
+      if (req.body.name !== undefined) updateData.name = req.body.name;
+      if (req.body.color !== undefined) updateData.color = req.body.color;
+      if (req.body.defaultTaxType !== undefined) updateData.defaultTaxType = req.body.defaultTaxType;
+      if (req.body.sortOrder !== undefined) updateData.sortOrder = req.body.sortOrder;
+
+      const [updated] = await db.update(expenseCategoryTable)
+        .set(updateData)
+        .where(eq(expenseCategoryTable.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/expense-categories/:id
+  app.delete("/api/admin/accounting/expense-categories/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+
+      const expenseUsage = await db.select({ cnt: count() }).from(expenses)
+        .where(eq(expenses.categoryId, id));
+      const keywordUsage = await db.select({ cnt: count() }).from(expenseKeywords)
+        .where(eq(expenseKeywords.categoryId, id));
+      const recurringUsage = await db.select({ cnt: count() }).from(expenseRecurring)
+        .where(eq(expenseRecurring.categoryId, id));
+
+      const totalUsage = (expenseUsage[0]?.cnt || 0) + (keywordUsage[0]?.cnt || 0) + (recurringUsage[0]?.cnt || 0);
+      if (Number(totalUsage) > 0) {
+        return res.status(400).json({
+          message: `이 카테고리를 사용 중인 항목이 ${totalUsage}건 있어 삭제할 수 없습니다`,
+          usageCount: Number(totalUsage),
+        });
+      }
+
+      await db.delete(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.categoryId, id));
+      await db.delete(expenseCategoryTable).where(eq(expenseCategoryTable.id, id));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expense-categories/:categoryId/sub-categories
+  app.post("/api/admin/accounting/expense-categories/:categoryId/sub-categories", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const categoryId = parseInt(req.params.categoryId);
+      const { name } = req.body;
+
+      const existing = await db.select().from(expenseSubCategoryTable)
+        .where(and(
+          eq(expenseSubCategoryTable.categoryId, categoryId),
+          eq(expenseSubCategoryTable.name, name)
+        )).limit(1);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "같은 카테고리에 동일한 소분류가 이미 존재합니다" });
+      }
+
+      const [inserted] = await db.insert(expenseSubCategoryTable).values({
+        categoryId,
+        name,
+      }).returning();
+
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/expense-sub-categories/:id
+  app.put("/api/admin/accounting/expense-sub-categories/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { name } = req.body;
+
+      const [updated] = await db.update(expenseSubCategoryTable)
+        .set({ name })
+        .where(eq(expenseSubCategoryTable.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "소분류를 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/expense-sub-categories/:id
+  app.delete("/api/admin/accounting/expense-sub-categories/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+
+      const expenseUsage = await db.select({ cnt: count() }).from(expenses)
+        .where(eq(expenses.subCategoryId, id));
+      const keywordUsage = await db.select({ cnt: count() }).from(expenseKeywords)
+        .where(eq(expenseKeywords.subCategoryId, id));
+      const recurringUsage = await db.select({ cnt: count() }).from(expenseRecurring)
+        .where(eq(expenseRecurring.subCategoryId, id));
+
+      const totalUsage = (expenseUsage[0]?.cnt || 0) + (keywordUsage[0]?.cnt || 0) + (recurringUsage[0]?.cnt || 0);
+      if (Number(totalUsage) > 0) {
+        return res.status(400).json({
+          message: `이 소분류를 사용 중인 항목이 ${totalUsage}건 있어 삭제할 수 없습니다`,
+          usageCount: Number(totalUsage),
+        });
+      }
+
+      await db.delete(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/admin/accounting/expenses
   app.get("/api/admin/accounting/expenses", async (req, res) => {
     try {
@@ -17369,13 +17588,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { month, category, search } = req.query;
+      const { month, category, categoryId, search } = req.query;
       const conditions: any[] = [];
 
       if (month && typeof month === 'string') {
         conditions.push(sql`${expenses.expenseDate}::text LIKE ${month + '%'}`);
       }
-      if (category && typeof category === 'string') {
+      if (categoryId && typeof categoryId === 'string') {
+        conditions.push(eq(expenses.categoryId, parseInt(categoryId)));
+      } else if (category && typeof category === 'string') {
         conditions.push(eq(expenses.category, category));
       }
       if (search && typeof search === 'string') {
@@ -17384,7 +17605,33 @@ export async function registerRoutes(
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const expenseList = await db.select().from(expenses)
+      const expenseList = await db.select({
+        id: expenses.id,
+        expenseDate: expenses.expenseDate,
+        itemName: expenses.itemName,
+        category: expenses.category,
+        subCategory: expenses.subCategory,
+        categoryId: expenses.categoryId,
+        subCategoryId: expenses.subCategoryId,
+        amount: expenses.amount,
+        taxType: expenses.taxType,
+        supplyAmount: expenses.supplyAmount,
+        vatAmount: expenses.vatAmount,
+        paymentMethod: expenses.paymentMethod,
+        vendorName: expenses.vendorName,
+        memo: expenses.memo,
+        receiptUrl: expenses.receiptUrl,
+        isRecurring: expenses.isRecurring,
+        recurringId: expenses.recurringId,
+        createdBy: expenses.createdBy,
+        createdAt: expenses.createdAt,
+        updatedAt: expenses.updatedAt,
+        categoryName: expenseCategoryTable.name,
+        categoryColor: expenseCategoryTable.color,
+        subCategoryName: expenseSubCategoryTable.name,
+      }).from(expenses)
+        .leftJoin(expenseCategoryTable, eq(expenses.categoryId, expenseCategoryTable.id))
+        .leftJoin(expenseSubCategoryTable, eq(expenses.subCategoryId, expenseSubCategoryTable.id))
         .where(whereClause)
         .orderBy(desc(expenses.expenseDate), desc(expenses.id));
 
@@ -17392,7 +17639,8 @@ export async function registerRoutes(
 
       const categoryMap: Record<string, number> = {};
       for (const e of expenseList) {
-        categoryMap[e.category] = (categoryMap[e.category] || 0) + (e.amount || 0);
+        const catKey = e.categoryName || e.category;
+        categoryMap[catKey] = (categoryMap[catKey] || 0) + (e.amount || 0);
       }
       const categoryTotals = Object.entries(categoryMap).map(([category, total]) => ({ category, total }));
 
@@ -17411,7 +17659,26 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { expenseDate, itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+      let { expenseDate, itemName, category, subCategory, categoryId, subCategoryId, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+
+      if (categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.id, categoryId)).limit(1);
+        if (catRow.length > 0) {
+          category = catRow[0].name;
+        }
+      } else if (category && !categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, category)).limit(1);
+        if (catRow.length > 0) {
+          categoryId = catRow[0].id;
+        }
+      }
+
+      if (subCategoryId) {
+        const subRow = await db.select().from(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, subCategoryId)).limit(1);
+        if (subRow.length > 0) {
+          subCategory = subRow[0].name;
+        }
+      }
 
       let supplyAmount: number;
       let vatAmount: number;
@@ -17428,6 +17695,8 @@ export async function registerRoutes(
         itemName,
         category,
         subCategory: subCategory || null,
+        categoryId: categoryId || null,
+        subCategoryId: subCategoryId || null,
         amount,
         taxType: taxType || 'taxable',
         supplyAmount,
@@ -17441,7 +17710,6 @@ export async function registerRoutes(
 
       // Keyword learning logic (4-step dedup per spec)
       try {
-        // Step 1: Check if exact itemName already exists as keyword
         const exactMatch = await db.select().from(expenseKeywords)
           .where(eq(expenseKeywords.keyword, itemName))
           .limit(1);
@@ -17451,12 +17719,14 @@ export async function registerRoutes(
             .set({ useCount: sql`${expenseKeywords.useCount} + 1`, lastAmount: amount })
             .where(eq(expenseKeywords.id, exactMatch[0].id));
         } else {
-          // Step 2: Check if any word in itemName matches existing keyword with same category
           const words = itemName.split(/\s+/).filter((w: string) => w.length >= 2);
           let wordMatched = false;
           for (const word of words) {
+            const matchCondition = categoryId
+              ? and(ilike(expenseKeywords.keyword, word), eq(expenseKeywords.categoryId, categoryId))
+              : and(ilike(expenseKeywords.keyword, word), eq(expenseKeywords.category, category));
             const partialMatch = await db.select().from(expenseKeywords)
-              .where(and(ilike(expenseKeywords.keyword, word), eq(expenseKeywords.category, category)))
+              .where(matchCondition)
               .limit(1);
             if (partialMatch.length > 0) {
               await db.update(expenseKeywords)
@@ -17468,9 +17738,11 @@ export async function registerRoutes(
           }
 
           if (!wordMatched) {
-            // Step 3: Check containment relationship with same category keywords
+            const catCondition = categoryId
+              ? eq(expenseKeywords.categoryId, categoryId)
+              : eq(expenseKeywords.category, category);
             const categoryKeywords = await db.select().from(expenseKeywords)
-              .where(eq(expenseKeywords.category, category));
+              .where(catCondition);
             let containmentMatched = false;
             for (const kw of categoryKeywords) {
               if (itemName.includes(kw.keyword) || kw.keyword.includes(itemName)) {
@@ -17483,9 +17755,9 @@ export async function registerRoutes(
             }
 
             if (!containmentMatched) {
-              // Step 4: Completely new - add keyword + individual words
               await db.insert(expenseKeywords).values({
                 keyword: itemName, category, subCategory: subCategory || null,
+                categoryId: categoryId || null, subCategoryId: subCategoryId || null,
                 priority: 50, source: 'learned', lastAmount: amount, useCount: 1,
               });
               for (const word of words) {
@@ -17495,6 +17767,7 @@ export async function registerRoutes(
                   if (existing.length === 0) {
                     await db.insert(expenseKeywords).values({
                       keyword: word, category, subCategory: subCategory || null,
+                      categoryId: categoryId || null, subCategoryId: subCategoryId || null,
                       priority: 15, source: 'learned', lastAmount: null, useCount: 0,
                     });
                   }
@@ -17581,7 +17854,19 @@ export async function registerRoutes(
       }
 
       const id = parseInt(req.params.id);
-      const { expenseDate, itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+      let { expenseDate, itemName, category, subCategory, categoryId, subCategoryId, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+
+      if (categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.id, categoryId)).limit(1);
+        if (catRow.length > 0) category = catRow[0].name;
+      } else if (category && !categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, category)).limit(1);
+        if (catRow.length > 0) categoryId = catRow[0].id;
+      }
+      if (subCategoryId) {
+        const subRow = await db.select().from(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, subCategoryId)).limit(1);
+        if (subRow.length > 0) subCategory = subRow[0].name;
+      }
 
       let supplyAmount: number | undefined;
       let vatAmount: number | undefined;
@@ -17600,6 +17885,8 @@ export async function registerRoutes(
       if (itemName !== undefined) updateData.itemName = itemName;
       if (category !== undefined) updateData.category = category;
       if (subCategory !== undefined) updateData.subCategory = subCategory;
+      if (categoryId !== undefined) updateData.categoryId = categoryId;
+      if (subCategoryId !== undefined) updateData.subCategoryId = subCategoryId;
       if (amount !== undefined) updateData.amount = amount;
       if (taxType !== undefined) updateData.taxType = taxType;
       if (supplyAmount !== undefined) updateData.supplyAmount = supplyAmount;
@@ -17661,11 +17948,27 @@ export async function registerRoutes(
 
       const totalExpense = currentMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
-      const byCategoryMap: Record<string, number> = {};
-      for (const e of currentMonthExpenses) {
-        byCategoryMap[e.category] = (byCategoryMap[e.category] || 0) + (e.amount || 0);
+      const allCategories = await db.select().from(expenseCategoryTable);
+      const catIdToInfo: Record<number, { name: string; color: string }> = {};
+      for (const c of allCategories) {
+        catIdToInfo[c.id] = { name: c.name, color: c.color };
       }
-      const byCategory = Object.entries(byCategoryMap).map(([category, total]) => ({ category, total }));
+
+      const byCategoryMap: Record<string, { categoryId: number | null; category: string; color: string; total: number }> = {};
+      for (const e of currentMonthExpenses) {
+        const catKey = e.categoryId ? String(e.categoryId) : e.category;
+        if (!byCategoryMap[catKey]) {
+          const info = e.categoryId ? catIdToInfo[e.categoryId] : null;
+          byCategoryMap[catKey] = {
+            categoryId: e.categoryId,
+            category: info?.name || e.category,
+            color: info?.color || 'gray',
+            total: 0,
+          };
+        }
+        byCategoryMap[catKey].total += (e.amount || 0);
+      }
+      const byCategory = Object.values(byCategoryMap);
 
       // Previous month total
       const [prevYear, prevMonthNum] = month.split('-').map(Number);
@@ -17736,24 +18039,42 @@ export async function registerRoutes(
         return res.json([]);
       }
 
-      // Search keywords
-      const keywordResults = await db.select().from(expenseKeywords)
+      const keywordResults = await db.select({
+        keyword: expenseKeywords.keyword,
+        category: expenseKeywords.category,
+        subCategory: expenseKeywords.subCategory,
+        categoryId: expenseKeywords.categoryId,
+        subCategoryId: expenseKeywords.subCategoryId,
+        lastAmount: expenseKeywords.lastAmount,
+        priority: expenseKeywords.priority,
+        useCount: expenseKeywords.useCount,
+        categoryName: expenseCategoryTable.name,
+        categoryColor: expenseCategoryTable.color,
+        subCategoryName: expenseSubCategoryTable.name,
+      }).from(expenseKeywords)
+        .leftJoin(expenseCategoryTable, eq(expenseKeywords.categoryId, expenseCategoryTable.id))
+        .leftJoin(expenseSubCategoryTable, eq(expenseKeywords.subCategoryId, expenseSubCategoryTable.id))
         .where(ilike(expenseKeywords.keyword, `%${q}%`))
         .orderBy(desc(expenseKeywords.priority), desc(expenseKeywords.useCount))
         .limit(10);
 
-      // Search recent expenses
       const expenseResults = await db.selectDistinctOn([expenses.itemName], {
         itemName: expenses.itemName,
         category: expenses.category,
         subCategory: expenses.subCategory,
+        categoryId: expenses.categoryId,
+        subCategoryId: expenses.subCategoryId,
         amount: expenses.amount,
+        categoryName: expenseCategoryTable.name,
+        categoryColor: expenseCategoryTable.color,
+        subCategoryName: expenseSubCategoryTable.name,
       }).from(expenses)
+        .leftJoin(expenseCategoryTable, eq(expenses.categoryId, expenseCategoryTable.id))
+        .leftJoin(expenseSubCategoryTable, eq(expenses.subCategoryId, expenseSubCategoryTable.id))
         .where(ilike(expenses.itemName, `%${q}%`))
         .orderBy(expenses.itemName, desc(expenses.expenseDate))
         .limit(10);
 
-      // Merge results
       const seen = new Set<string>();
       const merged: any[] = [];
 
@@ -17764,6 +18085,11 @@ export async function registerRoutes(
             item_name: kw.keyword,
             category: kw.category,
             sub_category: kw.subCategory,
+            category_id: kw.categoryId,
+            category_name: kw.categoryName,
+            category_color: kw.categoryColor,
+            sub_category_id: kw.subCategoryId,
+            sub_category_name: kw.subCategoryName,
             last_amount: kw.lastAmount,
             source: 'keyword',
             priority: kw.priority,
@@ -17779,6 +18105,11 @@ export async function registerRoutes(
             item_name: e.itemName,
             category: e.category,
             sub_category: e.subCategory,
+            category_id: e.categoryId,
+            category_name: e.categoryName,
+            category_color: e.categoryColor,
+            sub_category_id: e.subCategoryId,
+            sub_category_name: e.subCategoryName,
             last_amount: e.amount,
             source: 'history',
             priority: 0,
@@ -17811,9 +18142,38 @@ export async function registerRoutes(
       }
 
       const result = await classifyExpenseItem(item_name);
+      let category_id: number | null = null;
+      let category_name: string | null = result.category;
+      let sub_category_id: number | null = null;
+      let sub_category_name: string | null = result.subCategory;
+
+      if (result.category) {
+        const catRow = await db.select().from(expenseCategoryTable)
+          .where(eq(expenseCategoryTable.name, result.category)).limit(1);
+        if (catRow.length > 0) {
+          category_id = catRow[0].id;
+          category_name = catRow[0].name;
+        }
+      }
+      if (result.subCategory && category_id) {
+        const subRow = await db.select().from(expenseSubCategoryTable)
+          .where(and(
+            eq(expenseSubCategoryTable.categoryId, category_id),
+            eq(expenseSubCategoryTable.name, result.subCategory)
+          )).limit(1);
+        if (subRow.length > 0) {
+          sub_category_id = subRow[0].id;
+          sub_category_name = subRow[0].name;
+        }
+      }
+
       res.json({
         category: result.category,
         sub_category: result.subCategory,
+        category_id,
+        category_name,
+        sub_category_id,
+        sub_category_name,
         confidence: result.confidence,
       });
     } catch (error: any) {
@@ -17861,7 +18221,19 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { keyword, category, subCategory, matchType } = req.body;
+      let { keyword, category, subCategory, categoryId, subCategoryId, matchType } = req.body;
+
+      if (categoryId && !category) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.id, categoryId)).limit(1);
+        if (catRow.length > 0) category = catRow[0].name;
+      } else if (category && !categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, category)).limit(1);
+        if (catRow.length > 0) categoryId = catRow[0].id;
+      }
+      if (subCategoryId && !subCategory) {
+        const subRow = await db.select().from(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, subCategoryId)).limit(1);
+        if (subRow.length > 0) subCategory = subRow[0].name;
+      }
 
       const existing = await db.select().from(expenseKeywords)
         .where(eq(expenseKeywords.keyword, keyword))
@@ -17875,6 +18247,8 @@ export async function registerRoutes(
         keyword,
         category,
         subCategory: subCategory || null,
+        categoryId: categoryId || null,
+        subCategoryId: subCategoryId || null,
         matchType: matchType || 'contains',
         priority: 50,
         source: 'admin',
@@ -18023,12 +18397,26 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, dayOfMonth, cycle, cycleMonth, memo } = req.body;
+      let { itemName, category, subCategory, categoryId, subCategoryId, amount, taxType, paymentMethod, vendorName, dayOfMonth, cycle, cycleMonth, memo } = req.body;
+
+      if (categoryId && !category) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.id, categoryId)).limit(1);
+        if (catRow.length > 0) category = catRow[0].name;
+      } else if (category && !categoryId) {
+        const catRow = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, category)).limit(1);
+        if (catRow.length > 0) categoryId = catRow[0].id;
+      }
+      if (subCategoryId && !subCategory) {
+        const subRow = await db.select().from(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, subCategoryId)).limit(1);
+        if (subRow.length > 0) subCategory = subRow[0].name;
+      }
 
       const [inserted] = await db.insert(expenseRecurring).values({
         itemName,
         category,
         subCategory: subCategory || null,
+        categoryId: categoryId || null,
+        subCategoryId: subCategoryId || null,
         amount,
         taxType: taxType || 'taxable',
         paymentMethod: paymentMethod || '계좌이체',

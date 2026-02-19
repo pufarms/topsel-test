@@ -28,22 +28,6 @@ import {
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
-const EXPENSE_CATEGORIES = [
-  '물류/배송비', '인건비', '시설/임대료', '마케팅/광고',
-  'IT/시스템', '사무/관리', '금융비용', '기타',
-];
-
-const CATEGORY_COLORS: Record<string, string> = {
-  '물류/배송비': '#3B82F6',
-  '인건비': '#EF4444',
-  '시설/임대료': '#F59E0B',
-  '마케팅/광고': '#8B5CF6',
-  'IT/시스템': '#10B981',
-  '사무/관리': '#6366F1',
-  '금융비용': '#EC4899',
-  '기타': '#6B7280',
-};
-
 const PAYMENT_METHODS = ['카드', '계좌이체', '현금', '기타'];
 const TAX_TYPES = [
   { value: 'taxable', label: '과세' },
@@ -51,6 +35,15 @@ const TAX_TYPES = [
 ];
 const taxTypeLabel = (v: string) => v === 'taxable' ? '과세' : v === 'exempt' ? '면세' : v;
 const taxTypeValue = (label: string) => label === '과세' ? 'taxable' : label === '면세' ? 'exempt' : label;
+
+interface ExpenseCategory {
+  id: number;
+  name: string;
+  color: string;
+  defaultTaxType: string;
+  sortOrder: number;
+  subCategories: { id: number; name: string; categoryId: number }[];
+}
 
 interface Expense {
   id: number;
@@ -65,11 +58,16 @@ interface Expense {
   paymentMethod: string;
   vendorName: string;
   memo: string;
+  categoryId?: number;
+  categoryName?: string;
+  categoryColor?: string;
+  subCategoryId?: number;
+  subCategoryName?: string;
 }
 
 interface ExpenseSummary {
   totalExpense: number;
-  byCategory: { category: string; total: number }[];
+  byCategory: { categoryId: number; category: string; color: string; total: number }[];
   previousMonthTotal: number;
   changePercent: number;
 }
@@ -145,14 +143,14 @@ export default function ExpenseManagementTab() {
   const [showKeywordDialog, setShowKeywordDialog] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [formDate, setFormDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [formItemName, setFormItemName] = useState('');
   const [formAmount, setFormAmount] = useState('');
-  const [formCategory, setFormCategory] = useState('기타');
-  const [formSubCategory, setFormSubCategory] = useState('');
+  const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
+  const [formSubCategoryId, setFormSubCategoryId] = useState<number | null>(null);
   const [formTaxType, setFormTaxType] = useState('taxable');
   const [formPaymentMethod, setFormPaymentMethod] = useState('카드');
   const [formVendorName, setFormVendorName] = useState('');
@@ -164,11 +162,11 @@ export default function ExpenseManagementTab() {
   const [spreadsheetRows, setSpreadsheetRows] = useState<SpreadsheetRow[]>([emptySpreadsheetRow()]);
 
   const [recurringForm, setRecurringForm] = useState({
-    itemName: '', category: '기타', amount: '', dayOfMonth: '1', cycle: 'monthly',
+    itemName: '', categoryId: null as number | null, amount: '', dayOfMonth: '1', cycle: 'monthly',
   });
 
   const [keywordForm, setKeywordForm] = useState({
-    keyword: '', category: '기타', subCategory: '', matchType: 'exact',
+    keyword: '', categoryId: null as number | null, subCategoryId: null as number | null, matchType: 'exact',
   });
 
   const monthYear = selectedMonth.split('-');
@@ -180,6 +178,18 @@ export default function ExpenseManagementTab() {
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
+  const { data: categoriesData } = useQuery<ExpenseCategory[]>({
+    queryKey: ['/api/admin/accounting/expense-categories'],
+  });
+  const categories = categoriesData || [];
+
+  const getCategoryById = (id: number | null) => categories.find(c => c.id === id);
+  const getCategoryByName = (name: string) => categories.find(c => c.name === name);
+  const getSubCategoriesForCategory = (categoryId: number | null) => {
+    if (!categoryId) return [];
+    return categories.find(c => c.id === categoryId)?.subCategories || [];
+  };
+
   const { data: expensesData, isLoading: expensesLoading } = useQuery<{
     expenses: Expense[];
     monthTotal: number;
@@ -188,7 +198,7 @@ export default function ExpenseManagementTab() {
     queryKey: ['/api/admin/accounting/expenses', selectedMonth, categoryFilter, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams({ month: selectedMonth });
-      if (categoryFilter) params.set('category', categoryFilter);
+      if (categoryFilter) params.set('categoryId', String(categoryFilter));
       if (searchQuery) params.set('search', searchQuery);
       const res = await fetch(`/api/admin/accounting/expenses?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error('조회 실패');
@@ -224,7 +234,7 @@ export default function ExpenseManagementTab() {
     enabled: showKeywordDialog,
   });
 
-  const { data: autocompleteData } = useQuery<{ item_name: string; category: string; sub_category?: string; last_amount: number; source?: string }[]>({
+  const { data: autocompleteData } = useQuery<{ item_name: string; category: string; sub_category?: string; category_id?: number; sub_category_id?: number; last_amount: number; source?: string }[]>({
     queryKey: ['/api/admin/accounting/expenses/autocomplete', formItemName],
     queryFn: async () => {
       const res = await fetch(`/api/admin/accounting/expenses/autocomplete?q=${encodeURIComponent(formItemName)}`, { credentials: 'include' });
@@ -314,7 +324,7 @@ export default function ExpenseManagementTab() {
     onSuccess: () => {
       toast({ title: '정기비용 등록 완료' });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/recurring'] });
-      setRecurringForm({ itemName: '', category: '기타', amount: '', dayOfMonth: '1', cycle: 'monthly' });
+      setRecurringForm({ itemName: '', categoryId: null, amount: '', dayOfMonth: '1', cycle: 'monthly' });
     },
     onError: (error: any) => {
       toast({ title: '등록 실패', description: error.message, variant: 'destructive' });
@@ -365,7 +375,7 @@ export default function ExpenseManagementTab() {
     onSuccess: () => {
       toast({ title: '키워드 등록 완료' });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/keywords'] });
-      setKeywordForm({ keyword: '', category: '기타', subCategory: '', matchType: 'exact' });
+      setKeywordForm({ keyword: '', categoryId: null, subCategoryId: null, matchType: 'exact' });
     },
     onError: (error: any) => {
       toast({ title: '등록 실패', description: error.message, variant: 'destructive' });
@@ -389,8 +399,8 @@ export default function ExpenseManagementTab() {
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormItemName('');
     setFormAmount('');
-    setFormCategory('기타');
-    setFormSubCategory('');
+    setFormCategoryId(null);
+    setFormSubCategoryId(null);
     setFormTaxType('taxable');
     setFormPaymentMethod('카드');
     setFormVendorName('');
@@ -403,8 +413,17 @@ export default function ExpenseManagementTab() {
     setFormDate(expense.expenseDate);
     setFormItemName(expense.itemName);
     setFormAmount(String(expense.amount));
-    setFormCategory(expense.category);
-    setFormSubCategory(expense.subCategory || '');
+    if (expense.categoryId) {
+      setFormCategoryId(expense.categoryId);
+    } else {
+      const cat = getCategoryByName(expense.category);
+      setFormCategoryId(cat?.id || null);
+    }
+    if (expense.subCategoryId) {
+      setFormSubCategoryId(expense.subCategoryId);
+    } else {
+      setFormSubCategoryId(null);
+    }
     setFormTaxType(expense.taxType);
     setFormPaymentMethod(expense.paymentMethod);
     setFormVendorName(expense.vendorName || '');
@@ -423,12 +442,16 @@ export default function ExpenseManagementTab() {
       return;
     }
 
+    const selectedCat = getCategoryById(formCategoryId);
+    const selectedSub = getSubCategoriesForCategory(formCategoryId).find(s => s.id === formSubCategoryId);
     const body = {
       expenseDate: formDate,
       itemName: formItemName.trim(),
       amount,
-      category: formCategory,
-      subCategory: formSubCategory.trim(),
+      category: selectedCat?.name || '기타',
+      subCategory: selectedSub?.name || '',
+      categoryId: formCategoryId,
+      subCategoryId: formSubCategoryId,
       taxType: formTaxType,
       paymentMethod: formPaymentMethod,
       vendorName: formVendorName.trim(),
@@ -452,12 +475,16 @@ export default function ExpenseManagementTab() {
       toast({ title: '올바른 금액을 입력해주세요', variant: 'destructive' });
       return;
     }
+    const selectedCat = getCategoryById(formCategoryId);
+    const selectedSub = getSubCategoriesForCategory(formCategoryId).find(s => s.id === formSubCategoryId);
     const body = {
       expenseDate: formDate,
       itemName: formItemName.trim(),
       amount,
-      category: formCategory,
-      subCategory: formSubCategory.trim(),
+      category: selectedCat?.name || '기타',
+      subCategory: selectedSub?.name || '',
+      categoryId: formCategoryId,
+      subCategoryId: formSubCategoryId,
       taxType: formTaxType,
       paymentMethod: formPaymentMethod,
       vendorName: formVendorName.trim(),
@@ -472,7 +499,7 @@ export default function ExpenseManagementTab() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/trend'] });
       setFormItemName('');
       setFormAmount('');
-      setFormSubCategory('');
+      setFormSubCategoryId(null);
       setFormVendorName('');
       setFormMemo('');
       setShowAutocomplete(false);
@@ -487,8 +514,15 @@ export default function ExpenseManagementTab() {
       const res = await apiRequest('POST', '/api/admin/accounting/expenses/classify', { item_name: formItemName });
       const data = await res.json();
       if (data.confidence === 'high' || data.confidence === 'medium') {
-        if (data.category) setFormCategory(data.category);
-        if (data.sub_category) setFormSubCategory(data.sub_category);
+        if (data.category_id) {
+          setFormCategoryId(data.category_id);
+        } else if (data.category) {
+          const cat = getCategoryByName(data.category);
+          if (cat) setFormCategoryId(cat.id);
+        }
+        if (data.sub_category_id) {
+          setFormSubCategoryId(data.sub_category_id);
+        }
         toast({ title: '자동 분류 완료', description: `${data.category} / ${data.sub_category || ''}` });
       } else {
         toast({ title: '자동 분류 실패', description: '매칭되는 분류를 찾지 못했습니다.' });
@@ -604,6 +638,7 @@ export default function ExpenseManagementTab() {
     return (summary?.byCategory || []).map(c => ({
       name: c.category,
       value: c.total,
+      color: c.color || '#6B7280',
     }));
   }, [summary]);
 
@@ -684,20 +719,20 @@ export default function ExpenseManagementTab() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-        {EXPENSE_CATEGORIES.map(cat => {
-          const catTotal = (summary?.byCategory || []).find(c => c.category === cat)?.total || 0;
-          const isSelected = categoryFilter === cat;
+        {categories.map(cat => {
+          const catTotal = (summary?.byCategory || []).find(c => c.categoryId === cat.id)?.total || 0;
+          const isSelected = categoryFilter === cat.id;
           return (
             <Card
-              key={cat}
+              key={cat.id}
               className={`cursor-pointer hover-elevate ${isSelected ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setCategoryFilter(isSelected ? '' : cat)}
-              data-testid={`card-category-${cat}`}
+              onClick={() => setCategoryFilter(isSelected ? null : cat.id)}
+              data-testid={`card-category-${cat.id}`}
             >
               <CardContent className="p-3">
                 <div className="flex items-center gap-1 mb-1">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
-                  <span className="text-xs truncate">{cat}</span>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                  <span className="text-xs truncate">{cat.name}</span>
                 </div>
                 <div className="text-sm font-bold">{catTotal.toLocaleString()}원</div>
               </CardContent>
@@ -709,8 +744,8 @@ export default function ExpenseManagementTab() {
       {categoryFilter && (
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="gap-1">
-            {categoryFilter}
-            <X className="h-3 w-3 cursor-pointer" onClick={() => setCategoryFilter('')} />
+            {getCategoryById(categoryFilter)?.name || ''}
+            <X className="h-3 w-3 cursor-pointer" onClick={() => setCategoryFilter(null)} />
           </Badge>
         </div>
       )}
@@ -770,14 +805,14 @@ export default function ExpenseManagementTab() {
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <Select value={categoryFilter || '__all__'} onValueChange={(v) => setCategoryFilter(v === '__all__' ? '' : v)}>
+              <Select value={categoryFilter ? String(categoryFilter) : '__all__'} onValueChange={(v) => setCategoryFilter(v === '__all__' ? null : parseInt(v))}>
                 <SelectTrigger className="w-[160px]" data-testid="select-category-filter">
                   <SelectValue placeholder="전체 분류" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 분류</SelectItem>
-                  {EXPENSE_CATEGORIES.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -825,8 +860,8 @@ export default function ExpenseManagementTab() {
                       <TableRow key={exp.id} data-testid={`row-expense-${exp.id}`}>
                         <TableCell className="whitespace-nowrap">{exp.expenseDate}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="no-default-active-elevate" style={{ borderColor: CATEGORY_COLORS[exp.category] || '#6B7280' }}>
-                            {exp.category}
+                          <Badge variant="outline" className="no-default-active-elevate" style={{ borderColor: exp.categoryColor || '#6B7280' }}>
+                            {exp.categoryName || exp.category}
                           </Badge>
                         </TableCell>
                         <TableCell>{exp.subCategory}</TableCell>
@@ -925,8 +960,8 @@ export default function ExpenseManagementTab() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {EXPENSE_CATEGORIES.map(c => (
-                              <SelectItem key={c} value={c}>{c}</SelectItem>
+                            {categories.map(c => (
+                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1019,7 +1054,7 @@ export default function ExpenseManagementTab() {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {pieData.map((entry, i) => (
-                      <Cell key={i} fill={CATEGORY_COLORS[entry.name] || '#6B7280'} />
+                      <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => `${value.toLocaleString()}원`} />
@@ -1092,8 +1127,15 @@ export default function ExpenseManagementTab() {
                     e.preventDefault();
                     const item = autocompleteItems[autocompleteIndex];
                     setFormItemName(item.item_name);
-                    if (item.category) setFormCategory(item.category);
-                    if (item.sub_category) setFormSubCategory(item.sub_category);
+                    if (item.category_id) {
+                      setFormCategoryId(item.category_id);
+                    } else if (item.category) {
+                      const cat = getCategoryByName(item.category);
+                      if (cat) setFormCategoryId(cat.id);
+                    }
+                    if (item.sub_category_id) {
+                      setFormSubCategoryId(item.sub_category_id);
+                    }
                     if (item.last_amount) setFormAmount(String(item.last_amount));
                     setShowAutocomplete(false);
                   } else if (e.key === 'Escape') {
@@ -1112,8 +1154,15 @@ export default function ExpenseManagementTab() {
                       className={`w-full text-left px-3 py-2 hover-elevate text-sm flex items-center justify-between ${i === autocompleteIndex ? 'bg-accent' : ''}`}
                       onClick={() => {
                         setFormItemName(item.item_name);
-                        if (item.category) setFormCategory(item.category);
-                        if (item.sub_category) setFormSubCategory(item.sub_category);
+                        if (item.category_id) {
+                          setFormCategoryId(item.category_id);
+                        } else if (item.category) {
+                          const cat = getCategoryByName(item.category);
+                          if (cat) setFormCategoryId(cat.id);
+                        }
+                        if (item.sub_category_id) {
+                          setFormSubCategoryId(item.sub_category_id);
+                        }
                         if (item.last_amount) setFormAmount(String(item.last_amount));
                         setShowAutocomplete(false);
                       }}
@@ -1144,25 +1193,36 @@ export default function ExpenseManagementTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>분류</Label>
-                <Select value={formCategory} onValueChange={setFormCategory}>
+                <Select value={formCategoryId ? String(formCategoryId) : ''} onValueChange={(v) => {
+                  const id = parseInt(v);
+                  setFormCategoryId(id);
+                  setFormSubCategoryId(null);
+                }}>
                   <SelectTrigger data-testid="select-expense-category">
-                    <SelectValue />
+                    <SelectValue placeholder="분류 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPENSE_CATEGORIES.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>세부항목</Label>
-                <Input
-                  value={formSubCategory}
-                  onChange={(e) => setFormSubCategory(e.target.value)}
-                  placeholder="세부항목"
-                  data-testid="input-expense-subcategory"
-                />
+                <Select value={formSubCategoryId ? String(formSubCategoryId) : '__none__'} onValueChange={(v) => {
+                  setFormSubCategoryId(v === '__none__' ? null : parseInt(v));
+                }}>
+                  <SelectTrigger data-testid="select-expense-subcategory">
+                    <SelectValue placeholder="세부항목 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">선택안함</SelectItem>
+                    {getSubCategoriesForCategory(formCategoryId).map(sc => (
+                      <SelectItem key={sc.id} value={String(sc.id)}>{sc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -1331,13 +1391,13 @@ export default function ExpenseManagementTab() {
                   </div>
                   <div>
                     <Label>분류</Label>
-                    <Select value={recurringForm.category} onValueChange={(v) => setRecurringForm(p => ({ ...p, category: v }))}>
+                    <Select value={recurringForm.categoryId ? String(recurringForm.categoryId) : ''} onValueChange={(v) => setRecurringForm(p => ({ ...p, categoryId: parseInt(v) }))}>
                       <SelectTrigger data-testid="select-recurring-category">
-                        <SelectValue />
+                        <SelectValue placeholder="분류 선택" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXPENSE_CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        {categories.map(c => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1382,9 +1442,11 @@ export default function ExpenseManagementTab() {
                           toast({ title: '항목명과 금액을 입력해주세요', variant: 'destructive' });
                           return;
                         }
+                        const recurringCat = getCategoryById(recurringForm.categoryId);
                         recurringCreateMutation.mutate({
                           itemName: recurringForm.itemName.trim(),
-                          category: recurringForm.category,
+                          category: recurringCat?.name || '기타',
+                          categoryId: recurringForm.categoryId,
                           amount: parseInt(recurringForm.amount),
                           dayOfMonth: parseInt(recurringForm.dayOfMonth),
                           cycle: recurringForm.cycle,
@@ -1497,25 +1559,35 @@ export default function ExpenseManagementTab() {
                   </div>
                   <div>
                     <Label>분류</Label>
-                    <Select value={keywordForm.category} onValueChange={(v) => setKeywordForm(p => ({ ...p, category: v }))}>
+                    <Select value={keywordForm.categoryId ? String(keywordForm.categoryId) : ''} onValueChange={(v) => {
+                      const id = parseInt(v);
+                      setKeywordForm(p => ({ ...p, categoryId: id, subCategoryId: null }));
+                    }}>
                       <SelectTrigger data-testid="select-keyword-category">
-                        <SelectValue />
+                        <SelectValue placeholder="분류 선택" />
                       </SelectTrigger>
                       <SelectContent>
-                        {EXPENSE_CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        {categories.map(c => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>세부항목</Label>
-                    <Input
-                      value={keywordForm.subCategory}
-                      onChange={(e) => setKeywordForm(p => ({ ...p, subCategory: e.target.value }))}
-                      placeholder="세부항목"
-                      data-testid="input-keyword-subcategory"
-                    />
+                    <Select value={keywordForm.subCategoryId ? String(keywordForm.subCategoryId) : '__none__'} onValueChange={(v) => {
+                      setKeywordForm(p => ({ ...p, subCategoryId: v === '__none__' ? null : parseInt(v) }));
+                    }}>
+                      <SelectTrigger data-testid="select-keyword-subcategory">
+                        <SelectValue placeholder="세부항목 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">선택안함</SelectItem>
+                        {getSubCategoriesForCategory(keywordForm.categoryId).map(sc => (
+                          <SelectItem key={sc.id} value={String(sc.id)}>{sc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label>매칭 방식</Label>
@@ -1538,10 +1610,14 @@ export default function ExpenseManagementTab() {
                         toast({ title: '키워드를 입력해주세요', variant: 'destructive' });
                         return;
                       }
+                      const kwCat = getCategoryById(keywordForm.categoryId);
+                      const kwSub = getSubCategoriesForCategory(keywordForm.categoryId).find(s => s.id === keywordForm.subCategoryId);
                       keywordCreateMutation.mutate({
                         keyword: keywordForm.keyword.trim(),
-                        category: keywordForm.category,
-                        subCategory: keywordForm.subCategory.trim(),
+                        categoryId: keywordForm.categoryId,
+                        subCategoryId: keywordForm.subCategoryId,
+                        category: kwCat?.name || '기타',
+                        subCategory: kwSub?.name || '',
                         matchType: keywordForm.matchType,
                       });
                     }}

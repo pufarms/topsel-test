@@ -1890,14 +1890,45 @@ export const insertInvoiceRecordSchema = createInsertSchema(invoiceRecords).omit
 export type InvoiceRecord = typeof invoiceRecords.$inferSelect;
 export type NewInvoiceRecord = z.infer<typeof insertInvoiceRecordSchema>;
 
-export const expenseCategories = [
+export const expenseCategoryNames = [
   "물류/배송비", "인건비", "시설/임대료", "마케팅/광고",
   "IT/시스템", "사무/관리", "금융비용", "기타"
 ] as const;
-export type ExpenseCategory = typeof expenseCategories[number];
 
 export const expenseTaxTypes = ["taxable", "exempt"] as const;
 export const expensePaymentMethods = ["계좌이체", "카드", "현금", "자동이체", "기타"] as const;
+
+export const expenseCategoryTable = pgTable("expense_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  color: varchar("color", { length: 20 }).notNull().default("gray"),
+  defaultTaxType: varchar("default_tax_type", { length: 10 }).notNull().default("taxable"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExpenseCategorySchema = createInsertSchema(expenseCategoryTable).omit({
+  id: true,
+  createdAt: true,
+});
+export type ExpenseCategoryRow = typeof expenseCategoryTable.$inferSelect;
+export type NewExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
+
+export const expenseSubCategoryTable = pgTable("expense_sub_categories", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExpenseSubCategorySchema = createInsertSchema(expenseSubCategoryTable).omit({
+  id: true,
+  createdAt: true,
+});
+export type ExpenseSubCategoryRow = typeof expenseSubCategoryTable.$inferSelect;
+export type NewExpenseSubCategory = z.infer<typeof insertExpenseSubCategorySchema>;
 
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
@@ -1905,6 +1936,8 @@ export const expenses = pgTable("expenses", {
   itemName: varchar("item_name", { length: 200 }).notNull(),
   category: varchar("category", { length: 50 }).notNull(),
   subCategory: varchar("sub_category", { length: 100 }),
+  categoryId: integer("category_id"),
+  subCategoryId: integer("sub_category_id"),
   amount: integer("amount").notNull(),
   taxType: varchar("tax_type", { length: 10 }).notNull().default("taxable"),
   supplyAmount: integer("supply_amount"),
@@ -1933,6 +1966,8 @@ export const expenseKeywords = pgTable("expense_keywords", {
   keyword: varchar("keyword", { length: 100 }).notNull(),
   category: varchar("category", { length: 50 }).notNull(),
   subCategory: varchar("sub_category", { length: 100 }),
+  categoryId: integer("category_id"),
+  subCategoryId: integer("sub_category_id"),
   matchType: varchar("match_type", { length: 10 }).notNull().default("contains"),
   priority: integer("priority").notNull().default(10),
   source: varchar("source", { length: 10 }).notNull().default("system"),
@@ -1953,6 +1988,8 @@ export const expenseRecurring = pgTable("expense_recurring", {
   itemName: varchar("item_name", { length: 200 }).notNull(),
   category: varchar("category", { length: 50 }).notNull(),
   subCategory: varchar("sub_category", { length: 100 }),
+  categoryId: integer("category_id"),
+  subCategoryId: integer("sub_category_id"),
   amount: integer("amount").notNull(),
   taxType: varchar("tax_type", { length: 10 }).notNull().default("taxable"),
   paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("계좌이체"),
