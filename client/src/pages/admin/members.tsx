@@ -290,10 +290,13 @@ export default function MembersPage() {
     { key: "username", label: "아이디", className: "text-muted-foreground" },
     { key: "memberName", label: "회원명", render: (m) => m.memberName || "-" },
     { key: "grade", label: "등급", render: (m) => (
-      <Badge className={gradeColors[m.grade]}>
-        {m.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
-        {memberGradeLabels[m.grade as MemberGrade]}
-      </Badge>
+      <div className="flex items-center gap-1 flex-wrap">
+        <Badge className={gradeColors[m.grade]}>
+          {m.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
+          {memberGradeLabels[m.grade as MemberGrade]}
+        </Badge>
+        {m.isPostpaid && <Badge variant="secondary" className="no-default-active-elevate text-xs">후불</Badge>}
+      </div>
     )},
     { key: "representative", label: "대표자", render: (m) => m.representative || "-" },
     { key: "phone", label: "대표연락처", render: (m) => m.phone || "-" },
@@ -569,6 +572,7 @@ export default function MembersPage() {
                   {member.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
                   {memberGradeLabels[member.grade as MemberGrade]}
                 </Badge>
+                {member.isPostpaid && <Badge variant="secondary" className="no-default-active-elevate text-xs">후불</Badge>}
                 <Button
                   size="icon"
                   variant="ghost"

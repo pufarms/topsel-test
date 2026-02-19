@@ -89,11 +89,22 @@ Preferred communication style: Simple, everyday language.
 2. 잔액 부족 시 상세 메시지 반환 (부족금액, 예치금, 포인터, 진행중 주문액)
 3. 모든 주문은 엑셀 파일 업로드 방식으로만 진행 (개별 주문 등록 없음)
 
+**후불결재 회원 시스템:**
+- 후불결재 회원(isPostpaid=true)은 잔액 없이도 주문 등록 가능 (잔액 검증 건너뜀)
+- 정산 시 포인터 우선 차감 → 나머지는 예치금에서 차감 (마이너스 허용)
+- 예치금이 음수가 되면 마이너스로 누적 표시, 입금 시 자동 상계
+- 관리자 설정: `/api/admin/members/:memberId/postpaid` (POST)
+- DB 필드: isPostpaid, postpaidNote, postpaidSetBy, postpaidSetAt
+- 회원 상세 페이지에 후불결재 설정 UI (등급 고정 아래)
+- 회원 목록/잔액 현황에 "후불" 배지 표시
+- 매출/정산 내역 필터에 회원 유형 필터 추가 (전체/일반/후불결재)
+
 **자동 정산 (배송중 전환 시):**
 - 회원별로 주문 그룹핑 → 순차 정산 처리
 - 차감 순서: 포인터 우선 차감 → 예치금 차감
 - 이력 기록: settlement_history, pointer_history, deposit_history
-- 잔액 부족 시 해당 주문부터 실패 처리, 정상 처리된 건만 전환
+- 일반 회원: 잔액 부족 시 해당 주문부터 실패 처리
+- 후불결재 회원: 잔액 부족 시에도 정산 진행 (예치금 마이너스 허용)
 
 **관리자 기능:**
 - 예치금 충전/환급: `/api/admin/members/:memberId/deposit/charge|refund`

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock } from "lucide-react";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -59,6 +59,11 @@ export default function MemberDetailPage() {
     lockedGrade: string;
     gradeLockReason: string;
   }>({ gradeLocked: false, lockedGrade: 'START', gradeLockReason: '' });
+
+  const [postpaidData, setPostpaidData] = useState<{
+    isPostpaid: boolean;
+    postpaidNote: string;
+  }>({ isPostpaid: false, postpaidNote: '' });
 
   const [formData, setFormData] = useState<{
     grade: string;
@@ -177,6 +182,21 @@ export default function MemberDetailPage() {
     },
   });
 
+  const postpaidMutation = useMutation({
+    mutationFn: async (data: { isPostpaid: boolean; postpaidNote: string }) => {
+      const res = await apiRequest("POST", `/api/admin/members/${memberId}/postpaid`, data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members", memberId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      toast({ title: data.message || "후불결재 설정이 저장되었습니다" });
+    },
+    onError: () => {
+      toast({ title: "후불결재 설정 실패", variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
     if (!member) return;
 
@@ -251,6 +271,11 @@ export default function MemberDetailPage() {
               {member.gradeLocked && <Lock className="h-3 w-3 mr-1 inline" />}
               {memberGradeLabels[displayGrade as MemberGrade] || displayGrade}
             </Badge>
+            {member.isPostpaid && (
+              <Badge variant="secondary" className="no-default-active-elevate">
+                후불결재
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">@{member.username}</p>
         </div>
@@ -738,6 +763,62 @@ export default function MemberDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                후불결재 회원 설정
+              </CardTitle>
+              <CardDescription>
+                후불결재 회원은 잔액 없이도 주문이 가능하며, 예치금이 마이너스로 기록됩니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">후불결재 회원</Label>
+                <Switch
+                  checked={postpaidData.isPostpaid !== undefined ? postpaidData.isPostpaid : (member.isPostpaid ?? false)}
+                  onCheckedChange={(checked) => setPostpaidData({
+                    ...postpaidData,
+                    isPostpaid: checked,
+                  })}
+                  data-testid="switch-postpaid"
+                />
+              </div>
+              {(postpaidData.isPostpaid !== undefined ? postpaidData.isPostpaid : member.isPostpaid) && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-sm">메모/사유 (선택)</Label>
+                    <Input
+                      value={postpaidData.postpaidNote || (member.postpaidNote ?? '')}
+                      onChange={(e) => setPostpaidData({ ...postpaidData, postpaidNote: e.target.value })}
+                      placeholder="예: 대량 거래 고객, 월말 정산"
+                      data-testid="input-postpaid-note"
+                    />
+                  </div>
+                  {member.postpaidSetAt && (
+                    <p className="text-xs text-muted-foreground">
+                      설정일: {formatDateTime(member.postpaidSetAt)}
+                    </p>
+                  )}
+                </>
+              )}
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => postpaidMutation.mutate({
+                  isPostpaid: postpaidData.isPostpaid !== undefined ? postpaidData.isPostpaid : (member.isPostpaid ?? false),
+                  postpaidNote: postpaidData.postpaidNote || (member.postpaidNote ?? ''),
+                })}
+                disabled={postpaidMutation.isPending}
+                data-testid="button-save-postpaid"
+              >
+                {postpaidMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="h-4 w-4 mr-2" />}
+                후불결재 설정 저장
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

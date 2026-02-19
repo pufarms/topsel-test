@@ -45,6 +45,7 @@ interface MemberBalance {
   deposit: number;
   point: number;
   username: string;
+  isPostpaid: boolean;
 }
 
 interface MemberSettlementViewItem {
@@ -128,6 +129,7 @@ export function MemberSettlementTab() {
   const detailDateRange = useDateRange("month");
   const [detailMemberFilter, setDetailMemberFilter] = useState("");
   const [detailClientType, setDetailClientType] = useState<"member" | "vendor">("member");
+  const [detailMemberType, setDetailMemberType] = useState<"all" | "normal" | "postpaid">("all");
   const [detailPage, setDetailPage] = useState(1);
   const [detailTypeFilter, setDetailTypeFilter] = useState("all");
   const [detailSearchText, setDetailSearchText] = useState("");
@@ -474,9 +476,16 @@ export function MemberSettlementTab() {
                             <TableCell className="font-medium">{member.companyName}</TableCell>
                             <TableCell className="text-muted-foreground">{member.username}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="no-default-active-elevate">
-                                {gradeLabels[member.grade] || member.grade}
-                              </Badge>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <Badge variant="outline" className="no-default-active-elevate">
+                                  {gradeLabels[member.grade] || member.grade}
+                                </Badge>
+                                {member.isPostpaid && (
+                                  <Badge variant="secondary" className="no-default-active-elevate text-xs">
+                                    후불
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">{member.deposit.toLocaleString()}원</TableCell>
                             <TableCell className="text-right">{member.point.toLocaleString()}P</TableCell>
@@ -531,6 +540,7 @@ export function MemberSettlementTab() {
                     value={detailClientType}
                     onValueChange={(v) => {
                       setDetailClientType(v as "member" | "vendor");
+                      setDetailMemberType("all");
                       setDetailMemberFilter("");
                       setDetailSearchText("");
                       setDetailSelectedLabel("");
@@ -546,6 +556,24 @@ export function MemberSettlementTab() {
                       <SelectItem value="vendor">매입업체</SelectItem>
                     </SelectContent>
                   </Select>
+                  {detailClientType === "member" && (
+                    <Select value={detailMemberType} onValueChange={(v) => {
+                      setDetailMemberType(v as "all" | "normal" | "postpaid");
+                      setDetailMemberFilter("");
+                      setDetailSearchText("");
+                      setDetailSelectedLabel("");
+                      setDetailPage(1);
+                    }}>
+                      <SelectTrigger className="w-[120px]" data-testid="select-detail-member-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체</SelectItem>
+                        <SelectItem value="normal">일반</SelectItem>
+                        <SelectItem value="postpaid">후불결재</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
                     <Input
@@ -583,10 +611,13 @@ export function MemberSettlementTab() {
                     {detailSearchOpen && detailSearchText.trim() && !detailSelectedLabel && (() => {
                       const q = detailSearchText.trim().toLowerCase();
                       if (detailClientType === "member") {
-                        const suggestions = memberList.filter((m) =>
-                          m.companyName?.toLowerCase().includes(q) ||
-                          m.username?.toLowerCase().includes(q)
-                        ).slice(0, 20);
+                        const suggestions = memberList.filter((m) => {
+                          const matchSearch = m.companyName?.toLowerCase().includes(q) || m.username?.toLowerCase().includes(q);
+                          if (!matchSearch) return false;
+                          if (detailMemberType === "postpaid") return m.isPostpaid;
+                          if (detailMemberType === "normal") return !m.isPostpaid;
+                          return true;
+                        }).slice(0, 20);
                         if (suggestions.length === 0) return (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 p-3 text-sm text-muted-foreground text-center">
                             검색 결과가 없습니다
@@ -610,7 +641,10 @@ export function MemberSettlementTab() {
                                 data-testid={`suggestion-member-${m.id}`}
                               >
                                 <span className="font-medium truncate">{m.companyName}</span>
-                                <span className="text-xs text-muted-foreground shrink-0">{m.username}</span>
+                                <span className="flex items-center gap-1 shrink-0">
+                                  {m.isPostpaid && <Badge variant="secondary" className="no-default-active-elevate text-[10px] px-1 py-0">후불</Badge>}
+                                  <span className="text-xs text-muted-foreground">{m.username}</span>
+                                </span>
                               </button>
                             ))}
                           </div>

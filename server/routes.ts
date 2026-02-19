@@ -1827,6 +1827,56 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/members/:memberId/postpaid", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+
+    try {
+      const { memberId } = req.params;
+      const { isPostpaid, postpaidNote } = req.body;
+
+      const member = await storage.getMember(memberId);
+      if (!member) return res.status(404).json({ message: "회원을 찾을 수 없습니다" });
+
+      const updateData: any = {
+        isPostpaid: !!isPostpaid,
+        updatedAt: new Date(),
+      };
+
+      if (isPostpaid) {
+        updateData.postpaidNote = postpaidNote || null;
+        updateData.postpaidSetBy = user.id;
+        updateData.postpaidSetAt = new Date();
+      } else {
+        updateData.postpaidNote = null;
+        updateData.postpaidSetBy = null;
+        updateData.postpaidSetAt = null;
+      }
+
+      const updatedMember = await storage.updateMember(memberId, updateData);
+
+      const action = isPostpaid ? '후불결재 회원 등록' : '후불결재 회원 해제';
+      const desc = isPostpaid
+        ? `후불결재 등록${postpaidNote ? ', 사유: ' + postpaidNote : ''}`
+        : `후불결재 해제 (이전 사유: ${member.postpaidNote || '없음'})`;
+
+      await storage.createMemberLog({
+        memberId,
+        changedBy: user.id,
+        changeType: '후불결재',
+        previousValue: member.isPostpaid ? '후불결재' : '일반',
+        newValue: isPostpaid ? '후불결재' : '일반',
+        description: desc,
+      });
+
+      const { password, ...memberWithoutPassword } = updatedMember!;
+      res.json({ success: true, message: `${action} 완료`, member: memberWithoutPassword });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/admin/members/bulk-update", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -6701,8 +6751,8 @@ export async function registerRoutes(
         });
       }
 
-      // ⑩-1 잔액 검증: 기본 검증 통과한 정상건의 총 주문금액 기준으로 잔액 체크
-      if (pendingValidationRows.length > 0) {
+      // ⑩-1 잔액 검증: 기본 검증 통과한 정상건의 총 주문금액 기준으로 잔액 체크 (후불결재 회원은 건너뜀)
+      if (pendingValidationRows.length > 0 && !member.isPostpaid) {
         let totalOrderAmount = 0;
         for (const pvRow of pendingValidationRows) {
           totalOrderAmount += getSupplyPriceByGrade(pvRow.currentProduct, member.grade);
@@ -6857,7 +6907,7 @@ export async function registerRoutes(
             pendingOrdersTotal: balanceForValidation.pendingOrdersTotal,
             availableBalance: balanceForValidation.availableBalance,
           },
-          balanceSufficient: balanceForValidation.availableBalance >= validOrderAmount,
+          balanceSufficient: member.isPostpaid || balanceForValidation.availableBalance >= validOrderAmount,
         });
       }
 
@@ -8153,7 +8203,7 @@ export async function registerRoutes(
       const memberIds = Array.from(new Set(targetOrders.map(o => o.memberId)));
       const productCodes = Array.from(new Set(targetOrders.map(o => o.productCode)));
 
-      const membersList = await db.select({ id: members.id, grade: members.grade, deposit: members.deposit, point: members.point, companyName: members.companyName })
+      const membersList = await db.select({ id: members.id, grade: members.grade, deposit: members.deposit, point: members.point, companyName: members.companyName, isPostpaid: members.isPostpaid })
         .from(members)
         .where(inArray(members.id, memberIds));
       const memberMap = new Map(membersList.map(m => [m.id, m]));
@@ -8194,7 +8244,7 @@ export async function registerRoutes(
               const confirmedPrice = product ? getSupplyPriceByGrade(product, memberInfo.grade) : 0;
 
               const totalAvailable = currentDeposit + currentPoint;
-              if (totalAvailable < confirmedPrice) {
+              if (!memberInfo.isPostpaid && totalAvailable < confirmedPrice) {
                 return {
                   transferred: memberTransferred,
                   failed: true,
@@ -8209,8 +8259,8 @@ export async function registerRoutes(
               if (currentPoint >= confirmedPrice) {
                 pointerDeduct = confirmedPrice;
               } else {
-                pointerDeduct = currentPoint;
-                depositDeduct = confirmedPrice - currentPoint;
+                pointerDeduct = Math.max(0, currentPoint);
+                depositDeduct = confirmedPrice - pointerDeduct;
               }
 
               currentPoint -= pointerDeduct;
@@ -10539,6 +10589,7 @@ export async function registerRoutes(
         deposit: members.deposit,
         point: members.point,
         username: members.username,
+        isPostpaid: members.isPostpaid,
       })
         .from(members)
         .where(inArray(members.grade, ['START', 'DRIVING', 'TOP']))
