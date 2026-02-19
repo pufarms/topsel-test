@@ -17082,11 +17082,15 @@ export async function registerRoutes(
         }
       }
 
+      const UserID = process.env.POPBILL_USER_ID || '';
+
       const taxinvoice = {
+        mgtKey: MgtKey,
         writeDate: popbillFormatDate(new Date()),
         issueType: '정발행',
         taxType: invoiceType === 'exempt' ? '면세' : '과세',
         chargeDirection: '정과금',
+        purposeType: '영수',
         invoicerCorpNum: CorpNum,
         invoicerTaxRegID: '',
         invoicerCorpName: '탑셀러',
@@ -17120,16 +17124,18 @@ export async function registerRoutes(
         remark1: memo || `${year}년 ${month}월분 ${invoiceType === 'exempt' ? '계산서' : '세금계산서'}`,
       };
 
+      console.log(`[팝빌] registIssue 호출: CorpNum=${CorpNum}, UserID=${UserID}, MgtKey=${MgtKey}, taxType=${taxinvoice.taxType}`);
+
       const popbillResult: any = await new Promise((resolve, reject) => {
         taxinvoiceService.registIssue(
           CorpNum,
           taxinvoice,
           false,
-          memo || '',
           false,
+          memo || '',
           '',
           '',
-          MgtKey,
+          UserID,
           function(result: any) { resolve(result); },
           function(error: any) { reject(error); }
         );
@@ -17180,6 +17186,7 @@ export async function registerRoutes(
         '-99004021': '팝빌 링크아이디가 유효하지 않습니다. 팝빌 계정 설정을 확인해주세요.',
         '-99004023': '팝빌 비밀키가 유효하지 않습니다. 팝빌 계정 설정을 확인해주세요.',
         '-99999905': '인증토큰이 만료되었습니다. IPRestrictOnOff 설정을 확인하세요.',
+        '-10000038': '팝빌 회원 아이디가 유효하지 않습니다. POPBILL_USER_ID 설정을 확인해주세요.',
         '-11000020': '공동인증서가 등록되지 않았습니다. 팝빌에서 인증서를 등록해주세요.',
         '-12000004': '이미 등록된 문서번호입니다.',
         '-12000009': '공급받는자 사업자번호가 유효하지 않습니다.',
@@ -17208,6 +17215,7 @@ export async function registerRoutes(
       }
 
       const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const UserID = process.env.POPBILL_USER_ID || '';
 
       await new Promise((resolve, reject) => {
         taxinvoiceService.cancelIssue(
@@ -17215,6 +17223,7 @@ export async function registerRoutes(
           popbill.MgtKeyType.SELL,
           mgtKey,
           reason || '발행 취소',
+          UserID,
           function(result: any) { resolve(result); },
           function(error: any) { reject(error); }
         );
@@ -17244,6 +17253,7 @@ export async function registerRoutes(
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
       const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const UserID = process.env.POPBILL_USER_ID || '';
       const { mgtKey } = req.params;
 
       const result = await new Promise((resolve, reject) => {
@@ -17251,6 +17261,7 @@ export async function registerRoutes(
           CorpNum,
           popbill.MgtKeyType.SELL,
           mgtKey,
+          UserID,
           function(result: any) { resolve(result); },
           function(error: any) { reject(error); }
         );
