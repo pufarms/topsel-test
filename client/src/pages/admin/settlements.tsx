@@ -120,7 +120,8 @@ export function MemberSettlementTab() {
   const { toast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState("members");
   const [selectedMember, setSelectedMember] = useState<MemberBalance | null>(null);
-  const [actionDialog, setActionDialog] = useState<"deposit-charge" | "deposit-refund" | "pointer-grant" | null>(null);
+  const [actionDialog, setActionDialog] = useState<"deposit" | "pointer" | null>(null);
+  const [actionSubType, setActionSubType] = useState<"charge" | "refund" | "grant" | "deduct">("charge");
   const [actionAmount, setActionAmount] = useState("");
   const [actionDescription, setActionDescription] = useState("");
   const [memberFilter, setMemberFilter] = useState("");
@@ -239,6 +240,25 @@ export function MemberSettlementTab() {
     },
   });
 
+  const pointerDeductMutation = useMutation({
+    mutationFn: async ({ memberId, amount, description }: { memberId: string; amount: number; description: string }) => {
+      const res = await apiRequest("POST", `/api/admin/members/${memberId}/pointer/deduct`, { amount, description });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "포인터 삭감 완료", description: data.message });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/member-settlement-view"] });
+      setActionDialog(null);
+      setActionAmount("");
+      setActionDescription("");
+      setSelectedMember(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "삭감 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
   const vendorPaymentMutation = useMutation({
     mutationFn: async ({ vendorId, amount, paymentDate, paymentMethod, memo }: { vendorId: number; amount: number; paymentDate: string; paymentMethod: string; memo: string }) => {
       const res = await apiRequest("POST", "/api/admin/vendor-payments", { vendorId, amount, paymentDate, paymentMethod, memo });
@@ -283,10 +303,18 @@ export function MemberSettlementTab() {
       toast({ title: "금액 오류", description: "올바른 금액을 입력해주세요", variant: "destructive" });
       return;
     }
-    const params = { memberId: selectedMember.id, amount, description: actionDescription };
-    if (actionDialog === "deposit-charge") depositChargeMutation.mutate(params);
-    else if (actionDialog === "deposit-refund") depositRefundMutation.mutate(params);
-    else if (actionDialog === "pointer-grant") pointerGrantMutation.mutate(params);
+    if (!actionDescription.trim()) {
+      toast({ title: "내용 필수", description: "내용을 입력해주세요", variant: "destructive" });
+      return;
+    }
+    const params = { memberId: selectedMember.id, amount, description: actionDescription.trim() };
+    if (actionDialog === "deposit") {
+      if (actionSubType === "charge") depositChargeMutation.mutate(params);
+      else depositRefundMutation.mutate(params);
+    } else if (actionDialog === "pointer") {
+      if (actionSubType === "grant") pointerGrantMutation.mutate(params);
+      else pointerDeductMutation.mutate(params);
+    }
   };
 
   const filteredMembers = memberList.filter(m => {
@@ -492,14 +520,11 @@ export function MemberSettlementTab() {
                             <TableCell className="text-right font-medium">{(member.deposit + member.point).toLocaleString()}원</TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center gap-1">
-                                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setSelectedMember(member); setActionDialog("deposit-charge"); }} data-testid={`button-deposit-charge-${member.id}`}>
-                                  <Plus className="h-3 w-3" />충전
+                                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setSelectedMember(member); setActionSubType("charge"); setActionDialog("deposit"); }} data-testid={`button-deposit-manage-${member.id}`}>
+                                  <Wallet className="h-3 w-3" />예치금 관리
                                 </Button>
-                                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setSelectedMember(member); setActionDialog("deposit-refund"); }} data-testid={`button-deposit-refund-${member.id}`}>
-                                  <Minus className="h-3 w-3" />환급
-                                </Button>
-                                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setSelectedMember(member); setActionDialog("pointer-grant"); }} data-testid={`button-pointer-grant-${member.id}`}>
-                                  <Gift className="h-3 w-3" />포인터
+                                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setSelectedMember(member); setActionSubType("grant"); setActionDialog("pointer"); }} data-testid={`button-pointer-manage-${member.id}`}>
+                                  <Gift className="h-3 w-3" />포인터 관리
                                 </Button>
                               </div>
                             </TableCell>
@@ -879,9 +904,8 @@ export function MemberSettlementTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {actionDialog === "deposit-charge" && "예치금 충전"}
-              {actionDialog === "deposit-refund" && "예치금 환급"}
-              {actionDialog === "pointer-grant" && "포인터 지급"}
+              {actionDialog === "deposit" && "예치금 관리"}
+              {actionDialog === "pointer" && "포인터 관리"}
             </DialogTitle>
           </DialogHeader>
           {selectedMember && (
@@ -889,23 +913,75 @@ export function MemberSettlementTab() {
               <div className="text-sm text-muted-foreground">
                 대상: <span className="font-medium text-foreground">{selectedMember.companyName}</span> ({selectedMember.username})
               </div>
-              <div className="text-sm flex gap-4">
-                <span>예치금: {selectedMember.deposit.toLocaleString()}원</span>
-                <span>포인터: {selectedMember.point.toLocaleString()}P</span>
+              <div className="text-sm flex gap-4 flex-wrap">
+                <span>예치금: <strong>{selectedMember.deposit.toLocaleString()}원</strong></span>
+                <span>포인터: <strong>{selectedMember.point.toLocaleString()}P</strong></span>
+              </div>
+              <div className="space-y-2">
+                <Label>유형</Label>
+                <div className="flex gap-2">
+                  {actionDialog === "deposit" ? (
+                    <>
+                      <Button
+                        variant={actionSubType === "charge" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActionSubType("charge")}
+                        className="flex-1"
+                        data-testid="button-subtype-charge"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />충전
+                      </Button>
+                      <Button
+                        variant={actionSubType === "refund" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActionSubType("refund")}
+                        className="flex-1"
+                        data-testid="button-subtype-refund"
+                      >
+                        <Minus className="h-3 w-3 mr-1" />환급
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant={actionSubType === "grant" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActionSubType("grant")}
+                        className="flex-1"
+                        data-testid="button-subtype-grant"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />지급
+                      </Button>
+                      <Button
+                        variant={actionSubType === "deduct" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActionSubType("deduct")}
+                        className="flex-1"
+                        data-testid="button-subtype-deduct"
+                      >
+                        <Minus className="h-3 w-3 mr-1" />삭감
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>금액</Label>
                 <Input type="number" value={actionAmount} onChange={(e) => setActionAmount(e.target.value)} placeholder="금액을 입력하세요" data-testid="input-action-amount" />
               </div>
               <div className="space-y-2">
-                <Label>설명 (선택)</Label>
-                <Textarea value={actionDescription} onChange={(e) => setActionDescription(e.target.value)} placeholder="메모를 입력하세요" data-testid="input-action-description" />
+                <Label>내용 <span className="text-destructive">*</span></Label>
+                <Textarea value={actionDescription} onChange={(e) => setActionDescription(e.target.value)} placeholder="내용을 입력하세요 (필수)" data-testid="input-action-description" />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => { setActionDialog(null); setActionAmount(""); setActionDescription(""); }} data-testid="button-action-cancel">취소</Button>
-                <Button onClick={handleAction} disabled={depositChargeMutation.isPending || depositRefundMutation.isPending || pointerGrantMutation.isPending} data-testid="button-action-confirm">
-                  {(depositChargeMutation.isPending || depositRefundMutation.isPending || pointerGrantMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  확인
+                <Button
+                  onClick={handleAction}
+                  disabled={!actionAmount || !actionDescription.trim() || depositChargeMutation.isPending || depositRefundMutation.isPending || pointerGrantMutation.isPending || pointerDeductMutation.isPending}
+                  data-testid="button-action-confirm"
+                >
+                  {(depositChargeMutation.isPending || depositRefundMutation.isPending || pointerGrantMutation.isPending || pointerDeductMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  {actionDialog === "deposit" ? (actionSubType === "charge" ? "충전" : "환급") : (actionSubType === "grant" ? "지급" : "삭감")}
                 </Button>
               </div>
             </div>

@@ -10233,6 +10233,7 @@ export async function registerRoutes(
       const { memberId } = req.params;
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "충전 금액을 올바르게 입력해주세요" });
+      if (!description || !description.trim()) return res.status(400).json({ message: "내용을 입력해주세요" });
 
       const result = await db.transaction(async (tx) => {
         const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
@@ -10294,6 +10295,7 @@ export async function registerRoutes(
       const { memberId } = req.params;
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "환급 금액을 올바르게 입력해주세요" });
+      if (!description || !description.trim()) return res.status(400).json({ message: "내용을 입력해주세요" });
 
       const result = await db.transaction(async (tx) => {
         const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
@@ -10337,6 +10339,7 @@ export async function registerRoutes(
       const { memberId } = req.params;
       const { amount, description } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ message: "지급 금액을 올바르게 입력해주세요" });
+      if (!description || !description.trim()) return res.status(400).json({ message: "내용을 입력해주세요" });
 
       const result = await db.transaction(async (tx) => {
         const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
@@ -10359,6 +10362,50 @@ export async function registerRoutes(
         return res.status(404).json({ message: result.message });
       }
       res.json({ success: true, message: `${result.newPoint.toLocaleString()}P 지급 완료`, newPoint: result.newPoint });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // 관리자: 포인터 삭감
+  app.post('/api/admin/members/:memberId/pointer/deduct', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { memberId } = req.params;
+      const { amount, description } = req.body;
+      if (!amount || amount <= 0) return res.status(400).json({ message: "삭감 금액을 올바르게 입력해주세요" });
+      if (!description || description.trim() === '') return res.status(400).json({ message: "내용을 입력해주세요" });
+
+      const result = await db.transaction(async (tx) => {
+        const [lockedMember] = await tx.select().from(members).where(eq(members.id, memberId)).for('update');
+        if (!lockedMember) return { error: true, status: 404, message: "회원을 찾을 수 없습니다" } as const;
+
+        if (lockedMember.point < amount) {
+          return { error: true, status: 400, message: `삭감 가능 포인터가 부족합니다. 현재 포인터: ${lockedMember.point.toLocaleString()}P` } as const;
+        }
+
+        const newPoint = lockedMember.point - amount;
+        await tx.update(members).set({ point: newPoint, updatedAt: new Date() }).where(eq(members.id, memberId));
+        await tx.insert(pointerHistory).values({
+          memberId,
+          type: "admin_deduct",
+          amount,
+          balanceAfter: newPoint,
+          description: description.trim(),
+          adminId: req.session.userId,
+        });
+        return { error: false, newPoint } as const;
+      });
+
+      if (result.error) {
+        return res.status(result.status).json({ message: result.message });
+      }
+      res.json({ success: true, message: `${amount.toLocaleString()}P 삭감 완료`, newPoint: result.newPoint });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -10639,7 +10686,7 @@ export async function registerRoutes(
 
       const pointerConditions: any[] = [
         eq(pointerHistory.memberId, memberId),
-        eq(pointerHistory.type, 'grant'),
+        inArray(pointerHistory.type, ['grant', 'admin_deduct']),
       ];
 
       const settlementConditions: any[] = [
@@ -10713,13 +10760,13 @@ export async function registerRoutes(
             }).from(depositHistory).where(eq(depositHistory.memberId, memberId)),
         startUTC
           ? db.select({
-              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} IN ('deduct', 'admin_deduct') THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
             }).from(pointerHistory).where(and(
               eq(pointerHistory.memberId, memberId),
               gte(pointerHistory.createdAt, startUTC),
             ))
           : db.select({
-              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} IN ('deduct', 'admin_deduct') THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
             }).from(pointerHistory).where(eq(pointerHistory.memberId, memberId)),
       ]);
 
@@ -10777,6 +10824,7 @@ export async function registerRoutes(
       }
 
       for (const row of pointerRows) {
+        const isAdminDeduct = row.type === 'admin_deduct';
         items.push({
           type: "pointer",
           date: row.date,
@@ -10786,8 +10834,8 @@ export async function registerRoutes(
           unitPrice: 0,
           subtotal: 0,
           depositAmount: 0,
-          pointerAmount: row.amount,
-          description: row.description || '포인터 지급',
+          pointerAmount: isAdminDeduct ? -row.amount : row.amount,
+          description: row.description || (isAdminDeduct ? '포인터 삭감' : '포인터 지급'),
           balance: 0,
         });
       }
@@ -10948,13 +10996,13 @@ export async function registerRoutes(
             }).from(depositHistory).where(eq(depositHistory.memberId, memberId)),
         startUTC
           ? db.select({
-              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} IN ('deduct', 'admin_deduct') THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
             }).from(pointerHistory).where(and(
               eq(pointerHistory.memberId, memberId),
               gte(pointerHistory.createdAt, startUTC),
             ))
           : db.select({
-              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+              netChange: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} IN ('deduct', 'admin_deduct') THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
             }).from(pointerHistory).where(eq(pointerHistory.memberId, memberId)),
         endUTC
           ? db.select({
@@ -10966,7 +11014,7 @@ export async function registerRoutes(
           : Promise.resolve([{ netDeposit: 0 }] as any),
         endUTC
           ? db.select({
-              netPointer: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} = 'deduct' THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
+              netPointer: sql<number>`COALESCE(SUM(CASE WHEN ${pointerHistory.type} = 'grant' THEN ${pointerHistory.amount} WHEN ${pointerHistory.type} IN ('deduct', 'admin_deduct') THEN -${pointerHistory.amount} ELSE 0 END), 0)::int`,
             }).from(pointerHistory).where(and(
               eq(pointerHistory.memberId, memberId),
               gt(pointerHistory.createdAt, endUTC),
@@ -11025,7 +11073,7 @@ export async function registerRoutes(
           type: "deposit",
           date: row.date,
           companyName,
-          productName: row.type === 'charge' ? '입금/예치금 충전' : '환급/예치금 환급',
+          productName: row.description || (row.type === 'charge' ? '입금/예치금 충전' : '환급/예치금 환급'),
           productCode: "",
           quantity: 1,
           unitPrice: 0,
@@ -11038,16 +11086,18 @@ export async function registerRoutes(
       }
 
       for (const row of pointerRows) {
+        const isAdminDeduct = row.type === 'admin_deduct';
+        const defaultName = isAdminDeduct ? '포인터 삭감' : '포인터 지급';
         items.push({
           type: "pointer",
           date: row.date,
           companyName,
-          productName: '포인터 충전',
+          productName: row.description || defaultName,
           productCode: "",
           quantity: 1,
           unitPrice: 0,
           subtotal: 0,
-          pointerChange: row.amount,
+          pointerChange: isAdminDeduct ? -row.amount : row.amount,
           depositChange: 0,
           description: row.description || undefined,
           balance: 0,
