@@ -17051,7 +17051,8 @@ export async function registerRoutes(
 
       const cleanBizNum = businessNumber.replace(/-/g, '');
       const CorpNum = process.env.POPBILL_CORP_NUM || '';
-      const MgtKey = `${year}${String(month).padStart(2, '0')}-${invoiceType === 'exempt' ? 'EX' : 'TX'}-${Date.now()}`;
+      const shortTs = String(Date.now()).slice(-8);
+      const MgtKey = `${year}${String(month).padStart(2, '0')}${invoiceType === 'exempt' ? 'EX' : 'TX'}${shortTs}`;
 
       const popbillFormatDate = (date: Date) => {
         const y = date.getFullYear();
