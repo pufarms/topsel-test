@@ -20,9 +20,10 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck, Wallet,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
+import { MemberSettlementTab } from "@/pages/admin/settlements";
 
 function formatCurrency(n: number) {
   return n.toLocaleString() + "원";
@@ -150,7 +151,7 @@ function SectionHeader({ number, title, icon: Icon, color, children, isOpen, onT
   number: string;
   title: string;
   icon: any;
-  color: "blue" | "emerald" | "amber";
+  color: "blue" | "emerald" | "amber" | "orange";
   children?: React.ReactNode;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -173,6 +174,12 @@ function SectionHeader({ number, title, icon: Icon, color, children, isOpen, onT
       iconBg: "bg-amber-100 dark:bg-amber-900/50",
       iconText: "text-amber-600 dark:text-amber-400",
       border: "border-l-amber-500",
+    },
+    orange: {
+      bg: "bg-orange-600 dark:bg-orange-500",
+      iconBg: "bg-orange-100 dark:bg-orange-900/50",
+      iconText: "text-orange-600 dark:text-orange-400",
+      border: "border-l-orange-500",
     },
   };
   const c = colorMap[color];
@@ -1034,7 +1041,7 @@ function DailySalesDetail() {
   return (
     <div className="rounded-lg border-l-4 border-l-emerald-500 border border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-md overflow-hidden">
       <div className="p-5">
-        <SectionHeader number="2" title="일별 매출 상세" icon={Calendar} color="emerald" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
+        <SectionHeader number="3" title="일별 매출 상세" icon={Calendar} color="emerald" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
           <div className="flex items-center gap-2">
             <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
               <SelectTrigger className="w-[120px]" data-testid="select-daily-filter">
@@ -1664,7 +1671,7 @@ function DirectSalesManagement() {
   return (
     <div className="rounded-lg border-l-4 border-l-amber-500 border border-amber-200 dark:border-amber-900 bg-amber-50/40 dark:bg-amber-950/20 shadow-md">
       <div className="p-5">
-        <SectionHeader number="3" title="직접 매출 관리" icon={Handshake} color="amber" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
+        <SectionHeader number="4" title="직접 매출 관리" icon={Handshake} color="amber" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
           <div className="flex items-center gap-2">
             <Button size="sm" className="gap-1" onClick={() => { resetAddForm(); setShowAddDialog(true); setAddDate(todayStr); }} data-testid="button-create-direct-sale">
               <Plus className="h-4 w-4" />등록
@@ -2344,10 +2351,27 @@ function DirectSalesManagement() {
   );
 }
 
+function MemberSettlementSection() {
+  const [sectionOpen, setSectionOpen] = useState(false);
+  return (
+    <div className="rounded-lg border-l-4 border-l-orange-500 border border-orange-200 dark:border-orange-900 bg-orange-50/40 dark:bg-orange-950/20 shadow-md overflow-hidden">
+      <div className="p-5">
+        <SectionHeader number="2" title="회원 매출/정산 관리" icon={Wallet} color="orange" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)} />
+        {sectionOpen && (
+          <div className="mt-4">
+            <MemberSettlementTab />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SalesOverviewTab() {
   return (
     <div className="space-y-10">
       <MonthlySalesSummary />
+      <MemberSettlementSection />
       <DailySalesDetail />
       <DirectSalesManagement />
     </div>

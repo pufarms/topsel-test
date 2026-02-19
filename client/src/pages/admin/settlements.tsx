@@ -115,7 +115,7 @@ function formatCurrency(n: number): string {
 
 const ITEMS_PER_PAGE = 30;
 
-function MemberSettlementTab() {
+export function MemberSettlementTab() {
   const { toast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState("members");
   const [selectedMember, setSelectedMember] = useState<MemberBalance | null>(null);
@@ -938,7 +938,7 @@ function MemberSettlementTab() {
 }
 
 export default function SettlementsPage() {
-  const [activeMainTab, setActiveMainTab] = useState("member-settlement");
+  const [activeMainTab, setActiveMainTab] = useState("purchase-management");
 
   return (
     <div data-testid="page-settlements">
@@ -951,9 +951,6 @@ export default function SettlementsPage() {
 
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
         <TabsList className="flex-wrap mb-4 bg-emerald-50 dark:bg-emerald-950/30">
-          <TabsTrigger value="member-settlement" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-member-settlement">
-            <Wallet className="h-4 w-4" />회원 매출/정산 관리
-          </TabsTrigger>
           <TabsTrigger value="purchase-management" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-purchase-management">
             <ShoppingCart className="h-4 w-4" />매입관리
           </TabsTrigger>
@@ -964,10 +961,6 @@ export default function SettlementsPage() {
             <TrendingUp className="h-4 w-4" />손익 현황
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="member-settlement">
-          <MemberSettlementTab />
-        </TabsContent>
 
         <TabsContent value="purchase-management">
           <PurchaseManagementTab />
