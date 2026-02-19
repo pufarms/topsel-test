@@ -37,6 +37,7 @@ import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilt
 import PurchaseManagementTab from "./accounting/purchase-management-tab";
 import SalesOverviewTab from "./accounting/sales-overview-tab";
 import ProfitLossTab from "./accounting/profit-loss-tab";
+import ExpenseManagementTab from "./accounting/expense-management-tab";
 
 interface MemberBalance {
   id: string;
@@ -1070,6 +1071,9 @@ export default function SettlementsPage() {
           <TabsTrigger value="profit-loss" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-profit-loss">
             <TrendingUp className="h-4 w-4" />손익 현황
           </TabsTrigger>
+          <TabsTrigger value="expense-management" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-expense-management">
+            <Settings className="h-4 w-4" />비용관리
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="purchase-management">
@@ -1082,6 +1086,10 @@ export default function SettlementsPage() {
 
         <TabsContent value="profit-loss">
           <ProfitLossTab />
+        </TabsContent>
+
+        <TabsContent value="expense-management">
+          <ExpenseManagementTab />
         </TabsContent>
       </Tabs>
     </div>

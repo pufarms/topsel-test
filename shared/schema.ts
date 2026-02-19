@@ -1889,3 +1889,79 @@ export const insertInvoiceRecordSchema = createInsertSchema(invoiceRecords).omit
 });
 export type InvoiceRecord = typeof invoiceRecords.$inferSelect;
 export type NewInvoiceRecord = z.infer<typeof insertInvoiceRecordSchema>;
+
+export const expenseCategories = [
+  "물류/배송비", "인건비", "시설/임대료", "마케팅/광고",
+  "IT/시스템", "사무/관리", "금융비용", "기타"
+] as const;
+export type ExpenseCategory = typeof expenseCategories[number];
+
+export const expenseTaxTypes = ["taxable", "exempt"] as const;
+export const expensePaymentMethods = ["계좌이체", "카드", "현금", "자동이체", "기타"] as const;
+
+export const expenses = pgTable("expenses", {
+  id: serial("id").primaryKey(),
+  expenseDate: date("expense_date").notNull(),
+  itemName: varchar("item_name", { length: 200 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  subCategory: varchar("sub_category", { length: 100 }),
+  amount: integer("amount").notNull(),
+  taxType: varchar("tax_type", { length: 10 }).notNull().default("taxable"),
+  supplyAmount: integer("supply_amount"),
+  vatAmount: integer("vat_amount"),
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("계좌이체"),
+  vendorName: varchar("vendor_name", { length: 100 }),
+  memo: text("memo"),
+  receiptUrl: text("receipt_url"),
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurringId: integer("recurring_id"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = z.infer<typeof insertExpenseSchema>;
+
+export const expenseKeywords = pgTable("expense_keywords", {
+  id: serial("id").primaryKey(),
+  keyword: varchar("keyword", { length: 100 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  subCategory: varchar("sub_category", { length: 100 }),
+  matchType: varchar("match_type", { length: 10 }).notNull().default("contains"),
+  priority: integer("priority").notNull().default(10),
+  source: varchar("source", { length: 10 }).notNull().default("system"),
+  useCount: integer("use_count").notNull().default(0),
+  lastAmount: integer("last_amount"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExpenseKeywordSchema = createInsertSchema(expenseKeywords).omit({
+  id: true,
+  createdAt: true,
+});
+export type ExpenseKeyword = typeof expenseKeywords.$inferSelect;
+export type NewExpenseKeyword = z.infer<typeof insertExpenseKeywordSchema>;
+
+export const expenseRecurring = pgTable("expense_recurring", {
+  id: serial("id").primaryKey(),
+  itemName: varchar("item_name", { length: 200 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  subCategory: varchar("sub_category", { length: 100 }),
+  amount: integer("amount").notNull(),
+  taxType: varchar("tax_type", { length: 10 }).notNull().default("taxable"),
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("계좌이체"),
+  vendorName: varchar("vendor_name", { length: 100 }),
+  dayOfMonth: integer("day_of_month").notNull().default(1),
+  cycle: varchar("cycle", { length: 10 }).notNull().default("monthly"),
+  cycleMonth: integer("cycle_month"),
+  isActive: boolean("is_active").notNull().default(true),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

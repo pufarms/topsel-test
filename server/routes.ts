@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategories } from "@shared/schema";
+import XLSX from "xlsx";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
 import { solapiService } from "./services/solapi";
@@ -17317,6 +17318,1004 @@ export async function registerRoutes(
           locked: preview.filter(p => p.gradeLocked).length,
         },
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== Expense classify helper function ==========
+  async function classifyExpenseItem(itemName: string): Promise<{ category: string | null; subCategory: string | null; confidence: string }> {
+    // Step 1: Exact match or high-priority keyword found in item_name
+    const highPriorityKeywords = await db.select().from(expenseKeywords)
+      .where(
+        or(
+          eq(expenseKeywords.matchType, 'exact'),
+          gte(expenseKeywords.priority, 50)
+        )
+      )
+      .orderBy(desc(expenseKeywords.priority));
+
+    for (const kw of highPriorityKeywords) {
+      if (kw.matchType === 'exact' && kw.keyword === itemName) {
+        return { category: kw.category, subCategory: kw.subCategory, confidence: 'high' };
+      }
+      if (kw.priority >= 50 && itemName.includes(kw.keyword)) {
+        return { category: kw.category, subCategory: kw.subCategory, confidence: 'high' };
+      }
+    }
+
+    // Step 2: Contains match
+    const allKeywords = await db.select().from(expenseKeywords)
+      .orderBy(desc(expenseKeywords.priority), desc(expenseKeywords.useCount));
+
+    for (const kw of allKeywords) {
+      if (itemName.includes(kw.keyword)) {
+        return { category: kw.category, subCategory: kw.subCategory, confidence: 'medium' };
+      }
+    }
+
+    // Step 3: No match
+    return { category: null, subCategory: null, confidence: 'none' };
+  }
+
+  // ========== Expense Management Routes ==========
+
+  // GET /api/admin/accounting/expenses
+  app.get("/api/admin/accounting/expenses", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { month, category, search } = req.query;
+      const conditions: any[] = [];
+
+      if (month && typeof month === 'string') {
+        conditions.push(like(expenses.expenseDate, `${month}%`));
+      }
+      if (category && typeof category === 'string') {
+        conditions.push(eq(expenses.category, category));
+      }
+      if (search && typeof search === 'string') {
+        conditions.push(ilike(expenses.itemName, `%${search}%`));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const expenseList = await db.select().from(expenses)
+        .where(whereClause)
+        .orderBy(desc(expenses.expenseDate), desc(expenses.id));
+
+      const monthTotal = expenseList.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+      const categoryMap: Record<string, number> = {};
+      for (const e of expenseList) {
+        categoryMap[e.category] = (categoryMap[e.category] || 0) + (e.amount || 0);
+      }
+      const categoryTotals = Object.entries(categoryMap).map(([category, total]) => ({ category, total }));
+
+      res.json({ expenses: expenseList, monthTotal, categoryTotals });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses
+  app.post("/api/admin/accounting/expenses", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { expenseDate, itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+
+      let supplyAmount: number;
+      let vatAmount: number;
+      if (taxType === 'taxable') {
+        supplyAmount = Math.round(amount / 1.1);
+        vatAmount = amount - supplyAmount;
+      } else {
+        supplyAmount = amount;
+        vatAmount = 0;
+      }
+
+      const [inserted] = await db.insert(expenses).values({
+        expenseDate,
+        itemName,
+        category,
+        subCategory: subCategory || null,
+        amount,
+        taxType: taxType || 'taxable',
+        supplyAmount,
+        vatAmount,
+        paymentMethod: paymentMethod || '계좌이체',
+        vendorName: vendorName || null,
+        memo: memo || null,
+        receiptUrl: receiptUrl || null,
+        createdBy: user.username,
+      }).returning();
+
+      // Keyword learning logic
+      try {
+        const existingKeyword = await db.select().from(expenseKeywords)
+          .where(eq(expenseKeywords.keyword, itemName))
+          .limit(1);
+
+        if (existingKeyword.length === 0) {
+          await db.insert(expenseKeywords).values({
+            keyword: itemName,
+            category,
+            subCategory: subCategory || null,
+            priority: 50,
+            source: 'learned',
+            lastAmount: amount,
+            useCount: 1,
+          });
+        } else {
+          await db.update(expenseKeywords)
+            .set({
+              useCount: sql`${expenseKeywords.useCount} + 1`,
+              lastAmount: amount,
+            })
+            .where(eq(expenseKeywords.keyword, itemName));
+        }
+
+        // Extract first word
+        const firstWord = itemName.split(/\s+/)[0];
+        if (firstWord && firstWord.length >= 2 && firstWord !== itemName) {
+          const existingFirstWord = await db.select().from(expenseKeywords)
+            .where(eq(expenseKeywords.keyword, firstWord))
+            .limit(1);
+          if (existingFirstWord.length === 0) {
+            await db.insert(expenseKeywords).values({
+              keyword: firstWord,
+              category,
+              subCategory: subCategory || null,
+              priority: 15,
+              source: 'learned',
+              lastAmount: amount,
+              useCount: 0,
+            });
+          }
+        }
+      } catch (learnErr) {
+        console.error("Keyword learning error (non-critical):", learnErr);
+      }
+
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/bulk
+  app.post("/api/admin/accounting/expenses/bulk", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "items 배열이 필요합니다" });
+      }
+
+      let count = 0;
+      for (const item of items) {
+        let { expenseDate, itemName, amount, category, subCategory, taxType, paymentMethod, vendorName, memo } = item;
+
+        if (!category) {
+          const classified = await classifyExpenseItem(itemName);
+          category = classified.category || '기타';
+          subCategory = classified.subCategory || null;
+        }
+
+        taxType = taxType || 'taxable';
+        let supplyAmount: number;
+        let vatAmount: number;
+        if (taxType === 'taxable') {
+          supplyAmount = Math.round(amount / 1.1);
+          vatAmount = amount - supplyAmount;
+        } else {
+          supplyAmount = amount;
+          vatAmount = 0;
+        }
+
+        await db.insert(expenses).values({
+          expenseDate,
+          itemName,
+          category,
+          subCategory: subCategory || null,
+          amount,
+          taxType,
+          supplyAmount,
+          vatAmount,
+          paymentMethod: paymentMethod || '계좌이체',
+          vendorName: vendorName || null,
+          memo: memo || null,
+          createdBy: user.username,
+        });
+        count++;
+      }
+
+      res.json({ success: true, count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/expenses/:id
+  app.put("/api/admin/accounting/expenses/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const { expenseDate, itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, memo, receiptUrl } = req.body;
+
+      let supplyAmount: number | undefined;
+      let vatAmount: number | undefined;
+      if (amount !== undefined && taxType !== undefined) {
+        if (taxType === 'taxable') {
+          supplyAmount = Math.round(amount / 1.1);
+          vatAmount = amount - supplyAmount;
+        } else {
+          supplyAmount = amount;
+          vatAmount = 0;
+        }
+      }
+
+      const updateData: any = { updatedAt: new Date() };
+      if (expenseDate !== undefined) updateData.expenseDate = expenseDate;
+      if (itemName !== undefined) updateData.itemName = itemName;
+      if (category !== undefined) updateData.category = category;
+      if (subCategory !== undefined) updateData.subCategory = subCategory;
+      if (amount !== undefined) updateData.amount = amount;
+      if (taxType !== undefined) updateData.taxType = taxType;
+      if (supplyAmount !== undefined) updateData.supplyAmount = supplyAmount;
+      if (vatAmount !== undefined) updateData.vatAmount = vatAmount;
+      if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+      if (vendorName !== undefined) updateData.vendorName = vendorName;
+      if (memo !== undefined) updateData.memo = memo;
+      if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl;
+
+      const [updated] = await db.update(expenses)
+        .set(updateData)
+        .where(eq(expenses.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "비용을 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/expenses/:id
+  app.delete("/api/admin/accounting/expenses/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(expenses).where(eq(expenses.id, id)).returning();
+      if (!deleted) {
+        return res.status(404).json({ message: "비용을 찾을 수 없습니다" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/summary
+  app.get("/api/admin/accounting/expenses/summary", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+
+      // Current month totals
+      const currentMonthExpenses = await db.select().from(expenses)
+        .where(like(expenses.expenseDate, `${month}%`));
+
+      const totalExpense = currentMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+      const byCategoryMap: Record<string, number> = {};
+      for (const e of currentMonthExpenses) {
+        byCategoryMap[e.category] = (byCategoryMap[e.category] || 0) + (e.amount || 0);
+      }
+      const byCategory = Object.entries(byCategoryMap).map(([category, total]) => ({ category, total }));
+
+      // Previous month total
+      const [prevYear, prevMonthNum] = month.split('-').map(Number);
+      const prevDate = new Date(prevYear, prevMonthNum - 2, 1);
+      const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+      const prevMonthExpenses = await db.select().from(expenses)
+        .where(like(expenses.expenseDate, `${prevMonth}%`));
+
+      const previousMonthTotal = prevMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const changePercent = previousMonthTotal > 0
+        ? Math.round(((totalExpense - previousMonthTotal) / previousMonthTotal) * 100 * 10) / 10
+        : 0;
+
+      res.json({ totalExpense, byCategory, previousMonthTotal, changePercent });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/trend
+  app.get("/api/admin/accounting/expenses/trend", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const monthsCount = parseInt(req.query.months as string) || 6;
+      const now = new Date();
+      const result: any[] = [];
+
+      for (let i = monthsCount - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+        const monthExpenses = await db.select().from(expenses)
+          .where(like(expenses.expenseDate, `${monthStr}%`));
+
+        const total = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+        const categoryBreakdown: Record<string, number> = {};
+        for (const e of monthExpenses) {
+          categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + (e.amount || 0);
+        }
+
+        result.push({ month: monthStr, total, categoryBreakdown });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/autocomplete
+  app.get("/api/admin/accounting/expenses/autocomplete", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const q = req.query.q as string;
+      if (!q || q.length < 1) {
+        return res.json([]);
+      }
+
+      // Search keywords
+      const keywordResults = await db.select().from(expenseKeywords)
+        .where(ilike(expenseKeywords.keyword, `%${q}%`))
+        .orderBy(desc(expenseKeywords.priority), desc(expenseKeywords.useCount))
+        .limit(10);
+
+      // Search recent expenses
+      const expenseResults = await db.selectDistinctOn([expenses.itemName], {
+        itemName: expenses.itemName,
+        category: expenses.category,
+        subCategory: expenses.subCategory,
+        amount: expenses.amount,
+      }).from(expenses)
+        .where(ilike(expenses.itemName, `%${q}%`))
+        .orderBy(expenses.itemName, desc(expenses.expenseDate))
+        .limit(10);
+
+      // Merge results
+      const seen = new Set<string>();
+      const merged: any[] = [];
+
+      for (const kw of keywordResults) {
+        if (!seen.has(kw.keyword)) {
+          seen.add(kw.keyword);
+          merged.push({
+            item_name: kw.keyword,
+            category: kw.category,
+            sub_category: kw.subCategory,
+            last_amount: kw.lastAmount,
+            source: 'keyword',
+            priority: kw.priority,
+            useCount: kw.useCount,
+          });
+        }
+      }
+
+      for (const e of expenseResults) {
+        if (!seen.has(e.itemName)) {
+          seen.add(e.itemName);
+          merged.push({
+            item_name: e.itemName,
+            category: e.category,
+            sub_category: e.subCategory,
+            last_amount: e.amount,
+            source: 'history',
+            priority: 0,
+            useCount: 0,
+          });
+        }
+      }
+
+      // Sort by priority desc, useCount desc
+      merged.sort((a, b) => (b.priority - a.priority) || (b.useCount - a.useCount));
+
+      res.json(merged.slice(0, 10));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/classify
+  app.post("/api/admin/accounting/expenses/classify", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { item_name } = req.body;
+      if (!item_name) {
+        return res.status(400).json({ message: "item_name이 필요합니다" });
+      }
+
+      const result = await classifyExpenseItem(item_name);
+      res.json({
+        category: result.category,
+        sub_category: result.subCategory,
+        confidence: result.confidence,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/keywords
+  app.get("/api/admin/accounting/expenses/keywords", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { category, search } = req.query;
+      const conditions: any[] = [];
+
+      if (category && typeof category === 'string') {
+        conditions.push(eq(expenseKeywords.category, category));
+      }
+      if (search && typeof search === 'string') {
+        conditions.push(ilike(expenseKeywords.keyword, `%${search}%`));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const keywords = await db.select().from(expenseKeywords)
+        .where(whereClause)
+        .orderBy(desc(expenseKeywords.priority), desc(expenseKeywords.useCount));
+
+      res.json(keywords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/keywords
+  app.post("/api/admin/accounting/expenses/keywords", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { keyword, category, subCategory, matchType } = req.body;
+
+      const existing = await db.select().from(expenseKeywords)
+        .where(eq(expenseKeywords.keyword, keyword))
+        .limit(1);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ message: "이미 등록된 키워드입니다" });
+      }
+
+      const [inserted] = await db.insert(expenseKeywords).values({
+        keyword,
+        category,
+        subCategory: subCategory || null,
+        matchType: matchType || 'contains',
+        priority: 50,
+        source: 'admin',
+        useCount: 0,
+      }).returning();
+
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/expenses/keywords/:id
+  app.put("/api/admin/accounting/expenses/keywords/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existing = await db.select().from(expenseKeywords)
+        .where(eq(expenseKeywords.id, id))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "키워드를 찾을 수 없습니다" });
+      }
+
+      const kw = existing[0];
+      const updateData: any = {};
+
+      if (kw.source === 'system') {
+        if (req.body.category !== undefined) updateData.category = req.body.category;
+        if (req.body.subCategory !== undefined) updateData.subCategory = req.body.subCategory;
+      } else {
+        if (req.body.keyword !== undefined) updateData.keyword = req.body.keyword;
+        if (req.body.category !== undefined) updateData.category = req.body.category;
+        if (req.body.subCategory !== undefined) updateData.subCategory = req.body.subCategory;
+        if (req.body.matchType !== undefined) updateData.matchType = req.body.matchType;
+        if (req.body.priority !== undefined) updateData.priority = req.body.priority;
+      }
+
+      const [updated] = await db.update(expenseKeywords)
+        .set(updateData)
+        .where(eq(expenseKeywords.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/expenses/keywords/:id
+  app.delete("/api/admin/accounting/expenses/keywords/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existing = await db.select().from(expenseKeywords)
+        .where(eq(expenseKeywords.id, id))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "키워드를 찾을 수 없습니다" });
+      }
+
+      if (existing[0].source === 'system') {
+        return res.status(400).json({ message: "시스템 키워드는 삭제할 수 없습니다" });
+      }
+
+      await db.delete(expenseKeywords).where(eq(expenseKeywords.id, id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/recurring
+  app.get("/api/admin/accounting/expenses/recurring", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const recurringList = await db.select().from(expenseRecurring)
+        .orderBy(asc(expenseRecurring.dayOfMonth));
+
+      res.json(recurringList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/recurring
+  app.post("/api/admin/accounting/expenses/recurring", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { itemName, category, subCategory, amount, taxType, paymentMethod, vendorName, dayOfMonth, cycle, cycleMonth, memo } = req.body;
+
+      const [inserted] = await db.insert(expenseRecurring).values({
+        itemName,
+        category,
+        subCategory: subCategory || null,
+        amount,
+        taxType: taxType || 'taxable',
+        paymentMethod: paymentMethod || '계좌이체',
+        vendorName: vendorName || null,
+        dayOfMonth: dayOfMonth || 1,
+        cycle: cycle || 'monthly',
+        cycleMonth: cycleMonth || null,
+        memo: memo || null,
+      }).returning();
+
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PUT /api/admin/accounting/expenses/recurring/:id
+  app.put("/api/admin/accounting/expenses/recurring/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const updateData: any = { updatedAt: new Date() };
+      const body = req.body;
+      if (body.itemName !== undefined) updateData.itemName = body.itemName;
+      if (body.category !== undefined) updateData.category = body.category;
+      if (body.subCategory !== undefined) updateData.subCategory = body.subCategory;
+      if (body.amount !== undefined) updateData.amount = body.amount;
+      if (body.taxType !== undefined) updateData.taxType = body.taxType;
+      if (body.paymentMethod !== undefined) updateData.paymentMethod = body.paymentMethod;
+      if (body.vendorName !== undefined) updateData.vendorName = body.vendorName;
+      if (body.dayOfMonth !== undefined) updateData.dayOfMonth = body.dayOfMonth;
+      if (body.cycle !== undefined) updateData.cycle = body.cycle;
+      if (body.cycleMonth !== undefined) updateData.cycleMonth = body.cycleMonth;
+      if (body.memo !== undefined) updateData.memo = body.memo;
+
+      const [updated] = await db.update(expenseRecurring)
+        .set(updateData)
+        .where(eq(expenseRecurring.id, id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "정기 비용을 찾을 수 없습니다" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/admin/accounting/expenses/recurring/:id
+  app.delete("/api/admin/accounting/expenses/recurring/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(expenseRecurring).where(eq(expenseRecurring.id, id)).returning();
+      if (!deleted) {
+        return res.status(404).json({ message: "정기 비용을 찾을 수 없습니다" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/admin/accounting/expenses/recurring/:id/toggle
+  app.patch("/api/admin/accounting/expenses/recurring/:id/toggle", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existing = await db.select().from(expenseRecurring)
+        .where(eq(expenseRecurring.id, id))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ message: "정기 비용을 찾을 수 없습니다" });
+      }
+
+      const [updated] = await db.update(expenseRecurring)
+        .set({ isActive: !existing[0].isActive, updatedAt: new Date() })
+        .where(eq(expenseRecurring.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/recurring/generate
+  app.post("/api/admin/accounting/expenses/recurring/generate", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const { month } = req.body;
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ message: "month 형식은 YYYY-MM 이어야 합니다" });
+      }
+
+      const [yearStr, monthStr] = month.split('-');
+      const yearNum = parseInt(yearStr);
+      const monthNum = parseInt(monthStr);
+
+      const activeRecurring = await db.select().from(expenseRecurring)
+        .where(eq(expenseRecurring.isActive, true));
+
+      let generated = 0;
+      let skipped = 0;
+
+      for (const rec of activeRecurring) {
+        // For yearly cycle, only generate if month matches cycleMonth
+        if (rec.cycle === 'yearly' && rec.cycleMonth !== monthNum) {
+          skipped++;
+          continue;
+        }
+
+        const day = Math.min(rec.dayOfMonth, 28);
+        const expenseDate = `${month}-${String(day).padStart(2, '0')}`;
+
+        // Check if already generated for this month
+        const existing = await db.select().from(expenses)
+          .where(
+            and(
+              eq(expenses.recurringId, rec.id),
+              like(expenses.expenseDate, `${month}%`)
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        let supplyAmount: number;
+        let vatAmount: number;
+        if (rec.taxType === 'taxable') {
+          supplyAmount = Math.round(rec.amount / 1.1);
+          vatAmount = rec.amount - supplyAmount;
+        } else {
+          supplyAmount = rec.amount;
+          vatAmount = 0;
+        }
+
+        await db.insert(expenses).values({
+          expenseDate,
+          itemName: rec.itemName,
+          category: rec.category,
+          subCategory: rec.subCategory,
+          amount: rec.amount,
+          taxType: rec.taxType,
+          supplyAmount,
+          vatAmount,
+          paymentMethod: rec.paymentMethod,
+          vendorName: rec.vendorName,
+          memo: rec.memo,
+          isRecurring: true,
+          recurringId: rec.id,
+          createdBy: user.username,
+        });
+        generated++;
+      }
+
+      res.json({ generated, skipped });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/admin/accounting/expenses/upload
+  const expenseUpload = multer({ storage: multer.memoryStorage() });
+  app.post("/api/admin/accounting/expenses/upload", expenseUpload.single("file"), async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "파일이 필요합니다" });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      let count = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        try {
+          const row = rows[i];
+          const itemName = row['항목명'] || row['item_name'];
+          const rawAmount = row['금액'] || row['amount'];
+          const rawDate = row['날짜'] || row['date'] || row['expense_date'];
+
+          if (!itemName || !rawAmount || !rawDate) {
+            errors.push(`행 ${i + 2}: 필수 항목(날짜, 항목명, 금액)이 누락되었습니다`);
+            continue;
+          }
+
+          const amount = typeof rawAmount === 'number' ? rawAmount : parseInt(String(rawAmount).replace(/[^0-9]/g, ''));
+          if (isNaN(amount)) {
+            errors.push(`행 ${i + 2}: 금액이 유효하지 않습니다`);
+            continue;
+          }
+
+          // Parse date
+          let expenseDate: string;
+          if (typeof rawDate === 'number') {
+            const dateObj = XLSX.SSF.parse_date_code(rawDate);
+            expenseDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+          } else {
+            expenseDate = String(rawDate).replace(/\//g, '-');
+          }
+
+          const taxTypeRaw = row['과세구분'] || row['tax_type'] || '과세';
+          const taxType = (taxTypeRaw === '면세' || taxTypeRaw === 'exempt') ? 'exempt' : 'taxable';
+          const paymentMethod = row['결제방법'] || row['payment_method'] || '계좌이체';
+          const vendorName = row['거래처'] || row['vendor_name'] || null;
+          const memo = row['메모'] || row['memo'] || null;
+
+          // Classify
+          const classified = await classifyExpenseItem(itemName);
+          const category = classified.category || '기타';
+          const subCategory = classified.subCategory || null;
+
+          let supplyAmount: number;
+          let vatAmount: number;
+          if (taxType === 'taxable') {
+            supplyAmount = Math.round(amount / 1.1);
+            vatAmount = amount - supplyAmount;
+          } else {
+            supplyAmount = amount;
+            vatAmount = 0;
+          }
+
+          await db.insert(expenses).values({
+            expenseDate,
+            itemName,
+            category,
+            subCategory,
+            amount,
+            taxType,
+            supplyAmount,
+            vatAmount,
+            paymentMethod,
+            vendorName,
+            memo,
+            createdBy: user.username,
+          });
+          count++;
+        } catch (rowErr: any) {
+          errors.push(`행 ${i + 2}: ${rowErr.message}`);
+        }
+      }
+
+      res.json({ success: true, count, errors });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/download
+  app.get("/api/admin/accounting/expenses/download", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
+
+      const expenseList = await db.select().from(expenses)
+        .where(like(expenses.expenseDate, `${month}%`))
+        .orderBy(desc(expenses.expenseDate), desc(expenses.id));
+
+      const data = expenseList.map(e => ({
+        '날짜': e.expenseDate,
+        '분류': e.category,
+        '세부항목': e.subCategory || '',
+        '항목명': e.itemName,
+        '금액': e.amount,
+        '공급가': e.supplyAmount || 0,
+        '부가세': e.vatAmount || 0,
+        '과세구분': e.taxType === 'taxable' ? '과세' : '면세',
+        '결제방법': e.paymentMethod,
+        '거래처': e.vendorName || '',
+        '메모': e.memo || '',
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, '비용내역');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=expenses_${month}.xlsx`);
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/template
+  app.get("/api/admin/accounting/expenses/template", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const headers = [['날짜', '항목명', '금액', '과세구분(과세/면세)', '결제방법', '거래처', '메모']];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(headers);
+      XLSX.utils.book_append_sheet(wb, ws, '비용업로드양식');
+
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=expense_template.xlsx');
+      res.send(buffer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

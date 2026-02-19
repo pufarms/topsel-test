@@ -1,7 +1,7 @@
 # Order Management System
 
 ## Overview
-This project is a Korean-language order management system for sellers and administrators, designed to streamline order submission and comprehensive management. It features role-based authentication, separate dashboards, intuitive order entry, detailed history, and extensive user management. The system enhances efficiency, reduces manual errors, and centralizes data with critical business rules for pricing, responsive design, category management, smart address validation, and an outsourcing/vendor system. The vision is to be the leading solution in the Korean market, known for reliability, features, and user-friendliness, driving efficiency for e-commerce.
+This project is a comprehensive Korean-language order management system for sellers and administrators, designed to centralize order submission and management. It features role-based authentication, distinct dashboards for different user types, intuitive order entry, detailed history tracking, and extensive user management capabilities. The system aims to significantly enhance operational efficiency, minimize manual errors, and provide a unified data source with critical business rules for pricing, responsive design, category management, smart address validation, and an integrated outsourcing/vendor system. The overarching goal is to establish the system as a leading, reliable, feature-rich, and user-friendly solution in the Korean e-commerce market.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -147,10 +147,9 @@ Preferred communication style: Simple, everyday language.
 ### Frontend
 - **Framework**: React 18 with TypeScript, Wouter for routing.
 - **State Management**: TanStack React Query for server state, React Context for authentication.
-- **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS.
+- **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS, Topsel Design System (v2.0.0).
 - **Form Handling**: React Hook Form with Zod validation.
 - **Build Tool**: Vite.
-- **Design System**: Topsel Design System (v2.0.0) for global styles, responsiveness, and component standards (e.g., scrollable tables, pagination).
 
 ### Backend
 - **Framework**: Express 5 on Node.js with TypeScript.
@@ -161,26 +160,26 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect.
 - **Schema**: Shared `shared/schema.ts` with Zod schemas.
-- **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, `siteSettings`, `vendors`, `product_vendors`, `order_allocations`, `allocation_details`, `vendor_payments`, `inquiries`, `inquiry_messages`, `inquiry_fields`, `inquiry_attachments`, `invoice_records`.
+- **Database Schema**: Key tables for users, orders, products, categories, members, site settings, vendors, allocations, payments, inquiries, invoices, and expenses.
 
 ### Core Features
-- **User Portals**: Member Mypage, Admin dashboards, and Partner Portal.
-- **Product & Inventory Management**: Tools for categories, registration, material management, product mapping, stock tracking, and bulk Excel uploads.
-- **Admin Design System**: Standardized components and design rules.
-- **Filter Components**: `AdminCategoryFilter`, `MemberOrderFilter`, `DateRangeFilter` (KST timezone, server-side SQL filtering).
-- **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
-- **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management.
-- **Legal Compliance**: Term Agreement Record Keeping.
-- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms; categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
-- **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
-- **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
-- **Outsourcing/Vendor System**: Manages vendors and product mapping, with stock logic differentiating between vendor and self-fulfilled orders.
-- **Allocation System**: 5-step workflow (aggregation → notification → response → confirmation → assignment) for allocating orders to vendors, with auto-adjustment for insufficient supply.
-- **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication, offering dashboard, allocation response, order list, tracking registration, and settlement view.
-- **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view.
-- **Inquiry Board System (문의 게시판)**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features for both admin and members, integrated with dashboards for notifications.
-- **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with overview, member-specific, and product-specific sales data, including charts, tables, and Excel export, all sourced from `priceConfirmed=true` orders.
-- **Invoice Management System (계산서/세금계산서 관리)**: Monthly invoice tracking with `invoice_records` table, unified summary view, manual invoice issuance, and `isAutoIssued` flag for future automation.
+- **User Portals**: Member Mypage, Admin dashboards, Partner Portal.
+- **Product & Inventory Management**: Categories, registration, material management, product mapping, stock tracking, bulk Excel uploads.
+- **Filtering**: `AdminCategoryFilter`, `MemberOrderFilter`, `DateRangeFilter` (KST timezone, server-side SQL filtering).
+- **Excel Uploads**: Standard pattern for `.xlsx` and `.xls` with partial order support and error reporting.
+- **CMS**: Site Settings, Header Menu, Page Management.
+- **Legal**: Term Agreement Record Keeping.
+- **Smart Address Validation**: Multi-step pipeline using regex, pattern similarity, rule-based validation, and AI, categorizing addresses as `VALID`, `WARNING`, or `INVALID`.
+- **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE.
+- **Page Access Control**: Hierarchical role-based access from `PENDING` to `SUPER_ADMIN` with server-side validation.
+- **Outsourcing/Vendor System**: Vendor management and product mapping, stock logic for vendor/self-fulfilled orders.
+- **Allocation System**: 5-step workflow (aggregation → notification → response → confirmation → assignment) for vendor order allocation, with auto-adjustment.
+- **Partner Portal**: Vendor-facing portal with JWT auth, dashboard, allocation response, order list, tracking, and settlement.
+- **Vendor Payment System**: Tracks admin-entered payments and provides chronological settlement views.
+- **Inquiry Board System**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features.
+- **Sales Statistics Dashboard**: Comprehensive analytics (`/admin/stats`) including overview, member-specific, and product-specific sales data, charts, tables, and Excel export, based on `priceConfirmed=true` orders.
+- **Invoice Management System**: Monthly invoice tracking, unified summary, manual issuance, with `isAutoIssued` for future automation.
+- **Expense Management System**: Expense tracking across 8 categories, auto-classification via keyword dictionary, autocomplete, bulk spreadsheet entry, Excel import/export, recurring expense management, charts, and keyword learning.
 
 ## External Dependencies
 
@@ -204,6 +203,6 @@ Preferred communication style: Simple, everyday language.
 
 ### Other APIs
 - Resend (email)
-- Juso.go.kr (행정안전부 주소 API) (address verification)
+- Juso.go.kr (행정안전부 주소 API for address verification)
 - Anthropic Claude AI (address normalization)
 - Solapi (SMS for vendor notification)
