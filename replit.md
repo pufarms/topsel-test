@@ -1,7 +1,7 @@
 # Order Management System
 
 ## Overview
-This project is a Korean-language order management system designed to streamline operations for sellers and administrators. Its primary purpose is to allow sellers to efficiently submit orders and provide administrators with comprehensive tools for managing all orders and users. Key capabilities include robust role-based authentication, separate dashboards for sellers and administrators, intuitive order entry forms, detailed order history tracking, and extensive user management functionalities. The system aims to enhance efficiency, reduce manual errors, and provide a centralized platform for order and user data. It features critical business rules for pricing, a responsive design, integrated category management, smart address validation, and an outsourcing/vendor system for order fulfillment. The project's vision is to become the leading order management solution in the Korean market, known for its reliability, comprehensive features, and user-friendly experience, ultimately driving significant efficiency gains for e-commerce businesses.
+This project is a Korean-language order management system for sellers and administrators, designed to streamline order submission and comprehensive management. It features role-based authentication, separate dashboards, intuitive order entry, detailed history, and extensive user management. The system enhances efficiency, reduces manual errors, and centralizes data with critical business rules for pricing, responsive design, category management, smart address validation, and an outsourcing/vendor system. The vision is to be the leading solution in the Korean market, known for reliability, features, and user-friendliness, driving efficiency for e-commerce.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -150,7 +150,7 @@ Preferred communication style: Simple, everyday language.
 - **UI/Styling**: shadcn/ui (Radix UI, Lucide React), Tailwind CSS.
 - **Form Handling**: React Hook Form with Zod validation.
 - **Build Tool**: Vite.
-- **Design System**: Topsel Design System (v2.0.0) defines global styles, color palette, responsive breakpoints, and typography. All pages must be responsive, use Pretendard font, have scrollable tables with sticky headers and pagination options, and integrate category filtering.
+- **Design System**: Topsel Design System (v2.0.0) for global styles, responsiveness, and component standards (e.g., scrollable tables, pagination).
 
 ### Backend
 - **Framework**: Express 5 on Node.js with TypeScript.
@@ -160,7 +160,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect.
-- **Schema**: Shared `shared/schema.ts` with Zod schemas generated from Drizzle.
+- **Schema**: Shared `shared/schema.ts` with Zod schemas.
 - **Database Schema**: Key tables include `users`, `orders`, `products`, `categories`, `members`, `siteSettings`, `vendors`, `product_vendors`, `order_allocations`, `allocation_details`, `vendor_payments`, `inquiries`, `inquiry_messages`, `inquiry_fields`, `inquiry_attachments`, `invoice_records`.
 
 ### Core Features
@@ -171,13 +171,13 @@ Preferred communication style: Simple, everyday language.
 - **Excel Upload Standard Pattern**: Supports `.xlsx` and `.xls` for data import, including partial order uploads with error reporting.
 - **CMS & Configuration**: Site Settings, Header Menu Management, and Page Management.
 - **Legal Compliance**: Term Agreement Record Keeping.
-- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms. Categorizes addresses as `VALID`, `WARNING`, or `INVALID` and includes AI Address Learning Management.
+- **Smart Address Validation System**: Multi-step pipeline for validating and normalizing recipient addresses using regex, pattern similarity, rule-based validation, and AI with learning mechanisms; categorizes addresses as `VALID`, `WARNING`, or `INVALID`.
 - **Order Workflow**: Orders transition through `주문대기` (Pending), `주문조정` (Adjustment), `상품준비중` (Product Preparation), `배송준비중` (Ready for Shipping), and `배송중` (In Shipping), with real-time updates via SSE events.
 - **Page Access Control**: Levels from `PENDING` to `SUPER_ADMIN` with hierarchical access and server-side validation.
 - **Outsourcing/Vendor System**: Manages vendors and product mapping, with stock logic differentiating between vendor and self-fulfilled orders.
 - **Allocation System**: 5-step workflow (aggregation → notification → response → confirmation → assignment) for allocating orders to vendors, with auto-adjustment for insufficient supply.
-- **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication, offering dashboard, allocation response, order list, tracking registration (individual + bulk Excel), and settlement view.
-- **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view merging order and payment rows.
+- **Partner Portal (/partner)**: Vendor-facing portal with separate JWT authentication, offering dashboard, allocation response, order list, tracking registration, and settlement view.
+- **Vendor Payment System**: Tracks admin-entered payments per vendor and provides a chronological settlement view.
 - **Inquiry Board System (문의 게시판)**: Thread-based 1:1 inquiry system with dynamic fields, attachments, status flow, and category-specific features for both admin and members, integrated with dashboards for notifications.
 - **Sales Statistics Dashboard** (`/admin/stats`): Comprehensive analytics with overview, member-specific, and product-specific sales data, including charts, tables, and Excel export, all sourced from `priceConfirmed=true` orders.
 - **Invoice Management System (계산서/세금계산서 관리)**: Monthly invoice tracking with `invoice_records` table, unified summary view, manual invoice issuance, and `isAutoIssued` flag for future automation.
