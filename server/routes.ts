@@ -16437,6 +16437,10 @@ export async function registerRoutes(
               issuedStatus: 'issued',
               issuedAt: inv.issuedAt,
               isAutoIssued: inv.isAutoIssued,
+              isManuallyAdjusted: inv.isManuallyAdjusted || false,
+              originalSupplyAmount: inv.originalSupplyAmount,
+              originalVatAmount: inv.originalVatAmount,
+              originalTotalAmount: inv.originalTotalAmount,
               memo: inv.memo,
               orderIds: inv.orderIds,
             });
@@ -16554,6 +16558,10 @@ export async function registerRoutes(
               issuedStatus: 'issued',
               issuedAt: inv.issuedAt,
               isAutoIssued: inv.isAutoIssued,
+              isManuallyAdjusted: inv.isManuallyAdjusted || false,
+              originalSupplyAmount: inv.originalSupplyAmount,
+              originalVatAmount: inv.originalVatAmount,
+              originalTotalAmount: inv.originalTotalAmount,
               memo: inv.memo,
               orderIds: inv.orderIds,
             });
@@ -16648,7 +16656,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo } = req.body;
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount } = req.body;
 
       if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
@@ -16745,6 +16753,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "면세 또는 과세 금액이 없어 계산서(세금계산서)를 발행할 수 없습니다." });
       }
 
+      const hasCustomAmount = customSupplyAmount !== undefined && customSupplyAmount !== null;
+      const finalSupplyAmount = hasCustomAmount ? Number(customSupplyAmount) : serverSupplyAmount;
+      const finalVatAmount = hasCustomAmount ? Number(customVatAmount || 0) : serverVatAmount;
+      const finalTotalAmount = hasCustomAmount ? Number(customTotalAmount || 0) : serverTotalAmount;
+      const isManuallyAdj = hasCustomAmount && (finalSupplyAmount !== serverSupplyAmount || finalVatAmount !== serverVatAmount || finalTotalAmount !== serverTotalAmount);
+
+      if (finalTotalAmount <= 0) {
+        return res.status(400).json({ message: "발행 금액이 0원 이하입니다. 금액을 확인해주세요." });
+      }
+
       const [record] = await db.insert(invoiceRecords).values({
         targetType,
         targetId: String(targetId),
@@ -16755,9 +16773,13 @@ export async function registerRoutes(
         month,
         orderIds,
         orderCount: orderIds.length,
-        supplyAmount: serverSupplyAmount,
-        vatAmount: serverVatAmount,
-        totalAmount: serverTotalAmount,
+        supplyAmount: finalSupplyAmount,
+        vatAmount: finalVatAmount,
+        totalAmount: finalTotalAmount,
+        originalSupplyAmount: isManuallyAdj ? serverSupplyAmount : null,
+        originalVatAmount: isManuallyAdj ? serverVatAmount : null,
+        originalTotalAmount: isManuallyAdj ? serverTotalAmount : null,
+        isManuallyAdjusted: isManuallyAdj,
         isAutoIssued: false,
         memo: memo || null,
         issuedAt: new Date(),
@@ -16765,6 +16787,27 @@ export async function registerRoutes(
       }).returning();
 
       res.json({ success: true, record });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 계산서/세금계산서 발행 취소 API =====
+  app.delete('/api/admin/accounting/invoice-issue/:id', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const invoiceId = parseInt(req.params.id);
+      if (isNaN(invoiceId)) return res.status(400).json({ message: "유효하지 않은 ID입니다" });
+
+      const [existing] = await db.select().from(invoiceRecords).where(eq(invoiceRecords.id, invoiceId)).limit(1);
+      if (!existing) return res.status(404).json({ message: "해당 발행 내역을 찾을 수 없습니다" });
+
+      await db.delete(invoiceRecords).where(eq(invoiceRecords.id, invoiceId));
+
+      res.json({ success: true, message: "발행이 취소되었습니다" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

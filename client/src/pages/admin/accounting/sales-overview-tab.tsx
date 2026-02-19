@@ -218,6 +218,10 @@ type InvoiceSummaryRow = {
   issuedStatus: 'issued' | 'not_issued';
   issuedAt: string | null;
   isAutoIssued: boolean;
+  isManuallyAdjusted?: boolean;
+  originalSupplyAmount?: number | null;
+  originalVatAmount?: number | null;
+  originalTotalAmount?: number | null;
   memo: string | null;
   orderIds: string[];
 };
@@ -258,6 +262,11 @@ function MonthlySalesSummary() {
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
   const [issueDialogRow, setIssueDialogRow] = useState<InvoiceSummaryRow | null>(null);
   const [issueMemo, setIssueMemo] = useState("");
+  const [customSupply, setCustomSupply] = useState<string>("");
+  const [customVat, setCustomVat] = useState<string>("");
+  const [customTotal, setCustomTotal] = useState<string>("");
+  const [useCustomAmount, setUseCustomAmount] = useState(false);
+  const [cancelDialogRow, setCancelDialogRow] = useState<InvoiceSummaryRow | null>(null);
   const [sectionOpen, setSectionOpen] = useState(true);
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
@@ -322,6 +331,10 @@ function MonthlySalesSummary() {
       toast({ title: "계산서 발행 완료" });
       setIssueDialogRow(null);
       setIssueMemo("");
+      setUseCustomAmount(false);
+      setCustomSupply("");
+      setCustomVat("");
+      setCustomTotal("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
     },
     onError: (e: any) => {
@@ -329,10 +342,37 @@ function MonthlySalesSummary() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async (invoiceId: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/accounting/invoice-issue/${invoiceId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "발행이 취소되었습니다" });
+      setCancelDialogRow(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "취소 실패", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const openIssueDialog = (r: InvoiceSummaryRow) => {
+    setIssueDialogRow(r);
+    setIssueMemo("");
+    setUseCustomAmount(false);
+    const origSupply = r.exemptAmount + r.taxableSupply;
+    const origVat = r.taxableVat;
+    const origTotal = r.exemptAmount + r.taxableAmount;
+    setCustomSupply(String(origSupply));
+    setCustomVat(String(origVat));
+    setCustomTotal(String(origTotal));
+  };
+
   const handleIssue = () => {
     if (!issueDialogRow) return;
     const r = issueDialogRow;
-    issueMutation.mutate({
+    const baseData: any = {
       targetType: r.type,
       targetId: r.targetId,
       targetName: r.targetName,
@@ -345,7 +385,13 @@ function MonthlySalesSummary() {
       vatAmount: r.taxableVat,
       totalAmount: r.exemptAmount + r.taxableAmount,
       memo: issueMemo || null,
-    });
+    };
+    if (useCustomAmount) {
+      baseData.customSupplyAmount = parseInt(customSupply) || 0;
+      baseData.customVatAmount = parseInt(customVat) || 0;
+      baseData.customTotalAmount = parseInt(customTotal) || 0;
+    }
+    issueMutation.mutate(baseData);
   };
 
   const handleExcelDownload = async () => {
@@ -605,7 +651,19 @@ function MonthlySalesSummary() {
                         {r.issuedStatus === 'issued' ? (
                           <div className="flex flex-col items-center gap-0.5">
                             <Badge variant="default" className="text-xs bg-green-600">발행완료</Badge>
+                            {r.isManuallyAdjusted && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">수동조정</Badge>
+                            )}
                             <span className="text-[10px] text-muted-foreground">{r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ko-KR') : ''}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-[10px] h-5 px-1.5 text-destructive"
+                              onClick={(e) => { e.stopPropagation(); setCancelDialogRow(r); }}
+                              data-testid={`button-cancel-invoice-${idx}`}
+                            >
+                              <X className="h-3 w-3 mr-0.5" />취소
+                            </Button>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-1">
@@ -615,7 +673,7 @@ function MonthlySalesSummary() {
                                 variant="outline"
                                 size="sm"
                                 className="text-xs gap-1 h-6 px-2"
-                                onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
+                                onClick={(e) => { e.stopPropagation(); openIssueDialog(r); }}
                                 data-testid={`button-issue-${idx}`}
                               >
                                 <FileText className="h-3 w-3" />발행하기
@@ -654,7 +712,7 @@ function MonthlySalesSummary() {
         </div>}
       </div>
 
-      <Dialog open={!!issueDialogRow} onOpenChange={(open) => { if (!open) { setIssueDialogRow(null); setIssueMemo(""); } }}>
+      <Dialog open={!!issueDialogRow} onOpenChange={(open) => { if (!open) { setIssueDialogRow(null); setIssueMemo(""); setUseCustomAmount(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -682,25 +740,94 @@ function MonthlySalesSummary() {
                   <span className="text-muted-foreground">주문 건수</span>
                   <span className="font-medium">{issueDialogRow.orderCount}건</span>
                 </div>
-                {issueDialogRow.exemptAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-green-700 dark:text-green-400">면세 공급가액</span>
-                    <span className="font-medium text-green-700 dark:text-green-400">{formatCurrency(issueDialogRow.exemptAmount)}</span>
+              </div>
+
+              <div className="rounded-md border p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-semibold">발행 금액</Label>
+                  <Button
+                    variant={useCustomAmount ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs h-6 px-2 gap-1"
+                    onClick={() => setUseCustomAmount(!useCustomAmount)}
+                    data-testid="button-toggle-custom-amount"
+                  >
+                    <Pencil className="h-3 w-3" />{useCustomAmount ? "수정 중" : "금액 수정"}
+                  </Button>
+                </div>
+
+                {!useCustomAmount ? (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">공급가액</span>
+                      <span className="font-medium">{formatCurrency(issueDialogRow.exemptAmount + issueDialogRow.taxableSupply)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">부가세</span>
+                      <span className="font-medium">{formatCurrency(issueDialogRow.taxableVat)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-1.5">
+                      <span className="font-semibold">합계</span>
+                      <span className="font-semibold">{formatCurrency(issueDialogRow.exemptAmount + issueDialogRow.taxableAmount)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-2">
+                      <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        시스템 계산 금액과 다르게 발행됩니다. 수동조정 표시가 남습니다.
+                      </p>
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      참고) 시스템 계산 금액: {formatCurrency(issueDialogRow.exemptAmount + issueDialogRow.taxableAmount)}
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs w-16 shrink-0">공급가액</Label>
+                        <Input
+                          type="number"
+                          value={customSupply}
+                          onChange={(e) => {
+                            setCustomSupply(e.target.value);
+                            const s = parseInt(e.target.value) || 0;
+                            const v = parseInt(customVat) || 0;
+                            setCustomTotal(String(s + v));
+                          }}
+                          className="text-right text-sm"
+                          data-testid="input-custom-supply"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs w-16 shrink-0">부가세</Label>
+                        <Input
+                          type="number"
+                          value={customVat}
+                          onChange={(e) => {
+                            setCustomVat(e.target.value);
+                            const s = parseInt(customSupply) || 0;
+                            const v = parseInt(e.target.value) || 0;
+                            setCustomTotal(String(s + v));
+                          }}
+                          className="text-right text-sm"
+                          data-testid="input-custom-vat"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 border-t pt-1.5">
+                        <Label className="text-xs w-16 shrink-0 font-semibold">합계</Label>
+                        <Input
+                          type="number"
+                          value={customTotal}
+                          readOnly
+                          className="text-right text-sm font-semibold bg-muted/50"
+                          data-testid="input-custom-total"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
-                {issueDialogRow.taxableAmount > 0 && (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-violet-700 dark:text-violet-400">과세 공급가액</span>
-                      <span className="font-medium text-violet-700 dark:text-violet-400">{formatCurrency(issueDialogRow.taxableSupply)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-violet-700 dark:text-violet-400">부가세</span>
-                      <span className="font-medium text-violet-700 dark:text-violet-400">{formatCurrency(issueDialogRow.taxableVat)}</span>
-                    </div>
-                  </>
-                )}
               </div>
+
               <div className="space-y-1">
                 <Label>메모 (선택)</Label>
                 <Textarea
@@ -714,9 +841,63 @@ function MonthlySalesSummary() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setIssueDialogRow(null); setIssueMemo(""); }}>취소</Button>
+            <Button variant="outline" onClick={() => { setIssueDialogRow(null); setIssueMemo(""); setUseCustomAmount(false); }}>취소</Button>
             <Button onClick={handleIssue} disabled={issueMutation.isPending} data-testid="button-confirm-issue">
               {issueMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}발행 확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cancelDialogRow} onOpenChange={(open) => { if (!open) setCancelDialogRow(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />발행 취소 확인
+            </DialogTitle>
+          </DialogHeader>
+          {cancelDialogRow && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                다음 계산서 발행을 취소하시겠습니까? 취소 후 다시 발행할 수 있습니다.
+              </p>
+              <div className="rounded-md bg-muted/30 border p-3 space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">대상</span>
+                  <span className="font-medium">{cancelDialogRow.targetName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">발행일</span>
+                  <span>{cancelDialogRow.issuedAt ? new Date(cancelDialogRow.issuedAt).toLocaleDateString('ko-KR') : '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">발행 금액</span>
+                  <span className="font-medium">{formatCurrency(cancelDialogRow.exemptAmount + cancelDialogRow.taxableAmount)}</span>
+                </div>
+                {cancelDialogRow.isManuallyAdjusted && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-amber-600 dark:text-amber-400">수동조정</span>
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">수동조정 발행건</Badge>
+                  </div>
+                )}
+                {cancelDialogRow.memo && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">메모</span>
+                    <span className="text-xs max-w-[180px] truncate">{cancelDialogRow.memo}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogRow(null)}>닫기</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { if (cancelDialogRow?.invoiceId) cancelMutation.mutate(cancelDialogRow.invoiceId); }}
+              disabled={cancelMutation.isPending}
+              data-testid="button-confirm-cancel-invoice"
+            >
+              {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}발행 취소
             </Button>
           </DialogFooter>
         </DialogContent>
