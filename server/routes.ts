@@ -17086,7 +17086,7 @@ export async function registerRoutes(
       const UserID = process.env.POPBILL_USER_ID || '';
 
       const taxinvoice = {
-        mgtKey: MgtKey,
+        invoicerMgtKey: MgtKey,
         writeDate: popbillFormatDate(new Date()),
         issueType: '정발행',
         taxType: invoiceType === 'exempt' ? '면세' : '과세',
@@ -17125,7 +17125,8 @@ export async function registerRoutes(
         remark1: memo || `${year}년 ${month}월분 ${invoiceType === 'exempt' ? '계산서' : '세금계산서'}`,
       };
 
-      console.log(`[팝빌] registIssue 호출: CorpNum=${CorpNum}, UserID=${UserID}, MgtKey=${MgtKey}, taxType=${taxinvoice.taxType}`);
+      console.log(`[팝빌] registIssue 호출: MgtKey=${MgtKey} (길이:${MgtKey.length})`);
+      console.log(`[팝빌] taxinvoice 객체:`, JSON.stringify(taxinvoice, null, 2));
 
       const popbillResult: any = await new Promise((resolve, reject) => {
         taxinvoiceService.registIssue(
