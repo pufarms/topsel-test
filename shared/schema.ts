@@ -1880,6 +1880,11 @@ export const invoiceRecords = pgTable("invoice_records", {
   memo: text("memo"),
   issuedAt: timestamp("issued_at").defaultNow().notNull(),
   issuedBy: varchar("issued_by", { length: 100 }),
+  popbillMgtKey: varchar("popbill_mgt_key", { length: 50 }),
+  popbillNtsConfirmNum: varchar("popbill_nts_confirm_num", { length: 50 }),
+  popbillIssueStatus: varchar("popbill_issue_status", { length: 20 }).default("none"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

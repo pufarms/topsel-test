@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck, Wallet,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck, Wallet, ExternalLink, Eye,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { MemberSettlementTab } from "@/pages/admin/settlements";
@@ -231,6 +231,10 @@ type InvoiceSummaryRow = {
   originalTotalAmount?: number | null;
   memo: string | null;
   orderIds: string[];
+  popbillMgtKey?: string | null;
+  popbillNtsConfirmNum?: string | null;
+  popbillIssueStatus?: string | null;
+  cancelledAt?: string | null;
 };
 
 type InvoiceSummaryData = {
@@ -274,6 +278,7 @@ function MonthlySalesSummary() {
   const [customTotal, setCustomTotal] = useState<string>("");
   const [useCustomAmount, setUseCustomAmount] = useState(false);
   const [cancelDialogRow, setCancelDialogRow] = useState<InvoiceSummaryRow | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [sectionOpen, setSectionOpen] = useState(false);
 
   const monthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
@@ -331,11 +336,15 @@ function MonthlySalesSummary() {
 
   const issueMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/admin/accounting/invoice-issue", data);
+      const res = await apiRequest("POST", "/api/admin/accounting/popbill-issue", data);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "계산서 발행 완료" });
+    onSuccess: (result: any) => {
+      const ntsNum = result?.data?.ntsConfirmNum;
+      toast({
+        title: "계산서 발행 완료",
+        description: ntsNum ? `국세청 승인번호: ${ntsNum}` : undefined,
+      });
       setIssueDialogRow(null);
       setIssueMemo("");
       setUseCustomAmount(false);
@@ -350,13 +359,23 @@ function MonthlySalesSummary() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (invoiceId: number) => {
-      const res = await apiRequest("DELETE", `/api/admin/accounting/invoice-issue/${invoiceId}`);
-      return res.json();
+    mutationFn: async (row: InvoiceSummaryRow) => {
+      if (row.popbillMgtKey) {
+        const res = await apiRequest("POST", "/api/admin/accounting/popbill-cancel", {
+          invoiceId: row.invoiceId,
+          mgtKey: row.popbillMgtKey,
+          reason: cancelReason || '발행 취소',
+        });
+        return res.json();
+      } else {
+        const res = await apiRequest("DELETE", `/api/admin/accounting/invoice-issue/${row.invoiceId}`);
+        return res.json();
+      }
     },
     onSuccess: () => {
       toast({ title: "발행이 취소되었습니다" });
       setCancelDialogRow(null);
+      setCancelReason("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
     },
     onError: (e: any) => {
@@ -655,22 +674,51 @@ function MonthlySalesSummary() {
                       <td className="py-2.5 px-2 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10">{r.taxableVat > 0 ? formatCurrency(r.taxableVat) : "-"}</td>
                       <td className="py-2.5 px-2 text-right whitespace-nowrap bg-violet-50/30 dark:bg-violet-950/10 font-medium">{r.taxableAmount > 0 ? formatCurrency(r.taxableAmount) : "-"}</td>
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
-                        {r.issuedStatus === 'issued' ? (
+                        {r.issuedStatus === 'issued' && !r.cancelledAt ? (
                           <div className="flex flex-col items-center gap-0.5">
                             <Badge variant="default" className="text-xs bg-green-600">발행완료</Badge>
+                            {r.popbillNtsConfirmNum && (
+                              <span className="text-[9px] text-green-700 dark:text-green-400 font-mono">{r.popbillNtsConfirmNum}</span>
+                            )}
                             {r.isManuallyAdjusted && (
                               <Badge variant="outline" className="text-[9px] px-1 py-0 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">수동조정</Badge>
                             )}
                             <span className="text-[10px] text-muted-foreground">{r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ko-KR') : ''}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-[10px] h-5 px-1.5 text-destructive"
-                              onClick={(e) => { e.stopPropagation(); setCancelDialogRow(r); }}
-                              data-testid={`button-cancel-invoice-${idx}`}
-                            >
-                              <X className="h-3 w-3 mr-0.5" />취소
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {r.popbillMgtKey && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-[10px] h-5 px-1.5 text-blue-600"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const res = await fetch(`/api/admin/accounting/popbill-popup/${r.popbillMgtKey}`, { credentials: 'include' });
+                                      const data = await res.json();
+                                      if (data.success && data.url) window.open(data.url, '_blank', 'width=900,height=700');
+                                      else toast({ title: "미리보기 불가", description: data.message, variant: "destructive" });
+                                    } catch { toast({ title: "미리보기 오류", variant: "destructive" }); }
+                                  }}
+                                  data-testid={`button-preview-invoice-${idx}`}
+                                >
+                                  <Eye className="h-3 w-3 mr-0.5" />보기
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-[10px] h-5 px-1.5 text-destructive"
+                                onClick={(e) => { e.stopPropagation(); setCancelDialogRow(r); setCancelReason(""); }}
+                                data-testid={`button-cancel-invoice-${idx}`}
+                              >
+                                <X className="h-3 w-3 mr-0.5" />취소
+                              </Button>
+                            </div>
+                          </div>
+                        ) : r.cancelledAt ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge variant="outline" className="text-xs text-red-600 dark:text-red-400 border-red-300 dark:border-red-700">취소됨</Badge>
+                            <span className="text-[10px] text-muted-foreground">{new Date(r.cancelledAt).toLocaleDateString('ko-KR')}</span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-1">
@@ -893,14 +941,31 @@ function MonthlySalesSummary() {
                     <span className="text-xs max-w-[180px] truncate">{cancelDialogRow.memo}</span>
                   </div>
                 )}
+                {cancelDialogRow.popbillNtsConfirmNum && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">승인번호</span>
+                    <span className="text-xs font-mono">{cancelDialogRow.popbillNtsConfirmNum}</span>
+                  </div>
+                )}
               </div>
+              {cancelDialogRow.popbillMgtKey && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">취소 사유</Label>
+                  <Input
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="취소 사유를 입력하세요"
+                    data-testid="input-cancel-reason"
+                  />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelDialogRow(null)}>닫기</Button>
+            <Button variant="outline" onClick={() => { setCancelDialogRow(null); setCancelReason(""); }}>닫기</Button>
             <Button
               variant="destructive"
-              onClick={() => { if (cancelDialogRow?.invoiceId) cancelMutation.mutate(cancelDialogRow.invoiceId); }}
+              onClick={() => { if (cancelDialogRow) cancelMutation.mutate(cancelDialogRow); }}
               disabled={cancelMutation.isPending}
               data-testid="button-confirm-cancel-invoice"
             >

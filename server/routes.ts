@@ -20,6 +20,7 @@ import { db } from "./db";
 import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, isNull, gte, lte, lt, gt, count } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
+import { taxinvoiceService, popbill } from "./lib/popbill";
 
 // PortOne V2 환경변수
 const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
@@ -16418,7 +16419,9 @@ export async function registerRoutes(
       const invoicesByTarget: Record<string, any[]> = {};
       for (const inv of existingInvoices) {
         const orderIdsArr = (inv.orderIds || []) as string[];
-        orderIdsArr.forEach(id => issuedOrderIds.add(id));
+        if (!inv.cancelledAt) {
+          orderIdsArr.forEach(id => issuedOrderIds.add(id));
+        }
         const key = `${inv.targetType}_${inv.targetId}`;
         if (!invoicesByTarget[key]) invoicesByTarget[key] = [];
         invoicesByTarget[key].push(inv);
@@ -16518,7 +16521,9 @@ export async function registerRoutes(
 
           const issuedOrderIdsForTarget = new Set<string>();
           for (const inv of issuedInvoices) {
-            ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+            if (!inv.cancelledAt) {
+              ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+            }
           }
 
           for (const inv of issuedInvoices) {
@@ -16545,6 +16550,10 @@ export async function registerRoutes(
               originalTotalAmount: inv.originalTotalAmount,
               memo: inv.memo,
               orderIds: inv.orderIds,
+              popbillMgtKey: inv.popbillMgtKey || null,
+              popbillNtsConfirmNum: inv.popbillNtsConfirmNum || null,
+              popbillIssueStatus: inv.popbillIssueStatus || null,
+              cancelledAt: inv.cancelledAt || null,
             });
           }
 
@@ -16639,7 +16648,9 @@ export async function registerRoutes(
 
           const issuedOrderIdsForTarget = new Set<string>();
           for (const inv of issuedInvoices) {
-            ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+            if (!inv.cancelledAt) {
+              ((inv.orderIds || []) as string[]).forEach((id: string) => issuedOrderIdsForTarget.add(id));
+            }
           }
 
           for (const inv of issuedInvoices) {
@@ -16666,6 +16677,10 @@ export async function registerRoutes(
               originalTotalAmount: inv.originalTotalAmount,
               memo: inv.memo,
               orderIds: inv.orderIds,
+              popbillMgtKey: inv.popbillMgtKey || null,
+              popbillNtsConfirmNum: inv.popbillNtsConfirmNum || null,
+              popbillIssueStatus: inv.popbillIssueStatus || null,
+              cancelledAt: inv.cancelledAt || null,
             });
           }
 
@@ -16912,6 +16927,366 @@ export async function registerRoutes(
       res.json({ success: true, message: "발행이 취소되었습니다" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== 팝빌 전자세금계산서 즉시 발행 API =====
+  app.post('/api/admin/accounting/popbill-issue', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount } = req.body;
+
+      if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
+        return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
+      }
+
+      if (!businessNumber) {
+        return res.status(400).json({ message: "팝빌 발행에는 사업자번호가 필요합니다" });
+      }
+
+      const existingInvoices = await db.select().from(invoiceRecords)
+        .where(and(
+          eq(invoiceRecords.year, year),
+          eq(invoiceRecords.month, month),
+          isNull(invoiceRecords.cancelledAt),
+        ));
+
+      const alreadyIssuedIds = new Set<string>();
+      for (const inv of existingInvoices) {
+        ((inv.orderIds || []) as string[]).forEach(id => alreadyIssuedIds.add(id));
+      }
+
+      const duplicateIds = orderIds.filter((id: string) => alreadyIssuedIds.has(id));
+      if (duplicateIds.length > 0) {
+        return res.status(400).json({
+          message: `이미 발행된 주문이 ${duplicateIds.length}건 포함되어 있습니다. 중복 발행은 불가합니다.`,
+          duplicateIds,
+        });
+      }
+
+      let serverSupplyAmount = 0;
+      let serverVatAmount = 0;
+      let serverTotalAmount = 0;
+
+      if (targetType === 'member') {
+        for (const oid of orderIds as string[]) {
+          if (oid.startsWith('ds_')) {
+            const dsId = parseInt(oid.replace('ds_', ''));
+            const [ds] = await db.select({ amount: directSales.amount, taxType: directSales.taxType })
+              .from(directSales).where(eq(directSales.id, dsId)).limit(1);
+            if (ds) {
+              const amt = ds.amount || 0;
+              if (ds.taxType === 'taxable') {
+                const supply = Math.round(amt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += amt - supply;
+                serverTotalAmount += amt;
+              } else {
+                serverSupplyAmount += amt;
+                serverTotalAmount += amt;
+              }
+            }
+          } else {
+            const [sh] = await db.select({
+              depositAmount: settlementHistory.depositAmount,
+              pointerAmount: settlementHistory.pointerAmount,
+              totalAmount: settlementHistory.totalAmount,
+            }).from(settlementHistory)
+              .innerJoin(pendingOrders, eq(settlementHistory.orderId, pendingOrders.id))
+              .where(eq(settlementHistory.orderId, oid)).limit(1);
+            if (sh) {
+              const [po] = await db.select({ taxType: pendingOrders.taxType })
+                .from(pendingOrders).where(eq(pendingOrders.id, oid)).limit(1);
+              const depositAmt = sh.depositAmount || 0;
+              if (po && po.taxType === 'taxable') {
+                const supply = Math.round(depositAmt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += depositAmt - supply;
+                serverTotalAmount += depositAmt;
+              } else {
+                serverSupplyAmount += depositAmt;
+                serverTotalAmount += depositAmt;
+              }
+            }
+          }
+        }
+      } else if (targetType === 'vendor') {
+        for (const oid of orderIds as string[]) {
+          if (oid.startsWith('vds_')) {
+            const dsId = parseInt(oid.replace('vds_', ''));
+            const [ds] = await db.select({ amount: directSales.amount, taxType: directSales.taxType })
+              .from(directSales).where(eq(directSales.id, dsId)).limit(1);
+            if (ds) {
+              const amt = ds.amount || 0;
+              if (ds.taxType === 'taxable') {
+                const supply = Math.round(amt / 1.1);
+                serverSupplyAmount += supply;
+                serverVatAmount += amt - supply;
+                serverTotalAmount += amt;
+              } else {
+                serverSupplyAmount += amt;
+                serverTotalAmount += amt;
+              }
+            }
+          }
+        }
+      }
+
+      if (serverTotalAmount <= 0) {
+        return res.status(400).json({ message: "면세 또는 과세 금액이 없어 발행할 수 없습니다." });
+      }
+
+      const hasCustomAmount = customSupplyAmount !== undefined && customSupplyAmount !== null;
+      const finalSupplyAmount = hasCustomAmount ? Number(customSupplyAmount) : serverSupplyAmount;
+      const finalVatAmount = hasCustomAmount ? Number(customVatAmount || 0) : serverVatAmount;
+      const finalTotalAmount = hasCustomAmount ? Number(customTotalAmount || 0) : serverTotalAmount;
+      const isManuallyAdj = hasCustomAmount && (finalSupplyAmount !== serverSupplyAmount || finalVatAmount !== serverVatAmount || finalTotalAmount !== serverTotalAmount);
+
+      if (finalTotalAmount <= 0) {
+        return res.status(400).json({ message: "발행 금액이 0원 이하입니다." });
+      }
+
+      const cleanBizNum = businessNumber.replace(/-/g, '');
+      const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const MgtKey = `${year}${String(month).padStart(2, '0')}-${invoiceType === 'exempt' ? 'EX' : 'TX'}-${Date.now()}`;
+
+      const popbillFormatDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}${m}${d}`;
+      };
+
+      let invoiceeCEOName = '';
+      let invoiceeAddr = '';
+      let invoiceeEmail = '';
+      if (targetType === 'member') {
+        const [memberInfo] = await db.select({
+          representative: members.representative,
+          businessAddress: members.businessAddress,
+          email: members.email,
+        }).from(members).where(eq(members.id, targetId)).limit(1);
+        if (memberInfo) {
+          invoiceeCEOName = memberInfo.representative || '';
+          invoiceeAddr = memberInfo.businessAddress || '';
+          invoiceeEmail = memberInfo.email || '';
+        }
+      } else if (targetType === 'vendor') {
+        const partner = await storage.getPartner(targetId);
+        if (partner) {
+          invoiceeCEOName = partner.representative || '';
+          invoiceeAddr = partner.address || '';
+        }
+      }
+
+      const taxinvoice = {
+        writeDate: popbillFormatDate(new Date()),
+        issueType: '정발행',
+        taxType: invoiceType === 'exempt' ? '면세' : '과세',
+        chargeDirection: '정과금',
+        invoicerCorpNum: CorpNum,
+        invoicerTaxRegID: '',
+        invoicerCorpName: '탑셀러',
+        invoicerCEOName: '',
+        invoicerAddr: '',
+        invoicerBizType: '',
+        invoicerBizClass: '',
+        invoicerContactName: '',
+        invoicerEmail: '',
+        invoicerTEL: '',
+        invoiceeType: '사업자',
+        invoiceeCorpNum: cleanBizNum,
+        invoiceeCorpName: targetName,
+        invoiceeCEOName,
+        invoiceeAddr,
+        invoiceeBizType: '',
+        invoiceeBizClass: '',
+        invoiceeEmail,
+        supplyCostTotal: String(finalSupplyAmount),
+        taxTotal: String(finalVatAmount),
+        totalAmount: String(finalTotalAmount),
+        detailList: [
+          {
+            serialNum: 1,
+            itemName: `${year}년 ${month}월 공급분`,
+            supplyCost: String(finalSupplyAmount),
+            tax: String(finalVatAmount),
+            remark: `주문 ${orderIds.length}건`,
+          }
+        ],
+        remark1: memo || `${year}년 ${month}월분 ${invoiceType === 'exempt' ? '계산서' : '세금계산서'}`,
+      };
+
+      const popbillResult: any = await new Promise((resolve, reject) => {
+        taxinvoiceService.registIssue(
+          CorpNum,
+          taxinvoice,
+          false,
+          memo || '',
+          false,
+          '',
+          '',
+          MgtKey,
+          function(result: any) { resolve(result); },
+          function(error: any) { reject(error); }
+        );
+      });
+
+      const [record] = await db.insert(invoiceRecords).values({
+        targetType,
+        targetId: String(targetId),
+        targetName,
+        businessNumber: businessNumber || null,
+        invoiceType,
+        year,
+        month,
+        orderIds,
+        orderCount: orderIds.length,
+        supplyAmount: finalSupplyAmount,
+        vatAmount: finalVatAmount,
+        totalAmount: finalTotalAmount,
+        originalSupplyAmount: isManuallyAdj ? serverSupplyAmount : null,
+        originalVatAmount: isManuallyAdj ? serverVatAmount : null,
+        originalTotalAmount: isManuallyAdj ? serverTotalAmount : null,
+        isManuallyAdjusted: isManuallyAdj,
+        isAutoIssued: false,
+        memo: memo || null,
+        issuedAt: new Date(),
+        issuedBy: user.name || user.username,
+        popbillMgtKey: MgtKey,
+        popbillNtsConfirmNum: popbillResult.ntsConfirmNum || null,
+        popbillIssueStatus: 'issued',
+      }).returning();
+
+      res.json({
+        success: true,
+        message: '계산서 발행이 완료되었습니다.',
+        data: {
+          invoiceId: record.id,
+          mgtKey: MgtKey,
+          ntsConfirmNum: popbillResult.ntsConfirmNum,
+          code: popbillResult.code,
+          message: popbillResult.message,
+        },
+        record,
+      });
+
+    } catch (error: any) {
+      console.error('팝빌 발행 오류:', error);
+      const popbillErrorMap: Record<string, string> = {
+        '-99999905': '인증토큰이 만료되었습니다. IPRestrictOnOff 설정을 확인하세요.',
+        '-11000020': '공동인증서가 등록되지 않았습니다. 팝빌에서 인증서를 등록해주세요.',
+        '-12000004': '이미 등록된 문서번호입니다.',
+        '-12000009': '공급받는자 사업자번호가 유효하지 않습니다.',
+        '-20000013': '포인트가 부족합니다. 팝빌에서 포인트를 충전해주세요.',
+      };
+      const errorMessage = popbillErrorMap[String(error.code)] || error.message || `팝빌 오류 (코드: ${error.code})`;
+      res.status(500).json({ success: false, message: errorMessage, code: error.code });
+    }
+  });
+
+  // ===== 팝빌 발행 취소 API =====
+  app.post('/api/admin/accounting/popbill-cancel', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const { invoiceId, mgtKey, reason } = req.body;
+      if (!invoiceId || !mgtKey) return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
+
+      const [existing] = await db.select().from(invoiceRecords).where(eq(invoiceRecords.id, invoiceId)).limit(1);
+      if (!existing) return res.status(404).json({ message: "해당 발행 내역을 찾을 수 없습니다" });
+
+      if (existing.cancelledAt) {
+        return res.status(400).json({ message: "이미 취소된 발행 내역입니다" });
+      }
+
+      const CorpNum = process.env.POPBILL_CORP_NUM || '';
+
+      await new Promise((resolve, reject) => {
+        taxinvoiceService.cancelIssue(
+          CorpNum,
+          popbill.MgtKeyType.SELL,
+          mgtKey,
+          reason || '발행 취소',
+          function(result: any) { resolve(result); },
+          function(error: any) { reject(error); }
+        );
+      });
+
+      await db.update(invoiceRecords)
+        .set({
+          cancelledAt: new Date(),
+          cancelReason: reason || '발행 취소',
+          popbillIssueStatus: 'cancelled',
+        })
+        .where(eq(invoiceRecords.id, invoiceId));
+
+      res.json({ success: true, message: '발행이 취소되었습니다.' });
+
+    } catch (error: any) {
+      console.error('팝빌 취소 오류:', error);
+      res.status(500).json({ success: false, message: error.message || '취소 처리 중 오류가 발생했습니다.', code: error.code });
+    }
+  });
+
+  // ===== 팝빌 발행 상태 조회 API =====
+  app.get('/api/admin/accounting/popbill-status/:mgtKey', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const { mgtKey } = req.params;
+
+      const result = await new Promise((resolve, reject) => {
+        taxinvoiceService.getInfo(
+          CorpNum,
+          popbill.MgtKeyType.SELL,
+          mgtKey,
+          function(result: any) { resolve(result); },
+          function(error: any) { reject(error); }
+        );
+      });
+
+      res.json({ success: true, data: result });
+
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // ===== 팝빌 세금계산서 인쇄/미리보기 URL =====
+  app.get('/api/admin/accounting/popbill-popup/:mgtKey', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const UserID = process.env.POPBILL_USER_ID || '';
+      const { mgtKey } = req.params;
+
+      const url = await new Promise((resolve, reject) => {
+        taxinvoiceService.getPopUpURL(
+          CorpNum,
+          popbill.MgtKeyType.SELL,
+          mgtKey,
+          UserID,
+          function(result: any) { resolve(result); },
+          function(error: any) { reject(error); }
+        );
+      });
+
+      res.json({ success: true, url });
+
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 

@@ -1,7 +1,7 @@
 # Order Management System
 
 ## Overview
-This project is a comprehensive Korean-language order management system for sellers and administrators, designed to centralize order submission and management. It features role-based authentication, distinct dashboards for different user types, intuitive order entry, detailed history tracking, and extensive user management capabilities. The system aims to significantly enhance operational efficiency, minimize manual errors, and provide a unified data source with critical business rules for pricing, responsive design, category management, smart address validation, and an integrated outsourcing/vendor system. The overarching goal is to establish the system as a leading, reliable, feature-rich, and user-friendly solution in the Korean e-commerce market.
+This project is a comprehensive Korean-language order management system for sellers and administrators, designed to centralize order submission and management. It features role-based authentication, distinct dashboards, intuitive order entry, detailed history tracking, and extensive user management capabilities. The system aims to significantly enhance operational efficiency, minimize manual errors, and provide a unified data source with critical business rules for pricing, responsive design, category management, smart address validation, and an integrated outsourcing/vendor system. The overarching goal is to establish the system as a leading, reliable, feature-rich, and user-friendly solution in the Korean e-commerce market.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -206,3 +206,4 @@ Preferred communication style: Simple, everyday language.
 - Juso.go.kr (행정안전부 주소 API for address verification)
 - Anthropic Claude AI (address normalization)
 - Solapi (SMS for vendor notification)
+- Popbill (팝빌 전자세금계산서/계산서 발행 API)
