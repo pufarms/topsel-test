@@ -16741,6 +16741,10 @@ export async function registerRoutes(
         }
       }
 
+      if (serverTotalAmount <= 0) {
+        return res.status(400).json({ message: "면세 또는 과세 금액이 없어 계산서(세금계산서)를 발행할 수 없습니다." });
+      }
+
       const [record] = await db.insert(invoiceRecords).values({
         targetType,
         targetId: String(targetId),

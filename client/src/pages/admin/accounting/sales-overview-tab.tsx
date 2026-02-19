@@ -610,15 +610,19 @@ function MonthlySalesSummary() {
                         ) : (
                           <div className="flex flex-col items-center gap-1">
                             <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">미발행</Badge>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs gap-1 h-6 px-2"
-                              onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
-                              data-testid={`button-issue-${idx}`}
-                            >
-                              <FileText className="h-3 w-3" />발행하기
-                            </Button>
+                            {(r.exemptAmount > 0 || r.taxableAmount > 0) ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs gap-1 h-6 px-2"
+                                onClick={(e) => { e.stopPropagation(); setIssueDialogRow(r); setIssueMemo(""); }}
+                                data-testid={`button-issue-${idx}`}
+                              >
+                                <FileText className="h-3 w-3" />발행하기
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">발행불가</span>
+                            )}
                           </div>
                         )}
                       </td>
