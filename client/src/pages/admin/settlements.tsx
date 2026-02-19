@@ -1068,11 +1068,11 @@ export default function SettlementsPage() {
           <TabsTrigger value="sales-overview" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-sales-overview">
             <DollarSign className="h-4 w-4" />매출 관리
           </TabsTrigger>
-          <TabsTrigger value="profit-loss" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-profit-loss">
-            <TrendingUp className="h-4 w-4" />손익 현황
-          </TabsTrigger>
           <TabsTrigger value="expense-management" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-expense-management">
             <Settings className="h-4 w-4" />비용관리
+          </TabsTrigger>
+          <TabsTrigger value="profit-loss" className="gap-1 data-[state=active]:bg-orange-100 data-[state=active]:dark:bg-orange-900/30" data-testid="tab-profit-loss">
+            <TrendingUp className="h-4 w-4" />손익 현황
           </TabsTrigger>
         </TabsList>
 
@@ -1084,12 +1084,12 @@ export default function SettlementsPage() {
           <SalesOverviewTab />
         </TabsContent>
 
-        <TabsContent value="profit-loss">
-          <ProfitLossTab />
-        </TabsContent>
-
         <TabsContent value="expense-management">
           <ExpenseManagementTab />
+        </TabsContent>
+
+        <TabsContent value="profit-loss">
+          <ProfitLossTab />
         </TabsContent>
       </Tabs>
     </div>
