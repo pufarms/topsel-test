@@ -1901,10 +1901,12 @@ export const expensePaymentMethods = ["계좌이체", "카드", "현금", "자�
 export const expenseCategoryTable = pgTable("expense_categories", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 50 }).notNull().unique(),
+  emoji: varchar("emoji", { length: 10 }),
   color: varchar("color", { length: 20 }).notNull().default("gray"),
   defaultTaxType: varchar("default_tax_type", { length: 10 }).notNull().default("taxable"),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  isSystem: boolean("is_system").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1920,6 +1922,7 @@ export const expenseSubCategoryTable = pgTable("expense_sub_categories", {
   categoryId: integer("category_id").notNull(),
   name: varchar("name", { length: 100 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  isSystem: boolean("is_system").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
