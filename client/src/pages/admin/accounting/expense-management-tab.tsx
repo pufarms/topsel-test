@@ -29,6 +29,15 @@ import {
 } from "recharts";
 
 const PAYMENT_METHODS = ['카드', '계좌이체', '현금', '기타'];
+
+const COLOR_CLASS_MAP: Record<string, string> = {
+  red: 'bg-red-500', orange: 'bg-orange-500', amber: 'bg-amber-500',
+  yellow: 'bg-yellow-500', green: 'bg-green-500', emerald: 'bg-emerald-500',
+  cyan: 'bg-cyan-500', blue: 'bg-blue-500', indigo: 'bg-indigo-500',
+  violet: 'bg-violet-500', purple: 'bg-purple-500', pink: 'bg-pink-500',
+  slate: 'bg-slate-500', gray: 'bg-gray-500',
+};
+const getColorBgClass = (color: string) => COLOR_CLASS_MAP[color] || 'bg-gray-500';
 const TAX_TYPES = [
   { value: 'taxable', label: '과세' },
   { value: 'exempt', label: '면세' },
@@ -39,10 +48,14 @@ const taxTypeValue = (label: string) => label === '과세' ? 'taxable' : label =
 interface ExpenseCategory {
   id: number;
   name: string;
+  emoji: string | null;
   color: string;
   defaultTaxType: string;
   sortOrder: number;
-  subCategories: { id: number; name: string; categoryId: number }[];
+  isSystem: boolean;
+  subCategories: { id: number; name: string; categoryId: number; isSystem: boolean }[];
+  subCategoryCount: number;
+  expenseCount: number;
 }
 
 interface Expense {
@@ -82,7 +95,9 @@ interface RecurringExpense {
   id: number;
   itemName: string;
   category: string;
+  categoryId: number | null;
   subCategory: string | null;
+  subCategoryId: number | null;
   amount: number;
   dayOfMonth: number;
   cycle: string;
@@ -177,6 +192,19 @@ export default function ExpenseManagementTab() {
   const [keywordSearch, setKeywordSearch] = useState('');
   const [keywordSourceFilter, setKeywordSourceFilter] = useState<string>('all');
 
+  const [categoryMgmtTab, setCategoryMgmtTab] = useState<'categories' | 'keywords'>('categories');
+  const [selectedCategoryForSubs, setSelectedCategoryForSubs] = useState<number | null>(null);
+  const [showCategoryEditDialog, setShowCategoryEditDialog] = useState(false);
+  const [showSubCategoryEditDialog, setShowSubCategoryEditDialog] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+  const [editingSubCategory, setEditingSubCategory] = useState<any>(null);
+  const [catFormName, setCatFormName] = useState('');
+  const [catFormEmoji, setCatFormEmoji] = useState('');
+  const [catFormColor, setCatFormColor] = useState('gray');
+  const [subCatFormName, setSubCatFormName] = useState('');
+  const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState<ExpenseCategory | null>(null);
+  const [showDeleteSubCategoryConfirm, setShowDeleteSubCategoryConfirm] = useState<any>(null);
+
   const monthYear = selectedMonth.split('-');
   const monthLabel = `${monthYear[0]}년 ${parseInt(monthYear[1])}월`;
 
@@ -241,6 +269,19 @@ export default function ExpenseManagementTab() {
     queryKey: ['/api/admin/accounting/expenses/keywords'],
     enabled: showKeywordDialog,
   });
+
+  const { data: subCategoriesData } = useQuery<any[]>({
+    queryKey: ['/api/admin/accounting/expense-subcategories', selectedCategoryForSubs],
+    queryFn: async () => {
+      const url = selectedCategoryForSubs 
+        ? `/api/admin/accounting/expense-subcategories?categoryId=${selectedCategoryForSubs}`
+        : '/api/admin/accounting/expense-subcategories';
+      const res = await fetch(url, { credentials: 'include' });
+      return res.json();
+    },
+    enabled: showKeywordDialog && selectedCategoryForSubs !== null,
+  });
+  const subCategoriesList = subCategoriesData || [];
 
   const { data: autocompleteData } = useQuery<{ item_name: string; category: string; sub_category?: string; category_id?: number; category_name?: string; category_color?: string; sub_category_id?: number; sub_category_name?: string; last_amount: number; source?: string }[]>({
     queryKey: ['/api/admin/accounting/expenses/autocomplete', formItemName],
@@ -423,6 +464,93 @@ export default function ExpenseManagementTab() {
       toast({ title: '삭제 완료' });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/keywords'] });
     },
+  });
+
+  const categoryCreateMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await apiRequest('POST', '/api/admin/accounting/expense-categories', body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      toast({ title: '분류가 추가되었습니다' });
+      setShowCategoryEditDialog(false);
+    },
+    onError: (e: any) => toast({ title: e.message || '분류 추가 실패', variant: 'destructive' }),
+  });
+
+  const categoryUpdateMutation = useMutation({
+    mutationFn: async ({ id, ...body }: any) => {
+      const res = await apiRequest('PUT', `/api/admin/accounting/expense-categories/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      toast({ title: '분류가 수정되었습니다' });
+      setShowCategoryEditDialog(false);
+      setEditingCategory(null);
+    },
+    onError: (e: any) => toast({ title: e.message || '분류 수정 실패', variant: 'destructive' }),
+  });
+
+  const categoryDeleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('DELETE', `/api/admin/accounting/expense-categories/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses'] });
+      toast({ title: '분류가 삭제되었습니다' });
+      setShowDeleteCategoryConfirm(null);
+      if (selectedCategoryForSubs) setSelectedCategoryForSubs(null);
+    },
+    onError: (e: any) => toast({ title: e.message || '분류 삭제 실패', variant: 'destructive' }),
+  });
+
+  const subCategoryCreateMutation = useMutation({
+    mutationFn: async ({ categoryId, name }: { categoryId: number; name: string }) => {
+      const res = await apiRequest('POST', `/api/admin/accounting/expense-categories/${categoryId}/sub-categories`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-subcategories'] });
+      toast({ title: '세부항목이 추가되었습니다' });
+      setShowSubCategoryEditDialog(false);
+      setSubCatFormName('');
+    },
+    onError: (e: any) => toast({ title: e.message || '세부항목 추가 실패', variant: 'destructive' }),
+  });
+
+  const subCategoryUpdateMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest('PUT', `/api/admin/accounting/expense-sub-categories/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-subcategories'] });
+      toast({ title: '세부항목이 수정되었습니다' });
+      setShowSubCategoryEditDialog(false);
+      setEditingSubCategory(null);
+    },
+    onError: (e: any) => toast({ title: e.message || '세부항목 수정 실패', variant: 'destructive' }),
+  });
+
+  const subCategoryDeleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('DELETE', `/api/admin/accounting/expense-sub-categories/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expense-subcategories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses'] });
+      toast({ title: '세부항목이 삭제되었습니다' });
+      setShowDeleteSubCategoryConfirm(null);
+    },
+    onError: (e: any) => toast({ title: e.message || '세부항목 삭제 실패', variant: 'destructive' }),
   });
 
   const formatAmountWithComma = (val: string) => {
@@ -1687,82 +1815,92 @@ export default function ExpenseManagementTab() {
       <Dialog open={showKeywordDialog} onOpenChange={setShowKeywordDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle data-testid="dialog-title-keywords">키워드 사전</DialogTitle>
+            <DialogTitle data-testid="dialog-title-keywords">분류 사전 관리</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={keywordSearch}
-                  onChange={(e) => setKeywordSearch(e.target.value)}
-                  placeholder="키워드 검색..."
-                  className="pl-8"
-                  data-testid="input-keyword-search"
-                />
+          <div className="flex gap-1 border-b mb-4">
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${categoryMgmtTab === 'categories' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
+              onClick={() => setCategoryMgmtTab('categories')}
+              data-testid="tab-category-management"
+            >
+              분류 관리
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${categoryMgmtTab === 'keywords' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
+              onClick={() => setCategoryMgmtTab('keywords')}
+              data-testid="tab-keyword-management"
+            >
+              키워드 관리
+            </button>
+          </div>
+
+          {categoryMgmtTab === 'categories' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium">대분류</div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setCatFormName('');
+                    setCatFormEmoji('');
+                    setCatFormColor('gray');
+                    setShowCategoryEditDialog(true);
+                  }}
+                  data-testid="button-add-category"
+                >
+                  <Plus className="h-4 w-4 mr-1" />대분류 추가
+                </Button>
               </div>
-              <Select value={keywordSourceFilter} onValueChange={setKeywordSourceFilter}>
-                <SelectTrigger className="w-[120px]" data-testid="select-keyword-source-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="system">시스템</SelectItem>
-                  <SelectItem value="admin">관리자</SelectItem>
-                  <SelectItem value="learned">학습</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-muted-foreground" data-testid="text-keyword-count">
-                {keywords.length}개 / 총 {allKeywords.length}개
-              </div>
-            </div>
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>키워드</TableHead>
-                    <TableHead>분류</TableHead>
-                    <TableHead>세부항목</TableHead>
-                    <TableHead>매칭</TableHead>
-                    <TableHead>우선순위</TableHead>
-                    <TableHead>출처</TableHead>
-                    <TableHead className="text-right">사용횟수</TableHead>
-                    <TableHead className="text-center">작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {keywords.length === 0 ? (
+              <div className="border rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                        등록된 키워드가 없습니다
-                      </TableCell>
+                      <TableHead className="w-[50px]">이모지</TableHead>
+                      <TableHead>분류명</TableHead>
+                      <TableHead>색상</TableHead>
+                      <TableHead className="text-right">세부항목</TableHead>
+                      <TableHead className="text-right">사용 비용수</TableHead>
+                      <TableHead className="text-center">작업</TableHead>
                     </TableRow>
-                  ) : (
-                    keywords.map((kw) => (
-                      <TableRow key={kw.id} data-testid={`row-keyword-${kw.id}`}>
-                        <TableCell className="font-medium">{kw.keyword}</TableCell>
-                        <TableCell>{kw.category}</TableCell>
-                        <TableCell>{kw.subCategory}</TableCell>
-                        <TableCell>{kw.matchType === 'exact' ? '완전일치' : kw.matchType === 'contains' ? '포함' : kw.matchType}</TableCell>
-                        <TableCell>{kw.priority}</TableCell>
+                  </TableHeader>
+                  <TableBody>
+                    {categories.map((cat) => (
+                      <TableRow
+                        key={cat.id}
+                        className={`cursor-pointer ${selectedCategoryForSubs === cat.id ? 'bg-muted/50' : ''}`}
+                        onClick={() => setSelectedCategoryForSubs(selectedCategoryForSubs === cat.id ? null : cat.id)}
+                        data-testid={`row-category-${cat.id}`}
+                      >
+                        <TableCell className="text-lg">{cat.emoji || ''}</TableCell>
+                        <TableCell className="font-medium">{cat.name}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={kw.source === 'system' ? 'default' : kw.source === 'admin' ? 'outline' : 'secondary'}
-                            className="no-default-active-elevate"
-                            data-testid={`badge-keyword-source-${kw.id}`}
-                          >
-                            {kw.source === 'system' ? '시스템' : kw.source === 'admin' ? '관리자' : '학습'}
-                          </Badge>
+                          <span className={`inline-block w-3 h-3 rounded-full ${getColorBgClass(cat.color)}`} />
                         </TableCell>
-                        <TableCell className="text-right">{kw.useCount}</TableCell>
+                        <TableCell className="text-right">{cat.subCategoryCount || cat.subCategories?.length || 0}개</TableCell>
+                        <TableCell className="text-right">{cat.expenseCount || 0}건</TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-center">
-                            {kw.source !== 'system' && (
+                          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingCategory(cat);
+                                setCatFormName(cat.name);
+                                setCatFormEmoji(cat.emoji || '');
+                                setCatFormColor(cat.color);
+                                setShowCategoryEditDialog(true);
+                              }}
+                              data-testid={`button-edit-category-${cat.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {!cat.isSystem && (
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                onClick={() => keywordDeleteMutation.mutate(kw.id)}
-                                data-testid={`button-delete-keyword-${kw.id}`}
+                                onClick={() => setShowDeleteCategoryConfirm(cat)}
+                                data-testid={`button-delete-category-${cat.id}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1770,110 +1908,426 @@ export default function ExpenseManagementTab() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <div className="text-sm font-medium mb-3">키워드 추가</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <Label>키워드</Label>
-                    <Input
-                      value={keywordForm.keyword}
-                      onChange={(e) => setKeywordForm(p => ({ ...p, keyword: e.target.value }))}
-                      placeholder="키워드"
-                      data-testid="input-keyword-text"
-                    />
-                    {similarKeywords.length > 0 && (
-                      <div className="mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md text-xs space-y-1" data-testid="similar-keywords-warning">
-                        <div className="font-medium text-yellow-700 dark:text-yellow-400">유사 키워드가 존재합니다:</div>
-                        {similarKeywords.map((sk: any, i: number) => (
-                          <div key={i} className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
-                            <span>"{sk.keyword}" ({sk.category})</span>
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">{sk.relation === 'exact' ? '동일' : '유사'}</Badge>
-                          </div>
-                        ))}
-                      </div>
+              {selectedCategoryForSubs ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium">
+                      {(() => {
+                        const selCat = categories.find(c => c.id === selectedCategoryForSubs);
+                        return selCat ? `${selCat.emoji || ''} ${selCat.name} 세부항목 (${subCategoriesList.length}개)` : '세부항목';
+                      })()}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingSubCategory(null);
+                        setSubCatFormName('');
+                        setShowSubCategoryEditDialog(true);
+                      }}
+                      data-testid="button-add-subcategory"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />세부항목 추가
+                    </Button>
+                  </div>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>세부항목명</TableHead>
+                          <TableHead className="text-right">사용 비용수</TableHead>
+                          <TableHead className="text-center">작업</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {subCategoriesList.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                              세부항목이 없습니다
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          subCategoriesList.map((sub: any) => (
+                            <TableRow key={sub.id} data-testid={`row-subcategory-${sub.id}`}>
+                              <TableCell className="font-medium">{sub.name}</TableCell>
+                              <TableCell className="text-right">{sub.expenseCount || 0}건</TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingSubCategory(sub);
+                                      setSubCatFormName(sub.name);
+                                      setShowSubCategoryEditDialog(true);
+                                    }}
+                                    data-testid={`button-edit-subcategory-${sub.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  {!sub.isSystem && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setShowDeleteSubCategoryConfirm(sub)}
+                                      data-testid={`button-delete-subcategory-${sub.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg">
+                  대분류를 선택하면 세부항목이 표시됩니다
+                </div>
+              )}
+            </div>
+          )}
+
+          {categoryMgmtTab === 'keywords' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={keywordSearch}
+                    onChange={(e) => setKeywordSearch(e.target.value)}
+                    placeholder="키워드 검색..."
+                    className="pl-8"
+                    data-testid="input-keyword-search"
+                  />
+                </div>
+                <Select value={keywordSourceFilter} onValueChange={setKeywordSourceFilter}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-keyword-source-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    <SelectItem value="system">시스템</SelectItem>
+                    <SelectItem value="admin">관리자</SelectItem>
+                    <SelectItem value="learned">학습</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground" data-testid="text-keyword-count">
+                  {keywords.length}개 / 총 {allKeywords.length}개
+                </div>
+              </div>
+              <div className="border rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>키워드</TableHead>
+                      <TableHead>분류</TableHead>
+                      <TableHead>세부항목</TableHead>
+                      <TableHead>매칭</TableHead>
+                      <TableHead>우선순위</TableHead>
+                      <TableHead>출처</TableHead>
+                      <TableHead className="text-right">사용횟수</TableHead>
+                      <TableHead className="text-center">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {keywords.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                          등록된 키워드가 없습니다
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      keywords.map((kw) => (
+                        <TableRow key={kw.id} data-testid={`row-keyword-${kw.id}`}>
+                          <TableCell className="font-medium">{kw.keyword}</TableCell>
+                          <TableCell>{kw.category}</TableCell>
+                          <TableCell>{kw.subCategory}</TableCell>
+                          <TableCell>{kw.matchType === 'exact' ? '완전일치' : kw.matchType === 'contains' ? '포함' : kw.matchType}</TableCell>
+                          <TableCell>{kw.priority}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={kw.source === 'system' ? 'default' : kw.source === 'admin' ? 'outline' : 'secondary'}
+                              className="no-default-active-elevate"
+                              data-testid={`badge-keyword-source-${kw.id}`}
+                            >
+                              {kw.source === 'system' ? '시스템' : kw.source === 'admin' ? '관리자' : '학습'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{kw.useCount}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center">
+                              {kw.source !== 'system' && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => keywordDeleteMutation.mutate(kw.id)}
+                                  data-testid={`button-delete-keyword-${kw.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="text-sm font-medium mb-3">키워드 추가</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <Label>키워드</Label>
+                      <Input
+                        value={keywordForm.keyword}
+                        onChange={(e) => setKeywordForm(p => ({ ...p, keyword: e.target.value }))}
+                        placeholder="키워드"
+                        data-testid="input-keyword-text"
+                      />
+                      {similarKeywords.length > 0 && (
+                        <div className="mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md text-xs space-y-1" data-testid="similar-keywords-warning">
+                          <div className="font-medium text-yellow-700 dark:text-yellow-400">유사 키워드가 존재합니다:</div>
+                          {similarKeywords.map((sk: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+                              <span>"{sk.keyword}" ({sk.category})</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">{sk.relation === 'exact' ? '동일' : '유사'}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Label>분류</Label>
+                      <Select value={keywordForm.categoryId ? String(keywordForm.categoryId) : ''} onValueChange={(v) => {
+                        const id = parseInt(v);
+                        setKeywordForm(p => ({ ...p, categoryId: id, subCategoryId: null }));
+                      }}>
+                        <SelectTrigger data-testid="select-keyword-category">
+                          <SelectValue placeholder="분류 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map(c => (
+                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>세부항목</Label>
+                      <Select value={keywordForm.subCategoryId ? String(keywordForm.subCategoryId) : '__none__'} onValueChange={(v) => {
+                        setKeywordForm(p => ({ ...p, subCategoryId: v === '__none__' ? null : parseInt(v) }));
+                      }}>
+                        <SelectTrigger data-testid="select-keyword-subcategory">
+                          <SelectValue placeholder="세부항목 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">선택안함</SelectItem>
+                          {getSubCategoriesForCategory(keywordForm.categoryId).map(sc => (
+                            <SelectItem key={sc.id} value={String(sc.id)}>{sc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>매칭 방식</Label>
+                      <Select value={keywordForm.matchType} onValueChange={(v) => setKeywordForm(p => ({ ...p, matchType: v }))}>
+                        <SelectTrigger data-testid="select-keyword-match-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="exact">완전일치</SelectItem>
+                          <SelectItem value="contains">포함</SelectItem>
+                          <SelectItem value="startsWith">시작일치</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div>
-                    <Label>분류</Label>
-                    <Select value={keywordForm.categoryId ? String(keywordForm.categoryId) : ''} onValueChange={(v) => {
-                      const id = parseInt(v);
-                      setKeywordForm(p => ({ ...p, categoryId: id, subCategoryId: null }));
-                    }}>
-                      <SelectTrigger data-testid="select-keyword-category">
-                        <SelectValue placeholder="분류 선택" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(c => (
-                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      onClick={() => {
+                        if (!keywordForm.keyword.trim()) {
+                          toast({ title: '키워드를 입력해주세요', variant: 'destructive' });
+                          return;
+                        }
+                        const kwCat = getCategoryById(keywordForm.categoryId);
+                        const kwSub = getSubCategoriesForCategory(keywordForm.categoryId).find(s => s.id === keywordForm.subCategoryId);
+                        keywordCreateMutation.mutate({
+                          keyword: keywordForm.keyword.trim(),
+                          categoryId: keywordForm.categoryId,
+                          subCategoryId: keywordForm.subCategoryId,
+                          category: kwCat?.name || '기타',
+                          subCategory: kwSub?.name || '',
+                          matchType: keywordForm.matchType,
+                        });
+                      }}
+                      disabled={keywordCreateMutation.isPending}
+                      className="gap-1"
+                      data-testid="button-add-keyword"
+                    >
+                      {keywordCreateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      <Plus className="h-4 w-4" />추가
+                    </Button>
                   </div>
-                  <div>
-                    <Label>세부항목</Label>
-                    <Select value={keywordForm.subCategoryId ? String(keywordForm.subCategoryId) : '__none__'} onValueChange={(v) => {
-                      setKeywordForm(p => ({ ...p, subCategoryId: v === '__none__' ? null : parseInt(v) }));
-                    }}>
-                      <SelectTrigger data-testid="select-keyword-subcategory">
-                        <SelectValue placeholder="세부항목 선택" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">선택안함</SelectItem>
-                        {getSubCategoriesForCategory(keywordForm.categoryId).map(sc => (
-                          <SelectItem key={sc.id} value={String(sc.id)}>{sc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>매칭 방식</Label>
-                    <Select value={keywordForm.matchType} onValueChange={(v) => setKeywordForm(p => ({ ...p, matchType: v }))}>
-                      <SelectTrigger data-testid="select-keyword-match-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="exact">완전일치</SelectItem>
-                        <SelectItem value="contains">포함</SelectItem>
-                        <SelectItem value="startsWith">시작일치</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end mt-3">
-                  <Button
-                    onClick={() => {
-                      if (!keywordForm.keyword.trim()) {
-                        toast({ title: '키워드를 입력해주세요', variant: 'destructive' });
-                        return;
-                      }
-                      const kwCat = getCategoryById(keywordForm.categoryId);
-                      const kwSub = getSubCategoriesForCategory(keywordForm.categoryId).find(s => s.id === keywordForm.subCategoryId);
-                      keywordCreateMutation.mutate({
-                        keyword: keywordForm.keyword.trim(),
-                        categoryId: keywordForm.categoryId,
-                        subCategoryId: keywordForm.subCategoryId,
-                        category: kwCat?.name || '기타',
-                        subCategory: kwSub?.name || '',
-                        matchType: keywordForm.matchType,
-                      });
-                    }}
-                    disabled={keywordCreateMutation.isPending}
-                    className="gap-1"
-                    data-testid="button-add-keyword"
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCategoryEditDialog} onOpenChange={setShowCategoryEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? '대분류 수정' : '대분류 추가'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>분류명</Label>
+              <Input value={catFormName} onChange={(e) => setCatFormName(e.target.value)} placeholder="분류명" data-testid="input-category-name" />
+            </div>
+            <div>
+              <Label>이모지</Label>
+              <Input value={catFormEmoji} onChange={(e) => setCatFormEmoji(e.target.value)} placeholder="이모지 입력" className="mb-2" data-testid="input-category-emoji" />
+              <div className="flex flex-wrap gap-1">
+                {['\u{1F4B0}', '\u{1F4B3}', '\u{1F381}', '\u{1F3AF}', '\u{1F527}', '\u{1F4E6}', '\u{1F6D2}', '\u{1F3ED}', '\u26A1', '\u{1F50C}', '\u{1F697}', '\u2708\uFE0F', '\u{1F37D}\uFE0F', '\u{1F3E5}', '\u{1F4DA}', '\u{1F393}', '\u{1F3CB}\uFE0F', '\u{1F3EA}', '\u{1F4F1}', '\u{1F5A5}\uFE0F'].map(em => (
+                  <button key={em} type="button" className={`text-lg p-1 rounded hover-elevate ${catFormEmoji === em ? 'ring-2 ring-primary' : ''}`} onClick={() => setCatFormEmoji(em)} data-testid={`button-emoji-${em}`}>{em}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>색상</Label>
+              <div className="grid grid-cols-7 gap-2 mt-2">
+                {['red', 'orange', 'amber', 'yellow', 'green', 'emerald', 'cyan', 'blue', 'indigo', 'violet', 'purple', 'pink', 'slate', 'gray'].map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-8 h-8 rounded-md flex items-center justify-center hover-elevate ${catFormColor === color ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                    onClick={() => setCatFormColor(color)}
+                    data-testid={`button-color-${color}`}
                   >
-                    {keywordCreateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <Plus className="h-4 w-4" />추가
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    <span className={`w-5 h-5 rounded-full ${getColorBgClass(color)}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCategoryEditDialog(false)}>취소</Button>
+              <Button
+                onClick={() => {
+                  if (!catFormName.trim()) { toast({ title: '분류명을 입력해주세요', variant: 'destructive' }); return; }
+                  if (editingCategory) {
+                    categoryUpdateMutation.mutate({ id: editingCategory.id, name: catFormName.trim(), emoji: catFormEmoji, color: catFormColor });
+                  } else {
+                    categoryCreateMutation.mutate({ name: catFormName.trim(), emoji: catFormEmoji, color: catFormColor });
+                  }
+                }}
+                disabled={categoryCreateMutation.isPending || categoryUpdateMutation.isPending}
+                data-testid="button-save-category"
+              >
+                {(categoryCreateMutation.isPending || categoryUpdateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                저장
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSubCategoryEditDialog} onOpenChange={setShowSubCategoryEditDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editingSubCategory ? '세부항목 수정' : '세부항목 추가'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>대분류</Label>
+              <div className="text-sm text-muted-foreground mt-1">
+                {(() => { const c = categories.find(c => c.id === selectedCategoryForSubs); return c ? `${c.emoji || ''} ${c.name}` : ''; })()}
+              </div>
+            </div>
+            <div>
+              <Label>세부항목명</Label>
+              <Input value={subCatFormName} onChange={(e) => setSubCatFormName(e.target.value)} placeholder="세부항목명" data-testid="input-subcategory-name" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowSubCategoryEditDialog(false)}>취소</Button>
+              <Button
+                onClick={() => {
+                  if (!subCatFormName.trim()) { toast({ title: '세부항목명을 입력해주세요', variant: 'destructive' }); return; }
+                  if (editingSubCategory) {
+                    subCategoryUpdateMutation.mutate({ id: editingSubCategory.id, name: subCatFormName.trim() });
+                  } else if (selectedCategoryForSubs) {
+                    subCategoryCreateMutation.mutate({ categoryId: selectedCategoryForSubs, name: subCatFormName.trim() });
+                  }
+                }}
+                disabled={subCategoryCreateMutation.isPending || subCategoryUpdateMutation.isPending}
+                data-testid="button-save-subcategory"
+              >
+                {(subCategoryCreateMutation.isPending || subCategoryUpdateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                저장
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showDeleteCategoryConfirm} onOpenChange={() => setShowDeleteCategoryConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>분류 삭제</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {showDeleteCategoryConfirm && showDeleteCategoryConfirm.expenseCount > 0 ? (
+              <div className="text-sm">
+                <div className="font-medium text-destructive mb-1">"{showDeleteCategoryConfirm.name}" 분류를 사용 중인 비용이 {showDeleteCategoryConfirm.expenseCount}건 있습니다.</div>
+                <div className="text-muted-foreground">삭제하면 해당 비용의 분류가 "기타"로 변경됩니다. 계속하시겠습니까?</div>
+              </div>
+            ) : (
+              <div className="text-sm">"{showDeleteCategoryConfirm?.name}" 분류를 삭제하시겠습니까?</div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteCategoryConfirm(null)}>취소</Button>
+              <Button variant="destructive" onClick={() => showDeleteCategoryConfirm && categoryDeleteMutation.mutate(showDeleteCategoryConfirm.id)} disabled={categoryDeleteMutation.isPending} data-testid="button-confirm-delete-category">
+                {categoryDeleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                삭제
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showDeleteSubCategoryConfirm} onOpenChange={() => setShowDeleteSubCategoryConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>세부항목 삭제</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {showDeleteSubCategoryConfirm && showDeleteSubCategoryConfirm.expenseCount > 0 ? (
+              <div className="text-sm">
+                <div className="font-medium text-destructive mb-1">"{showDeleteSubCategoryConfirm.name}" 세부항목을 사용 중인 비용이 {showDeleteSubCategoryConfirm.expenseCount}건 있습니다.</div>
+                <div className="text-muted-foreground">삭제하면 해당 비용의 세부항목이 제거됩니다. 계속하시겠습니까?</div>
+              </div>
+            ) : (
+              <div className="text-sm">"{showDeleteSubCategoryConfirm?.name}" 세부항목을 삭제하시겠습니까?</div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteSubCategoryConfirm(null)}>취소</Button>
+              <Button variant="destructive" onClick={() => showDeleteSubCategoryConfirm && subCategoryDeleteMutation.mutate(showDeleteSubCategoryConfirm.id)} disabled={subCategoryDeleteMutation.isPending} data-testid="button-confirm-delete-subcategory">
+                {subCategoryDeleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                삭제
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

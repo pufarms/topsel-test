@@ -17376,7 +17376,14 @@ export async function registerRoutes(
       for (const cat of categories) {
         const subCategories = await db.select().from(expenseSubCategoryTable)
           .where(eq(expenseSubCategoryTable.categoryId, cat.id));
-        result.push({ ...cat, subCategories });
+        const [expenseCount] = await db.select({ cnt: count() }).from(expenses)
+          .where(eq(expenses.categoryId, cat.id));
+        result.push({
+          ...cat,
+          subCategories,
+          subCategoryCount: subCategories.length,
+          expenseCount: Number(expenseCount?.cnt || 0),
+        });
       }
 
       res.json(result);
@@ -17394,7 +17401,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "권한이 없습니다" });
       }
 
-      const { name, color, defaultTaxType, sortOrder } = req.body;
+      const { name, emoji, color, defaultTaxType, sortOrder } = req.body;
 
       const existing = await db.select().from(expenseCategoryTable)
         .where(eq(expenseCategoryTable.name, name)).limit(1);
@@ -17402,11 +17409,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "이미 존재하는 카테고리명입니다" });
       }
 
+      const maxSort = await db.select({ max: sql<number>`COALESCE(MAX(sort_order), 0)` }).from(expenseCategoryTable);
+      const nextSort = (maxSort[0]?.max || 0) + 1;
+
       const [inserted] = await db.insert(expenseCategoryTable).values({
         name,
+        emoji: emoji || null,
         color: color || 'gray',
         defaultTaxType: defaultTaxType || 'taxable',
-        sortOrder: sortOrder ?? 0,
+        sortOrder: sortOrder ?? nextSort,
+        isSystem: false,
       }).returning();
 
       await db.insert(expenseSubCategoryTable).values({
@@ -17432,6 +17444,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const updateData: any = {};
       if (req.body.name !== undefined) updateData.name = req.body.name;
+      if (req.body.emoji !== undefined) updateData.emoji = req.body.emoji;
       if (req.body.color !== undefined) updateData.color = req.body.color;
       if (req.body.defaultTaxType !== undefined) updateData.defaultTaxType = req.body.defaultTaxType;
       if (req.body.sortOrder !== undefined) updateData.sortOrder = req.body.sortOrder;
@@ -17443,6 +17456,12 @@ export async function registerRoutes(
 
       if (!updated) {
         return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+      }
+
+      if (updateData.name) {
+        await db.update(expenses).set({ category: updateData.name }).where(eq(expenses.categoryId, id));
+        await db.update(expenseKeywords).set({ category: updateData.name }).where(eq(expenseKeywords.categoryId, id));
+        await db.update(expenseRecurring).set({ category: updateData.name }).where(eq(expenseRecurring.categoryId, id));
       }
 
       res.json(updated);
@@ -17462,25 +17481,53 @@ export async function registerRoutes(
 
       const id = parseInt(req.params.id);
 
-      const expenseUsage = await db.select({ cnt: count() }).from(expenses)
-        .where(eq(expenses.categoryId, id));
-      const keywordUsage = await db.select({ cnt: count() }).from(expenseKeywords)
-        .where(eq(expenseKeywords.categoryId, id));
-      const recurringUsage = await db.select({ cnt: count() }).from(expenseRecurring)
-        .where(eq(expenseRecurring.categoryId, id));
+      const [category] = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.id, id));
+      if (!category) return res.status(404).json({ message: "카테고리를 찾을 수 없습니다" });
+      if (category.isSystem) return res.status(400).json({ message: "기본 분류는 삭제할 수 없습니다" });
 
-      const totalUsage = (expenseUsage[0]?.cnt || 0) + (keywordUsage[0]?.cnt || 0) + (recurringUsage[0]?.cnt || 0);
-      if (Number(totalUsage) > 0) {
-        return res.status(400).json({
-          message: `이 카테고리를 사용 중인 항목이 ${totalUsage}건 있어 삭제할 수 없습니다`,
-          usageCount: Number(totalUsage),
-        });
+      const [etcCategory] = await db.select().from(expenseCategoryTable).where(eq(expenseCategoryTable.name, '기타'));
+      const etcId = etcCategory?.id;
+
+      if (etcId) {
+        await db.update(expenses).set({ categoryId: etcId, category: '기타', subCategoryId: null, subCategory: null }).where(eq(expenses.categoryId, id));
+        await db.update(expenseKeywords).set({ categoryId: etcId, category: '기타', subCategoryId: null, subCategory: null }).where(eq(expenseKeywords.categoryId, id));
+        await db.update(expenseRecurring).set({ categoryId: etcId, category: '기타' }).where(eq(expenseRecurring.categoryId, id));
       }
 
       await db.delete(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.categoryId, id));
       await db.delete(expenseCategoryTable).where(eq(expenseCategoryTable.id, id));
 
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expense-subcategories
+  app.get("/api/admin/accounting/expense-subcategories", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : null;
+      let conditions: any[] = [];
+      if (categoryId) conditions.push(eq(expenseSubCategoryTable.categoryId, categoryId));
+
+      const subCategories = conditions.length > 0
+        ? await db.select().from(expenseSubCategoryTable).where(and(...conditions))
+        : await db.select().from(expenseSubCategoryTable);
+
+      const result = [];
+      for (const sub of subCategories) {
+        const [expenseCount] = await db.select({ cnt: count() }).from(expenses)
+          .where(eq(expenses.subCategoryId, sub.id));
+        result.push({ ...sub, expenseCount: Number(expenseCount?.cnt || 0) });
+      }
+
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -17511,6 +17558,7 @@ export async function registerRoutes(
       const [inserted] = await db.insert(expenseSubCategoryTable).values({
         categoryId,
         name,
+        isSystem: false,
       }).returning();
 
       res.json(inserted);
@@ -17540,6 +17588,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "소분류를 찾을 수 없습니다" });
       }
 
+      await db.update(expenses).set({ subCategory: name }).where(eq(expenses.subCategoryId, id));
+      await db.update(expenseKeywords).set({ subCategory: name }).where(eq(expenseKeywords.subCategoryId, id));
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -17557,20 +17608,12 @@ export async function registerRoutes(
 
       const id = parseInt(req.params.id);
 
-      const expenseUsage = await db.select({ cnt: count() }).from(expenses)
-        .where(eq(expenses.subCategoryId, id));
-      const keywordUsage = await db.select({ cnt: count() }).from(expenseKeywords)
-        .where(eq(expenseKeywords.subCategoryId, id));
-      const recurringUsage = await db.select({ cnt: count() }).from(expenseRecurring)
-        .where(eq(expenseRecurring.subCategoryId, id));
+      const [subCategory] = await db.select().from(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, id));
+      if (!subCategory) return res.status(404).json({ message: "세부항목을 찾을 수 없습니다" });
+      if (subCategory.isSystem) return res.status(400).json({ message: "기본 세부항목은 삭제할 수 없습니다" });
 
-      const totalUsage = (expenseUsage[0]?.cnt || 0) + (keywordUsage[0]?.cnt || 0) + (recurringUsage[0]?.cnt || 0);
-      if (Number(totalUsage) > 0) {
-        return res.status(400).json({
-          message: `이 소분류를 사용 중인 항목이 ${totalUsage}건 있어 삭제할 수 없습니다`,
-          usageCount: Number(totalUsage),
-        });
-      }
+      await db.update(expenses).set({ subCategoryId: null, subCategory: null }).where(eq(expenses.subCategoryId, id));
+      await db.update(expenseKeywords).set({ subCategoryId: null, subCategory: null }).where(eq(expenseKeywords.subCategoryId, id));
 
       await db.delete(expenseSubCategoryTable).where(eq(expenseSubCategoryTable.id, id));
       res.json({ success: true });
