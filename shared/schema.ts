@@ -1986,6 +1986,55 @@ export const insertExpenseKeywordSchema = createInsertSchema(expenseKeywords).om
 export type ExpenseKeyword = typeof expenseKeywords.$inferSelect;
 export type NewExpenseKeyword = z.infer<typeof insertExpenseKeywordSchema>;
 
+export const loans = pgTable("loans", {
+  id: serial("id").primaryKey(),
+  loanName: varchar("loan_name", { length: 200 }).notNull(),
+  bankName: varchar("bank_name", { length: 100 }).notNull(),
+  loanType: varchar("loan_type", { length: 30 }).notNull().default("term"),
+  loanAmount: integer("loan_amount").notNull(),
+  annualRate: decimal("annual_rate", { precision: 5, scale: 2 }).notNull(),
+  loanStartDate: date("loan_start_date").notNull(),
+  loanEndDate: date("loan_end_date"),
+  loanTermMonths: integer("loan_term_months"),
+  repaymentType: varchar("repayment_type", { length: 30 }).notNull().default("equal_payment"),
+  monthlyPayment: integer("monthly_payment"),
+  repaymentDay: integer("repayment_day").notNull().default(1),
+  remainingBalance: integer("remaining_balance"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLoanSchema = createInsertSchema(loans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Loan = typeof loans.$inferSelect;
+export type NewLoan = z.infer<typeof insertLoanSchema>;
+
+export const loanRepayments = pgTable("loan_repayments", {
+  id: serial("id").primaryKey(),
+  loanId: integer("loan_id").notNull(),
+  repaymentDate: date("repayment_date").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  principalAmount: integer("principal_amount").notNull(),
+  interestAmount: integer("interest_amount").notNull(),
+  remainingAfter: integer("remaining_after").notNull(),
+  expenseId: integer("expense_id"),
+  isExtraPayment: boolean("is_extra_payment").notNull().default(false),
+  memo: text("memo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLoanRepaymentSchema = createInsertSchema(loanRepayments).omit({
+  id: true,
+  createdAt: true,
+});
+export type LoanRepayment = typeof loanRepayments.$inferSelect;
+export type NewLoanRepayment = z.infer<typeof insertLoanRepaymentSchema>;
+
 export const expenseRecurring = pgTable("expense_recurring", {
   id: serial("id").primaryKey(),
   itemName: varchar("item_name", { length: 200 }).notNull(),
