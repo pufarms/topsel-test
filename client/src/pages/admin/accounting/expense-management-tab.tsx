@@ -389,7 +389,7 @@ export default function ExpenseManagementTab() {
     setFormAmount('');
     setFormCategory('기타');
     setFormSubCategory('');
-    setFormTaxType('과세');
+    setFormTaxType('taxable');
     setFormPaymentMethod('카드');
     setFormVendorName('');
     setFormMemo('');

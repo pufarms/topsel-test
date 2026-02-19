@@ -17373,7 +17373,7 @@ export async function registerRoutes(
       const conditions: any[] = [];
 
       if (month && typeof month === 'string') {
-        conditions.push(like(expenses.expenseDate, `${month}%`));
+        conditions.push(sql`${expenses.expenseDate}::text LIKE ${month + '%'}`);
       }
       if (category && typeof category === 'string') {
         conditions.push(eq(expenses.category, category));
@@ -17636,7 +17636,7 @@ export async function registerRoutes(
 
       // Current month totals
       const currentMonthExpenses = await db.select().from(expenses)
-        .where(like(expenses.expenseDate, `${month}%`));
+        .where(sql`${expenses.expenseDate}::text LIKE ${month + '%'}`);
 
       const totalExpense = currentMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
@@ -17652,7 +17652,7 @@ export async function registerRoutes(
       const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
       const prevMonthExpenses = await db.select().from(expenses)
-        .where(like(expenses.expenseDate, `${prevMonth}%`));
+        .where(sql`${expenses.expenseDate}::text LIKE ${prevMonth + '%'}`);
 
       const previousMonthTotal = prevMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
       const changePercent = previousMonthTotal > 0
@@ -17683,7 +17683,7 @@ export async function registerRoutes(
         const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
         const monthExpenses = await db.select().from(expenses)
-          .where(like(expenses.expenseDate, `${monthStr}%`));
+          .where(sql`${expenses.expenseDate}::text LIKE ${monthStr + '%'}`);
 
         const total = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
@@ -18114,7 +18114,7 @@ export async function registerRoutes(
           .where(
             and(
               eq(expenses.recurringId, rec.id),
-              like(expenses.expenseDate, `${month}%`)
+              sql`${expenses.expenseDate}::text LIKE ${month + '%'}`
             )
           )
           .limit(1);
@@ -18266,7 +18266,7 @@ export async function registerRoutes(
       const month = (req.query.month as string) || new Date().toISOString().slice(0, 7);
 
       const expenseList = await db.select().from(expenses)
-        .where(like(expenses.expenseDate, `${month}%`))
+        .where(sql`${expenses.expenseDate}::text LIKE ${month + '%'}`)
         .orderBy(desc(expenses.expenseDate), desc(expenses.id));
 
       const data = expenseList.map(e => ({
