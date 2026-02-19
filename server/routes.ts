@@ -17177,6 +17177,8 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('팝빌 발행 오류:', error);
       const popbillErrorMap: Record<string, string> = {
+        '-99004021': '팝빌 링크아이디가 유효하지 않습니다. 팝빌 계정 설정을 확인해주세요.',
+        '-99004023': '팝빌 비밀키가 유효하지 않습니다. 팝빌 계정 설정을 확인해주세요.',
         '-99999905': '인증토큰이 만료되었습니다. IPRestrictOnOff 설정을 확인하세요.',
         '-11000020': '공동인증서가 등록되지 않았습니다. 팝빌에서 인증서를 등록해주세요.',
         '-12000004': '이미 등록된 문서번호입니다.',
