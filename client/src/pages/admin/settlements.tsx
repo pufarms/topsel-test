@@ -358,7 +358,7 @@ function MemberSettlementTab() {
     excelData.push({
       "적용날짜": "-",
       "상호명": cn,
-      "내역(상품명)": "기간 시작 잔액",
+      "내역(상품명)": "이전 잔액",
       "수량": "",
       "단가": "",
       "합계": "",
@@ -384,7 +384,7 @@ function MemberSettlementTab() {
     excelData.push({
       "적용날짜": "-",
       "상호명": cn,
-      "내역(상품명)": "기간 종료 잔액",
+      "내역(상품명)": "잔액 합계",
       "수량": "",
       "단가": "",
       "합계": "",
@@ -742,7 +742,7 @@ function MemberSettlementTab() {
                           <tr className="border-b bg-blue-50 dark:bg-blue-950/30" data-testid="row-starting-balance">
                             <td className="py-2 px-3 text-center whitespace-nowrap text-muted-foreground">-</td>
                             <td className="py-2 px-3 whitespace-nowrap">{settlementView.companyName}</td>
-                            <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={4}>기간 시작 잔액</td>
+                            <td className="py-2 px-3 whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400" colSpan={4}>이전 잔액</td>
                             <td className="py-2 px-3 text-right whitespace-nowrap text-blue-600 dark:text-blue-400">{settlementView.startingPointerBalance.toLocaleString()}P</td>
                             <td className="py-2 px-3 text-right whitespace-nowrap text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.startingDepositBalance)}</td>
                             <td className="py-2 px-3 text-right whitespace-nowrap font-semibold text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.startingBalance)}</td>
@@ -810,7 +810,7 @@ function MemberSettlementTab() {
                           <tr className="bg-blue-50 dark:bg-blue-950/30 font-semibold" data-testid="row-ending-balance">
                             <td className="py-2 px-3 text-center text-muted-foreground">-</td>
                             <td className="py-2 px-3">{settlementView.companyName}</td>
-                            <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={4}>기간 종료 잔액</td>
+                            <td className="py-2 px-3 text-blue-600 dark:text-blue-400" colSpan={4}>잔액 합계</td>
                             <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{settlementView.endingPointerBalance.toLocaleString()}P</td>
                             <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.endingDepositBalance)}</td>
                             <td className="py-2 px-3 text-right text-blue-600 dark:text-blue-400">{formatCurrency(settlementView.endingBalance)}</td>
