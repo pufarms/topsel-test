@@ -498,6 +498,17 @@ function MemberSettlementTab() {
                         ))
                       )}
                     </TableBody>
+                    {filteredMembers.length > 0 && (
+                      <tfoot className="sticky bottom-0 z-10 bg-muted/80 border-t-2 border-border">
+                        <tr>
+                          <td colSpan={3} className="py-2.5 px-3 font-semibold text-sm">합계</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-sm">{filteredMembers.reduce((s, m) => s + m.deposit, 0).toLocaleString()}원</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-sm">{filteredMembers.reduce((s, m) => s + m.point, 0).toLocaleString()}P</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-sm">{filteredMembers.reduce((s, m) => s + m.deposit + m.point, 0).toLocaleString()}원</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </Table>
                 </div>
               )}
