@@ -1674,7 +1674,7 @@ function DirectSalesManagement() {
         <SectionHeader number="4" title="직접 매출 관리" icon={Handshake} color="amber" isOpen={sectionOpen} onToggle={() => setSectionOpen(!sectionOpen)}>
           <div className="flex items-center gap-2">
             <Button size="sm" className="gap-1" onClick={() => { resetAddForm(); setShowAddDialog(true); setAddDate(todayStr); }} data-testid="button-create-direct-sale">
-              <Plus className="h-4 w-4" />등록
+              <Plus className="h-4 w-4" />직접 매출 등록
             </Button>
             <DateRangeFilter onChange={(range) => dateRange.setDateRange(range)} defaultPreset="month" controlledPreset={dateRange.activePreset} onPresetChange={dateRange.setActivePreset} />
           </div>
