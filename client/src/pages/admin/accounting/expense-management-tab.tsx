@@ -158,6 +158,8 @@ export default function ExpenseManagementTab() {
   const [formVendorName, setFormVendorName] = useState('');
   const [formMemo, setFormMemo] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(-1);
+  const [similarKeywords, setSimilarKeywords] = useState<any[]>([]);
 
   const [spreadsheetRows, setSpreadsheetRows] = useState<SpreadsheetRow[]>([emptySpreadsheetRow()]);
 
@@ -440,6 +442,45 @@ export default function ExpenseManagementTab() {
     }
   };
 
+  const handleContinueSubmit = async () => {
+    if (!formItemName.trim()) {
+      toast({ title: '항목명을 입력해주세요', variant: 'destructive' });
+      return;
+    }
+    const amount = parseInt(formAmount);
+    if (!amount || amount <= 0) {
+      toast({ title: '올바른 금액을 입력해주세요', variant: 'destructive' });
+      return;
+    }
+    const body = {
+      expenseDate: formDate,
+      itemName: formItemName.trim(),
+      amount,
+      category: formCategory,
+      subCategory: formSubCategory.trim(),
+      taxType: formTaxType,
+      paymentMethod: formPaymentMethod,
+      vendorName: formVendorName.trim(),
+      memo: formMemo.trim(),
+    };
+    try {
+      const res = await apiRequest('POST', '/api/admin/accounting/expenses', body);
+      await res.json();
+      toast({ title: '등록 완료', description: '비용이 등록되었습니다. 계속 입력하세요.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/accounting/expenses/trend'] });
+      setFormItemName('');
+      setFormAmount('');
+      setFormSubCategory('');
+      setFormVendorName('');
+      setFormMemo('');
+      setShowAutocomplete(false);
+    } catch (error: any) {
+      toast({ title: '등록 실패', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleAutoClassify = async () => {
     if (!formItemName.trim()) return;
     try {
@@ -523,6 +564,31 @@ export default function ExpenseManagementTab() {
   }, [formAmount, formTaxType]);
 
   const activeRecurringCount = recurringExpenses.filter(r => r.isActive).length;
+
+  useEffect(() => {
+    setAutocompleteIndex(-1);
+  }, [formItemName]);
+
+  useEffect(() => {
+    if (!showAutocomplete) setAutocompleteIndex(-1);
+  }, [showAutocomplete]);
+
+  useEffect(() => {
+    if (!keywordForm.keyword || keywordForm.keyword.length < 2 || !showKeywordDialog) {
+      setSimilarKeywords([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/accounting/expenses/keywords/similar?q=${encodeURIComponent(keywordForm.keyword)}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setSimilarKeywords(data.similar || []);
+        }
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [keywordForm.keyword, showKeywordDialog]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -616,6 +682,38 @@ export default function ExpenseManagementTab() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        {EXPENSE_CATEGORIES.map(cat => {
+          const catTotal = (summary?.byCategory || []).find(c => c.category === cat)?.total || 0;
+          const isSelected = categoryFilter === cat;
+          return (
+            <Card
+              key={cat}
+              className={`cursor-pointer hover-elevate ${isSelected ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setCategoryFilter(isSelected ? '' : cat)}
+              data-testid={`card-category-${cat}`}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1 mb-1">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
+                  <span className="text-xs truncate">{cat}</span>
+                </div>
+                <div className="text-sm font-bold">{catTotal.toLocaleString()}원</div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {categoryFilter && (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="gap-1">
+            {categoryFilter}
+            <X className="h-3 w-3 cursor-pointer" onClick={() => setCategoryFilter('')} />
+          </Badge>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
@@ -982,6 +1080,26 @@ export default function ExpenseManagementTab() {
                 }}
                 onFocus={() => { if (formItemName.length >= 1) setShowAutocomplete(true); }}
                 onBlur={() => { setTimeout(() => handleAutoClassify(), 300); }}
+                onKeyDown={(e) => {
+                  if (!showAutocomplete || autocompleteItems.length === 0) return;
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setAutocompleteIndex(prev => (prev + 1) % autocompleteItems.length);
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setAutocompleteIndex(prev => (prev - 1 + autocompleteItems.length) % autocompleteItems.length);
+                  } else if (e.key === 'Enter' && autocompleteIndex >= 0) {
+                    e.preventDefault();
+                    const item = autocompleteItems[autocompleteIndex];
+                    setFormItemName(item.item_name);
+                    if (item.category) setFormCategory(item.category);
+                    if (item.sub_category) setFormSubCategory(item.sub_category);
+                    if (item.last_amount) setFormAmount(String(item.last_amount));
+                    setShowAutocomplete(false);
+                  } else if (e.key === 'Escape') {
+                    setShowAutocomplete(false);
+                  }
+                }}
                 placeholder="항목명을 입력하세요"
                 data-testid="input-expense-item-name"
               />
@@ -991,7 +1109,7 @@ export default function ExpenseManagementTab() {
                     <button
                       key={i}
                       type="button"
-                      className="w-full text-left px-3 py-2 hover-elevate text-sm flex items-center justify-between"
+                      className={`w-full text-left px-3 py-2 hover-elevate text-sm flex items-center justify-between ${i === autocompleteIndex ? 'bg-accent' : ''}`}
                       onClick={() => {
                         setFormItemName(item.item_name);
                         if (item.category) setFormCategory(item.category);
@@ -1098,6 +1216,17 @@ export default function ExpenseManagementTab() {
               <Button variant="outline" onClick={resetForm} data-testid="button-cancel-expense">
                 취소
               </Button>
+              {!editingExpense && (
+                <Button
+                  variant="outline"
+                  onClick={handleContinueSubmit}
+                  disabled={createMutation.isPending}
+                  data-testid="button-continue-expense"
+                >
+                  {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  연속등록
+                </Button>
+              )}
               <Button
                 onClick={handleFormSubmit}
                 disabled={createMutation.isPending || updateMutation.isPending}
@@ -1354,6 +1483,17 @@ export default function ExpenseManagementTab() {
                       placeholder="키워드"
                       data-testid="input-keyword-text"
                     />
+                    {similarKeywords.length > 0 && (
+                      <div className="mt-1 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md text-xs space-y-1" data-testid="similar-keywords-warning">
+                        <div className="font-medium text-yellow-700 dark:text-yellow-400">유사 키워드가 존재합니다:</div>
+                        {similarKeywords.map((sk: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500">
+                            <span>"{sk.keyword}" ({sk.category})</span>
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">{sk.relation === 'exact' ? '동일' : '유사'}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label>분류</Label>

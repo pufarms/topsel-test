@@ -17439,47 +17439,68 @@ export async function registerRoutes(
         createdBy: user.username,
       }).returning();
 
-      // Keyword learning logic
+      // Keyword learning logic (4-step dedup per spec)
       try {
-        const existingKeyword = await db.select().from(expenseKeywords)
+        // Step 1: Check if exact itemName already exists as keyword
+        const exactMatch = await db.select().from(expenseKeywords)
           .where(eq(expenseKeywords.keyword, itemName))
           .limit(1);
 
-        if (existingKeyword.length === 0) {
-          await db.insert(expenseKeywords).values({
-            keyword: itemName,
-            category,
-            subCategory: subCategory || null,
-            priority: 50,
-            source: 'learned',
-            lastAmount: amount,
-            useCount: 1,
-          });
-        } else {
+        if (exactMatch.length > 0) {
           await db.update(expenseKeywords)
-            .set({
-              useCount: sql`${expenseKeywords.useCount} + 1`,
-              lastAmount: amount,
-            })
-            .where(eq(expenseKeywords.keyword, itemName));
-        }
+            .set({ useCount: sql`${expenseKeywords.useCount} + 1`, lastAmount: amount })
+            .where(eq(expenseKeywords.id, exactMatch[0].id));
+        } else {
+          // Step 2: Check if any word in itemName matches existing keyword with same category
+          const words = itemName.split(/\s+/).filter((w: string) => w.length >= 2);
+          let wordMatched = false;
+          for (const word of words) {
+            const partialMatch = await db.select().from(expenseKeywords)
+              .where(and(ilike(expenseKeywords.keyword, word), eq(expenseKeywords.category, category)))
+              .limit(1);
+            if (partialMatch.length > 0) {
+              await db.update(expenseKeywords)
+                .set({ useCount: sql`${expenseKeywords.useCount} + 1`, lastAmount: amount })
+                .where(eq(expenseKeywords.id, partialMatch[0].id));
+              wordMatched = true;
+              break;
+            }
+          }
 
-        // Extract first word
-        const firstWord = itemName.split(/\s+/)[0];
-        if (firstWord && firstWord.length >= 2 && firstWord !== itemName) {
-          const existingFirstWord = await db.select().from(expenseKeywords)
-            .where(eq(expenseKeywords.keyword, firstWord))
-            .limit(1);
-          if (existingFirstWord.length === 0) {
-            await db.insert(expenseKeywords).values({
-              keyword: firstWord,
-              category,
-              subCategory: subCategory || null,
-              priority: 15,
-              source: 'learned',
-              lastAmount: amount,
-              useCount: 0,
-            });
+          if (!wordMatched) {
+            // Step 3: Check containment relationship with same category keywords
+            const categoryKeywords = await db.select().from(expenseKeywords)
+              .where(eq(expenseKeywords.category, category));
+            let containmentMatched = false;
+            for (const kw of categoryKeywords) {
+              if (itemName.includes(kw.keyword) || kw.keyword.includes(itemName)) {
+                await db.update(expenseKeywords)
+                  .set({ useCount: sql`${expenseKeywords.useCount} + 1`, lastAmount: amount })
+                  .where(eq(expenseKeywords.id, kw.id));
+                containmentMatched = true;
+                break;
+              }
+            }
+
+            if (!containmentMatched) {
+              // Step 4: Completely new - add keyword + individual words
+              await db.insert(expenseKeywords).values({
+                keyword: itemName, category, subCategory: subCategory || null,
+                priority: 50, source: 'learned', lastAmount: amount, useCount: 1,
+              });
+              for (const word of words) {
+                if (word !== itemName) {
+                  const existing = await db.select().from(expenseKeywords)
+                    .where(eq(expenseKeywords.keyword, word)).limit(1);
+                  if (existing.length === 0) {
+                    await db.insert(expenseKeywords).values({
+                      keyword: word, category, subCategory: subCategory || null,
+                      priority: 15, source: 'learned', lastAmount: null, useCount: 0,
+                    });
+                  }
+                }
+              }
+            }
           }
         }
       } catch (learnErr) {
@@ -17933,6 +17954,43 @@ export async function registerRoutes(
 
       await db.delete(expenseKeywords).where(eq(expenseKeywords.id, id));
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // GET /api/admin/accounting/expenses/keywords/similar
+  app.get("/api/admin/accounting/expenses/keywords/similar", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        return res.status(403).json({ message: "권한이 없습니다" });
+      }
+
+      const q = req.query.q as string;
+      if (!q || q.length < 2) {
+        return res.json({ similar: [], exactMatch: false });
+      }
+
+      const allKeywords = await db.select().from(expenseKeywords)
+        .orderBy(desc(expenseKeywords.priority), desc(expenseKeywords.useCount));
+
+      const similar: any[] = [];
+      let exactMatch = false;
+
+      for (const kw of allKeywords) {
+        if (kw.keyword === q) {
+          exactMatch = true;
+          similar.push({ ...kw, relation: 'exact' });
+        } else if (q.includes(kw.keyword)) {
+          similar.push({ ...kw, relation: 'input_contains_keyword' });
+        } else if (kw.keyword.includes(q)) {
+          similar.push({ ...kw, relation: 'keyword_contains_input' });
+        }
+      }
+
+      res.json({ similar: similar.slice(0, 10), exactMatch });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
