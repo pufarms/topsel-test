@@ -405,7 +405,7 @@ function MemberSettlementTab() {
       <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="members" data-testid="tab-members">회원 잔액</TabsTrigger>
-          <TabsTrigger value="member-detail" data-testid="tab-member-detail">업체별 정산 내역</TabsTrigger>
+          <TabsTrigger value="member-detail" data-testid="tab-member-detail">매출/정산 내역</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members">
@@ -522,7 +522,7 @@ function MemberSettlementTab() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-5 w-5" />업체별 정산 내역
+                    <FileText className="h-5 w-5" />매출/정산 내역
                   </CardTitle>
                   <DateRangeFilter onChange={(range) => { detailDateRange.setDateRange(range); setDetailPage(1); }} defaultPreset="month" controlledPreset={detailDateRange.activePreset} onPresetChange={detailDateRange.setActivePreset} />
                 </div>
