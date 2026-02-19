@@ -6,13 +6,17 @@ const LinkID = process.env.POPBILL_LINK_ID || '';
 const SecretKey = process.env.POPBILL_SECRET_KEY || '';
 const IsTest = process.env.POPBILL_IS_TEST === 'true';
 
-console.log(`[팝빌] 초기화: LinkID=${LinkID ? LinkID.substring(0, 3) + '***' : '(미설정)'}, IsTest=${IsTest}, SecretKey=${SecretKey ? '설정됨' : '(미설정)'}`);
+popbill.config({
+  LinkID: LinkID,
+  SecretKey: SecretKey,
+  IsTest: IsTest,
+  IPRestrictOnOff: false,
+  UseStaticIP: false,
+  UseLocalTimeYN: true,
+});
 
-const taxinvoiceService = popbill.TaxinvoiceService(LinkID, SecretKey);
+const taxinvoiceService = popbill.TaxinvoiceService();
 
-taxinvoiceService.IsTest = IsTest;
-taxinvoiceService.IPRestrictOnOff = false;
-taxinvoiceService.UseStaticIP = false;
-taxinvoiceService.UseLocalTimeYN = true;
+console.log(`[팝빌] SDK 초기화 완료 (LinkID=${LinkID ? LinkID.substring(0, 2) + '**' : '(미설정)'}, IsTest=${IsTest}, ServiceURL=${taxinvoiceService.ServiceURL || ''})`);
 
 export { taxinvoiceService, popbill };
