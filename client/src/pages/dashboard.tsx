@@ -1516,15 +1516,18 @@ export default function Dashboard() {
 
                                 {uploadExcelMutation.isPending && (
                                   <div className="rounded-lg p-4 bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-                                    <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex items-center gap-3 mb-3">
                                       <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin" />
-                                      <h4 className="font-medium text-blue-800 dark:text-blue-200">주문 검증 중입니다</h4>
+                                      <h4 className="font-medium text-blue-800 dark:text-blue-200">정확한 배송을 위해 주소를 검증하고 있습니다</h4>
                                     </div>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                                      상품 확인 및 배송지 주소 검증을 진행하고 있습니다. 주문 건수에 따라 다소 시간이 소요될 수 있으니 잠시만 기다려 주세요.
+                                    <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+                                      고객님께 상품이 정확하게 배송될 수 있도록, 모든 주문의 배송지 주소를 행정안전부 공인 주소 데이터와 대조하여 검증하고 있습니다. 이 과정을 통해 잘못된 주소로 인한 배송 사고를 사전에 예방합니다.
                                     </p>
-                                    <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">
-                                      창을 닫지 마시고 잠시만 기다려 주세요.
+                                    <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
+                                      주문 건수에 따라 다소 시간이 소요될 수 있습니다. 양해 부탁드립니다.
+                                    </p>
+                                    <p className="text-xs text-blue-500 dark:text-blue-400 mt-2 font-medium">
+                                      처리가 완료될 때까지 창을 닫지 말아 주세요.
                                     </p>
                                   </div>
                                 )}
