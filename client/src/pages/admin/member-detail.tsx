@@ -276,8 +276,8 @@ export default function MemberDetailPage() {
           {/* Read-only Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base md:text-lg">기본 정보 (수정 불가)</CardTitle>
-              <CardDescription>아이디, 상호명, 사업자번호는 변경할 수 없습니다</CardDescription>
+              <CardTitle className="text-base md:text-lg">기본 정보</CardTitle>
+              <CardDescription>아이디, 상호명, 사업자번호는 변경할 수 없습니다. 회원명/대표자명은 수정 가능합니다.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -296,6 +296,15 @@ export default function MemberDetailPage() {
                     onChange={(e) => setFormData({...formData, memberName: e.target.value})}
                     placeholder="회원명 (뱅크다 입금자명 매칭용)"
                     data-testid="input-member-name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">대표자명 (세금계산서용)</Label>
+                  <Input 
+                    value={formData.representative || member.representative}
+                    onChange={(e) => setFormData({...formData, representative: e.target.value})}
+                    placeholder="사업자 대표자명 (세금계산서 공급받는자)"
+                    data-testid="input-representative"
                   />
                 </div>
                 <div className="space-y-1">
@@ -454,14 +463,6 @@ export default function MemberDetailPage() {
                       <SelectItem value="false">미사용</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm">대표자명</Label>
-                  <Input 
-                    value={formData.representative || member.representative}
-                    onChange={(e) => setFormData({...formData, representative: e.target.value})}
-                    data-testid="input-representative"
-                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-sm">대표연락처</Label>
