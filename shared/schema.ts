@@ -1875,6 +1875,8 @@ export const invoiceRecords = pgTable("invoice_records", {
   originalSupplyAmount: integer("original_supply_amount"),
   originalVatAmount: integer("original_vat_amount"),
   originalTotalAmount: integer("original_total_amount"),
+  periodStartDate: varchar("period_start_date", { length: 10 }),
+  periodEndDate: varchar("period_end_date", { length: 10 }),
   isManuallyAdjusted: boolean("is_manually_adjusted").notNull().default(false),
   isAutoIssued: boolean("is_auto_issued").notNull().default(false),
   memo: text("memo"),

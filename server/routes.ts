@@ -16823,7 +16823,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount } = req.body;
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount, periodStartDate, periodEndDate } = req.body;
 
       if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
@@ -16930,6 +16930,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: "발행 금액이 0원 이하입니다. 금액을 확인해주세요." });
       }
 
+      const defaultStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const defaultEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
       const [record] = await db.insert(invoiceRecords).values({
         targetType,
         targetId: String(targetId),
@@ -16946,6 +16950,8 @@ export async function registerRoutes(
         originalSupplyAmount: isManuallyAdj ? serverSupplyAmount : null,
         originalVatAmount: isManuallyAdj ? serverVatAmount : null,
         originalTotalAmount: isManuallyAdj ? serverTotalAmount : null,
+        periodStartDate: periodStartDate || defaultStartDate,
+        periodEndDate: periodEndDate || defaultEndDate,
         isManuallyAdjusted: isManuallyAdj,
         isAutoIssued: false,
         memo: memo || null,
@@ -16987,7 +16993,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount } = req.body;
+      const { targetType, targetId, targetName, businessNumber, invoiceType, year, month, orderIds, memo, customSupplyAmount, customVatAmount, customTotalAmount, periodStartDate, periodEndDate } = req.body;
 
       if (!targetType || !targetId || !targetName || !invoiceType || !year || !month || !orderIds || orderIds.length === 0) {
         return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
@@ -17193,6 +17199,10 @@ export async function registerRoutes(
         );
       });
 
+      const popbillDefaultStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const popbillLastDay = new Date(year, month, 0).getDate();
+      const popbillDefaultEndDate = `${year}-${String(month).padStart(2, '0')}-${String(popbillLastDay).padStart(2, '0')}`;
+
       const [record] = await db.insert(invoiceRecords).values({
         targetType,
         targetId: String(targetId),
@@ -17209,6 +17219,8 @@ export async function registerRoutes(
         originalSupplyAmount: isManuallyAdj ? serverSupplyAmount : null,
         originalVatAmount: isManuallyAdj ? serverVatAmount : null,
         originalTotalAmount: isManuallyAdj ? serverTotalAmount : null,
+        periodStartDate: periodStartDate || popbillDefaultStartDate,
+        periodEndDate: periodEndDate || popbillDefaultEndDate,
         isManuallyAdjusted: isManuallyAdj,
         isAutoIssued: false,
         memo: memo || null,

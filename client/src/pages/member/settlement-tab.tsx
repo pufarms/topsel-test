@@ -98,6 +98,8 @@ interface InvoiceRecord {
   supplyAmount: number;
   vatAmount: number;
   totalAmount: number;
+  periodStartDate: string | null;
+  periodEndDate: string | null;
   isManuallyAdjusted: boolean;
   memo: string | null;
   issuedAt: string;
@@ -134,6 +136,16 @@ const popbillStatusLabels: Record<string, string> = {
   cancelled: "발행취소",
 };
 
+function formatPeriod(startDate: string | null, endDate: string | null, year: number, month: number): string {
+  if (startDate && endDate) {
+    const s = startDate.replace(/-/g, '.');
+    const e = endDate.replace(/-/g, '.');
+    return `${s} ~ ${e}`;
+  }
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}.${String(month).padStart(2, '0')}.01 ~ ${year}.${String(month).padStart(2, '0')}.${String(lastDay).padStart(2, '0')}`;
+}
+
 function InvoiceHistoryTab() {
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -160,6 +172,7 @@ function InvoiceHistoryTab() {
       const XLSX = await import("xlsx");
       const excelData = records.map((r) => ({
         '발행년월': `${r.year}년 ${r.month}월`,
+        '거래기간': formatPeriod(r.periodStartDate, r.periodEndDate, r.year, r.month),
         '유형': invoiceTypeLabels[r.invoiceType] || r.invoiceType,
         '주문건수': r.orderCount,
         '공급가액': r.supplyAmount,
@@ -173,7 +186,7 @@ function InvoiceHistoryTab() {
 
       const ws = XLSX.utils.json_to_sheet(excelData);
       ws['!cols'] = [
-        { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
+        { wch: 12 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
         { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 20 },
       ];
       const wb = XLSX.utils.book_new();
@@ -247,7 +260,7 @@ function InvoiceHistoryTab() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b bg-muted/30">
-                    <th className="text-center py-2 px-3 whitespace-nowrap">발행일</th>
+                    <th className="text-center py-2 px-3 whitespace-nowrap">거래기간</th>
                     <th className="text-center py-2 px-3 whitespace-nowrap">유형</th>
                     <th className="text-right py-2 px-3 whitespace-nowrap">주문건수</th>
                     <th className="text-right py-2 px-3 whitespace-nowrap">공급가액</th>
@@ -255,13 +268,14 @@ function InvoiceHistoryTab() {
                     <th className="text-right py-2 px-3 whitespace-nowrap">합계금액</th>
                     <th className="text-center py-2 px-3 whitespace-nowrap">발행상태</th>
                     <th className="text-center py-2 px-3 whitespace-nowrap">국세청확인번호</th>
+                    <th className="text-center py-2 px-3 whitespace-nowrap">발행일</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((record) => (
                     <tr key={record.id} className={`border-b hover:bg-muted/20 ${record.cancelledAt ? 'opacity-50 line-through' : ''}`} data-testid={`row-invoice-${record.id}`}>
-                      <td className="py-2 px-3 text-center whitespace-nowrap">
-                        {new Date(record.issuedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-xs">
+                        {formatPeriod(record.periodStartDate, record.periodEndDate, record.year, record.month)}
                       </td>
                       <td className="py-2 px-3 text-center whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -290,6 +304,9 @@ function InvoiceHistoryTab() {
                       <td className="py-2 px-3 text-center whitespace-nowrap text-xs text-muted-foreground">
                         {record.popbillNtsConfirmNum || '-'}
                       </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-xs text-muted-foreground">
+                        {new Date(record.issuedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -314,6 +331,10 @@ function InvoiceHistoryTab() {
                     }`}>
                       {record.cancelledAt ? '취소' : popbillStatusLabels[record.popbillIssueStatus || 'none'] || '미발행'}
                     </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">거래기간</span>
+                    <span className="text-xs">{formatPeriod(record.periodStartDate, record.periodEndDate, record.year, record.month)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">발행일</span>
