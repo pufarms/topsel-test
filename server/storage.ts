@@ -634,11 +634,17 @@ export class DatabaseStorage implements IStorage {
   async updateMember(id: string, data: Partial<{
     password: string;
     grade: string;
+    memberName: string;
     businessAddress: string;
     representative: string;
     phone: string;
     managerName: string;
     managerPhone: string;
+    managerEmail: string;
+    manager2Name: string;
+    manager2Phone: string;
+    manager3Name: string;
+    manager3Phone: string;
     email: string;
     deposit: number;
     point: number;
