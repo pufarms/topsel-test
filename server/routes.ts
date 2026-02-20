@@ -17120,22 +17120,32 @@ export async function registerRoutes(
       let invoiceeCEOName = '';
       let invoiceeAddr = '';
       let invoiceeEmail = '';
+      let invoiceeContactName = '';
+      let invoiceeTEL = '';
       if (targetType === 'member') {
         const [memberInfo] = await db.select({
           representative: members.representative,
           businessAddress: members.businessAddress,
           email: members.email,
+          managerName: members.managerName,
+          managerPhone: members.managerPhone,
+          phone: members.phone,
         }).from(members).where(eq(members.id, targetId)).limit(1);
         if (memberInfo) {
           invoiceeCEOName = memberInfo.representative || '';
           invoiceeAddr = memberInfo.businessAddress || '';
           invoiceeEmail = memberInfo.email || '';
+          invoiceeContactName = memberInfo.managerName || memberInfo.representative || '';
+          invoiceeTEL = memberInfo.managerPhone || memberInfo.phone || '';
         }
       } else if (targetType === 'vendor') {
         const partner = await storage.getPartner(targetId);
         if (partner) {
           invoiceeCEOName = partner.representative || '';
           invoiceeAddr = partner.address || '';
+          invoiceeEmail = '';
+          invoiceeContactName = partner.representative || '';
+          invoiceeTEL = partner.phone1 || '';
         }
       }
 
@@ -17165,6 +17175,8 @@ export async function registerRoutes(
         invoiceeAddr,
         invoiceeBizType: '',
         invoiceeBizClass: '',
+        invoiceeContactName,
+        invoiceeTEL,
         invoiceeEmail,
         supplyCostTotal: String(finalSupplyAmount),
         taxTotal: String(finalVatAmount),
