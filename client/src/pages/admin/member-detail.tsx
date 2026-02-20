@@ -644,7 +644,7 @@ export default function MemberDetailPage() {
             </CardContent>
           </Card>
 
-          {['START', 'DRIVING', 'TOP'].includes(member.grade) && (
+          {['ASSOCIATE', 'START', 'DRIVING', 'TOP'].includes(member.grade) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -680,6 +680,7 @@ export default function MemberDetailPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="ASSOCIATE">준회원</SelectItem>
                           <SelectItem value="START">Start회원</SelectItem>
                           <SelectItem value="DRIVING">Driving회원</SelectItem>
                           <SelectItem value="TOP">Top회원</SelectItem>
