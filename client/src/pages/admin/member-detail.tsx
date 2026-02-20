@@ -277,7 +277,7 @@ export default function MemberDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base md:text-lg">기본 정보</CardTitle>
-              <CardDescription>아이디, 상호명, 사업자번호는 변경할 수 없습니다. 회원명/대표자명은 수정 가능합니다.</CardDescription>
+              <CardDescription>아이디, 상호명, 대표자명, 사업자번호는 변경할 수 없습니다. 회원명만 수정 가능합니다.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -299,13 +299,8 @@ export default function MemberDetailPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm text-muted-foreground">대표자명 (세금계산서용)</Label>
-                  <Input 
-                    value={formData.representative || member.representative}
-                    onChange={(e) => setFormData({...formData, representative: e.target.value})}
-                    placeholder="사업자 대표자명 (세금계산서 공급받는자)"
-                    data-testid="input-representative"
-                  />
+                  <Label className="text-sm text-muted-foreground">대표자명 (본인인증 · 세금계산서용)</Label>
+                  <Input value={member.representative} disabled className="bg-muted" data-testid="input-representative" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">사업자번호</Label>
