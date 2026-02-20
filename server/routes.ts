@@ -17141,9 +17141,10 @@ export async function registerRoutes(
 
       let invoiceeCEOName = '';
       let invoiceeAddr = '';
-      let invoiceeEmail = '';
-      let invoiceeContactName = '';
-      let invoiceeTEL = '';
+      let invoiceeEmail1 = '';
+      let invoiceeContactName1 = '';
+      let invoiceeTEL1 = '';
+      let invoiceeHP1 = '';
       if (targetType === 'member') {
         const [memberInfo] = await db.select({
           representative: members.representative,
@@ -17157,18 +17158,20 @@ export async function registerRoutes(
         if (memberInfo) {
           invoiceeCEOName = memberInfo.representative || '';
           invoiceeAddr = memberInfo.businessAddress || '';
-          invoiceeEmail = memberInfo.managerEmail || memberInfo.email || '';
-          invoiceeContactName = memberInfo.managerName || memberInfo.representative || '';
-          invoiceeTEL = memberInfo.managerPhone || memberInfo.phone || '';
+          invoiceeEmail1 = memberInfo.managerEmail || memberInfo.email || '';
+          invoiceeContactName1 = memberInfo.managerName || memberInfo.representative || '';
+          invoiceeTEL1 = memberInfo.phone || '';
+          invoiceeHP1 = memberInfo.managerPhone || '';
         }
       } else if (targetType === 'vendor') {
         const partner = await storage.getPartner(targetId);
         if (partner) {
           invoiceeCEOName = partner.representative || '';
           invoiceeAddr = partner.address || '';
-          invoiceeEmail = '';
-          invoiceeContactName = partner.representative || '';
-          invoiceeTEL = partner.phone1 || '';
+          invoiceeEmail1 = '';
+          invoiceeContactName1 = partner.representative || '';
+          invoiceeTEL1 = partner.phone1 || '';
+          invoiceeHP1 = '';
         }
       }
 
@@ -17198,9 +17201,10 @@ export async function registerRoutes(
         invoiceeAddr,
         invoiceeBizType: '',
         invoiceeBizClass: '',
-        invoiceeContactName,
-        invoiceeTEL,
-        invoiceeEmail,
+        invoiceeContactName1,
+        invoiceeTEL1,
+        invoiceeHP1,
+        invoiceeEmail1,
         supplyCostTotal: String(finalSupplyAmount),
         taxTotal: String(finalVatAmount),
         totalAmount: String(finalTotalAmount),
