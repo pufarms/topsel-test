@@ -17365,8 +17365,8 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId);
       if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
 
-      const { invoiceId, mgtKey, reason } = req.body;
-      if (!invoiceId || !mgtKey) return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
+      const { invoiceId, mgtKey, reason, forceLocal } = req.body;
+      if (!invoiceId) return res.status(400).json({ message: "필수 항목이 누락되었습니다" });
 
       const [existing] = await db.select().from(invoiceRecords).where(eq(invoiceRecords.id, invoiceId)).limit(1);
       if (!existing) return res.status(404).json({ message: "해당 발행 내역을 찾을 수 없습니다" });
@@ -17375,20 +17375,61 @@ export async function registerRoutes(
         return res.status(400).json({ message: "이미 취소된 발행 내역입니다" });
       }
 
+      if (forceLocal) {
+        await db.update(invoiceRecords)
+          .set({
+            cancelledAt: new Date(),
+            cancelReason: reason || '사이트 취소 (팝빌 별도 취소)',
+            popbillIssueStatus: 'cancelled',
+          })
+          .where(eq(invoiceRecords.id, invoiceId));
+        return res.json({ success: true, message: '사이트 기록이 취소 처리되었습니다.' });
+      }
+
+      if (!mgtKey) return res.status(400).json({ message: "팝빌 관리번호가 없습니다. 사이트 기록만 취소하려면 '사이트만 취소' 옵션을 사용하세요." });
+
       const CorpNum = process.env.POPBILL_CORP_NUM || '';
       const UserID = process.env.POPBILL_USER_ID || '';
 
-      await new Promise((resolve, reject) => {
-        taxinvoiceService.cancelIssue(
-          CorpNum,
-          popbill.MgtKeyType.SELL,
-          mgtKey,
-          reason || '발행 취소',
-          UserID,
-          function(result: any) { resolve(result); },
-          function(error: any) { reject(error); }
-        );
-      });
+      try {
+        await new Promise((resolve, reject) => {
+          taxinvoiceService.cancelIssue(
+            CorpNum,
+            popbill.MgtKeyType.SELL,
+            mgtKey,
+            reason || '발행 취소',
+            UserID,
+            function(result: any) { resolve(result); },
+            function(error: any) { reject(error); }
+          );
+        });
+      } catch (popbillErr: any) {
+        const errCode = popbillErr?.code || 0;
+        const errMsg = popbillErr?.message || '';
+        console.error(`[팝빌] cancelIssue 실패 (code: ${errCode}): ${errMsg}`);
+
+        if (errCode === -11000019 || errCode === -11000016 || errMsg.includes('취소') || errMsg.includes('상태')) {
+          await db.update(invoiceRecords)
+            .set({
+              cancelledAt: new Date(),
+              cancelReason: reason || `팝빌 취소 동기화 (${errMsg})`,
+              popbillIssueStatus: 'cancelled',
+            })
+            .where(eq(invoiceRecords.id, invoiceId));
+          return res.json({
+            success: true,
+            message: `팝빌에서 이미 취소된 상태입니다. 사이트 기록도 취소 처리되었습니다.`,
+            syncedFromPopbill: true,
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: `팝빌 취소 실패: ${errMsg}`,
+          code: errCode,
+          canForceLocal: true,
+        });
+      }
 
       await db.update(invoiceRecords)
         .set({
@@ -17432,6 +17473,93 @@ export async function registerRoutes(
 
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // ===== 팝빌 상태 동기화 API =====
+  app.post('/api/admin/accounting/popbill-sync/:invoiceId', async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.role)) return res.status(403).json({ message: "권한 없음" });
+
+      const invoiceId = parseInt(req.params.invoiceId);
+      const [existing] = await db.select().from(invoiceRecords).where(eq(invoiceRecords.id, invoiceId)).limit(1);
+      if (!existing) return res.status(404).json({ message: "발행 내역을 찾을 수 없습니다" });
+
+      const mgtKey = existing.popbillMgtKey;
+      if (!mgtKey) return res.status(400).json({ message: "팝빌 관리번호가 없어 동기화할 수 없습니다" });
+
+      const CorpNum = process.env.POPBILL_CORP_NUM || '';
+      const UserID = process.env.POPBILL_USER_ID || '';
+
+      let popbillInfo: any;
+      try {
+        popbillInfo = await new Promise((resolve, reject) => {
+          taxinvoiceService.getInfo(
+            CorpNum,
+            popbill.MgtKeyType.SELL,
+            mgtKey,
+            UserID,
+            function(result: any) { resolve(result); },
+            function(error: any) { reject(error); }
+          );
+        });
+      } catch (popErr: any) {
+        return res.status(400).json({
+          success: false,
+          message: `팝빌 상태 조회 실패: ${popErr.message || '알 수 없는 오류'}`,
+          code: popErr.code,
+        });
+      }
+
+      const stateCode = popbillInfo?.stateCode || 0;
+      const stateDT = popbillInfo?.stateDT || '';
+      const ntsConfirmNum = popbillInfo?.ntsconfirmNum || popbillInfo?.ntsConfirmNum || '';
+
+      const cancelledStates = [3, 4];
+      const isPopbillCancelled = cancelledStates.includes(stateCode) ||
+        (popbillInfo?.invoiceType === '역발행' && stateCode < 0);
+
+      const updateFields: any = {};
+      let statusMessage = '';
+
+      if (isPopbillCancelled && !existing.cancelledAt) {
+        updateFields.cancelledAt = new Date();
+        updateFields.cancelReason = `팝빌 동기화 (상태코드: ${stateCode})`;
+        updateFields.popbillIssueStatus = 'cancelled';
+        statusMessage = '팝빌에서 취소된 것을 확인하여 사이트에도 반영했습니다.';
+      } else if (!isPopbillCancelled && existing.cancelledAt) {
+        statusMessage = '팝빌에서는 취소되지 않았으나 사이트에서는 취소 상태입니다. 수동 확인이 필요합니다.';
+      } else if (isPopbillCancelled && existing.cancelledAt) {
+        statusMessage = '팝빌과 사이트 모두 취소 상태입니다.';
+      } else {
+        statusMessage = '팝빌과 사이트 상태가 일치합니다 (정상 발행).';
+      }
+
+      if (ntsConfirmNum && ntsConfirmNum !== existing.popbillNtsConfirmNum) {
+        updateFields.popbillNtsConfirmNum = ntsConfirmNum;
+      }
+
+      if (Object.keys(updateFields).length > 0) {
+        await db.update(invoiceRecords).set(updateFields).where(eq(invoiceRecords.id, invoiceId));
+      }
+
+      res.json({
+        success: true,
+        message: statusMessage,
+        popbillStatus: {
+          stateCode,
+          stateDT,
+          ntsConfirmNum,
+          isCancelled: isPopbillCancelled,
+        },
+        updated: Object.keys(updateFields).length > 0,
+      });
+
+    } catch (error: any) {
+      console.error('팝빌 동기화 오류:', error);
+      res.status(500).json({ success: false, message: error.message || '동기화 중 오류가 발생했습니다.' });
     }
   });
 

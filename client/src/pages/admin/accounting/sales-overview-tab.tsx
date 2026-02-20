@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, Store, FileText,
   Download, Plus, Pencil, Trash2, Calendar, Building2, ArrowUpDown,
-  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck, Wallet, ExternalLink, Eye,
+  BarChart3, ShoppingCart, Handshake, Search, X, ChevronDown, AlertTriangle, Truck, Wallet, ExternalLink, Eye, RefreshCw,
 } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 import { MemberSettlementTab } from "@/pages/admin/settlements";
@@ -360,13 +360,17 @@ function MonthlySalesSummary() {
     },
   });
 
+  const [cancelForceLocal, setCancelForceLocal] = useState(false);
+  const [cancelErrorInfo, setCancelErrorInfo] = useState<{ message: string; canForceLocal?: boolean } | null>(null);
+
   const cancelMutation = useMutation({
-    mutationFn: async (row: InvoiceSummaryRow) => {
+    mutationFn: async ({ row, forceLocal }: { row: InvoiceSummaryRow; forceLocal?: boolean }) => {
       if (row.popbillMgtKey) {
         const res = await apiRequest("POST", "/api/admin/accounting/popbill-cancel", {
           invoiceId: row.invoiceId,
           mgtKey: row.popbillMgtKey,
           reason: cancelReason || '발행 취소',
+          forceLocal: forceLocal || false,
         });
         return res.json();
       } else {
@@ -374,14 +378,48 @@ function MonthlySalesSummary() {
         return res.json();
       }
     },
-    onSuccess: () => {
-      toast({ title: "발행이 취소되었습니다" });
+    onSuccess: (result: any) => {
+      const msg = result?.syncedFromPopbill
+        ? "팝빌 취소 상태가 동기화되었습니다"
+        : "발행이 취소되었습니다";
+      toast({ title: msg, description: result?.message });
       setCancelDialogRow(null);
       setCancelReason("");
+      setCancelForceLocal(false);
+      setCancelErrorInfo(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
     },
     onError: (e: any) => {
-      toast({ title: "취소 실패", description: e.message, variant: "destructive" });
+      let parsed: any = null;
+      const errMsg = e.message || '';
+      const jsonStart = errMsg.indexOf('{');
+      if (jsonStart >= 0) {
+        try { parsed = JSON.parse(errMsg.substring(jsonStart)); } catch {}
+      }
+      if (parsed?.canForceLocal) {
+        setCancelErrorInfo({ message: parsed.message || errMsg, canForceLocal: true });
+      } else {
+        toast({ title: "취소 실패", description: parsed?.message || errMsg, variant: "destructive" });
+      }
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (invoiceId: number) => {
+      const res = await apiRequest("POST", `/api/admin/accounting/popbill-sync/${invoiceId}`);
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ title: "동기화 완료", description: result.message });
+      if (result.updated) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/accounting/invoice-summary"] });
+        setCancelDialogRow(null);
+        setCancelReason("");
+        setCancelErrorInfo(null);
+      }
+    },
+    onError: (e: any) => {
+      toast({ title: "동기화 실패", description: e.message, variant: "destructive" });
     },
   });
 
@@ -727,11 +765,23 @@ function MonthlySalesSummary() {
                                   <Eye className="h-3 w-3 mr-0.5" />보기
                                 </Button>
                               )}
+                              {r.popbillMgtKey && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-[10px] h-5 px-1.5 text-muted-foreground"
+                                  onClick={(e) => { e.stopPropagation(); if (r.invoiceId) syncMutation.mutate(r.invoiceId); }}
+                                  disabled={syncMutation.isPending}
+                                  data-testid={`button-sync-invoice-${idx}`}
+                                >
+                                  <RefreshCw className={`h-3 w-3 mr-0.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />동기화
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="text-[10px] h-5 px-1.5 text-destructive"
-                                onClick={(e) => { e.stopPropagation(); setCancelDialogRow(r); setCancelReason(""); }}
+                                onClick={(e) => { e.stopPropagation(); setCancelDialogRow(r); setCancelReason(""); setCancelErrorInfo(null); setCancelForceLocal(false); }}
                                 data-testid={`button-cancel-invoice-${idx}`}
                               >
                                 <X className="h-3 w-3 mr-0.5" />취소
@@ -927,7 +977,7 @@ function MonthlySalesSummary() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!cancelDialogRow} onOpenChange={(open) => { if (!open) setCancelDialogRow(null); }}>
+      <Dialog open={!!cancelDialogRow} onOpenChange={(open) => { if (!open) { setCancelDialogRow(null); setCancelErrorInfo(null); setCancelForceLocal(false); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -982,18 +1032,71 @@ function MonthlySalesSummary() {
                   />
                 </div>
               )}
+              {cancelErrorInfo && (
+                <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 space-y-2">
+                  <p className="text-xs text-destructive font-medium">{cancelErrorInfo.message}</p>
+                  {cancelErrorInfo.canForceLocal && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground">
+                        팝빌에서 취소할 수 없는 상태입니다. 국세청에 이미 전송된 경우 팝빌 웹사이트에서 직접 처리해야 합니다.
+                      </p>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => { if (cancelDialogRow.invoiceId) syncMutation.mutate(cancelDialogRow.invoiceId); }}
+                          disabled={syncMutation.isPending}
+                          data-testid="button-sync-popbill-status"
+                        >
+                          {syncMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                          팝빌 상태 확인
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => { if (cancelDialogRow) cancelMutation.mutate({ row: cancelDialogRow, forceLocal: true }); }}
+                          disabled={cancelMutation.isPending}
+                          data-testid="button-force-local-cancel"
+                        >
+                          {cancelMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                          사이트만 취소
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {cancelDialogRow.popbillMgtKey && !cancelErrorInfo && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => { if (cancelDialogRow.invoiceId) syncMutation.mutate(cancelDialogRow.invoiceId); }}
+                    disabled={syncMutation.isPending}
+                    data-testid="button-sync-popbill-dialog"
+                  >
+                    {syncMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <RefreshCw className="h-3 w-3 mr-0.5" />}
+                    팝빌 상태 동기화
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCancelDialogRow(null); setCancelReason(""); }}>닫기</Button>
-            <Button
-              variant="destructive"
-              onClick={() => { if (cancelDialogRow) cancelMutation.mutate(cancelDialogRow); }}
-              disabled={cancelMutation.isPending}
-              data-testid="button-confirm-cancel-invoice"
-            >
-              {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}발행 취소
-            </Button>
+            <Button variant="outline" onClick={() => { setCancelDialogRow(null); setCancelReason(""); setCancelErrorInfo(null); setCancelForceLocal(false); }}>닫기</Button>
+            {!cancelErrorInfo && (
+              <Button
+                variant="destructive"
+                onClick={() => { if (cancelDialogRow) cancelMutation.mutate({ row: cancelDialogRow }); }}
+                disabled={cancelMutation.isPending}
+                data-testid="button-confirm-cancel-invoice"
+              >
+                {cancelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}발행 취소
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
