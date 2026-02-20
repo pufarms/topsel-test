@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Wallet, CreditCard, Gift, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Wallet, CreditCard, Gift, ArrowUpDown, ChevronLeft, ChevronRight, FileText, Download } from "lucide-react";
 import { DateRangeFilter, useDateRange } from "@/components/common/DateRangeFilter";
 
 interface DepositRecord {
@@ -84,6 +84,281 @@ const pointerTypeLabels: Record<string, string> = {
   deduct: "정산 차감",
   expire: "포인터 만료",
 };
+
+interface InvoiceRecord {
+  id: number;
+  targetType: string;
+  targetId: string;
+  targetName: string;
+  businessNumber: string | null;
+  invoiceType: string;
+  year: number;
+  month: number;
+  orderCount: number;
+  supplyAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+  isManuallyAdjusted: boolean;
+  memo: string | null;
+  issuedAt: string;
+  issuedBy: string | null;
+  popbillMgtKey: string | null;
+  popbillNtsConfirmNum: string | null;
+  popbillIssueStatus: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+}
+
+interface InvoiceSummary {
+  totalCount: number;
+  taxableCount: number;
+  exemptCount: number;
+  totalSupplyAmount: number;
+  totalVatAmount: number;
+  totalAmount: number;
+  taxableSupplyAmount: number;
+  taxableVatAmount: number;
+  taxableTotalAmount: number;
+  exemptSupplyAmount: number;
+  exemptTotalAmount: number;
+}
+
+const invoiceTypeLabels: Record<string, string> = {
+  taxable: "세금계산서",
+  exempt: "계산서(면세)",
+};
+
+const popbillStatusLabels: Record<string, string> = {
+  none: "미발행",
+  issued: "발행완료",
+  cancelled: "발행취소",
+};
+
+function InvoiceHistoryTab() {
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+
+  const { data, isLoading } = useQuery<{ records: InvoiceRecord[]; summary: InvoiceSummary }>({
+    queryKey: ["/api/member/my-invoices", selectedYear, selectedMonth],
+    queryFn: async () => {
+      const params = new URLSearchParams({ year: String(selectedYear), month: String(selectedMonth) });
+      const res = await fetch(`/api/member/my-invoices?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("조회 실패");
+      return res.json();
+    },
+  });
+
+  const records = data?.records || [];
+  const summary = data?.summary;
+
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const handleExcelDownload = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const excelData = records.map((r) => ({
+        '발행년월': `${r.year}년 ${r.month}월`,
+        '유형': invoiceTypeLabels[r.invoiceType] || r.invoiceType,
+        '주문건수': r.orderCount,
+        '공급가액': r.supplyAmount,
+        '부가세': r.vatAmount,
+        '합계금액': r.totalAmount,
+        '발행상태': popbillStatusLabels[r.popbillIssueStatus || 'none'] || '미발행',
+        '국세청확인번호': r.popbillNtsConfirmNum || '-',
+        '발행일': new Date(r.issuedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }),
+        '비고': r.memo || '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      ws['!cols'] = [
+        { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 12 }, { wch: 14 },
+        { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 20 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '세금계산서내역');
+      XLSX.writeFile(wb, `세금계산서내역_${selectedYear}년${selectedMonth}월.xlsx`);
+    } catch (e) {
+      console.error('엑셀 다운로드 오류:', e);
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            세금계산서(계산서) 발행 내역
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <select
+              className="h-9 px-3 border rounded-md bg-background text-sm"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              data-testid="select-invoice-year"
+            >
+              {years.map(y => <option key={y} value={y}>{y}년</option>)}
+            </select>
+            <select
+              className="h-9 px-3 border rounded-md bg-background text-sm"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              data-testid="select-invoice-month"
+            >
+              {months.map(m => <option key={m} value={m}>{m}월</option>)}
+            </select>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="overflow-hidden space-y-3">
+        {summary && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="border rounded-lg p-3 bg-muted/20">
+              <p className="text-xs text-muted-foreground">총 발행건수</p>
+              <p className="text-lg font-bold" data-testid="text-invoice-total-count">{summary.totalCount}건</p>
+            </div>
+            <div className="border rounded-lg p-3 bg-muted/20">
+              <p className="text-xs text-muted-foreground">총 합계금액</p>
+              <p className="text-lg font-bold" data-testid="text-invoice-total-amount">{formatCurrency(summary.totalAmount)}</p>
+            </div>
+            <div className="border rounded-lg p-3 bg-blue-50 dark:bg-blue-950/30">
+              <p className="text-xs text-blue-600 dark:text-blue-400">세금계산서</p>
+              <p className="text-sm font-semibold">{summary.taxableCount}건 / {formatCurrency(summary.taxableTotalAmount)}</p>
+            </div>
+            <div className="border rounded-lg p-3 bg-emerald-50 dark:bg-emerald-950/30">
+              <p className="text-xs text-emerald-600 dark:text-emerald-400">계산서(면세)</p>
+              <p className="text-sm font-semibold">{summary.exemptCount}건 / {formatCurrency(summary.exemptTotalAmount)}</p>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : records.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">
+            <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p>{selectedYear}년 {selectedMonth}월 발행된 세금계산서(계산서)가 없습니다.</p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block border rounded-md overflow-x-auto overflow-y-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-center py-2 px-3 whitespace-nowrap">발행일</th>
+                    <th className="text-center py-2 px-3 whitespace-nowrap">유형</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">주문건수</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">공급가액</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">부가세</th>
+                    <th className="text-right py-2 px-3 whitespace-nowrap">합계금액</th>
+                    <th className="text-center py-2 px-3 whitespace-nowrap">발행상태</th>
+                    <th className="text-center py-2 px-3 whitespace-nowrap">국세청확인번호</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((record) => (
+                    <tr key={record.id} className={`border-b hover:bg-muted/20 ${record.cancelledAt ? 'opacity-50 line-through' : ''}`} data-testid={`row-invoice-${record.id}`}>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        {new Date(record.issuedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          record.invoiceType === 'taxable'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+                        }`}>
+                          {invoiceTypeLabels[record.invoiceType] || record.invoiceType}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap">{record.orderCount}건</td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap">{formatCurrency(record.supplyAmount)}</td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap">{record.invoiceType === 'taxable' ? formatCurrency(record.vatAmount) : '-'}</td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{formatCurrency(record.totalAmount)}</td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          record.popbillIssueStatus === 'issued'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                            : record.popbillIssueStatus === 'cancelled'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                        }`}>
+                          {record.cancelledAt ? '취소' : popbillStatusLabels[record.popbillIssueStatus || 'none'] || '미발행'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-xs text-muted-foreground">
+                        {record.popbillNtsConfirmNum || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="md:hidden space-y-3">
+              {records.map((record) => (
+                <div key={record.id} className={`border rounded-lg p-3 space-y-2 ${record.cancelledAt ? 'opacity-50' : ''}`} data-testid={`card-invoice-${record.id}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      record.invoiceType === 'taxable'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+                    }`}>
+                      {invoiceTypeLabels[record.invoiceType] || record.invoiceType}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      record.popbillIssueStatus === 'issued'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                    }`}>
+                      {record.cancelledAt ? '취소' : popbillStatusLabels[record.popbillIssueStatus || 'none'] || '미발행'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">발행일</span>
+                    <span>{new Date(record.issuedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">주문건수</span>
+                    <span>{record.orderCount}건</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">공급가액</span>
+                    <span>{formatCurrency(record.supplyAmount)}</span>
+                  </div>
+                  {record.invoiceType === 'taxable' && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">부가세</span>
+                      <span>{formatCurrency(record.vatAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-medium border-t pt-2">
+                    <span>합계금액</span>
+                    <span>{formatCurrency(record.totalAmount)}</span>
+                  </div>
+                  {record.popbillNtsConfirmNum && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">국세청확인번호</span>
+                      <span className="text-muted-foreground">{record.popbillNtsConfirmNum}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleExcelDownload} data-testid="button-invoice-excel-download">
+                <Download className="h-4 w-4 mr-1" />
+                엑셀 다운로드
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function DepositHistoryTab({ dateRange }: { dateRange: any }) {
   const [page, setPage] = useState(1);
@@ -654,6 +929,7 @@ export default function MemberSettlementTab() {
           <TabsTrigger value="balance" data-testid="tab-balance">정산 이력</TabsTrigger>
           <TabsTrigger value="deposit-history" data-testid="tab-deposit-history">예치금 이력</TabsTrigger>
           <TabsTrigger value="pointer-history" data-testid="tab-pointer-history">포인터 이력</TabsTrigger>
+          <TabsTrigger value="invoice-history" data-testid="tab-invoice-history">세금계산서 내역</TabsTrigger>
         </TabsList>
 
         <TabsContent value="balance">
@@ -861,6 +1137,10 @@ export default function MemberSettlementTab() {
 
         <TabsContent value="pointer-history">
           <PointerHistoryTab dateRange={pointerDateRange} />
+        </TabsContent>
+
+        <TabsContent value="invoice-history">
+          <InvoiceHistoryTab />
         </TabsContent>
       </Tabs>
     </div>

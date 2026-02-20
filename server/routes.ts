@@ -11424,6 +11424,56 @@ export async function registerRoutes(
     }
   });
 
+  // ===================== 회원용 세금계산서/계산서 발행 내역 조회 API =====================
+
+  app.get('/api/member/my-invoices', async (req, res) => {
+    try {
+      if (!req.session.userId || req.session.userType !== 'member') return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+      const member = await storage.getMember(req.session.userId);
+      if (!member) return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+
+      const { year, month } = req.query as any;
+      const conditions: any[] = [
+        eq(invoiceRecords.targetType, 'member'),
+        eq(invoiceRecords.targetId, String(member.id)),
+      ];
+
+      if (year) {
+        conditions.push(eq(invoiceRecords.year, parseInt(year)));
+      }
+      if (month) {
+        conditions.push(eq(invoiceRecords.month, parseInt(month)));
+      }
+
+      const records = await db.select()
+        .from(invoiceRecords)
+        .where(and(...conditions))
+        .orderBy(desc(invoiceRecords.issuedAt));
+
+      const taxableRecords = records.filter(r => r.invoiceType === 'taxable');
+      const exemptRecords = records.filter(r => r.invoiceType === 'exempt');
+
+      res.json({
+        records,
+        summary: {
+          totalCount: records.length,
+          taxableCount: taxableRecords.length,
+          exemptCount: exemptRecords.length,
+          totalSupplyAmount: records.reduce((s, r) => s + (r.supplyAmount || 0), 0),
+          totalVatAmount: records.reduce((s, r) => s + (r.vatAmount || 0), 0),
+          totalAmount: records.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          taxableSupplyAmount: taxableRecords.reduce((s, r) => s + (r.supplyAmount || 0), 0),
+          taxableVatAmount: taxableRecords.reduce((s, r) => s + (r.vatAmount || 0), 0),
+          taxableTotalAmount: taxableRecords.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          exemptSupplyAmount: exemptRecords.reduce((s, r) => s + (r.supplyAmount || 0), 0),
+          exemptTotalAmount: exemptRecords.reduce((s, r) => s + (r.totalAmount || 0), 0),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ===================== 테스트 데이터 초기화 API (최고관리자 전용) =====================
 
   app.post('/api/admin/reset-test-data', async (req, res) => {
