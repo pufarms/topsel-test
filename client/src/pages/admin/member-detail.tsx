@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,46 +65,47 @@ export default function MemberDetailPage() {
     postpaidNote: string;
   }>({ isPostpaid: false, postpaidNote: '' });
 
-  const [formData, setFormData] = useState<{
-    grade: string;
-    representative: string;
-    memberName: string;
-    businessAddress: string;
-    phone: string;
-    managerName: string;
-    managerPhone: string;
-    manager2Name: string;
-    manager2Phone: string;
-    manager3Name: string;
-    manager3Phone: string;
-    email: string;
-    status: string;
-    memo: string;
-    password: string;
-    postOfficeEnabled: boolean;
-  }>({
-    grade: "",
-    representative: "",
-    memberName: "",
-    businessAddress: "",
-    phone: "",
-    managerName: "",
-    managerPhone: "",
-    manager2Name: "",
-    manager2Phone: "",
-    manager3Name: "",
-    manager3Phone: "",
-    email: "",
-    status: "",
-    memo: "",
-    password: "",
-    postOfficeEnabled: false,
-  });
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const formInitRef = useRef<string | null>(null);
 
   const { data: member, isLoading } = useQuery<MemberDetail>({
     queryKey: ["/api/admin/members", memberId],
     enabled: !!memberId,
   });
+
+  useEffect(() => {
+    if (member && formInitRef.current !== member.id) {
+      formInitRef.current = member.id;
+      setFormData({
+        grade: member.grade || "",
+        representative: member.representative || "",
+        memberName: member.memberName || "",
+        businessAddress: member.businessAddress || "",
+        phone: member.phone || "",
+        managerName: member.managerName || "",
+        managerPhone: member.managerPhone || "",
+        managerEmail: (member as any).managerEmail || "",
+        manager2Name: member.manager2Name || "",
+        manager2Phone: member.manager2Phone || "",
+        manager3Name: member.manager3Name || "",
+        manager3Phone: member.manager3Phone || "",
+        email: member.email || "",
+        status: member.status || "",
+        memo: member.memo || "",
+        password: "",
+        postOfficeEnabled: member.postOfficeEnabled ?? false,
+      });
+      setGradeLockData({
+        gradeLocked: member.gradeLocked ?? false,
+        lockedGrade: member.lockedGrade || 'START',
+        gradeLockReason: member.gradeLockReason || '',
+      });
+      setPostpaidData({
+        isPostpaid: member.isPostpaid ?? false,
+        postpaidNote: member.postpaidNote || '',
+      });
+    }
+  }, [member]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -112,6 +113,8 @@ export default function MemberDetailPage() {
       return res.json();
     },
     onSuccess: () => {
+      formInitRef.current = null;
+      setFormData({});
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members", memberId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members/stats"] });
@@ -197,25 +200,37 @@ export default function MemberDetailPage() {
     if (!member) return;
 
     const updateData: any = {};
-    
-    if (formData.grade && formData.grade !== member.grade) updateData.grade = formData.grade;
-    if (formData.memberName !== "" && formData.memberName !== (member.memberName || "")) updateData.memberName = formData.memberName;
-    if (formData.representative && formData.representative !== member.representative) updateData.representative = formData.representative;
-    if (formData.businessAddress !== (member.businessAddress || "")) updateData.businessAddress = formData.businessAddress;
-    if (formData.phone && formData.phone !== member.phone) updateData.phone = formData.phone;
-    if (formData.managerName !== (member.managerName || "")) updateData.managerName = formData.managerName;
-    if (formData.managerPhone !== (member.managerPhone || "")) updateData.managerPhone = formData.managerPhone;
-    if (formData.manager2Name !== (member.manager2Name || "")) updateData.manager2Name = formData.manager2Name;
-    if (formData.manager2Phone !== (member.manager2Phone || "")) updateData.manager2Phone = formData.manager2Phone;
-    if (formData.manager3Name !== (member.manager3Name || "")) updateData.manager3Name = formData.manager3Name;
-    if (formData.manager3Phone !== (member.manager3Phone || "")) updateData.manager3Phone = formData.manager3Phone;
-    if (formData.email !== (member.email || "")) updateData.email = formData.email;
-    if (formData.status && formData.status !== member.status) updateData.status = formData.status;
-    if (formData.postOfficeEnabled !== (member.postOfficeEnabled ?? false)) updateData.postOfficeEnabled = formData.postOfficeEnabled;
-    if (formData.memo !== (member.memo || "")) updateData.memo = formData.memo;
-    if (formData.password && formData.password.length >= 6) updateData.password = formData.password;
-    
+    const orig: Record<string, any> = {
+      grade: member.grade || "",
+      memberName: member.memberName || "",
+      representative: member.representative || "",
+      businessAddress: member.businessAddress || "",
+      phone: member.phone || "",
+      managerName: member.managerName || "",
+      managerPhone: member.managerPhone || "",
+      managerEmail: (member as any).managerEmail || "",
+      manager2Name: member.manager2Name || "",
+      manager2Phone: member.manager2Phone || "",
+      manager3Name: member.manager3Name || "",
+      manager3Phone: member.manager3Phone || "",
+      email: member.email || "",
+      status: member.status || "",
+      memo: member.memo || "",
+      postOfficeEnabled: member.postOfficeEnabled ?? false,
+    };
 
+    const fields = [
+      'grade', 'memberName', 'representative', 'businessAddress', 'phone',
+      'managerName', 'managerPhone', 'managerEmail',
+      'manager2Name', 'manager2Phone', 'manager3Name', 'manager3Phone',
+      'email', 'status', 'memo', 'postOfficeEnabled'
+    ];
+    for (const key of fields) {
+      if (formData[key] !== undefined && formData[key] !== orig[key]) {
+        updateData[key] = formData[key];
+      }
+    }
+    if (formData.password && formData.password.length >= 6) updateData.password = formData.password;
 
     if (Object.keys(updateData).length === 0) {
       toast({ title: "변경된 내용이 없습니다" });
@@ -246,6 +261,7 @@ export default function MemberDetailPage() {
 
   const displayGrade = formData.grade || member.grade;
   const displayStatus = formData.status || member.status;
+  const getVal = (key: string, fallback?: string) => formData[key] !== undefined ? formData[key] : (fallback ?? "");
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -292,7 +308,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">회원명</Label>
                   <Input 
-                    value={formData.memberName !== "" ? formData.memberName : (member.memberName || "")}
+                    value={getVal('memberName', member.memberName || "")}
                     onChange={(e) => setFormData({...formData, memberName: e.target.value})}
                     placeholder="회원명 (뱅크다 입금자명 매칭용)"
                     data-testid="input-member-name"
@@ -413,7 +429,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">등급</Label>
                   <Select 
-                    value={formData.grade || member.grade} 
+                    value={getVal('grade', member.grade)} 
                     onValueChange={(v) => setFormData({...formData, grade: v})}
                   >
                     <SelectTrigger data-testid="select-grade">
@@ -431,7 +447,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">상태</Label>
                   <Select 
-                    value={formData.status || member.status} 
+                    value={getVal('status', member.status)} 
                     onValueChange={(v) => setFormData({...formData, status: v})}
                   >
                     <SelectTrigger data-testid="select-status">
@@ -447,7 +463,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">우체국양식 사용</Label>
                   <Select 
-                    value={formData.postOfficeEnabled !== undefined ? String(formData.postOfficeEnabled) : String(member.postOfficeEnabled ?? false)} 
+                    value={String(formData.postOfficeEnabled !== undefined ? formData.postOfficeEnabled : (member.postOfficeEnabled ?? false))} 
                     onValueChange={(v) => setFormData({...formData, postOfficeEnabled: v === "true"})}
                   >
                     <SelectTrigger data-testid="select-post-office">
@@ -462,7 +478,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">대표연락처</Label>
                   <Input 
-                    value={formData.phone || member.phone}
+                    value={getVal('phone', member.phone)}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     data-testid="input-phone"
                   />
@@ -470,7 +486,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">담당자1</Label>
                   <Input 
-                    value={formData.managerName !== "" ? formData.managerName : (member.managerName || "")}
+                    value={getVal('managerName', member.managerName || "")}
                     onChange={(e) => setFormData({...formData, managerName: e.target.value})}
                     data-testid="input-manager-name"
                   />
@@ -478,15 +494,25 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">담당자1 연락처</Label>
                   <Input 
-                    value={formData.managerPhone !== "" ? formData.managerPhone : (member.managerPhone || "")}
+                    value={getVal('managerPhone', member.managerPhone || "")}
                     onChange={(e) => setFormData({...formData, managerPhone: e.target.value})}
                     data-testid="input-manager-phone"
                   />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-sm">담당자1 이메일</Label>
+                  <Input 
+                    type="email"
+                    value={getVal('managerEmail')}
+                    onChange={(e) => setFormData({...formData, managerEmail: e.target.value})}
+                    placeholder="담당자 이메일 (세금계산서 발행용)"
+                    data-testid="input-manager-email"
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label className="text-sm">담당자2</Label>
                   <Input 
-                    value={formData.manager2Name !== "" ? formData.manager2Name : (member.manager2Name || "")}
+                    value={getVal('manager2Name', member.manager2Name || "")}
                     onChange={(e) => setFormData({...formData, manager2Name: e.target.value})}
                     data-testid="input-manager2-name"
                   />
@@ -494,7 +520,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">담당자2 연락처</Label>
                   <Input 
-                    value={formData.manager2Phone !== "" ? formData.manager2Phone : (member.manager2Phone || "")}
+                    value={getVal('manager2Phone', member.manager2Phone || "")}
                     onChange={(e) => setFormData({...formData, manager2Phone: e.target.value})}
                     data-testid="input-manager2-phone"
                   />
@@ -502,7 +528,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">담당자3</Label>
                   <Input 
-                    value={formData.manager3Name !== "" ? formData.manager3Name : (member.manager3Name || "")}
+                    value={getVal('manager3Name', member.manager3Name || "")}
                     onChange={(e) => setFormData({...formData, manager3Name: e.target.value})}
                     data-testid="input-manager3-name"
                   />
@@ -510,7 +536,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1">
                   <Label className="text-sm">담당자3 연락처</Label>
                   <Input 
-                    value={formData.manager3Phone !== "" ? formData.manager3Phone : (member.manager3Phone || "")}
+                    value={getVal('manager3Phone', member.manager3Phone || "")}
                     onChange={(e) => setFormData({...formData, manager3Phone: e.target.value})}
                     data-testid="input-manager3-phone"
                   />
@@ -519,7 +545,7 @@ export default function MemberDetailPage() {
                   <Label className="text-sm">이메일</Label>
                   <Input 
                     type="email"
-                    value={formData.email !== "" ? formData.email : (member.email || "")}
+                    value={getVal('email', member.email || "")}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     data-testid="input-email"
                   />
@@ -527,7 +553,7 @@ export default function MemberDetailPage() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-sm">사업자주소</Label>
                   <Input 
-                    value={formData.businessAddress !== "" ? formData.businessAddress : (member.businessAddress || "")}
+                    value={getVal('businessAddress', member.businessAddress || "")}
                     onChange={(e) => setFormData({...formData, businessAddress: e.target.value})}
                     data-testid="input-address"
                   />
@@ -541,7 +567,7 @@ export default function MemberDetailPage() {
                 <Input 
                   type="password"
                   placeholder="새 비밀번호 (6자 이상)"
-                  value={formData.password}
+                  value={getVal('password')}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   data-testid="input-password"
                 />
@@ -551,7 +577,7 @@ export default function MemberDetailPage() {
                 <Label className="text-sm">메모</Label>
                 <Textarea 
                   placeholder="메모를 입력하세요..."
-                  value={formData.memo !== "" ? formData.memo : (member.memo || "")}
+                  value={getVal('memo', member.memo || "")}
                   onChange={(e) => setFormData({...formData, memo: e.target.value})}
                   rows={4}
                   data-testid="textarea-memo"

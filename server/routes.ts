@@ -1719,6 +1719,11 @@ export async function registerRoutes(
       if (data.phone) updateData.phone = data.phone;
       if (data.managerName !== undefined) updateData.managerName = data.managerName;
       if (data.managerPhone !== undefined) updateData.managerPhone = data.managerPhone;
+      if (data.managerEmail !== undefined) updateData.managerEmail = data.managerEmail;
+      if (data.manager2Name !== undefined) updateData.manager2Name = data.manager2Name;
+      if (data.manager2Phone !== undefined) updateData.manager2Phone = data.manager2Phone;
+      if (data.manager3Name !== undefined) updateData.manager3Name = data.manager3Name;
+      if (data.manager3Phone !== undefined) updateData.manager3Phone = data.manager3Phone;
       if (data.email !== undefined) updateData.email = data.email;
       if (data.status && data.status !== targetMember.status) {
         updateData.status = data.status;
@@ -17130,12 +17135,13 @@ export async function registerRoutes(
           email: members.email,
           managerName: members.managerName,
           managerPhone: members.managerPhone,
+          managerEmail: members.managerEmail,
           phone: members.phone,
         }).from(members).where(eq(members.id, targetId)).limit(1);
         if (memberInfo) {
           invoiceeCEOName = memberInfo.representative || '';
           invoiceeAddr = memberInfo.businessAddress || '';
-          invoiceeEmail = memberInfo.email || '';
+          invoiceeEmail = memberInfo.managerEmail || memberInfo.email || '';
           invoiceeContactName = memberInfo.managerName || memberInfo.representative || '';
           invoiceeTEL = memberInfo.managerPhone || memberInfo.phone || '';
         }
