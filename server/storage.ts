@@ -586,6 +586,7 @@ export class DatabaseStorage implements IStorage {
     mailNo?: string;
     managerName?: string;
     managerPhone?: string;
+    managerEmail?: string;
     manager2Name?: string;
     manager2Phone?: string;
     manager3Name?: string;
@@ -613,6 +614,7 @@ export class DatabaseStorage implements IStorage {
       mailNo: data.mailNo || null,
       managerName: data.managerName || null,
       managerPhone: data.managerPhone || null,
+      managerEmail: data.managerEmail || null,
       manager2Name: data.manager2Name || null,
       manager2Phone: data.manager2Phone || null,
       manager3Name: data.manager3Name || null,

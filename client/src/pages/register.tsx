@@ -421,12 +421,6 @@ export default function Register() {
                         <Input id={`manager${num}_phone`} name={`manager${num}_phone`} placeholder="010-0000-0000" data-testid={`input-manager${num}-phone`} />
                       </div>
                     </div>
-                    {num === 1 && (
-                      <div>
-                        <Label htmlFor="manager1_email">담당자1 이메일 (세금계산서 수신용)</Label>
-                        <Input id="manager1_email" name="manager1_email" type="email" placeholder="example@email.com" data-testid="input-manager1-email" />
-                      </div>
-                    )}
                   </div>
                 ))}
               </section>

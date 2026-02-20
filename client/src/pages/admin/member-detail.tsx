@@ -509,6 +509,15 @@ export default function MemberDetailPage() {
                   />
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-sm">이메일</Label>
+                  <Input 
+                    type="email"
+                    value={getVal('email', member.email || "")}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    data-testid="input-email"
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label className="text-sm">담당자1</Label>
                   <Input 
                     value={getVal('managerName', member.managerName || "")}
@@ -564,15 +573,6 @@ export default function MemberDetailPage() {
                     value={getVal('manager3Phone', member.manager3Phone || "")}
                     onChange={(e) => setFormData({...formData, manager3Phone: e.target.value})}
                     data-testid="input-manager3-phone"
-                  />
-                </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-sm">이메일</Label>
-                  <Input 
-                    type="email"
-                    value={getVal('email', member.email || "")}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    data-testid="input-email"
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
