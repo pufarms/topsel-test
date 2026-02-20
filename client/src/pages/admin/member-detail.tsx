@@ -81,6 +81,8 @@ export default function MemberDetailPage() {
         representative: member.representative || "",
         memberName: member.memberName || "",
         businessAddress: member.businessAddress || "",
+        bizType: member.bizType || "",
+        bizClass: member.bizClass || "",
         phone: member.phone || "",
         managerName: member.managerName || "",
         managerPhone: member.managerPhone || "",
@@ -205,6 +207,8 @@ export default function MemberDetailPage() {
       memberName: member.memberName || "",
       representative: member.representative || "",
       businessAddress: member.businessAddress || "",
+      bizType: member.bizType || "",
+      bizClass: member.bizClass || "",
       phone: member.phone || "",
       managerName: member.managerName || "",
       managerPhone: member.managerPhone || "",
@@ -220,7 +224,7 @@ export default function MemberDetailPage() {
     };
 
     const fields = [
-      'grade', 'memberName', 'representative', 'businessAddress', 'phone',
+      'grade', 'memberName', 'representative', 'businessAddress', 'bizType', 'bizClass', 'phone',
       'managerName', 'managerPhone', 'managerEmail',
       'manager2Name', 'manager2Phone', 'manager3Name', 'manager3Phone',
       'email', 'status', 'memo', 'postOfficeEnabled'
@@ -581,6 +585,22 @@ export default function MemberDetailPage() {
                     value={getVal('businessAddress', member.businessAddress || "")}
                     onChange={(e) => setFormData({...formData, businessAddress: e.target.value})}
                     data-testid="input-address"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">업태</Label>
+                  <Input 
+                    value={getVal('bizType', member.bizType || "")}
+                    onChange={(e) => setFormData({...formData, bizType: e.target.value})}
+                    data-testid="input-biz-type"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-sm">종목</Label>
+                  <Input 
+                    value={getVal('bizClass', member.bizClass || "")}
+                    onChange={(e) => setFormData({...formData, bizClass: e.target.value})}
+                    data-testid="input-biz-class"
                   />
                 </div>
               </div>

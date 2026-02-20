@@ -242,6 +242,8 @@ export async function registerRoutes(
         ceo_ci: z.string().optional().or(z.literal("")),
         mail_no: z.string().min(1, "통신판매번호를 입력해주세요"),
         address: z.string().min(1, "사업장 주소를 입력해주세요"),
+        biz_type: z.string().min(1, "업태를 입력해주세요"),
+        biz_class: z.string().min(1, "종목을 입력해주세요"),
         email: z.string().email("유효한 이메일을 입력해주세요"),
         manager1_name: z.string().optional().or(z.literal("")),
         manager1_phone: z.string().optional().or(z.literal("")),
@@ -302,6 +304,8 @@ export async function registerRoutes(
         ceoBirth: data.ceo_birth || undefined,
         ceoCi: data.ceo_ci || undefined,
         mailNo: data.mail_no,
+        bizType: data.biz_type,
+        bizClass: data.biz_class,
         businessAddress: data.address,
         email: data.email,
         managerName: data.manager1_name || undefined,
@@ -352,6 +356,8 @@ export async function registerRoutes(
         ceoBirth: z.string().optional().or(z.literal("")),
         ceoCi: z.string().optional().or(z.literal("")),
         mailNo: z.string().optional().or(z.literal("")),
+        bizType: z.string().optional().or(z.literal("")),
+        bizClass: z.string().optional().or(z.literal("")),
         managerName: z.string().optional().or(z.literal("")),
         managerPhone: z.string().optional().or(z.literal("")),
         managerEmail: z.string().email().optional().or(z.literal("")),
@@ -412,6 +418,8 @@ export async function registerRoutes(
         ceoBirth: data.ceoBirth || undefined,
         ceoCi: data.ceoCi || undefined,
         mailNo: data.mailNo || undefined,
+        bizType: data.bizType || undefined,
+        bizClass: data.bizClass || undefined,
         managerName: data.managerName || undefined,
         managerPhone: data.managerPhone || undefined,
         managerEmail: data.managerEmail || undefined,
@@ -1729,6 +1737,8 @@ export async function registerRoutes(
         changes.push(`대표자: ${targetMember.representative} → ${data.representative}`);
       }
       trackField('businessAddress', '사업자주소', data.businessAddress, targetMember.businessAddress);
+      trackField('bizType', '업태', data.bizType, targetMember.bizType);
+      trackField('bizClass', '종목', data.bizClass, targetMember.bizClass);
       if (data.phone && data.phone !== targetMember.phone) {
         updateData.phone = data.phone;
         changes.push(`대표연락처: ${targetMember.phone} → ${data.phone}`);

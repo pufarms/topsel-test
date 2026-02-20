@@ -376,10 +376,13 @@ export default function Register() {
               </section>
 
               <section className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">{sections.business_info?.title || "사업자 정보"}</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  {sections.business_info?.title || "사업자 정보"}
+                  <span className="text-sm font-normal text-blue-500 ml-2">세금계산서 발행을 위해 정확하게 입력해 주세요!</span>
+                </h3>
                 <div className="grid gap-4">
                   <div>
-                    <Label htmlFor="biz_name">{labels.biz_name || "상호명"} <span className="text-destructive">*</span> <span className="text-xs text-destructive font-normal ml-1">입금자명이 아닙니다, 입금자명=회원명</span></Label>
+                    <Label htmlFor="biz_name">{labels.biz_name || "상호명"} <span className="text-destructive">*</span> <span className="text-xs text-blue-500 font-normal ml-1">사업자등록 상호명</span> <span className="text-xs text-destructive font-normal ml-1">입금자명이 아닙니다, 입금자명=회원명</span></Label>
                     <Input id="biz_name" name="biz_name" required placeholder={placeholders.biz_name || "사업자 상호명"} data-testid="input-biz-name" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -390,6 +393,16 @@ export default function Register() {
                     <div>
                       <Label htmlFor="mail_no">{labels.mail_no || "통신판매번호"} <span className="text-destructive">*</span></Label>
                       <Input id="mail_no" name="mail_no" required placeholder={placeholders.mail_no || "제2023-경북-000호"} data-testid="input-mail-no" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="biz_type">업태 <span className="text-destructive">*</span></Label>
+                      <Input id="biz_type" name="biz_type" required placeholder="예: 도매 및 소매업" data-testid="input-biz-type" />
+                    </div>
+                    <div>
+                      <Label htmlFor="biz_class">종목 <span className="text-destructive">*</span></Label>
+                      <Input id="biz_class" name="biz_class" required placeholder="예: 식료품, 농산물" data-testid="input-biz-class" />
                     </div>
                   </div>
                   <div>
