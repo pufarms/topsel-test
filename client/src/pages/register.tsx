@@ -642,8 +642,20 @@ export default function Register() {
                           {expandedTerms.includes(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </div>
                         {expandedTerms.includes(index) && (
-                          <div className="p-3 pt-0 text-sm text-muted-foreground border-t">
-                            {term.content}
+                          <div className="p-3 pt-0 text-sm text-muted-foreground border-t max-h-[400px] overflow-y-auto">
+                            <div className="whitespace-pre-line leading-relaxed [&>*]:mb-1">
+                              {term.content.split('\n').map((line: string, i: number) => {
+                                const trimmed = line.trim();
+                                if (!trimmed) return <div key={i} className="h-2" />;
+                                const isHeading = /^(제\d+[장조]|제\d+조의\d+)/.test(trimmed);
+                                const isNumbered = /^\d+\./.test(trimmed) || /^[①②③④⑤⑥⑦⑧⑨⑩]/.test(trimmed);
+                                const isBracket = /^\[/.test(trimmed);
+                                if (isHeading) return <p key={i} className="font-semibold text-foreground mt-3 mb-1">{trimmed}</p>;
+                                if (isNumbered) return <p key={i} className="pl-2 mt-1">{trimmed}</p>;
+                                if (isBracket) return <p key={i} className="pl-2 mt-1 font-medium">{trimmed}</p>;
+                                return <p key={i}>{trimmed}</p>;
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
