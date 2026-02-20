@@ -17197,6 +17197,8 @@ export async function registerRoutes(
       let invoiceeContactName1 = '';
       let invoiceeTEL1 = '';
       let invoiceeHP1 = '';
+      let invoiceeBizTypeVal = '';
+      let invoiceeBizClassVal = '';
       if (targetType === 'member') {
         const [memberInfo] = await db.select({
           representative: members.representative,
@@ -17206,6 +17208,8 @@ export async function registerRoutes(
           managerPhone: members.managerPhone,
           managerEmail: members.managerEmail,
           phone: members.phone,
+          bizType: members.bizType,
+          bizClass: members.bizClass,
         }).from(members).where(eq(members.id, targetId)).limit(1);
         if (memberInfo) {
           invoiceeCEOName = memberInfo.representative || '';
@@ -17214,6 +17218,8 @@ export async function registerRoutes(
           invoiceeContactName1 = memberInfo.managerName || memberInfo.representative || '';
           invoiceeTEL1 = memberInfo.phone || '';
           invoiceeHP1 = memberInfo.managerPhone || '';
+          invoiceeBizTypeVal = memberInfo.bizType || '';
+          invoiceeBizClassVal = memberInfo.bizClass || '';
         }
       } else if (targetType === 'vendor') {
         const partner = await storage.getPartner(targetId);
@@ -17251,8 +17257,8 @@ export async function registerRoutes(
         invoiceeCorpName: targetName,
         invoiceeCEOName,
         invoiceeAddr,
-        invoiceeBizType: '',
-        invoiceeBizClass: '',
+        invoiceeBizType: invoiceeBizTypeVal,
+        invoiceeBizClass: invoiceeBizClassVal,
         invoiceeContactName1,
         invoiceeTEL1,
         invoiceeHP1,
