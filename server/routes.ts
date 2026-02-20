@@ -220,6 +220,23 @@ export async function registerRoutes(
 
   const registerUpload = multer({ storage: diskStorage });
 
+  app.get("/api/check-member-name", async (req, res) => {
+    try {
+      const name = (req.query.name as string || "").trim();
+      if (!name) {
+        return res.json({ available: false, message: "회원명을 입력해주세요." });
+      }
+      const existing = await db.select({ id: members.id }).from(members)
+        .where(eq(members.memberName, name));
+      if (existing.length > 0) {
+        return res.json({ available: false, message: "이미 사용 중인 회원명입니다." });
+      }
+      return res.json({ available: true, message: "사용 가능한 회원명입니다." });
+    } catch (error) {
+      return res.status(500).json({ available: false, message: "중복 확인 중 오류가 발생했습니다." });
+    }
+  });
+
   // 회원가입 API (POST /register)
   app.post("/register", registerUpload.fields([
     { name: "bizFile", maxCount: 1 },
@@ -276,6 +293,15 @@ export async function registerRoutes(
       if (existingMember) {
         console.log('\x1b[31m   ❌ 중복 아이디 (members 테이블)\x1b[0m');
         return res.status(400).json({ success: false, message: "이미 사용 중인 아이디입니다" });
+      }
+
+      // 회원명 중복 체크
+      console.log('   - 회원명 중복 체크:', data.member_name);
+      const existingMemberName = await db.select({ id: members.id }).from(members)
+        .where(eq(members.memberName, data.member_name.trim()));
+      if (existingMemberName.length > 0) {
+        console.log('\x1b[31m   ❌ 중복 회원명\x1b[0m');
+        return res.status(400).json({ success: false, message: "이미 사용 중인 회원명입니다. 다른 회원명을 입력해주세요." });
       }
 
       // 사업자번호 중복 체크
@@ -379,6 +405,15 @@ export async function registerRoutes(
       const existingMember = await storage.getMemberByUsername(data.username);
       if (existingMember) {
         return res.status(400).json({ message: "이미 사용 중인 아이디입니다" });
+      }
+
+      // 회원명 중복 확인
+      if (data.memberName) {
+        const existingMemberName2 = await db.select({ id: members.id }).from(members)
+          .where(eq(members.memberName, data.memberName.trim()));
+        if (existingMemberName2.length > 0) {
+          return res.status(400).json({ message: "이미 사용 중인 회원명입니다. 다른 회원명을 입력해주세요." });
+        }
       }
 
       // 사업자번호 중복 확인
@@ -1727,6 +1762,13 @@ export async function registerRoutes(
         }
       };
 
+      if (data.memberName && data.memberName !== targetMember.memberName) {
+        const dupName = await db.select({ id: members.id }).from(members)
+          .where(and(eq(members.memberName, data.memberName.trim()), ne(members.id, req.params.id)));
+        if (dupName.length > 0) {
+          return res.status(400).json({ message: "이미 사용 중인 회원명입니다. 다른 회원명을 입력해주세요." });
+        }
+      }
       trackField('memberName', '회원명', data.memberName, targetMember.memberName);
       if (data.grade && data.grade !== targetMember.grade) {
         updateData.grade = data.grade;

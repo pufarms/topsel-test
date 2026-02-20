@@ -71,6 +71,11 @@ export default function Register() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isKakaoFriendAdded, setIsKakaoFriendAdded] = useState(false);
   const [kakaoChannelId, setKakaoChannelId] = useState<string>('');
+  const [memberName, setMemberName] = useState('');
+  const [memberNameChecked, setMemberNameChecked] = useState(false);
+  const [memberNameAvailable, setMemberNameAvailable] = useState<boolean | null>(null);
+  const [memberNameMsg, setMemberNameMsg] = useState('');
+  const [isCheckingName, setIsCheckingName] = useState(false);
   
   const passwordMatch = passwordConfirm.length > 0 ? password === passwordConfirm : null;
 
@@ -232,10 +237,37 @@ export default function Register() {
     }
   };
 
+  const checkMemberNameDuplicate = async () => {
+    const name = memberName.trim();
+    if (!name) {
+      setMemberNameMsg("회원명을 입력해주세요.");
+      setMemberNameAvailable(false);
+      return;
+    }
+    setIsCheckingName(true);
+    try {
+      const res = await fetch(`/api/check-member-name?name=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      setMemberNameAvailable(data.available);
+      setMemberNameMsg(data.message);
+      setMemberNameChecked(true);
+    } catch {
+      setMemberNameMsg("중복 확인 중 오류가 발생했습니다.");
+      setMemberNameAvailable(false);
+    } finally {
+      setIsCheckingName(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
+
+    if (!memberNameChecked || !memberNameAvailable) {
+      toast({ variant: "destructive", title: "오류", description: "회원명 중복확인을 완료해주세요." });
+      return;
+    }
 
     const password = formData.get('password') as string;
     const passwordConfirm = formData.get('password_confirm') as string;
@@ -302,9 +334,43 @@ export default function Register() {
                 <h3 className="text-lg font-semibold border-b pb-2">{sections.member_info?.title || "회원정보"}</h3>
                 <div className="grid gap-4">
                   <div>
-                    <Label htmlFor="member_name">{labels.member_name || "회원명"} <span className="text-destructive">*</span></Label>
-                    <Input id="member_name" name="member_name" required maxLength={6} placeholder={placeholders.member_name || "한글 6자 이내"} data-testid="input-member-name" />
-                    <p className="text-xs text-muted-foreground mt-1">입금 시 자동매칭을 위하여 한글 6자 이내로 입력</p>
+                    <Label htmlFor="member_name">{labels.member_name || "회원명(입금자명으로 사용-예치금 자동 충전)"} <span className="text-destructive">*</span></Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        id="member_name" 
+                        name="member_name" 
+                        required 
+                        maxLength={6} 
+                        placeholder={placeholders.member_name || "한글 6자 이내"} 
+                        value={memberName}
+                        onChange={(e) => {
+                          setMemberName(e.target.value);
+                          setMemberNameChecked(false);
+                          setMemberNameAvailable(null);
+                          setMemberNameMsg('');
+                        }}
+                        data-testid="input-member-name" 
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={checkMemberNameDuplicate}
+                        disabled={isCheckingName || !memberName.trim()}
+                        className="whitespace-nowrap shrink-0"
+                        data-testid="button-check-member-name"
+                      >
+                        {isCheckingName ? <Loader2 className="w-4 h-4 animate-spin" /> : "중복확인"}
+                      </Button>
+                    </div>
+                    {memberNameMsg && (
+                      <p className={`text-xs mt-1 flex items-center gap-1 ${memberNameAvailable ? 'text-green-600' : 'text-destructive'}`}>
+                        {memberNameAvailable ? <Check className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                        {memberNameMsg}
+                      </p>
+                    )}
+                    {!memberNameMsg && (
+                      <p className="text-xs text-muted-foreground mt-1">입금 시 자동매칭을 위하여 한글 6자 이내로 입력 (중복확인 필수)</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="user_id">{labels.user_id || "아이디"} <span className="text-destructive">*</span></Label>
