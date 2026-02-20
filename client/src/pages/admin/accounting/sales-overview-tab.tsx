@@ -222,7 +222,7 @@ type InvoiceSummaryRow = {
   taxableSupply: number;
   taxableVat: number;
   taxableAmount: number;
-  issuedStatus: 'issued' | 'not_issued';
+  issuedStatus: 'issued' | 'not_issued' | 'cancelled';
   issuedAt: string | null;
   isAutoIssued: boolean;
   isManuallyAdjusted?: boolean;
@@ -269,6 +269,7 @@ function MonthlySalesSummary() {
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
 
   const [filterType, setFilterType] = useState<'all' | 'member' | 'vendor'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'issued' | 'not_issued' | 'cancelled'>('all');
   const [searchText, setSearchText] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
@@ -453,7 +454,13 @@ function MonthlySalesSummary() {
   const years = Array.from({ length: 3 }, (_, i) => kstNow.getFullYear() - 1 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const rows = invoiceSummary?.rows || [];
+  const allRows = invoiceSummary?.rows || [];
+  const rows = filterStatus === 'all' ? allRows : allRows.filter(r => {
+    if (filterStatus === 'issued') return r.issuedStatus === 'issued';
+    if (filterStatus === 'not_issued') return r.issuedStatus === 'not_issued';
+    if (filterStatus === 'cancelled') return r.issuedStatus === 'cancelled';
+    return true;
+  });
   const totals = invoiceSummary?.totals;
 
   return (
@@ -538,6 +545,18 @@ function MonthlySalesSummary() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+                <SelectTrigger className="w-[100px]" data-testid="select-invoice-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="issued">발행</SelectItem>
+                  <SelectItem value="not_issued">미발행</SelectItem>
+                  <SelectItem value="cancelled">취소</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={filterType} onValueChange={(v) => {
                 setFilterType(v as any);
                 setSearchText("");
