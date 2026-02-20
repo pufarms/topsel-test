@@ -1521,7 +1521,7 @@ export default function Dashboard() {
                                       <h4 className="font-medium text-blue-800 dark:text-blue-200">정확한 배송을 위해 주소를 검증하고 있습니다</h4>
                                     </div>
                                     <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
-                                      고객님께 상품이 정확하게 배송될 수 있도록, 모든 주문의 배송지 주소를 행정안전부 공인 주소 데이터와 대조하여 검증하고 있습니다. 이 과정을 통해 잘못된 주소로 인한 배송 사고를 사전에 예방합니다.
+                                      고객님께 상품이 정확하게 배송될 수 있도록, 모든 주문의 배송지 주소를 행정안전부 공인 주소 데이터와 대조하고 AI 주소 정규화를 통해 정확성을 검증하고 있습니다. 이 과정을 통해 잘못된 주소로 인한 배송 사고를 사전에 예방합니다.
                                     </p>
                                     <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
                                       주문 건수에 따라 다소 시간이 소요될 수 있습니다. 양해 부탁드립니다.
