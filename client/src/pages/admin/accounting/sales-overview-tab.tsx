@@ -250,6 +250,7 @@ type InvoiceSummaryData = {
     taxableAmount: number;
     issuedCount: number;
     notIssuedCount: number;
+    cancelledCount: number;
   };
 };
 
@@ -530,6 +531,9 @@ function MonthlySalesSummary() {
                 <div className="flex items-center gap-1.5 ml-2">
                   <Badge variant="secondary" className="text-xs">{totals.issuedCount}건 발행</Badge>
                   <Badge variant="outline" className="text-xs">{totals.notIssuedCount}건 미발행</Badge>
+                  {totals.cancelledCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">{totals.cancelledCount}건 취소</Badge>
+                  )}
                 </div>
               )}
             </div>

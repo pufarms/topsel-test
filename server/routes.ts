@@ -16591,7 +16591,7 @@ export async function registerRoutes(
               taxableSupply: inv.invoiceType === 'taxable' ? inv.supplyAmount : 0,
               taxableVat: inv.invoiceType === 'taxable' ? inv.vatAmount : 0,
               taxableAmount: inv.invoiceType === 'taxable' ? inv.totalAmount : 0,
-              issuedStatus: 'issued',
+              issuedStatus: inv.cancelledAt ? 'cancelled' : 'issued',
               issuedAt: inv.issuedAt,
               isAutoIssued: inv.isAutoIssued,
               isManuallyAdjusted: inv.isManuallyAdjusted || false,
@@ -16718,7 +16718,7 @@ export async function registerRoutes(
               taxableSupply: inv.invoiceType === 'taxable' ? inv.supplyAmount : 0,
               taxableVat: inv.invoiceType === 'taxable' ? inv.vatAmount : 0,
               taxableAmount: inv.invoiceType === 'taxable' ? inv.totalAmount : 0,
-              issuedStatus: 'issued',
+              issuedStatus: inv.cancelledAt ? 'cancelled' : 'issued',
               issuedAt: inv.issuedAt,
               isAutoIssued: inv.isAutoIssued,
               isManuallyAdjusted: inv.isManuallyAdjusted || false,
@@ -16792,6 +16792,7 @@ export async function registerRoutes(
         taxableAmount: rows.reduce((s, r) => s + (r.taxableAmount || 0), 0),
         issuedCount: rows.filter(r => r.issuedStatus === 'issued').length,
         notIssuedCount: rows.filter(r => r.issuedStatus === 'not_issued').length,
+        cancelledCount: rows.filter(r => r.issuedStatus === 'cancelled').length,
       };
 
       return { year, month, rows, totals };
@@ -17488,6 +17489,8 @@ export async function registerRoutes(
           taxableAmount: row.taxableAmount,
           issuedStatus: row.issuedStatus === 'issued'
             ? `발행 (${row.issuedAt ? new Date(row.issuedAt).toLocaleDateString('ko-KR') : ''})`
+            : row.issuedStatus === 'cancelled'
+            ? `취소 (${row.cancelledAt ? new Date(row.cancelledAt).toLocaleDateString('ko-KR') : ''})`
             : '미발행',
         });
       }
