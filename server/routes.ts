@@ -10641,7 +10641,7 @@ export async function registerRoutes(
         isPostpaid: members.isPostpaid,
       })
         .from(members)
-        .where(inArray(members.grade, ['START', 'DRIVING', 'TOP']))
+        .where(inArray(members.grade, ['ASSOCIATE', 'START', 'DRIVING', 'TOP']))
         .orderBy(members.companyName);
 
       res.json(memberList);

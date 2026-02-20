@@ -106,6 +106,7 @@ interface VendorOption {
 }
 
 const gradeLabels: Record<string, string> = {
+  ASSOCIATE: "준회원",
   START: "스타트",
   DRIVING: "드라이빙",
   TOP: "탑",
@@ -454,6 +455,7 @@ export function MemberSettlementTab() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">전체 등급</SelectItem>
+                      <SelectItem value="ASSOCIATE">준회원</SelectItem>
                       <SelectItem value="START">스타트</SelectItem>
                       <SelectItem value="DRIVING">드라이빙</SelectItem>
                       <SelectItem value="TOP">탑</SelectItem>
@@ -479,7 +481,7 @@ export function MemberSettlementTab() {
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : (
-                <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[600px]">
+                <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[480px]">
                   <Table className="min-w-[800px]">
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
