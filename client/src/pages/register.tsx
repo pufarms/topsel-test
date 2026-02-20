@@ -410,15 +410,23 @@ export default function Register() {
                   <span>{sections.manager_info?.description || "담당자 정보를 입력하시면 주문 관련 알림을 자동으로 발송해드립니다. (최대 3명)"}</span>
                 </div>
                 {[1, 2, 3].map((num) => (
-                  <div key={num} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`manager${num}_name`}>담당자{num} (역할)</Label>
-                      <Input id={`manager${num}_name`} name={`manager${num}_name`} placeholder={`예: 홍길동(${num === 1 ? '주문' : num === 2 ? '배송' : 'CS'}담당)`} data-testid={`input-manager${num}-name`} />
+                  <div key={num} className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`manager${num}_name`}>담당자{num} (역할)</Label>
+                        <Input id={`manager${num}_name`} name={`manager${num}_name`} placeholder={`예: 홍길동(${num === 1 ? '주문' : num === 2 ? '배송' : 'CS'}담당)`} data-testid={`input-manager${num}-name`} />
+                      </div>
+                      <div>
+                        <Label htmlFor={`manager${num}_phone`}>담당자{num} 휴대폰</Label>
+                        <Input id={`manager${num}_phone`} name={`manager${num}_phone`} placeholder="010-0000-0000" data-testid={`input-manager${num}-phone`} />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor={`manager${num}_phone`}>담당자{num} 휴대폰</Label>
-                      <Input id={`manager${num}_phone`} name={`manager${num}_phone`} placeholder="010-0000-0000" data-testid={`input-manager${num}-phone`} />
-                    </div>
+                    {num === 1 && (
+                      <div>
+                        <Label htmlFor="manager1_email">담당자1 이메일 (세금계산서 수신용)</Label>
+                        <Input id="manager1_email" name="manager1_email" type="email" placeholder="example@email.com" data-testid="input-manager1-email" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </section>

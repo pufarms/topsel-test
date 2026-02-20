@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock, CreditCard } from "lucide-react";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock, CreditCard, Fingerprint, PenTool } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -84,7 +84,7 @@ export default function MemberDetailPage() {
         phone: member.phone || "",
         managerName: member.managerName || "",
         managerPhone: member.managerPhone || "",
-        managerEmail: (member as any).managerEmail || "",
+        managerEmail: member.managerEmail || "",
         manager2Name: member.manager2Name || "",
         manager2Phone: member.manager2Phone || "",
         manager3Name: member.manager3Name || "",
@@ -208,7 +208,7 @@ export default function MemberDetailPage() {
       phone: member.phone || "",
       managerName: member.managerName || "",
       managerPhone: member.managerPhone || "",
-      managerEmail: (member as any).managerEmail || "",
+      managerEmail: member.managerEmail || "",
       manager2Name: member.manager2Name || "",
       manager2Phone: member.manager2Phone || "",
       manager3Name: member.manager3Name || "",
@@ -326,6 +326,15 @@ export default function MemberDetailPage() {
                   <Label className="text-sm text-muted-foreground">통신판매번호</Label>
                   <Input value={member.mailNo || "-"} disabled className="bg-muted" />
                 </div>
+                {member.ceoBirth && (
+                  <div className="space-y-1">
+                    <Label className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Fingerprint className="h-3.5 w-3.5" />
+                      대표자 생년월일 (본인인증)
+                    </Label>
+                    <Input value={member.ceoBirth} disabled className="bg-muted" />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -416,6 +425,22 @@ export default function MemberDetailPage() {
                   )}
                 </div>
               </div>
+              {member.signatureData && (
+                <div className="mt-4 pt-4 border-t">
+                  <Label className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
+                    <PenTool className="h-3.5 w-3.5" />
+                    약관동의 전자서명
+                  </Label>
+                  <div className="bg-white border rounded-lg p-2 inline-block">
+                    <img 
+                      src={member.signatureData} 
+                      alt="전자서명" 
+                      className="max-w-[300px] h-auto max-h-24 object-contain"
+                      data-testid="img-signature"
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

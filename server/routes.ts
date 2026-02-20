@@ -245,6 +245,7 @@ export async function registerRoutes(
         email: z.string().email("유효한 이메일을 입력해주세요"),
         manager1_name: z.string().optional().or(z.literal("")),
         manager1_phone: z.string().optional().or(z.literal("")),
+        manager1_email: z.string().email().optional().or(z.literal("")),
         manager2_name: z.string().optional().or(z.literal("")),
         manager2_phone: z.string().optional().or(z.literal("")),
         manager3_name: z.string().optional().or(z.literal("")),
@@ -306,6 +307,7 @@ export async function registerRoutes(
         email: data.email,
         managerName: data.manager1_name || undefined,
         managerPhone: data.manager1_phone || undefined,
+        managerEmail: data.manager1_email || undefined,
         manager2Name: data.manager2_name || undefined,
         manager2Phone: data.manager2_phone || undefined,
         manager3Name: data.manager3_name || undefined,
@@ -354,6 +356,7 @@ export async function registerRoutes(
         mailNo: z.string().optional().or(z.literal("")),
         managerName: z.string().optional().or(z.literal("")),
         managerPhone: z.string().optional().or(z.literal("")),
+        managerEmail: z.string().email().optional().or(z.literal("")),
         manager2Name: z.string().optional().or(z.literal("")),
         manager2Phone: z.string().optional().or(z.literal("")),
         manager3Name: z.string().optional().or(z.literal("")),
@@ -413,6 +416,7 @@ export async function registerRoutes(
         mailNo: data.mailNo || undefined,
         managerName: data.managerName || undefined,
         managerPhone: data.managerPhone || undefined,
+        managerEmail: data.managerEmail || undefined,
         manager2Name: data.manager2Name || undefined,
         manager2Phone: data.manager2Phone || undefined,
         manager3Name: data.manager3Name || undefined,
@@ -1706,30 +1710,44 @@ export async function registerRoutes(
       const updateData: any = {};
       const changes: string[] = [];
       
-      if (data.memberName !== undefined && data.memberName !== (targetMember.memberName || '')) {
-        updateData.memberName = data.memberName;
-        changes.push(`회원명: ${targetMember.memberName || '(없음)'} → ${data.memberName || '(없음)'}`);
-      }
+      const trackField = (field: string, label: string, newVal: any, oldVal: any) => {
+        if (newVal !== undefined) {
+          const oldStr = oldVal ?? '';
+          const newStr = newVal ?? '';
+          if (newStr !== oldStr) {
+            updateData[field] = newVal;
+            changes.push(`${label}: ${oldStr || '(없음)'} → ${newStr || '(없음)'}`);
+          }
+        }
+      };
+
+      trackField('memberName', '회원명', data.memberName, targetMember.memberName);
       if (data.grade && data.grade !== targetMember.grade) {
         updateData.grade = data.grade;
         changes.push(`등급: ${targetMember.grade} → ${data.grade}`);
       }
-      if (data.representative) updateData.representative = data.representative;
-      if (data.businessAddress !== undefined) updateData.businessAddress = data.businessAddress;
-      if (data.phone) updateData.phone = data.phone;
-      if (data.managerName !== undefined) updateData.managerName = data.managerName;
-      if (data.managerPhone !== undefined) updateData.managerPhone = data.managerPhone;
-      if (data.managerEmail !== undefined) updateData.managerEmail = data.managerEmail;
-      if (data.manager2Name !== undefined) updateData.manager2Name = data.manager2Name;
-      if (data.manager2Phone !== undefined) updateData.manager2Phone = data.manager2Phone;
-      if (data.manager3Name !== undefined) updateData.manager3Name = data.manager3Name;
-      if (data.manager3Phone !== undefined) updateData.manager3Phone = data.manager3Phone;
-      if (data.email !== undefined) updateData.email = data.email;
+      if (data.representative && data.representative !== targetMember.representative) {
+        updateData.representative = data.representative;
+        changes.push(`대표자: ${targetMember.representative} → ${data.representative}`);
+      }
+      trackField('businessAddress', '사업자주소', data.businessAddress, targetMember.businessAddress);
+      if (data.phone && data.phone !== targetMember.phone) {
+        updateData.phone = data.phone;
+        changes.push(`대표연락처: ${targetMember.phone} → ${data.phone}`);
+      }
+      trackField('managerName', '담당자1', data.managerName, targetMember.managerName);
+      trackField('managerPhone', '담당자1연락처', data.managerPhone, targetMember.managerPhone);
+      trackField('managerEmail', '담당자1이메일', data.managerEmail, targetMember.managerEmail);
+      trackField('manager2Name', '담당자2', data.manager2Name, targetMember.manager2Name);
+      trackField('manager2Phone', '담당자2연락처', data.manager2Phone, targetMember.manager2Phone);
+      trackField('manager3Name', '담당자3', data.manager3Name, targetMember.manager3Name);
+      trackField('manager3Phone', '담당자3연락처', data.manager3Phone, targetMember.manager3Phone);
+      trackField('email', '이메일', data.email, targetMember.email);
       if (data.status && data.status !== targetMember.status) {
         updateData.status = data.status;
         changes.push(`상태: ${targetMember.status} → ${data.status}`);
       }
-      if (data.memo !== undefined) updateData.memo = data.memo;
+      trackField('memo', '메모', data.memo, targetMember.memo);
       if (typeof (req.body as any).postOfficeEnabled === 'boolean' && (req.body as any).postOfficeEnabled !== targetMember.postOfficeEnabled) {
         updateData.postOfficeEnabled = (req.body as any).postOfficeEnabled;
         changes.push(`우체국 양식: ${(req.body as any).postOfficeEnabled ? '사용' : '미사용'}`);
