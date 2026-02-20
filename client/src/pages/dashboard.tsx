@@ -1514,6 +1514,21 @@ export default function Dashboard() {
                                   </div>
                                 )}
 
+                                {uploadExcelMutation.isPending && (
+                                  <div className="rounded-lg p-4 bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                                      <h4 className="font-medium text-blue-800 dark:text-blue-200">주문 검증 중입니다</h4>
+                                    </div>
+                                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                                      상품 확인 및 배송지 주소 검증을 진행하고 있습니다. 주문 건수에 따라 다소 시간이 소요될 수 있으니 잠시만 기다려 주세요.
+                                    </p>
+                                    <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">
+                                      창을 닫지 마시고 잠시만 기다려 주세요.
+                                    </p>
+                                  </div>
+                                )}
+
                                 {uploadProgress && uploadProgress.status !== 'duplicate_detected' && (
                                   <div className={`rounded-lg p-4 ${uploadProgress.status === 'validation_failed' ? 'bg-amber-50 border border-amber-300 dark:bg-amber-950/30 dark:border-amber-700' : 'bg-muted/50'}`}>
                                     <h4 className="font-medium mb-2">
