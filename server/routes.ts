@@ -11567,10 +11567,7 @@ export async function registerRoutes(
     try {
       if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(req.session.userId);
-      if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN')) {
-        return res.status(403).json({ message: "관리자 권한이 필요합니다" });
-      }
-      if (user.username !== 'kgong5026') {
+      if (!user || user.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ message: "이 기능은 최고관리자만 사용할 수 있습니다" });
       }
 

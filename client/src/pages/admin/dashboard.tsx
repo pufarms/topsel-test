@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
   const [confirmText, setConfirmText] = useState("");
 
-  const isSuperOwner = user?.username === "kgong5026";
+  const isSuperOwner = user?.role === "SUPER_ADMIN";
 
   const resetMutation = useMutation({
     mutationFn: async () => {
