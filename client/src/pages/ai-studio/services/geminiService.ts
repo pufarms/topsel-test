@@ -53,7 +53,15 @@ export async function validateApiKey(apiKey: string): Promise<{ valid: boolean; 
     if (res.status === 401) {
       return { valid: false, authError: true, error: "인증이 만료되었습니다. 다시 로그인해주세요." };
     }
-    const data = await res.json();
+    if (!res.ok) {
+      return { valid: false, error: `서버 오류 (${res.status})` };
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      return { valid: false, error: "서버 응답 파싱 실패" };
+    }
     if (data.valid === true) {
       return { valid: true };
     }

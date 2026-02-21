@@ -19,26 +19,11 @@ export default function ApiKeySetup({ onComplete }: ApiKeySetupProps) {
   const { toast } = useToast();
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
 
   const { data: keyInfo, isLoading } = useQuery<{ hasKey: boolean; maskedKey: string | null; updatedAt: string | null }>({
     queryKey: ["/api/ai-studio/api-key"],
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async (apiKey: string) => {
-      const res = await apiRequest("POST", "/api/ai-studio/api-key", { apiKey });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai-studio/api-key"] });
-      setApiKeyInput("");
-      toast({ title: "API Key 저장 완료", description: "안전하게 암호화되어 저장되었습니다" });
-    },
-    onError: () => {
-      toast({ title: "저장 실패", description: "API Key 저장 중 오류가 발생했습니다", variant: "destructive" });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -53,23 +38,41 @@ export default function ApiKeySetup({ onComplete }: ApiKeySetupProps) {
   });
 
   const handleSave = async () => {
-    if (!apiKeyInput.trim()) return;
-    setIsValidating(true);
+    const key = apiKeyInput.trim();
+    if (!key) return;
+    setIsSaving(true);
+
+    let saved = false;
     try {
-      const result = await validateApiKey(apiKeyInput.trim());
-      if (!result.valid) {
-        if (result.authError) {
-          toast({ title: "로그인이 필요합니다", description: "세션이 만료되었습니다. 페이지를 새로고침 후 다시 로그인해주세요.", variant: "destructive" });
-        } else {
-          toast({ title: "유효하지 않은 API Key", description: "Google AI Studio에서 발급받은 올바른 Key를 입력해주세요", variant: "destructive" });
-        }
-        return;
+      const saveRes = await apiRequest("POST", "/api/ai-studio/api-key", { apiKey: key });
+      await saveRes.json();
+      saved = true;
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-studio/api-key"] });
+      setApiKeyInput("");
+    } catch (err: any) {
+      if (err?.message?.includes("401")) {
+        toast({ title: "로그인이 필요합니다", description: "세션이 만료되었습니다. 페이지를 새로고침 후 다시 로그인해주세요.", variant: "destructive" });
+      } else {
+        toast({ title: "저장 실패", description: "API Key 저장 중 오류가 발생했습니다. 다시 시도해주세요.", variant: "destructive" });
       }
-      saveMutation.mutate(apiKeyInput.trim());
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const result = await validateApiKey(key);
+      if (result.valid) {
+        toast({ title: "API Key 저장 및 검증 완료", description: "안전하게 암호화되어 저장되었습니다" });
+      } else {
+        toast({
+          title: "API Key 저장 완료 (검증 실패)",
+          description: "Key가 저장되었지만 Google 검증에 실패했습니다. Key가 정확하다면 그대로 다음 단계로 진행해주세요.",
+        });
+      }
     } catch {
-      toast({ title: "검증 실패", description: "API Key 검증 중 오류가 발생했습니다", variant: "destructive" });
+      toast({ title: "API Key 저장 완료", description: "Key가 저장되었습니다. 검증은 건너뛰었습니다." });
     } finally {
-      setIsValidating(false);
+      setIsSaving(false);
     }
   };
 
@@ -155,14 +158,14 @@ export default function ApiKeySetup({ onComplete }: ApiKeySetupProps) {
             <div className="flex gap-2">
               <Button
                 onClick={handleSave}
-                disabled={!apiKeyInput.trim() || isValidating || saveMutation.isPending}
+                disabled={!apiKeyInput.trim() || isSaving}
                 className="flex-1"
                 data-testid="btn-save-key"
               >
-                {isValidating || saveMutation.isPending ? (
+                {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {isValidating ? "검증 중..." : "저장 중..."}
+                    저장 중...
                   </>
                 ) : (
                   "저장 및 검증"
