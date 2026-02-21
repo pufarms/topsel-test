@@ -54,7 +54,8 @@ import {
   Star,
   Menu,
   X,
-  TrendingUp
+  TrendingUp,
+  Sparkles
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { PublicHeader } from "@/components/public/PublicHeader";
@@ -71,6 +72,7 @@ import MemberProductList from "@/pages/member/product-list";
 import MemberSettlementTab from "@/pages/member/settlement-tab";
 import MemberStatsTab from "@/pages/member/member-stats-tab";
 import MemberInquiryTab from "@/pages/member/inquiry-tab";
+import AIStudioApp from "@/pages/ai-studio";
 
 type SidebarTab = 
   | "dashboard" 
@@ -85,6 +87,7 @@ type SidebarTab =
   | "deposit"
   | "member-stats"
   | "inquiry"
+  | "ai-studio"
   | "guide";
 
 interface SidebarItemProps {
@@ -888,6 +891,13 @@ export default function Dashboard() {
         activeTab={activeTab}
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
         badge={memberInquiryCounts?.newReplies}
+      />
+      <SidebarItem
+        icon={<Sparkles className="h-4 w-4" />}
+        label="AI 상세페이지"
+        tab="ai-studio"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
       />
       <SidebarItem
         icon={<BookOpen className="h-4 w-4" />}
@@ -1804,6 +1814,9 @@ export default function Dashboard() {
 
               {activeTab === "inquiry" && (
                 <MemberInquiryTab />
+              )}
+              {activeTab === "ai-studio" && (
+                <AIStudioApp />
               )}
           </main>
         </div>

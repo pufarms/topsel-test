@@ -1,7 +1,7 @@
 # Order Management System
 
 ## Overview
-This project is a comprehensive Korean-language order management system for sellers and administrators, designed to centralize order submission and management. It features role-based authentication, distinct dashboards, intuitive order entry, detailed history tracking, and extensive user management capabilities. The system aims to significantly enhance operational efficiency, minimize manual errors, and provide a unified data source with critical business rules for pricing, responsive design, category management, smart address validation, and an integrated outsourcing/vendor system. The overarching goal is to establish the system as a leading, reliable, feature-rich, and user-friendly solution in the Korean e-commerce market.
+This project is a comprehensive Korean-language order management system for sellers and administrators, centralizing order submission and management. It features role-based authentication, distinct dashboards, intuitive order entry, detailed history tracking, and extensive user management. The system aims to enhance operational efficiency, minimize manual errors, and provide a unified data source with critical business rules for pricing, responsive design, category management, smart address validation, and an integrated outsourcing/vendor system. The goal is to establish it as a leading, reliable, feature-rich, and user-friendly solution in the Korean e-commerce market.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -180,6 +180,7 @@ Preferred communication style: Simple, everyday language.
 - **Sales Statistics Dashboard**: Comprehensive analytics (`/admin/stats`) including overview, member-specific, and product-specific sales data, charts, tables, and Excel export, based on `priceConfirmed=true` orders.
 - **Invoice Management System**: Monthly invoice tracking, unified summary, manual issuance, with `isAutoIssued` for future automation.
 - **Expense Management System**: Expense tracking across 8 categories, auto-classification via keyword dictionary, autocomplete, bulk spreadsheet entry, Excel import/export, recurring expense management, charts, and keyword learning.
+- **AI 상세페이지 마법사**: Google Gemini API를 활용한 과일 상품 상세페이지 마케팅 카피 자동 생성 시스템. 8개 섹션(히어로, 문제공감, 사회적증거, 맛/품질, 구성, 산지, 배송, CTA) × 5가지 카피라이터 스타일로 순차 생성. 서버 프록시 방식으로 API Key 보안 유지(AES-256-GCM 암호화). 관리자(`/admin/ai-studio`)와 회원 대시보드(ai-studio 탭) 모두 접근 가능.
 
 ## External Dependencies
 
@@ -207,3 +208,4 @@ Preferred communication style: Simple, everyday language.
 - Anthropic Claude AI (address normalization)
 - Solapi (SMS for vendor notification)
 - Popbill (팝빌 전자세금계산서/계산서 발행 API)
+- Google Gemini AI (AI 상세페이지 카피 생성)

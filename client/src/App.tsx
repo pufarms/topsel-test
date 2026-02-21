@@ -54,6 +54,7 @@ import OrdersCompletedPage from "@/pages/admin/orders/completed";
 import PublicPreviewPage from "@/pages/public-preview";
 import MemberOrderPreview from "@/pages/admin/member-order-preview";
 import MyPage from "@/pages/mypage";
+import AIStudioApp from "@/pages/ai-studio";
 import DynamicPage from "@/pages/dynamic-page";
 import { PartnerAuthProvider } from "@/lib/partner-auth";
 import PartnerLogin from "@/pages/partner/login";
@@ -245,6 +246,9 @@ function Router() {
       </Route>
       <Route path="/admin/board">
         <AdminRoute><BoardManagement /></AdminRoute>
+      </Route>
+      <Route path="/admin/ai-studio">
+        <AdminRoute><AIStudioApp /></AdminRoute>
       </Route>
 
       <Route path="/partner/login">

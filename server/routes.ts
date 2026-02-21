@@ -20,6 +20,7 @@ import { db } from "./db";
 import { eq, ne, desc, asc, sql, and, or, inArray, like, ilike, isNotNull, isNull, gte, lte, lt, gt, count } from "drizzle-orm";
 import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
+import aiStudioRouter from "./ai-studio-routes";
 import { taxinvoiceService, popbill } from "./lib/popbill";
 
 // PortOne V2 환경변수
@@ -76,6 +77,9 @@ export async function registerRoutes(
 
   // 외주업체 파트너 API 라우터
   app.use("/api/partner", partnerRouter);
+
+  // AI 상세페이지 스튜디오 API 라우터
+  app.use("/api/ai-studio", aiStudioRouter);
 
   // SSE 이벤트 스트림 엔드포인트
   app.get("/api/events", async (req, res) => {

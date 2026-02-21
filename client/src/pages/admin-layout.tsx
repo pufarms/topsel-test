@@ -34,7 +34,8 @@ import {
   Shield,
   MessageSquare,
   Landmark,
-  ClipboardList
+  ClipboardList,
+  Sparkles
 } from "lucide-react";
 
 interface MenuItem {
@@ -131,6 +132,7 @@ const menuItems: MenuItem[] = [
       { id: "pages-etc", label: "기타페이지", path: "/admin/pages?category=기타페이지" },
     ]
   },
+  { id: "ai-studio", label: "AI 상세페이지", icon: <Sparkles className="h-5 w-5" />, path: "/admin/ai-studio" },
   { 
     id: "settings", 
     label: "설정", 
