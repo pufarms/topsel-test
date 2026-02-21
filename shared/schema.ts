@@ -52,6 +52,8 @@ export const users = pgTable("users", {
   permissions: jsonb("permissions").$type<string[]>().default([]),
   tier: text("tier").notNull().default("준회원"),
   lastLoginAt: timestamp("last_login_at"),
+  geminiApiKey: text("gemini_api_key"),
+  geminiApiKeyUpdatedAt: timestamp("gemini_api_key_updated_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
