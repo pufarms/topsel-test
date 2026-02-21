@@ -1,15 +1,18 @@
 import { SECTION_DEFINITIONS } from "../types";
-import { Loader2, CheckCircle2, Circle, AlertCircle, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, AlertCircle, Sparkles, ImageIcon, FileText } from "lucide-react";
 
 interface GeneratingProgressProps {
   currentSection: number;
   totalSections: number;
   sectionName: string;
+  phase: "copy" | "image";
   error?: string;
 }
 
-export default function GeneratingProgress({ currentSection, totalSections, sectionName, error }: GeneratingProgressProps) {
-  const progress = Math.round(((currentSection) / totalSections) * 100);
+export default function GeneratingProgress({ currentSection, totalSections, sectionName, phase, error }: GeneratingProgressProps) {
+  const totalSteps = totalSections * 2;
+  const currentStep = currentSection * 2 + (phase === "image" ? 1 : 0);
+  const progress = Math.round((currentStep / totalSteps) * 100);
 
   return (
     <div className="max-w-2xl mx-auto py-12">
@@ -18,10 +21,24 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
           <Sparkles className="h-8 w-8 text-cyan-500 animate-pulse" />
           <div className="absolute inset-0 rounded-2xl bg-cyan-500/10 animate-ping" style={{ animationDuration: "2s" }} />
         </div>
-        <h2 className="text-2xl font-bold mb-2">AI가 카피를 생성하고 있습니다</h2>
+        <h2 className="text-2xl font-bold mb-2">AI가 상세페이지를 생성하고 있습니다</h2>
         <p className="text-muted-foreground">
-          {error ? "일부 섹션에서 오류가 발생했습니다" : `${sectionName} 섹션을 작성 중입니다...`}
+          {error
+            ? "일부 섹션에서 오류가 발생했습니다"
+            : phase === "copy"
+            ? `${sectionName} — 카피 작성 중...`
+            : `${sectionName} — 배경 이미지 생성 중...`}
         </p>
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <div className={`flex items-center gap-1.5 text-xs ${phase === "copy" ? "text-primary font-medium" : "text-muted-foreground"}`}>
+            <FileText className="h-3.5 w-3.5" />
+            카피 생성
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs ${phase === "image" ? "text-primary font-medium" : "text-muted-foreground"}`}>
+            <ImageIcon className="h-3.5 w-3.5" />
+            이미지 합성
+          </div>
+        </div>
       </div>
 
       <div className="mb-8">
@@ -39,15 +56,18 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
 
       <div className="space-y-2">
         {SECTION_DEFINITIONS.map((section, idx) => {
-          let status: "done" | "active" | "pending" | "error" = "pending";
+          let status: "done" | "active-copy" | "active-image" | "pending" | "error" = "pending";
           if (idx < currentSection) status = "done";
-          else if (idx === currentSection) status = error ? "error" : "active";
+          else if (idx === currentSection) {
+            if (error) status = "error";
+            else status = phase === "copy" ? "active-copy" : "active-image";
+          }
 
           return (
             <div
               key={section.id}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                status === "active"
+                status === "active-copy" || status === "active-image"
                   ? "bg-primary/10 border border-primary/20"
                   : status === "done"
                   ? "bg-green-50 dark:bg-green-950/30"
@@ -58,15 +78,22 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
             >
               <span className="text-lg">{section.icon}</span>
               {status === "done" && <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />}
-              {status === "active" && <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />}
+              {status === "active-copy" && <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />}
+              {status === "active-image" && <Loader2 className="h-4 w-4 text-violet-500 animate-spin flex-shrink-0" />}
               {status === "error" && <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />}
               {status === "pending" && <Circle className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />}
               <span className={`text-sm font-medium ${
-                status === "active" ? "text-primary" : status === "done" ? "text-green-700 dark:text-green-400" : status === "error" ? "text-red-600" : "text-muted-foreground"
+                status === "active-copy" ? "text-primary" : status === "active-image" ? "text-violet-600" : status === "done" ? "text-green-700 dark:text-green-400" : status === "error" ? "text-red-600" : "text-muted-foreground"
               }`}>
                 {section.name}
               </span>
-              <span className="text-xs text-muted-foreground ml-auto">{section.description}</span>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {status === "active-copy" && "카피 생성 중..."}
+                {status === "active-image" && "이미지 합성 중..."}
+                {status === "done" && "완료"}
+                {status === "pending" && "대기"}
+                {status === "error" && "오류"}
+              </span>
             </div>
           );
         })}

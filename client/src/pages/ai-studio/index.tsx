@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import type { AppStep, ProductInfo, SectionData, CopyVariant } from "./types";
+import type { AppStep, ProductInfo, SectionData, CopyVariant, TextLayer } from "./types";
 import LandingHero from "./components/LandingHero";
 import ApiKeySetup from "./components/ApiKeySetup";
 import ProductInfoForm from "./components/ProductInfoForm";
@@ -19,6 +19,7 @@ export default function AIStudioApp() {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [generatingSection, setGeneratingSection] = useState(0);
   const [generatingSectionName, setGeneratingSectionName] = useState("");
+  const [generatingPhase, setGeneratingPhase] = useState<"copy" | "image">("copy");
 
   const handleStart = () => setStep("api-key");
   const handleApiKeyComplete = () => setStep("input");
@@ -27,16 +28,22 @@ export default function AIStudioApp() {
     setProduct(productInfo);
     setStep("generating");
     setGeneratingSection(0);
+    setGeneratingPhase("copy");
 
     try {
-      const results = await generateAllSections(productInfo, (idx, name) => {
-        setGeneratingSection(idx);
-        setGeneratingSectionName(name);
-      });
+      const results = await generateAllSections(
+        productInfo,
+        productInfo.imageBase64,
+        (idx, name, phase) => {
+          setGeneratingSection(idx);
+          setGeneratingSectionName(name);
+          setGeneratingPhase(phase);
+        }
+      );
 
       setSections(results);
       setStep("editor");
-      toast({ title: "생성 완료!", description: "8개 섹션의 마케팅 카피가 생성되었습니다" });
+      toast({ title: "생성 완료!", description: "8개 섹션의 카피와 이미지가 생성되었습니다" });
     } catch (error: any) {
       toast({ title: "생성 실패", description: error?.message || "AI 생성 중 오류가 발생했습니다", variant: "destructive" });
       setStep("input");
@@ -55,6 +62,12 @@ export default function AIStudioApp() {
     );
   };
 
+  const handleUpdateTextLayers = (sectionIdx: number, textLayers: TextLayer[]) => {
+    setSections((prev) =>
+      prev.map((s, i) => (i === sectionIdx ? { ...s, textLayers } : s))
+    );
+  };
+
   const stepHeader = step !== "landing" && step !== "generating" && step !== "preview" && (
     <div className="flex items-center justify-between mb-6 pb-4 border-b">
       <div className="flex items-center gap-3">
@@ -66,7 +79,7 @@ export default function AIStudioApp() {
           <p className="text-xs text-muted-foreground">
             {step === "api-key" && "1단계: API Key 설정"}
             {step === "input" && "2단계: 제품 정보 입력"}
-            {step === "editor" && "3단계: 카피 편집"}
+            {step === "editor" && "3단계: 이미지 + 카피 편집"}
           </p>
         </div>
       </div>
@@ -80,7 +93,7 @@ export default function AIStudioApp() {
   );
 
   return (
-    <div className="p-4 md:p-6">
+    <div className={step === "editor" ? "" : "p-4 md:p-6"}>
       {stepHeader}
 
       {step === "landing" && <LandingHero onStart={handleStart} />}
@@ -96,6 +109,7 @@ export default function AIStudioApp() {
           currentSection={generatingSection}
           totalSections={8}
           sectionName={generatingSectionName}
+          phase={generatingPhase}
         />
       )}
       {step === "editor" && product && (
@@ -105,6 +119,7 @@ export default function AIStudioApp() {
           onSectionChange={setCurrentSectionIndex}
           onSelectCopy={handleSelectCopy}
           onEditCopy={handleEditCopy}
+          onUpdateTextLayers={handleUpdateTextLayers}
           onPreview={() => setStep("preview")}
         />
       )}

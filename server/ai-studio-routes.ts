@@ -219,4 +219,66 @@ ${COPYWRITER_STYLES.map(s => `"${s.id}" (${s.name}): ${s.description}`).join("\n
   }
 });
 
+router.post("/generate-image", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session!.userId;
+    const apiKey = await getUserApiKey(userId);
+    if (!apiKey) {
+      return res.status(400).json({ error: "API Key가 등록되지 않았습니다" });
+    }
+
+    const { imageBase64, prompt, aspectRatio, sectionId } = req.body;
+    if (!imageBase64 || !prompt) {
+      return res.status(400).json({ error: "이미지와 프롬프트가 필요합니다" });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const fullPrompt = `Keep the product in the foreground exactly as is. Change ONLY the background to: ${prompt}. Professional advertising photography, photorealistic, high quality, 4k. Do NOT modify the product itself. The product must remain sharp and unaltered.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-exp",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: imageBase64,
+            },
+          },
+          {
+            text: fullPrompt,
+          },
+        ],
+      },
+      config: {
+        responseModalities: ["TEXT", "IMAGE"],
+      } as any,
+    });
+
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if ((part as any).inlineData) {
+        const inlineData = (part as any).inlineData;
+        return res.json({
+          sectionId,
+          imageSrc: `data:${inlineData.mimeType};base64,${inlineData.data}`,
+        });
+      }
+    }
+
+    throw new Error("Gemini에서 이미지를 생성하지 못했습니다");
+  } catch (error: any) {
+    console.error("이미지 생성 오류:", error?.message);
+    if (error?.message?.includes("429") || error?.message?.includes("quota")) {
+      return res.status(429).json({
+        error: "API 사용량 한도에 도달했습니다. 잠시 후 다시 시도해주세요.",
+      });
+    }
+    return res.status(500).json({
+      error: error?.message || "이미지 생성 중 오류가 발생했습니다",
+    });
+  }
+});
+
 export default router;

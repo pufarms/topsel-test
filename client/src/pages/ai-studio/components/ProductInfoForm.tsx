@@ -5,8 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText, Camera } from "lucide-react";
 import type { ProductInfo } from "../types";
+import ImageUploader from "./ImageUploader";
+import { fileToBase64 } from "../services/geminiService";
 
 interface ProductInfoFormProps {
   onSubmit: (product: ProductInfo) => void;
@@ -40,14 +42,33 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
     deliveryInfo: "",
     priceRange: "",
     additionalNotes: "",
-    images: [],
+    imageFile: null,
+    imageBase64: "",
   });
+  const [imagePreview, setImagePreview] = useState("");
 
   const update = (key: keyof ProductInfo, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const isValid = form.productName.trim() && form.origin.trim() && form.sellingPoints.trim();
+  const handleImageSelect = async (file: File | null) => {
+    if (!file) {
+      setForm((prev) => ({ ...prev, imageFile: null, imageBase64: "" }));
+      setImagePreview("");
+      return;
+    }
+    setForm((prev) => ({ ...prev, imageFile: file }));
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+    try {
+      const base64 = await fileToBase64(file);
+      setForm((prev) => ({ ...prev, imageBase64: base64 }));
+    } catch (err) {
+      console.error("이미지 변환 실패:", err);
+    }
+  };
+
+  const isValid = form.productName.trim() && form.origin.trim() && form.sellingPoints.trim() && form.imageBase64;
 
   const handleSubmit = () => {
     if (isValid) onSubmit(form);
@@ -102,6 +123,26 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
         <p className="text-muted-foreground">AI가 최적의 마케팅 카피를 생성할 수 있도록 제품 정보를 입력해주세요</p>
         <p className="text-xs text-muted-foreground mt-1">* 표시는 필수 항목입니다</p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Camera className="h-5 w-5 text-purple-500" />
+            제품 이미지
+            <span className="text-destructive text-sm">*</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ImageUploader
+            onImageSelect={handleImageSelect}
+            selectedFile={form.imageFile}
+            previewUrl={imagePreview}
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            AI가 이 이미지를 기반으로 각 섹션별 배경을 합성합니다
+          </p>
+        </CardContent>
+      </Card>
 
       {fieldGroups.map((group) => (
         <Card key={group.title}>
