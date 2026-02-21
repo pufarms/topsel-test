@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable, loans, loanRepayments } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable, loans, loanRepayments, brandtalkHistory, stockHistory } from "@shared/schema";
 import XLSX from "xlsx";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
@@ -11575,17 +11575,57 @@ export async function registerRoutes(
       }
 
       const result = await db.transaction(async (tx) => {
-        const [ordersResult] = await tx.select({ count: sql<number>`count(*)` }).from(pendingOrders);
-        const [settlementsResult] = await tx.select({ count: sql<number>`count(*)` }).from(settlementHistory);
-        const [depositsResult] = await tx.select({ count: sql<number>`count(*)` }).from(depositHistory);
-        const [pointersResult] = await tx.select({ count: sql<number>`count(*)` }).from(pointerHistory);
-        const [uploadsResult] = await tx.select({ count: sql<number>`count(*)` }).from(orderUploadHistory);
+        const [ordersCount] = await tx.select({ count: sql<number>`count(*)` }).from(pendingOrders);
+        const [settlementsCount] = await tx.select({ count: sql<number>`count(*)` }).from(settlementHistory);
+        const [depositsCount] = await tx.select({ count: sql<number>`count(*)` }).from(depositHistory);
+        const [pointersCount] = await tx.select({ count: sql<number>`count(*)` }).from(pointerHistory);
+        const [uploadsCount] = await tx.select({ count: sql<number>`count(*)` }).from(orderUploadHistory);
+        const [invoicesCount] = await tx.select({ count: sql<number>`count(*)` }).from(invoiceRecords);
+        const [allocDetailsCount] = await tx.select({ count: sql<number>`count(*)` }).from(allocationDetails);
+        const [allocsCount] = await tx.select({ count: sql<number>`count(*)` }).from(orderAllocations);
+        const [vendorPayCount] = await tx.select({ count: sql<number>`count(*)` }).from(vendorPayments);
+        const [bankdaCount] = await tx.select({ count: sql<number>`count(*)` }).from(bankdaTransactions);
+        const [brandtalkCount] = await tx.select({ count: sql<number>`count(*)` }).from(brandtalkHistory);
+        const [alimtalkCount] = await tx.select({ count: sql<number>`count(*)` }).from(alimtalkHistory);
+        const [purchasesCount] = await tx.select({ count: sql<number>`count(*)` }).from(purchases);
+        const [directSalesCount] = await tx.select({ count: sql<number>`count(*)` }).from(directSales);
+        const [stockHistCount] = await tx.select({ count: sql<number>`count(*)` }).from(stockHistory);
+        const [productStocksCount] = await tx.select({ count: sql<number>`count(*)` }).from(productStocks);
+        const [memberLogsCount] = await tx.select({ count: sql<number>`count(*)` }).from(memberLogs);
+        const [inquiryAttachCount] = await tx.select({ count: sql<number>`count(*)` }).from(inquiryAttachments);
+        const [inquiryMsgCount] = await tx.select({ count: sql<number>`count(*)` }).from(inquiryMessages);
+        const [inquiryFieldsCount] = await tx.select({ count: sql<number>`count(*)` }).from(inquiryFields);
+        const [inquiriesCount] = await tx.select({ count: sql<number>`count(*)` }).from(inquiries);
+        const [expensesCount] = await tx.select({ count: sql<number>`count(*)` }).from(expenses);
+        const [loanRepaymentsCount] = await tx.select({ count: sql<number>`count(*)` }).from(loanRepayments);
+        const [loansCount] = await tx.select({ count: sql<number>`count(*)` }).from(loans);
+        const [expRecurringCount] = await tx.select({ count: sql<number>`count(*)` }).from(expenseRecurring);
 
+        await tx.delete(allocationDetails);
+        await tx.delete(orderAllocations);
         await tx.delete(pendingOrders);
         await tx.delete(settlementHistory);
         await tx.delete(depositHistory);
         await tx.delete(pointerHistory);
         await tx.delete(orderUploadHistory);
+        await tx.delete(invoiceRecords);
+        await tx.delete(vendorPayments);
+        await tx.delete(bankdaTransactions);
+        await tx.delete(brandtalkHistory);
+        await tx.delete(alimtalkHistory);
+        await tx.delete(purchases);
+        await tx.delete(directSales);
+        await tx.delete(stockHistory);
+        await tx.delete(productStocks);
+        await tx.delete(memberLogs);
+        await tx.delete(inquiryAttachments);
+        await tx.delete(inquiryMessages);
+        await tx.delete(inquiryFields);
+        await tx.delete(inquiries);
+        await tx.delete(loanRepayments);
+        await tx.delete(loans);
+        await tx.delete(expenses);
+        await tx.delete(expenseRecurring);
 
         await tx.update(members).set({
           deposit: 0,
@@ -11594,21 +11634,56 @@ export async function registerRoutes(
         });
 
         return {
-          orders: Number(ordersResult?.count || 0),
-          settlements: Number(settlementsResult?.count || 0),
-          deposits: Number(depositsResult?.count || 0),
-          pointers: Number(pointersResult?.count || 0),
-          uploads: Number(uploadsResult?.count || 0),
+          orders: Number(ordersCount?.count || 0),
+          settlements: Number(settlementsCount?.count || 0),
+          deposits: Number(depositsCount?.count || 0),
+          pointers: Number(pointersCount?.count || 0),
+          uploads: Number(uploadsCount?.count || 0),
+          invoices: Number(invoicesCount?.count || 0),
+          allocations: Number(allocsCount?.count || 0) + Number(allocDetailsCount?.count || 0),
+          vendorPayments: Number(vendorPayCount?.count || 0),
+          bankda: Number(bankdaCount?.count || 0),
+          notifications: Number(brandtalkCount?.count || 0) + Number(alimtalkCount?.count || 0),
+          purchases: Number(purchasesCount?.count || 0),
+          directSales: Number(directSalesCount?.count || 0),
+          stocks: Number(stockHistCount?.count || 0) + Number(productStocksCount?.count || 0),
+          memberLogs: Number(memberLogsCount?.count || 0),
+          inquiries: Number(inquiriesCount?.count || 0) + Number(inquiryMsgCount?.count || 0) + Number(inquiryAttachCount?.count || 0) + Number(inquiryFieldsCount?.count || 0),
+          expenses: Number(expensesCount?.count || 0),
+          loans: Number(loansCount?.count || 0) + Number(loanRepaymentsCount?.count || 0),
+          expRecurring: Number(expRecurringCount?.count || 0),
         };
       });
 
       sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
       sseManager.broadcast("order-status-changed", { type: "order-status-changed" });
 
+      const parts = [];
+      if (result.orders > 0) parts.push(`주문 ${result.orders}건`);
+      if (result.settlements > 0) parts.push(`정산이력 ${result.settlements}건`);
+      if (result.deposits > 0) parts.push(`예치금이력 ${result.deposits}건`);
+      if (result.pointers > 0) parts.push(`포인터이력 ${result.pointers}건`);
+      if (result.uploads > 0) parts.push(`업로드이력 ${result.uploads}건`);
+      if (result.invoices > 0) parts.push(`세금계산서 ${result.invoices}건`);
+      if (result.allocations > 0) parts.push(`배분 ${result.allocations}건`);
+      if (result.vendorPayments > 0) parts.push(`매입업체정산 ${result.vendorPayments}건`);
+      if (result.bankda > 0) parts.push(`뱅크다거래 ${result.bankda}건`);
+      if (result.notifications > 0) parts.push(`알림톡/브랜드톡 ${result.notifications}건`);
+      if (result.purchases > 0) parts.push(`매입 ${result.purchases}건`);
+      if (result.directSales > 0) parts.push(`직접매출 ${result.directSales}건`);
+      if (result.stocks > 0) parts.push(`재고/재고이력 ${result.stocks}건`);
+      if (result.memberLogs > 0) parts.push(`회원로그 ${result.memberLogs}건`);
+      if (result.inquiries > 0) parts.push(`문의 ${result.inquiries}건`);
+      if (result.expenses > 0) parts.push(`경비 ${result.expenses}건`);
+      if (result.loans > 0) parts.push(`대출 ${result.loans}건`);
+      if (result.expRecurring > 0) parts.push(`정기경비 ${result.expRecurring}건`);
+
       res.json({
         success: true,
         deleted: result,
-        message: `초기화 완료: 주문 ${result.orders}건, 정산 ${result.settlements}건, 예치금이력 ${result.deposits}건, 포인터이력 ${result.pointers}건, 업로드이력 ${result.uploads}건 삭제. 회원 잔액 리셋 완료.`,
+        message: parts.length > 0
+          ? `초기화 완료: ${parts.join(', ')} 삭제. 회원 잔액 리셋 완료.`
+          : '초기화 완료: 삭제할 데이터가 없습니다. 회원 잔액 리셋 완료.',
       });
     } catch (error: any) {
       console.error("테스트 데이터 초기화 실패:", error);

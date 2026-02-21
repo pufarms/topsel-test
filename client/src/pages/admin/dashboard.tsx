@@ -532,14 +532,21 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div className="rounded-md bg-destructive/10 p-4 text-sm space-y-2">
               <p className="font-semibold text-destructive">다음 데이터가 모두 삭제됩니다:</p>
-              <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                <li>모든 주문 데이터</li>
-                <li>모든 정산 이력</li>
-                <li>모든 예치금/포인터 변동 이력</li>
-                <li>모든 업로드 이력 (중복 파일 감지 포함)</li>
+              <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-xs">
+                <li>모든 주문 데이터 (대기/배분 포함)</li>
+                <li>모든 정산/예치금/포인터 이력</li>
+                <li>모든 세금계산서(계산서) 발행 내역</li>
+                <li>모든 매입/직접매출/매입업체정산 이력</li>
+                <li>모든 뱅크다 거래 내역</li>
+                <li>모든 알림톡/브랜드톡 발송 이력</li>
+                <li>모든 재고/재고변동 이력</li>
+                <li>모든 문의/답변 데이터</li>
+                <li>모든 회원 활동 로그</li>
+                <li>모든 경비/대출/정기경비 이력</li>
+                <li>모든 업로드 이력</li>
                 <li>모든 회원 잔액 (예치금 + 포인터) → 0원 리셋</li>
               </ul>
-              <p className="text-xs text-muted-foreground mt-2">* 회원 정보, 상품, 카테고리, 사이트 설정은 유지됩니다.</p>
+              <p className="text-xs text-muted-foreground mt-2">* 회원 정보, 상품, 카테고리, 매입업체, 사이트 설정은 유지됩니다.</p>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => { setResetStep(0); setConfirmText(""); }} data-testid="button-reset-cancel-1">
