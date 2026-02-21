@@ -11523,23 +11523,37 @@ export async function registerRoutes(
         .where(and(...conditions))
         .orderBy(desc(invoiceRecords.issuedAt));
 
+      const validRecords = records.filter(r => !r.cancelledAt);
+      const cancelledRecords = records.filter(r => !!r.cancelledAt);
       const taxableRecords = records.filter(r => r.invoiceType === 'taxable');
       const exemptRecords = records.filter(r => r.invoiceType === 'exempt');
+      const validTaxable = validRecords.filter(r => r.invoiceType === 'taxable');
+      const validExempt = validRecords.filter(r => r.invoiceType === 'exempt');
 
       res.json({
         records,
         summary: {
           totalCount: records.length,
+          validCount: validRecords.length,
+          cancelledCount: cancelledRecords.length,
           taxableCount: taxableRecords.length,
           exemptCount: exemptRecords.length,
           totalSupplyAmount: records.reduce((s, r) => s + (r.supplyAmount || 0), 0),
           totalVatAmount: records.reduce((s, r) => s + (r.vatAmount || 0), 0),
           totalAmount: records.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          validSupplyAmount: validRecords.reduce((s, r) => s + (r.supplyAmount || 0), 0),
+          validVatAmount: validRecords.reduce((s, r) => s + (r.vatAmount || 0), 0),
+          validTotalAmount: validRecords.reduce((s, r) => s + (r.totalAmount || 0), 0),
           taxableSupplyAmount: taxableRecords.reduce((s, r) => s + (r.supplyAmount || 0), 0),
           taxableVatAmount: taxableRecords.reduce((s, r) => s + (r.vatAmount || 0), 0),
           taxableTotalAmount: taxableRecords.reduce((s, r) => s + (r.totalAmount || 0), 0),
           exemptSupplyAmount: exemptRecords.reduce((s, r) => s + (r.supplyAmount || 0), 0),
           exemptTotalAmount: exemptRecords.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          validTaxableCount: validTaxable.length,
+          validTaxableTotalAmount: validTaxable.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          validExemptCount: validExempt.length,
+          validExemptTotalAmount: validExempt.reduce((s, r) => s + (r.totalAmount || 0), 0),
+          ntsConfirmedCount: validRecords.filter(r => r.popbillNtsConfirmNum).length,
         },
       });
     } catch (error: any) {
