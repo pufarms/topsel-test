@@ -16,7 +16,21 @@ export interface ProductInfo {
   deliveryInfo: string;
   priceRange: string;
   additionalNotes: string;
-  images: string[];
+  imageFile: File | null;
+  imageBase64: string;
+}
+
+export interface TextLayer {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  color: string;
+  fontFamily: string;
+  fontWeight: string;
+  width?: number;
+  align?: "left" | "center" | "right";
 }
 
 export interface CopyVariant {
@@ -37,6 +51,8 @@ export interface SectionData {
   selectedCopyIndex: number;
   editedCopy: CopyVariant | null;
   isGenerated: boolean;
+  imageSrc: string;
+  textLayers: TextLayer[];
 }
 
 export interface GenerationProgress {
@@ -44,6 +60,7 @@ export interface GenerationProgress {
   totalSections: number;
   sectionName: string;
   status: "idle" | "generating" | "done" | "error";
+  phase: "copy" | "image";
   errorMessage?: string;
 }
 
@@ -65,3 +82,27 @@ export const COPYWRITER_STYLES = [
   { id: "impact", name: "임팩트형", description: "강렬하고 직설적인 카피" },
   { id: "story", name: "스토리텔링형", description: "이야기를 풀어내는 서사적 카피" },
 ] as const;
+
+export const SECTION_IMAGE_PROMPTS: Record<string, string> = {
+  hero: "Premium studio lighting, water droplets on surface, fresh morning dew feel, luxury food photography, soft bokeh background, spacious composition",
+  problem: "Dimly lit kitchen with empty fruit bowl, mundane supermarket shelf with wilted produce, contrast between dull and vibrant, moody atmospheric lighting",
+  "social-proof": "Elegant award ceremony stage setting, golden trophy shelf, premium certificate display, warm spotlights, professional achievement backdrop",
+  "taste-quality": "Extreme close-up with juice splash, cross-section revealing flesh, water droplets, macro photography, vibrant colors, fresh and appetizing",
+  composition: "Clean white marble surface, neatly arranged gift box packaging, premium wrapping, organized display, top-down flat lay photography",
+  origin: "Korean countryside orchard at golden hour, lush green trees heavy with fruit, misty mountain backdrop, traditional farming atmosphere, warm sunlight",
+  delivery: "Professional cold-chain delivery setup, insulated packaging with ice packs, fresh produce carefully wrapped, clean logistics facility",
+  cta: "Festive celebration setup with confetti, shopping bag with ribbon, gift-wrapped premium fruit box, warm holiday atmosphere, urgency and excitement",
+};
+
+export const FONTS = [
+  { name: "Noto Sans KR", value: "'Noto Sans KR', sans-serif" },
+  { name: "Inter", value: "'Inter', sans-serif" },
+  { name: "Serif", value: "serif" },
+  { name: "Monospace", value: "monospace" },
+];
+
+export const COLORS = [
+  "#000000", "#FFFFFF", "#FF3B30", "#FF9500", "#FFCC00",
+  "#4CD964", "#5AC8FA", "#007AFF", "#5856D6", "#FF2D55",
+  "#1F2937", "#4B5563", "#9CA3AF",
+];
