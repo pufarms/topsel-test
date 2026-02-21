@@ -295,9 +295,10 @@ router.post("/validate-key", requireAuth, async (req: Request, res: Response) =>
       return res.status(400).json({ valid: false, error: "API Key를 입력해주세요" });
     }
 
-    const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+    const trimmedKey = apiKey.trim();
+    const ai = new GoogleGenAI({ apiKey: trimmedKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: "Say 'OK' in one word.",
     });
     const valid = !!response.text;
@@ -327,7 +328,6 @@ router.post("/art-direction", requireAuth, async (req: Request, res: Response) =
     if (!apiKey) {
       return res.status(400).json({ error: "API Key가 등록되지 않았습니다" });
     }
-
     const { product } = req.body;
     if (!product) {
       return res.status(400).json({ error: "제품 정보가 필요합니다" });
@@ -362,7 +362,7 @@ router.post("/art-direction", requireAuth, async (req: Request, res: Response) =
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: { temperature: 0.7, maxOutputTokens: 1024 },
     });
@@ -423,7 +423,7 @@ router.post("/generate-section", requireAuth, async (req: Request, res: Response
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
+          model: "gemini-2.5-flash",
           contents: prompt,
           config: {
             temperature: attempt === 0 ? 0.8 : 0.5,
@@ -506,7 +506,7 @@ router.post("/generate-image", requireAuth, async (req: Request, res: Response) 
     const fullPrompt = `${prompt} Do NOT modify the product itself. The product must remain sharp and unaltered.${ratioHint}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash-image",
       contents: {
         parts: [
           {
