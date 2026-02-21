@@ -42,13 +42,24 @@ export function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export async function validateApiKey(apiKey: string): Promise<boolean> {
+export async function validateApiKey(apiKey: string): Promise<{ valid: boolean; authError?: boolean; error?: string }> {
   try {
-    const res = await apiRequest("POST", "/api/ai-studio/validate-key", { apiKey });
+    const res = await fetch("/api/ai-studio/validate-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+      credentials: "include",
+    });
+    if (res.status === 401) {
+      return { valid: false, authError: true, error: "인증이 만료되었습니다. 다시 로그인해주세요." };
+    }
     const data = await res.json();
-    return data.valid === true;
+    if (data.valid === true) {
+      return { valid: true };
+    }
+    return { valid: false, error: data.error || "유효하지 않은 API Key입니다." };
   } catch {
-    return false;
+    return { valid: false, error: "네트워크 오류가 발생했습니다. 다시 시도해주세요." };
   }
 }
 

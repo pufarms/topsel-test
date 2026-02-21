@@ -56,9 +56,13 @@ export default function ApiKeySetup({ onComplete }: ApiKeySetupProps) {
     if (!apiKeyInput.trim()) return;
     setIsValidating(true);
     try {
-      const valid = await validateApiKey(apiKeyInput.trim());
-      if (!valid) {
-        toast({ title: "유효하지 않은 API Key", description: "Google AI Studio에서 발급받은 올바른 Key를 입력해주세요", variant: "destructive" });
+      const result = await validateApiKey(apiKeyInput.trim());
+      if (!result.valid) {
+        if (result.authError) {
+          toast({ title: "로그인이 필요합니다", description: "세션이 만료되었습니다. 페이지를 새로고침 후 다시 로그인해주세요.", variant: "destructive" });
+        } else {
+          toast({ title: "유효하지 않은 API Key", description: "Google AI Studio에서 발급받은 올바른 Key를 입력해주세요", variant: "destructive" });
+        }
         return;
       }
       saveMutation.mutate(apiKeyInput.trim());
