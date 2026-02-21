@@ -808,8 +808,8 @@ export async function registerRoutes(
     }
 
     const user = await storage.getUser(req.session.userId);
-    if (!user || !isAdmin(user.role)) {
-      return res.status(403).json({ message: "Admin access required" });
+    if (!user || !isSuperAdmin(user.role)) {
+      return res.status(403).json({ message: "최고관리자만 접근할 수 있습니다" });
     }
 
     const admins = await storage.getAdminUsers();

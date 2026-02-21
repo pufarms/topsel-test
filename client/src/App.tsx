@@ -92,6 +92,30 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <AdminLayout>{children}</AdminLayout>;
 }
 
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
+
+  if (user.role !== "SUPER_ADMIN") {
+    navigate("/admin");
+    return null;
+  }
+
+  return <AdminLayout>{children}</AdminLayout>;
+}
 
 function Router() {
   return (
@@ -115,7 +139,7 @@ function Router() {
         <AdminRoute><MemberDetail /></AdminRoute>
       </Route>
       <Route path="/admin/admins">
-        <AdminRoute><AdminManagement /></AdminRoute>
+        <SuperAdminRoute><AdminManagement /></SuperAdminRoute>
       </Route>
       <Route path="/admin/vendors">
         <AdminRoute><VendorManagement /></AdminRoute>

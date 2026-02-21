@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -153,6 +153,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [searchParams, setSearchParams] = useState(window.location.search);
 
+  const filteredMenuItems = useMemo(() => {
+    if (user?.role === 'SUPER_ADMIN') return menuItems;
+    return menuItems.map(item => {
+      if (item.id === 'members' && item.children) {
+        return {
+          ...item,
+          children: item.children.filter(child => child.id !== 'admin-users'),
+        };
+      }
+      return item;
+    });
+  }, [user?.role]);
+
   // URL 변경 감지 및 searchParams 업데이트 (브라우저 뒤로/앞으로 버튼용)
   useEffect(() => {
     const handlePopState = () => {
@@ -172,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const currentFullPath = location + searchParams;
     const openParents: string[] = [];
     
-    menuItems.forEach(item => {
+    filteredMenuItems.forEach(item => {
       if (item.children) {
         const isChildActive = item.children.some(child => {
           if (child.path.includes('?')) {
@@ -189,7 +202,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (openParents.length > 0) {
       setOpenMenus(openParents); // 해당 부모 메뉴만 열기
     }
-  }, [location, searchParams]);
+  }, [location, searchParams, filteredMenuItems]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -454,7 +467,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <ScrollArea className="h-full py-4">
             <nav className={`${isCollapsed ? "px-2" : "px-3"} space-y-1`}>
-              {menuItems.map(renderMenuItem)}
+              {filteredMenuItems.map(renderMenuItem)}
             </nav>
           </ScrollArea>
           {!isCollapsed && (
@@ -492,7 +505,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <aside className="fixed top-14 left-0 bottom-0 w-64 bg-slate-900 border-r border-slate-800 z-40 md:hidden">
             <ScrollArea className="h-full py-4">
               <nav className="px-3 space-y-1">
-                {menuItems.map(renderMenuItem)}
+                {filteredMenuItems.map(renderMenuItem)}
               </nav>
             </ScrollArea>
           </aside>
