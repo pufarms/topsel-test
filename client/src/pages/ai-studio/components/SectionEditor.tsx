@@ -281,8 +281,9 @@ export default function SectionEditor({
                   >
                     {editingCopyIndex === idx && editForm ? (
                       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                        <Textarea value={editForm.headline} onChange={(e) => setEditForm({ ...editForm, headline: e.target.value })} rows={1} className="text-xs" />
-                        <Textarea value={editForm.subheadline} onChange={(e) => setEditForm({ ...editForm, subheadline: e.target.value })} rows={1} className="text-xs" />
+                        <Textarea value={editForm.headline} onChange={(e) => setEditForm({ ...editForm, headline: e.target.value })} rows={1} className="text-xs" placeholder="메인 카피" />
+                        {editForm.subCopy !== undefined && <Textarea value={editForm.subCopy || ""} onChange={(e) => setEditForm({ ...editForm, subCopy: e.target.value })} rows={2} className="text-xs" placeholder="서브카피 (설명문)" />}
+                        <Textarea value={editForm.subheadline} onChange={(e) => setEditForm({ ...editForm, subheadline: e.target.value })} rows={1} className="text-xs" placeholder="서브헤드라인" />
                         <Textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={2} className="text-xs" />
                         <div className="flex gap-1 justify-end">
                           <Button variant="ghost" size="sm" onClick={() => { setEditingCopyIndex(null); setEditForm(null); }}>
@@ -310,6 +311,7 @@ export default function SectionEditor({
                           </button>
                         </div>
                         <p className="text-xs font-medium leading-snug">{copy.headline}</p>
+                        {copy.subCopy && <p className="text-[11px] text-cyan-700 dark:text-cyan-400 mt-0.5">{copy.subCopy}</p>}
                         {copy.subheadline && <p className="text-[11px] text-muted-foreground mt-0.5">{copy.subheadline}</p>}
                       </div>
                     )}

@@ -1,5 +1,5 @@
 import { apiRequest } from "@/lib/queryClient";
-import type { SectionData } from "../types";
+import type { SectionData, ArtDirection } from "../types";
 import { SECTION_DEFINITIONS, SECTION_IMAGE_PROMPTS } from "../types";
 
 export function fileToBase64(file: File): Promise<string> {
@@ -52,6 +52,24 @@ export async function validateApiKey(apiKey: string): Promise<boolean> {
   }
 }
 
+export async function generateArtDirection(product: any): Promise<ArtDirection> {
+  const res = await apiRequest("POST", "/api/ai-studio/art-direction", { product });
+  if (!res.ok) {
+    throw new Error("아트 디렉션 생성 실패");
+  }
+  const data = await res.json();
+  return data.artDirection;
+}
+
+function buildImagePromptWithArtDirection(sectionId: string, artDirection: ArtDirection | null): string {
+  const basePrompt = SECTION_IMAGE_PROMPTS[sectionId] || "Clean professional studio lighting background";
+  if (!artDirection) return basePrompt;
+
+  const artDirectionBlock = `Maintain visual consistency: Color tone: ${artDirection.colorTone}. Lighting: ${artDirection.lightingStyle}. Mood: ${artDirection.mood}. Common elements: ${artDirection.commonElements}. Background base: ${artDirection.backgroundBase}.`;
+
+  return `${basePrompt} ${artDirectionBlock}`;
+}
+
 export async function generateSection(
   section: typeof SECTION_DEFINITIONS[number],
   product: any
@@ -99,13 +117,35 @@ export async function generateSectionImage(
   return data.imageSrc;
 }
 
+function getSectionImageBase64(product: any, sectionId: string): string {
+  const base64s: string[] = product.imageBase64s || [];
+  const sectionMap: Record<string, number> = product.sectionImageMap || {};
+
+  if (base64s.length === 0) return product.imageBase64 || "";
+
+  const assignedIdx = sectionMap[sectionId];
+  if (assignedIdx !== undefined && assignedIdx < base64s.length) {
+    return base64s[assignedIdx];
+  }
+
+  return base64s[0];
+}
+
 export async function generateAllSections(
   product: any,
   imageBase64: string,
-  onProgress: (sectionIndex: number, sectionName: string, phase: "copy" | "image") => void,
+  onProgress: (sectionIndex: number, sectionName: string, phase: "art-direction" | "copy" | "image") => void,
   aspectRatio: string = "3:4"
 ): Promise<SectionData[]> {
   const results: SectionData[] = [];
+
+  onProgress(0, "비주얼 기조 설계", "art-direction");
+  let artDirection: ArtDirection | null = null;
+  try {
+    artDirection = await generateArtDirection(product);
+  } catch (error: any) {
+    console.error("아트 디렉션 생성 실패:", error?.message);
+  }
 
   for (let i = 0; i < SECTION_DEFINITIONS.length; i++) {
     const section = SECTION_DEFINITIONS[i];
@@ -125,6 +165,7 @@ export async function generateAllSections(
             id: `${section.id}-error`,
             style: "donald-miller",
             headline: "생성 실패",
+            subCopy: "",
             subheadline: error?.message || "알 수 없는 오류",
             body: "",
             cta: "",
@@ -138,11 +179,12 @@ export async function generateAllSections(
       };
     }
 
-    if (imageBase64) {
+    const sectionImageBase64 = getSectionImageBase64(product, section.id);
+    if (sectionImageBase64) {
       onProgress(i, section.name, "image");
       try {
-        const sectionPrompt = SECTION_IMAGE_PROMPTS[section.id] || "Clean professional studio lighting background";
-        const imageSrc = await generateSectionImage(section.id, imageBase64, sectionPrompt, aspectRatio);
+        const sectionPrompt = buildImagePromptWithArtDirection(section.id, artDirection);
+        const imageSrc = await generateSectionImage(section.id, sectionImageBase64, sectionPrompt, aspectRatio);
         sectionData.imageSrc = imageSrc;
       } catch (error: any) {
         console.error(`섹션 ${section.name} 이미지 생성 실패:`, error?.message);

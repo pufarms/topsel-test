@@ -1,18 +1,25 @@
 import { SECTION_DEFINITIONS } from "../types";
-import { Loader2, CheckCircle2, Circle, AlertCircle, Sparkles, ImageIcon, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, AlertCircle, Sparkles, ImageIcon, FileText, Palette } from "lucide-react";
 
 interface GeneratingProgressProps {
   currentSection: number;
   totalSections: number;
   sectionName: string;
-  phase: "copy" | "image";
+  phase: "art-direction" | "copy" | "image";
   error?: string;
 }
 
 export default function GeneratingProgress({ currentSection, totalSections, sectionName, phase, error }: GeneratingProgressProps) {
-  const totalSteps = totalSections * 2;
-  const currentStep = currentSection * 2 + (phase === "image" ? 1 : 0);
+  const isArtDirection = phase === "art-direction";
+  const totalSteps = totalSections * 2 + 1;
+  const currentStep = isArtDirection ? 0 : 1 + currentSection * 2 + (phase === "image" ? 1 : 0);
   const progress = Math.round((currentStep / totalSteps) * 100);
+
+  const phaseMessage = isArtDirection
+    ? "비주얼 기조 설계 중..."
+    : phase === "copy"
+    ? `${sectionName} — 카피 작성 중...`
+    : `${sectionName} — 배경 이미지 생성 중...`;
 
   return (
     <div className="max-w-2xl mx-auto py-12">
@@ -21,15 +28,15 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
           <Sparkles className="h-8 w-8 text-cyan-500 animate-pulse" />
           <div className="absolute inset-0 rounded-2xl bg-cyan-500/10 animate-ping" style={{ animationDuration: "2s" }} />
         </div>
-        <h2 className="text-2xl font-bold mb-2">AI가 상세페이지를 생성하고 있습니다</h2>
-        <p className="text-muted-foreground">
-          {error
-            ? "일부 섹션에서 오류가 발생했습니다"
-            : phase === "copy"
-            ? `${sectionName} — 카피 작성 중...`
-            : `${sectionName} — 배경 이미지 생성 중...`}
+        <h2 className="text-2xl font-bold mb-2" data-testid="text-progress-title">AI가 상세페이지를 생성하고 있습니다</h2>
+        <p className="text-muted-foreground" data-testid="text-progress-status">
+          {error ? "일부 섹션에서 오류가 발생했습니다" : phaseMessage}
         </p>
         <div className="flex items-center justify-center gap-4 mt-3">
+          <div className={`flex items-center gap-1.5 text-xs ${isArtDirection ? "text-primary font-medium" : "text-muted-foreground"}`}>
+            <Palette className="h-3.5 w-3.5" />
+            비주얼 기조
+          </div>
           <div className={`flex items-center gap-1.5 text-xs ${phase === "copy" ? "text-primary font-medium" : "text-muted-foreground"}`}>
             <FileText className="h-3.5 w-3.5" />
             카피 생성
@@ -43,7 +50,7 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
 
       <div className="mb-8">
         <div className="flex justify-between text-sm text-muted-foreground mb-2">
-          <span>{currentSection} / {totalSections} 섹션</span>
+          <span>{isArtDirection ? "준비 중" : `${currentSection} / ${totalSections} 섹션`}</span>
           <span>{progress}%</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -55,10 +62,33 @@ export default function GeneratingProgress({ currentSection, totalSections, sect
       </div>
 
       <div className="space-y-2">
+        <div
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
+            isArtDirection
+              ? "bg-primary/10 border border-primary/20"
+              : "bg-green-50 dark:bg-green-950/30"
+          }`}
+        >
+          <span className="text-lg">🎨</span>
+          {isArtDirection
+            ? <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />
+            : <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+          }
+          <span className={`text-sm font-medium ${isArtDirection ? "text-primary" : "text-green-700 dark:text-green-400"}`}>
+            비주얼 기조 설계
+          </span>
+          <span className="text-xs text-muted-foreground ml-auto">
+            {isArtDirection ? "설계 중..." : "완료"}
+          </span>
+        </div>
+
         {SECTION_DEFINITIONS.map((section, idx) => {
           let status: "done" | "active-copy" | "active-image" | "pending" | "error" = "pending";
-          if (idx < currentSection) status = "done";
-          else if (idx === currentSection) {
+          if (isArtDirection) {
+            status = "pending";
+          } else if (idx < currentSection) {
+            status = "done";
+          } else if (idx === currentSection) {
             if (error) status = "error";
             else status = phase === "copy" ? "active-copy" : "active-image";
           }

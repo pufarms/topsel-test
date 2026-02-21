@@ -294,6 +294,8 @@ export const members = pgTable("members", {
   postpaidSetAt: timestamp("postpaid_set_at"),
   approvedAt: timestamp("approved_at"),
   approvedBy: varchar("approved_by").references(() => users.id),
+  geminiApiKey: text("gemini_api_key"),
+  geminiApiKeyUpdatedAt: timestamp("gemini_api_key_updated_at"),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

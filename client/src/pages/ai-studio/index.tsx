@@ -19,7 +19,7 @@ export default function AIStudioApp() {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [generatingSection, setGeneratingSection] = useState(0);
   const [generatingSectionName, setGeneratingSectionName] = useState("");
-  const [generatingPhase, setGeneratingPhase] = useState<"copy" | "image">("copy");
+  const [generatingPhase, setGeneratingPhase] = useState<"art-direction" | "copy" | "image">("copy");
 
   const handleStart = () => setStep("api-key");
   const handleApiKeyComplete = () => setStep("input");

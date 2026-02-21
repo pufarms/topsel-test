@@ -20,7 +20,7 @@ function getStyleLabel(styleId: string): string {
 }
 
 function copyToText(copy: CopyVariant): string {
-  return [copy.headline, copy.subheadline, copy.body, copy.cta].filter(Boolean).join("\n\n");
+  return [copy.headline, copy.subCopy, copy.subheadline, copy.body, copy.cta].filter(Boolean).join("\n\n");
 }
 
 const getWrappedLines = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
@@ -148,7 +148,7 @@ export default function PreviewPage({ sections, product, onBack, onEditSection }
 
       const allText = sections.map((section) => {
         const copy = section.editedCopy || section.copies[section.selectedCopyIndex];
-        return `=== ${section.name} ===\n\n헤드라인: ${copy.headline}\n서브: ${copy.subheadline}\n본문:\n${copy.body}\nCTA: ${copy.cta}`;
+        return `=== ${section.name} ===\n\n헤드라인: ${copy.headline}${copy.subCopy ? `\n서브카피: ${copy.subCopy}` : ""}\n서브: ${copy.subheadline}\n본문:\n${copy.body}\nCTA: ${copy.cta}`;
       }).join("\n\n" + "─".repeat(40) + "\n\n");
       zip.file("카피_텍스트.txt", `AI 상세페이지 - ${product.productName}\n생성일: ${new Date().toLocaleDateString("ko-KR")}\n${"═".repeat(40)}\n\n${allText}`);
 
@@ -168,7 +168,7 @@ export default function PreviewPage({ sections, product, onBack, onEditSection }
   const handleDownloadText = () => {
     const allText = sections.map((section) => {
       const copy = section.editedCopy || section.copies[section.selectedCopyIndex];
-      return `=== ${section.name} ===\n\n헤드라인: ${copy.headline}\n서브: ${copy.subheadline}\n본문:\n${copy.body}\nCTA: ${copy.cta}`;
+      return `=== ${section.name} ===\n\n헤드라인: ${copy.headline}${copy.subCopy ? `\n서브카피: ${copy.subCopy}` : ""}\n서브: ${copy.subheadline}\n본문:\n${copy.body}\nCTA: ${copy.cta}`;
     }).join("\n\n" + "─".repeat(40) + "\n\n");
     const header = `AI 상세페이지 카피 - ${product.productName}\n생성일: ${new Date().toLocaleDateString("ko-KR")}\n${"═".repeat(40)}\n\n`;
     const blob = new Blob([header + allText], { type: "text/plain;charset=utf-8" });
@@ -272,6 +272,7 @@ export default function PreviewPage({ sections, product, onBack, onEditSection }
                 ) : (
                   <div className="p-6">
                     <h3 className="text-xl font-bold mb-2">{copy.headline}</h3>
+                    {copy.subCopy && <p className="text-cyan-700 dark:text-cyan-400 font-medium mb-2">{copy.subCopy}</p>}
                     {copy.subheadline && <p className="text-muted-foreground font-medium mb-3">{copy.subheadline}</p>}
                     <p className="leading-relaxed whitespace-pre-wrap">{copy.body}</p>
                     {copy.cta && (

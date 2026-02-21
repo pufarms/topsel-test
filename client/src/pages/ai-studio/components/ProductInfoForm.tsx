@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText, Camera, Ratio } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText, Camera, Ratio, Link2 } from "lucide-react";
 import type { ProductInfo } from "../types";
+import { SECTION_DEFINITIONS } from "../types";
 import ImageUploader from "./ImageUploader";
 import { fileToBase64 } from "../services/geminiService";
 
@@ -52,9 +53,13 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
     additionalNotes: "",
     imageFile: null,
     imageBase64: "",
+    imageFiles: [],
+    imageBase64s: [],
+    sectionImageMap: {},
     aspectRatio: "3:4",
   });
   const [imagePreview, setImagePreview] = useState("");
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
   const update = (key: keyof ProductInfo, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -62,22 +67,56 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
 
   const handleImageSelect = async (file: File | null) => {
     if (!file) {
-      setForm((prev) => ({ ...prev, imageFile: null, imageBase64: "" }));
+      setForm((prev) => ({ ...prev, imageFile: null, imageBase64: "", imageFiles: [], imageBase64s: [], sectionImageMap: {} }));
       setImagePreview("");
+      setImagePreviewUrls([]);
       return;
     }
-    setForm((prev) => ({ ...prev, imageFile: file }));
+    setForm((prev) => ({ ...prev, imageFile: file, imageFiles: [file] }));
     const url = URL.createObjectURL(file);
     setImagePreview(url);
+    setImagePreviewUrls([url]);
     try {
       const base64 = await fileToBase64(file);
-      setForm((prev) => ({ ...prev, imageBase64: base64 }));
+      setForm((prev) => ({ ...prev, imageBase64: base64, imageBase64s: [base64] }));
     } catch (err) {
       console.error("이미지 변환 실패:", err);
     }
   };
 
-  const isValid = form.productName.trim() && form.origin.trim() && form.sellingPoints.trim() && form.imageBase64;
+  const handleMultiImageSelect = async (files: File[]) => {
+    if (files.length === 0) {
+      setForm((prev) => ({ ...prev, imageFile: null, imageBase64: "", imageFiles: [], imageBase64s: [], sectionImageMap: {} }));
+      setImagePreview("");
+      setImagePreviewUrls([]);
+      return;
+    }
+    const urls = files.map(f => URL.createObjectURL(f));
+    setImagePreviewUrls(urls);
+    setImagePreview(urls[0]);
+    setForm((prev) => ({ ...prev, imageFile: files[0], imageFiles: files }));
+    try {
+      const base64s = await Promise.all(files.map(f => fileToBase64(f)));
+      setForm((prev) => ({
+        ...prev,
+        imageBase64: base64s[0],
+        imageBase64s: base64s,
+        sectionImageMap: prev.sectionImageMap,
+      }));
+    } catch (err) {
+      console.error("이미지 변환 실패:", err);
+    }
+  };
+
+  const setSectionImage = (sectionId: string, imageIndex: number) => {
+    setForm((prev) => ({
+      ...prev,
+      sectionImageMap: { ...prev.sectionImageMap, [sectionId]: imageIndex },
+    }));
+  };
+
+  const hasImages = form.imageBase64s.length > 0 || form.imageBase64;
+  const isValid = form.productName.trim() && form.origin.trim() && form.sellingPoints.trim() && hasImages;
 
   const handleSubmit = () => {
     if (isValid) onSubmit(form);
@@ -125,6 +164,8 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
     },
   ];
 
+  const showSectionMapping = form.imageFiles.length > 1;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="text-center mb-6">
@@ -139,19 +180,67 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
             <Camera className="h-5 w-5 text-purple-500" />
             제품 이미지
             <span className="text-destructive text-sm">*</span>
+            <span className="text-xs text-muted-foreground font-normal ml-auto">1~8장 업로드 가능</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ImageUploader
             onImageSelect={handleImageSelect}
+            onMultiImageSelect={handleMultiImageSelect}
             selectedFile={form.imageFile}
+            selectedFiles={form.imageFiles}
             previewUrl={imagePreview}
+            previewUrls={imagePreviewUrls}
+            multiMode={true}
           />
           <p className="text-xs text-muted-foreground mt-2">
-            AI가 이 이미지를 기반으로 각 섹션별 배경을 합성합니다
+            {form.imageFiles.length > 1
+              ? "여러 장 업로드 시 섹션별로 다른 이미지를 배정할 수 있습니다"
+              : "AI가 이 이미지를 기반으로 각 섹션별 배경을 합성합니다"}
           </p>
         </CardContent>
       </Card>
+
+      {showSectionMapping && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-violet-500" />
+              섹션별 이미지 배정
+              <span className="text-xs text-muted-foreground font-normal ml-auto">미배정 시 첫 번째 이미지 사용</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {SECTION_DEFINITIONS.map((section) => {
+                const assigned = form.sectionImageMap[section.id] ?? 0;
+                return (
+                  <div key={section.id} className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-muted/50">
+                    <span className="text-base">{section.icon}</span>
+                    <span className="text-sm flex-1 min-w-0">{section.name}</span>
+                    <div className="flex gap-1">
+                      {form.imageFiles.map((_, imgIdx) => (
+                        <button
+                          key={imgIdx}
+                          onClick={() => setSectionImage(section.id, imgIdx)}
+                          className={`w-8 h-8 rounded border-2 overflow-hidden transition-all ${
+                            assigned === imgIdx
+                              ? "border-primary ring-1 ring-primary/30"
+                              : "border-transparent opacity-60 hover:opacity-100"
+                          }`}
+                          data-testid={`section-image-${section.id}-${imgIdx}`}
+                        >
+                          <img src={imagePreviewUrls[imgIdx]} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

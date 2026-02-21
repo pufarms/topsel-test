@@ -18,6 +18,9 @@ export interface ProductInfo {
   additionalNotes: string;
   imageFile: File | null;
   imageBase64: string;
+  imageFiles: File[];
+  imageBase64s: string[];
+  sectionImageMap: Record<string, number>;
   aspectRatio: string;
 }
 
@@ -38,6 +41,7 @@ export interface CopyVariant {
   id: string;
   style: string;
   headline: string;
+  subCopy: string;
   subheadline: string;
   body: string;
   cta: string;
@@ -56,12 +60,21 @@ export interface SectionData {
   textLayers: TextLayer[];
 }
 
+export interface ArtDirection {
+  colorTone: string;
+  lightingStyle: string;
+  mood: string;
+  productPlacement: string;
+  commonElements: string;
+  backgroundBase: string;
+}
+
 export interface GenerationProgress {
   currentSection: number;
   totalSections: number;
   sectionName: string;
   status: "idle" | "generating" | "done" | "error";
-  phase: "copy" | "image";
+  phase: "art-direction" | "copy" | "image";
   errorMessage?: string;
 }
 
