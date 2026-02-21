@@ -102,7 +102,8 @@ export async function generateSectionImage(
 export async function generateAllSections(
   product: any,
   imageBase64: string,
-  onProgress: (sectionIndex: number, sectionName: string, phase: "copy" | "image") => void
+  onProgress: (sectionIndex: number, sectionName: string, phase: "copy" | "image") => void,
+  aspectRatio: string = "3:4"
 ): Promise<SectionData[]> {
   const results: SectionData[] = [];
 
@@ -122,7 +123,7 @@ export async function generateAllSections(
         copies: [
           {
             id: `${section.id}-error`,
-            style: "professional",
+            style: "donald-miller",
             headline: "생성 실패",
             subheadline: error?.message || "알 수 없는 오류",
             body: "",
@@ -141,7 +142,7 @@ export async function generateAllSections(
       onProgress(i, section.name, "image");
       try {
         const sectionPrompt = SECTION_IMAGE_PROMPTS[section.id] || "Clean professional studio lighting background";
-        const imageSrc = await generateSectionImage(section.id, imageBase64, sectionPrompt);
+        const imageSrc = await generateSectionImage(section.id, imageBase64, sectionPrompt, aspectRatio);
         sectionData.imageSrc = imageSrc;
       } catch (error: any) {
         console.error(`섹션 ${section.name} 이미지 생성 실패:`, error?.message);

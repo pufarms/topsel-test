@@ -83,7 +83,8 @@ router.post("/validate-key", requireAuth, async (req: Request, res: Response) =>
 
     const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      // 카피 생성: gemini-3-flash-preview (Input $0.50, Output $3.00)
+      model: "gemini-3-flash-preview",
       contents: "Say 'OK' in one word.",
     });
     const valid = !!response.text;
@@ -123,12 +124,13 @@ router.post("/generate-section", requireAuth, async (req: Request, res: Response
       return res.status(400).json({ error: "섹션 정보와 제품 정보가 필요합니다" });
     }
 
+    // 5명의 전설적 카피라이터 페르소나
     const COPYWRITER_STYLES = [
-      { id: "professional", name: "전문가형", description: "신뢰감 있는 전문적 어조" },
-      { id: "friendly", name: "친근형", description: "편안하고 친근한 대화체" },
-      { id: "luxury", name: "프리미엄형", description: "고급스럽고 감성적인 표현" },
-      { id: "impact", name: "임팩트형", description: "강렬하고 직설적인 카피" },
-      { id: "story", name: "스토리텔링형", description: "이야기를 풀어내는 서사적 카피" },
+      { id: "donald-miller", name: "Donald Miller", description: "고객이 주인공이 되는 짧은 한 마디. 예: \"당신의 피부, 오늘부터 다시 태어납니다.\"" },
+      { id: "david-ogilvy", name: "David Ogilvy", description: "구체적 수치나 팩트로 신뢰를 주는 헤드라인. 예: \"소음은 90% 줄고, 집중은 2배로.\"" },
+      { id: "eugene-schwartz", name: "Eugene Schwartz", description: "지금 당장 사야 할 욕구를 자극하는 긴박함. 예: \"지금 놓치면 1년을 기다려야 합니다.\"" },
+      { id: "gary-halbert", name: "Gary Halbert", description: "친구에게 말하듯 툭 던지는 도발적인 질문. 예: \"아직도 비싼 돈 내고 배우시나요?\"" },
+      { id: "claude-hopkins", name: "Claude Hopkins", description: "\"왜 좋은지\"에 대한 가장 강력한 이유 하나. 예: \"특허받은 공법으로 쓴맛을 잡았습니다.\"" },
     ];
 
     const prompt = `당신은 한국 B2B 과일 도매 플랫폼의 전문 마케팅 카피라이터입니다.
@@ -154,24 +156,50 @@ ${product.additionalNotes ? `- 추가 참고: ${product.additionalNotes}` : ""}
 [섹션 설명]
 ${sectionDescription}
 
-5가지 카피라이터 스타일로 각각 카피를 작성해주세요:
-${COPYWRITER_STYLES.map(s => `"${s.id}" (${s.name}): ${s.description}`).join("\n")}
+아래 5명의 전설적 카피라이터 페르소나로 각각 카피를 작성해주세요.
+각 카피라이터의 고유한 접근법을 반드시 반영하세요:
+
+1) Donald Miller 스타일 (id: "donald-miller")
+   - 핵심: 고객이 주인공이 되는 짧은 한 마디
+   - 예시: "당신의 피부, 오늘부터 다시 태어납니다."
+
+2) David Ogilvy 스타일 (id: "david-ogilvy")
+   - 핵심: 구체적 수치나 팩트로 신뢰를 주는 헤드라인
+   - 예시: "소음은 90% 줄고, 집중은 2배로."
+
+3) Eugene Schwartz 스타일 (id: "eugene-schwartz")
+   - 핵심: 지금 당장 사야 할 욕구를 자극하는 긴박함
+   - 예시: "지금 놓치면 1년을 기다려야 합니다."
+
+4) Gary Halbert 스타일 (id: "gary-halbert")
+   - 핵심: 친구에게 말하듯 툭 던지는 도발적인 질문
+   - 예시: "아직도 비싼 돈 내고 배우시나요?"
+
+5) Claude Hopkins 스타일 (id: "claude-hopkins")
+   - 핵심: "왜 좋은지"에 대한 가장 강력한 이유 하나
+   - 예시: "특허받은 공법으로 쓴맛을 잡았습니다."
+
+[필수 제약 조건]
+- 모든 카피(headline)는 공백 포함 25자 이내
+- 설명문이 아닌 즉시 감정을 자극하는 한 마디
+- 각 카피라이터의 고유한 접근법을 반드시 반영
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요:
 [
   {
-    "style": "professional",
-    "headline": "메인 헤드라인 (1줄, 강렬하게)",
+    "style": "donald-miller",
+    "headline": "메인 헤드라인 (공백포함 25자 이내, 강렬하게)",
     "subheadline": "서브 헤드라인 (1-2줄, 보조 설명)",
     "body": "본문 내용 (3-5줄, 상세 설명)",
     "cta": "행동 유도 문구 (1줄)"
   },
-  ... (5개 스타일 모두)
+  ... (5명 카피라이터 모두)
 ]`;
 
     const ai = new GoogleGenAI({ apiKey });
+    // 카피 생성: gemini-3-flash-preview (Input $0.50, Output $3.00)
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         temperature: 0.8,
@@ -234,10 +262,12 @@ router.post("/generate-image", requireAuth, async (req: Request, res: Response) 
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const fullPrompt = `Keep the product in the foreground exactly as is. Change ONLY the background to: ${prompt}. Professional advertising photography, photorealistic, high quality, 4k. Do NOT modify the product itself. The product must remain sharp and unaltered.`;
+    const ratioHint = aspectRatio ? ` Output image aspect ratio should be ${aspectRatio}.` : "";
+    const fullPrompt = `${prompt} Do NOT modify the product itself. The product must remain sharp and unaltered.${ratioHint}`;
 
+    // 이미지 생성: gemini-3-pro-image-preview (Image Output $0.134/장)
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-3-pro-image-preview",
       contents: {
         parts: [
           {

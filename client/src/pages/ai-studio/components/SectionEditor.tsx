@@ -26,11 +26,11 @@ function getStyleLabel(styleId: string): string {
 
 function getStyleColor(styleId: string): string {
   const colors: Record<string, string> = {
-    professional: "bg-blue-100 text-blue-700 border-blue-200",
-    friendly: "bg-green-100 text-green-700 border-green-200",
-    luxury: "bg-purple-100 text-purple-700 border-purple-200",
-    impact: "bg-red-100 text-red-700 border-red-200",
-    story: "bg-amber-100 text-amber-700 border-amber-200",
+    "donald-miller": "bg-blue-100 text-blue-700 border-blue-200",
+    "david-ogilvy": "bg-green-100 text-green-700 border-green-200",
+    "eugene-schwartz": "bg-purple-100 text-purple-700 border-purple-200",
+    "gary-halbert": "bg-red-100 text-red-700 border-red-200",
+    "claude-hopkins": "bg-amber-100 text-amber-700 border-amber-200",
   };
   return colors[styleId] || "bg-gray-100 text-gray-700 border-gray-200";
 }

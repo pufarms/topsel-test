@@ -38,7 +38,8 @@ export default function AIStudioApp() {
           setGeneratingSection(idx);
           setGeneratingSectionName(name);
           setGeneratingPhase(phase);
-        }
+        },
+        productInfo.aspectRatio || "3:4"
       );
 
       setSections(results);
@@ -128,6 +129,10 @@ export default function AIStudioApp() {
           sections={sections}
           product={product}
           onBack={() => setStep("editor")}
+          onEditSection={(idx) => {
+            setCurrentSectionIndex(idx);
+            setStep("editor");
+          }}
         />
       )}
     </div>

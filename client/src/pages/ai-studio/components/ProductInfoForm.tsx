@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText, Camera } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Apple, MapPin, Award, Package, Droplets, Thermometer, Clock, Users, Star, ShieldCheck, Truck, DollarSign, FileText, Camera, Ratio } from "lucide-react";
 import type { ProductInfo } from "../types";
 import ImageUploader from "./ImageUploader";
 import { fileToBase64 } from "../services/geminiService";
@@ -22,6 +22,14 @@ const fruitCategories = [
 ];
 
 const gradeOptions = ["특", "상", "중", "보통", "혼합"];
+
+const aspectRatioOptions = [
+  { value: "1:1", label: "1:1", desc: "정방형", icon: "□" },
+  { value: "3:4", label: "3:4", desc: "일반 세로", icon: "▯" },
+  { value: "9:16", label: "9:16", desc: "모바일", icon: "📱" },
+  { value: "4:3", label: "4:3", desc: "일반 가로", icon: "▭" },
+  { value: "16:9", label: "16:9", desc: "와이드", icon: "🖥" },
+];
 
 const storageOptions = ["냉장보관", "냉동보관", "상온보관", "서늘한 곳 보관"];
 
@@ -44,6 +52,7 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
     additionalNotes: "",
     imageFile: null,
     imageBase64: "",
+    aspectRatio: "3:4",
   });
   const [imagePreview, setImagePreview] = useState("");
 
@@ -141,6 +150,36 @@ export default function ProductInfoForm({ onSubmit, onBack }: ProductInfoFormPro
           <p className="text-xs text-muted-foreground mt-2">
             AI가 이 이미지를 기반으로 각 섹션별 배경을 합성합니다
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Ratio className="h-5 w-5 text-indigo-500" />
+            생성할 이미지 비율
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-5 gap-3">
+            {aspectRatioOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => update("aspectRatio", opt.value)}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
+                  form.aspectRatio === opt.value
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-muted hover:border-muted-foreground/30"
+                }`}
+                data-testid={`ratio-${opt.value.replace(":", "-")}`}
+              >
+                <span className="text-xl">{opt.icon}</span>
+                <span className="text-sm font-bold">{opt.label}</span>
+                <span className="text-[10px] text-muted-foreground">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, FileText, Copy, CheckCircle2, Package, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Copy, CheckCircle2, Package, Loader2, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { SectionData, CopyVariant, ProductInfo } from "../types";
@@ -12,6 +12,7 @@ interface PreviewPageProps {
   sections: SectionData[];
   product: ProductInfo;
   onBack: () => void;
+  onEditSection?: (sectionIndex: number) => void;
 }
 
 function getStyleLabel(styleId: string): string {
@@ -98,7 +99,7 @@ function renderSectionToCanvas(section: SectionData, previewWidth: number): Prom
   });
 }
 
-export default function PreviewPage({ sections, product, onBack }: PreviewPageProps) {
+export default function PreviewPage({ sections, product, onBack, onEditSection }: PreviewPageProps) {
   const { toast } = useToast();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -235,12 +236,16 @@ export default function PreviewPage({ sections, product, onBack }: PreviewPagePr
 
               <CardContent className="p-0">
                 {section.imageSrc ? (
-                  <div className="relative">
+                  <div
+                    className="relative group cursor-pointer"
+                    onClick={() => onEditSection?.(idx)}
+                    data-testid={`preview-section-click-${idx}`}
+                  >
                     <img src={section.imageSrc} alt={section.name} className="w-full h-auto" />
                     {(section.textLayers || []).map((layer) => (
                       <div
                         key={layer.id}
-                        className="absolute leading-tight"
+                        className="absolute leading-tight pointer-events-none"
                         style={{
                           left: layer.x,
                           top: layer.y,
@@ -257,6 +262,12 @@ export default function PreviewPage({ sections, product, onBack }: PreviewPagePr
                         {layer.text}
                       </div>
                     ))}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 bg-white/90 text-gray-900 px-4 py-2 rounded-full font-medium text-sm shadow-lg">
+                        <Pencil className="h-4 w-4" />
+                        편집하기
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-6">

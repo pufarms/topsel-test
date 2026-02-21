@@ -18,6 +18,7 @@ export interface ProductInfo {
   additionalNotes: string;
   imageFile: File | null;
   imageBase64: string;
+  aspectRatio: string;
 }
 
 export interface TextLayer {
@@ -76,22 +77,25 @@ export const SECTION_DEFINITIONS = [
 ] as const;
 
 export const COPYWRITER_STYLES = [
-  { id: "professional", name: "전문가형", description: "신뢰감 있는 전문적 어조" },
-  { id: "friendly", name: "친근형", description: "편안하고 친근한 대화체" },
-  { id: "luxury", name: "프리미엄형", description: "고급스럽고 감성적인 표현" },
-  { id: "impact", name: "임팩트형", description: "강렬하고 직설적인 카피" },
-  { id: "story", name: "스토리텔링형", description: "이야기를 풀어내는 서사적 카피" },
+  { id: "donald-miller", name: "Donald Miller", description: "고객이 주인공이 되는 짧은 한 마디. 예: \"당신의 피부, 오늘부터 다시 태어납니다.\"" },
+  { id: "david-ogilvy", name: "David Ogilvy", description: "구체적 수치나 팩트로 신뢰를 주는 헤드라인. 예: \"소음은 90% 줄고, 집중은 2배로.\"" },
+  { id: "eugene-schwartz", name: "Eugene Schwartz", description: "지금 당장 사야 할 욕구를 자극하는 긴박함. 예: \"지금 놓치면 1년을 기다려야 합니다.\"" },
+  { id: "gary-halbert", name: "Gary Halbert", description: "친구에게 말하듯 툭 던지는 도발적인 질문. 예: \"아직도 비싼 돈 내고 배우시나요?\"" },
+  { id: "claude-hopkins", name: "Claude Hopkins", description: "\"왜 좋은지\"에 대한 가장 강력한 이유 하나. 예: \"특허받은 공법으로 쓴맛을 잡았습니다.\"" },
 ] as const;
 
+const IMAGE_PROMPT_PREFIX = "Keep the product in the foreground exactly as is. Change the background to:";
+const IMAGE_PROMPT_SUFFIX = "Professional advertising photography, photorealistic, high quality, 4k, spacious composition, clean layout.";
+
 export const SECTION_IMAGE_PROMPTS: Record<string, string> = {
-  hero: "Premium studio lighting, water droplets on surface, fresh morning dew feel, luxury food photography, soft bokeh background, spacious composition",
-  problem: "Dimly lit kitchen with empty fruit bowl, mundane supermarket shelf with wilted produce, contrast between dull and vibrant, moody atmospheric lighting",
-  "social-proof": "Elegant award ceremony stage setting, golden trophy shelf, premium certificate display, warm spotlights, professional achievement backdrop",
-  "taste-quality": "Extreme close-up with juice splash, cross-section revealing flesh, water droplets, macro photography, vibrant colors, fresh and appetizing",
-  composition: "Clean white marble surface, neatly arranged gift box packaging, premium wrapping, organized display, top-down flat lay photography",
-  origin: "Korean countryside orchard at golden hour, lush green trees heavy with fruit, misty mountain backdrop, traditional farming atmosphere, warm sunlight",
-  delivery: "Professional cold-chain delivery setup, insulated packaging with ice packs, fresh produce carefully wrapped, clean logistics facility",
-  cta: "Festive celebration setup with confetti, shopping bag with ribbon, gift-wrapped premium fruit box, warm holiday atmosphere, urgency and excitement",
+  hero: `${IMAGE_PROMPT_PREFIX} Premium studio lighting, water droplets on surface, fresh morning dew feel, luxury food photography, soft bokeh background. ${IMAGE_PROMPT_SUFFIX}`,
+  problem: `${IMAGE_PROMPT_PREFIX} Soft warm-toned kitchen table, natural window light, cozy home atmosphere, slightly blurred background, relatable everyday setting. ${IMAGE_PROMPT_SUFFIX}`,
+  "social-proof": `${IMAGE_PROMPT_PREFIX} Clean minimal white/cream background, professional product photography, trust-building composition, subtle gradient. ${IMAGE_PROMPT_SUFFIX}`,
+  "taste-quality": `${IMAGE_PROMPT_PREFIX} Close-up macro photography style, juice dripping, vibrant saturated colors, cross-section view feel, appetizing food photography. ${IMAGE_PROMPT_SUFFIX}`,
+  composition: `${IMAGE_PROMPT_PREFIX} Flat lay arrangement on clean white surface, all items neatly displayed, product unboxing feel, organized composition. ${IMAGE_PROMPT_SUFFIX}`,
+  origin: `${IMAGE_PROMPT_PREFIX} Korean countryside orchard, golden sunlight through fruit trees, rustic wooden crate, harvest season atmosphere, traditional farm scenery. ${IMAGE_PROMPT_SUFFIX}`,
+  delivery: `${IMAGE_PROMPT_PREFIX} Clean packaging scene with ice packs, cushioning material, styrofoam box, careful packaging process, fresh delivery concept. ${IMAGE_PROMPT_SUFFIX}`,
+  cta: `${IMAGE_PROMPT_PREFIX} Warm golden premium lighting, elegant dark or gradient background, call-to-action mood, urgency and desire, luxury gift feel. ${IMAGE_PROMPT_SUFFIX}`,
 };
 
 export const FONTS = [

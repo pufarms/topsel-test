@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Zap, ArrowRight, Bot, Layers, Wand2, Upload, ImageIcon, Download, DollarSign, Clock, Shield } from "lucide-react";
+import { Sparkles, Zap, ArrowRight, Bot, Wand2, Upload, ImageIcon, Download, DollarSign, Clock, Shield } from "lucide-react";
 
 interface LandingHeroProps {
   onStart: () => void;
@@ -108,10 +108,9 @@ function ParticleField() {
 }
 
 const featureCards = [
-  { icon: <Bot className="h-6 w-6" />, title: "AI 카피라이팅", desc: "5명의 AI 카피라이터가 각기 다른 스타일로 작성" },
-  { icon: <ImageIcon className="h-6 w-6" />, title: "AI 배경 이미지 합성", desc: "상품 사진을 올리면 섹션별 프로급 배경을 자동 생성" },
-  { icon: <Layers className="h-6 w-6" />, title: "8개 섹션 자동 생성", desc: "히어로부터 CTA까지 완벽한 상세페이지 구성" },
-  { icon: <Wand2 className="h-6 w-6" />, title: "비주얼 에디터", desc: "이미지 위에 텍스트를 드래그하고 폰트/색상 자유 편집" },
+  { icon: <ImageIcon className="h-6 w-6" />, title: "AI 배경 합성", desc: "산지직송 감성을 AI가 만듭니다" },
+  { icon: <Bot className="h-6 w-6" />, title: "AI 카피라이터", desc: "5명의 전설적 카피라이터가 제안" },
+  { icon: <Wand2 className="h-6 w-6" />, title: "간편 편집", desc: "클릭 한번으로 크기/색상/위치 편집" },
 ];
 
 const steps = [
@@ -188,13 +187,28 @@ export default function LandingHero({ onStart }: LandingHeroProps) {
             <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
           </Button>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-16 max-w-5xl w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-16 max-w-4xl w-full">
             {featureCards.map((card, i) => (
               <div
                 key={i}
-                className="relative group p-6 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm hover:border-cyan-500/30 hover:bg-white/10 transition-all duration-300"
+                className="relative group p-6 rounded-xl transition-all duration-300 cursor-default"
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = "rgba(139, 92, 246, 0.5)";
+                  el.style.boxShadow = "0 0 20px rgba(139, 92, 246, 0.3), 0 0 40px rgba(0, 224, 255, 0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                  el.style.boxShadow = "none";
+                }}
               >
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative z-10">
                   <div className="inline-flex p-3 rounded-lg bg-cyan-500/10 text-cyan-400 mb-4">
                     {card.icon}
