@@ -204,7 +204,7 @@ export async function generateProductBackground(apiKey: string, base64Image: str
 
   const operation = async () => {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3-pro-image-preview',
       contents: {
         parts: [
           {

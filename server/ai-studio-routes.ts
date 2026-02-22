@@ -298,7 +298,7 @@ router.post("/validate-key", requireAuth, async (req: Request, res: Response) =>
     const trimmedKey = apiKey.trim();
     const ai = new GoogleGenAI({ apiKey: trimmedKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: "Say 'OK' in one word.",
     });
     const valid = !!response.text;
@@ -362,7 +362,7 @@ router.post("/art-direction", requireAuth, async (req: Request, res: Response) =
 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: { temperature: 0.7, maxOutputTokens: 1024 },
     });
@@ -423,7 +423,7 @@ router.post("/generate-section", requireAuth, async (req: Request, res: Response
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3-flash-preview",
           contents: prompt,
           config: {
             temperature: attempt === 0 ? 0.8 : 0.5,
@@ -506,7 +506,7 @@ router.post("/generate-image", requireAuth, async (req: Request, res: Response) 
     const fullPrompt = `${prompt} Do NOT modify the product itself. The product must remain sharp and unaltered.${ratioHint}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-3-pro-image-preview",
       contents: {
         parts: [
           {
