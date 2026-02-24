@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock, CreditCard, Fingerprint, PenTool } from "lucide-react";
+import { Loader2, ArrowLeft, Save, KeyRound, UserCheck, History, User, FileText, ExternalLink, Download, Lock, Unlock, CreditCard, Fingerprint, PenTool, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Member, MemberLog, MemberGrade } from "@shared/schema";
@@ -54,6 +54,9 @@ export default function MemberDetailPage() {
 
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [gradeLockData, setGradeLockData] = useState<{
     gradeLocked: boolean;
     lockedGrade: string;
@@ -234,7 +237,16 @@ export default function MemberDetailPage() {
         updateData[key] = formData[key];
       }
     }
-    if (formData.password && formData.password.length >= 6) updateData.password = formData.password;
+    if (formData.password && formData.password.length >= 6) {
+      if (formData.password !== passwordConfirm) {
+        toast({ title: "비밀번호가 일치하지 않습니다", description: "비밀번호와 비밀번호 확인이 동일해야 합니다.", variant: "destructive" });
+        return;
+      }
+      updateData.password = formData.password;
+    } else if (formData.password && formData.password.length > 0 && formData.password.length < 6) {
+      toast({ title: "비밀번호는 6자 이상이어야 합니다", variant: "destructive" });
+      return;
+    }
 
     if (Object.keys(updateData).length === 0) {
       toast({ title: "변경된 내용이 없습니다" });
@@ -607,15 +619,52 @@ export default function MemberDetailPage() {
 
               <Separator />
 
-              <div className="space-y-1">
+              <div className="space-y-3">
                 <Label className="text-sm">비밀번호 변경</Label>
-                <Input 
-                  type="password"
-                  placeholder="새 비밀번호 (6자 이상)"
-                  value={getVal('password')}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  data-testid="input-password"
-                />
+                <div className="relative">
+                  <Input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="새 비밀번호 (6자 이상)"
+                    value={getVal('password')}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    data-testid="input-password"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                    data-testid="button-toggle-password"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input 
+                    type={showPasswordConfirm ? "text" : "password"}
+                    placeholder="비밀번호 확인"
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    data-testid="input-password-confirm"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                    data-testid="button-toggle-password-confirm"
+                    tabIndex={-1}
+                  >
+                    {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {getVal('password') && passwordConfirm && getVal('password') !== passwordConfirm && (
+                  <p className="text-xs text-destructive" data-testid="text-password-mismatch">비밀번호가 일치하지 않습니다</p>
+                )}
+                {getVal('password') && passwordConfirm && getVal('password') === passwordConfirm && (
+                  <p className="text-xs text-green-600" data-testid="text-password-match">비밀번호가 일치합니다</p>
+                )}
               </div>
 
               <div className="space-y-1">
