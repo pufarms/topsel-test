@@ -17304,7 +17304,7 @@ export async function registerRoutes(
         if (memberInfo) {
           invoiceeCEOName = memberInfo.representative || '';
           invoiceeAddr = memberInfo.businessAddress || '';
-          invoiceeEmail1 = memberInfo.managerEmail || memberInfo.email || '';
+          invoiceeEmail1 = memberInfo.email || '';
           invoiceeContactName1 = memberInfo.managerName || memberInfo.representative || '';
           invoiceeTEL1 = memberInfo.phone || '';
           invoiceeHP1 = memberInfo.managerPhone || '';

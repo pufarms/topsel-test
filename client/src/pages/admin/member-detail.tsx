@@ -89,7 +89,6 @@ export default function MemberDetailPage() {
         phone: member.phone || "",
         managerName: member.managerName || "",
         managerPhone: member.managerPhone || "",
-        managerEmail: member.managerEmail || "",
         manager2Name: member.manager2Name || "",
         manager2Phone: member.manager2Phone || "",
         manager3Name: member.manager3Name || "",
@@ -215,7 +214,6 @@ export default function MemberDetailPage() {
       phone: member.phone || "",
       managerName: member.managerName || "",
       managerPhone: member.managerPhone || "",
-      managerEmail: member.managerEmail || "",
       manager2Name: member.manager2Name || "",
       manager2Phone: member.manager2Phone || "",
       manager3Name: member.manager3Name || "",
@@ -228,7 +226,7 @@ export default function MemberDetailPage() {
 
     const fields = [
       'grade', 'memberName', 'representative', 'businessAddress', 'bizType', 'bizClass', 'phone',
-      'managerName', 'managerPhone', 'managerEmail',
+      'managerName', 'managerPhone',
       'manager2Name', 'manager2Phone', 'manager3Name', 'manager3Phone',
       'email', 'status', 'memo', 'postOfficeEnabled'
     ];
@@ -525,15 +523,6 @@ export default function MemberDetailPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-sm">이메일</Label>
-                  <Input 
-                    type="email"
-                    value={getVal('email', member.email || "")}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    data-testid="input-email"
-                  />
-                </div>
-                <div className="space-y-1">
                   <Label className="text-sm">담당자1</Label>
                   <Input 
                     value={getVal('managerName', member.managerName || "")}
@@ -547,16 +536,6 @@ export default function MemberDetailPage() {
                     value={getVal('managerPhone', member.managerPhone || "")}
                     onChange={(e) => setFormData({...formData, managerPhone: e.target.value})}
                     data-testid="input-manager-phone"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-sm">담당자1 이메일</Label>
-                  <Input 
-                    type="email"
-                    value={getVal('managerEmail')}
-                    onChange={(e) => setFormData({...formData, managerEmail: e.target.value})}
-                    placeholder="담당자 이메일 (세금계산서 발행용)"
-                    data-testid="input-manager-email"
                   />
                 </div>
                 <div className="space-y-1">
@@ -615,6 +594,19 @@ export default function MemberDetailPage() {
                     data-testid="input-biz-class"
                   />
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-1">
+                <Label className="text-sm">이메일 (세금계산서 발행용)</Label>
+                <Input 
+                  type="email"
+                  value={getVal('email', member.email || "")}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="세금계산서가 발송될 이메일 주소"
+                  data-testid="input-email"
+                />
               </div>
 
               <Separator />
