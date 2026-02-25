@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileDown, Loader2, ChevronLeft, ChevronRight, Send, Bell, BanIcon } from "lucide-react";
+import { FileDown, Loader2, ChevronLeft, ChevronRight, Send, Bell, BanIcon, Undo2 } from "lucide-react";
 import OrderStatsBanner from "@/components/order-stats-banner";
 import { AdminCategoryFilter, useAdminCategoryFilter, type AdminCategoryFilterState } from "@/components/admin-category-filter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -54,6 +54,8 @@ export default function OrdersReadyToShipPage() {
   const [showTransferSelectedDialog, setShowTransferSelectedDialog] = useState(false);
   const [showDeliverDialog, setShowDeliverDialog] = useState(false);
   const [showCancelDeadlineDialog, setShowCancelDeadlineDialog] = useState(false);
+  const [showRevertSelectedDialog, setShowRevertSelectedDialog] = useState(false);
+  const [showRevertAllDialog, setShowRevertAllDialog] = useState(false);
 
   const { data: allPendingOrders = [], isLoading } = useQuery<PendingOrder[]>({
     queryKey: ["/api/admin/pending-orders", dateRange.startDate, dateRange.endDate],
@@ -158,6 +160,22 @@ export default function OrdersReadyToShipPage() {
     },
   });
 
+  const revertMutation = useMutation({
+    mutationFn: async (body: any) => {
+      const res = await apiRequest("POST", "/api/admin/orders/revert-to-preparing", body);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "복원 완료", description: data.message });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
+      setSelectedOrders([]);
+    },
+    onError: (error: any) => {
+      toast({ title: "복원 실패", description: error.message, variant: "destructive" });
+    },
+  });
+
   const isTransferring = transferMutation.isPending;
 
   const handleTransferAll = () => {
@@ -194,6 +212,16 @@ export default function OrdersReadyToShipPage() {
   const handleCloseCancelDeadline = () => {
     cancelDeadlineMutation.mutate();
     setShowCancelDeadlineDialog(false);
+  };
+
+  const handleRevertSelected = () => {
+    revertMutation.mutate({ mode: "selected", orderIds: selectedOrders });
+    setShowRevertSelectedDialog(false);
+  };
+
+  const handleRevertAll = () => {
+    revertMutation.mutate({ mode: "all" });
+    setShowRevertAllDialog(false);
   };
 
   return (
@@ -255,6 +283,36 @@ export default function OrdersReadyToShipPage() {
               <Button size="sm" variant="outline" data-testid="button-download-orders">
                 <FileDown className="h-4 w-4 mr-1" />
                 엑셀 다운로드
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950"
+                disabled={selectedOrders.length === 0 || revertMutation.isPending}
+                onClick={() => setShowRevertSelectedDialog(true)}
+                data-testid="button-revert-selected"
+              >
+                {revertMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Undo2 className="h-4 w-4 mr-1" />
+                )}
+                선택건 복원 ({selectedOrders.length}건)
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950"
+                disabled={readyOrders.length === 0 || revertMutation.isPending}
+                onClick={() => setShowRevertAllDialog(true)}
+                data-testid="button-revert-all"
+              >
+                {revertMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Undo2 className="h-4 w-4 mr-1" />
+                )}
+                전체 복원 ({readyOrders.length}건)
               </Button>
               <span className="text-sm text-muted-foreground">
                 {displayedOrders.length} / {filteredOrders.length}건
@@ -560,6 +618,53 @@ export default function OrdersReadyToShipPage() {
             <AlertDialogCancel data-testid="button-deadline-cancel">취소</AlertDialogCancel>
             <AlertDialogAction onClick={handleCloseCancelDeadline} data-testid="button-deadline-confirm">
               마감 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={showRevertSelectedDialog} onOpenChange={setShowRevertSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>선택건 상품준비중 복원</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedOrders.length}건의 주문을 상품준비중으로 복원하시겠습니까?
+              <br /><br />
+              <strong>복원 시 주의사항:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>선택한 주문의 상태가 "배송준비중" → "상품준비중"으로 변경됩니다.</li>
+                <li>상품준비중 페이지에서 다시 확인할 수 있습니다.</li>
+                <li>운송장 번호는 유지됩니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-revert-selected-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevertSelected} className="bg-amber-600 hover:bg-amber-700" data-testid="button-revert-selected-confirm">
+              선택건 복원 실행
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRevertAllDialog} onOpenChange={setShowRevertAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>전체 상품준비중 복원</AlertDialogTitle>
+            <AlertDialogDescription>
+              배송준비중인 전체 {readyOrders.length}건의 주문을 상품준비중으로 복원하시겠습니까?
+              <br /><br />
+              <strong>복원 시 주의사항:</strong>
+              <ul className="list-disc list-inside mt-2 text-left">
+                <li>모든 배송준비중 주문이 "상품준비중"으로 변경됩니다.</li>
+                <li>상품준비중 페이지에서 다시 확인할 수 있습니다.</li>
+                <li>운송장 번호는 유지됩니다.</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-revert-all-cancel">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevertAll} className="bg-amber-600 hover:bg-amber-700" data-testid="button-revert-all-confirm">
+              전체 복원 실행
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

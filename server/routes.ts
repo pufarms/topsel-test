@@ -8031,6 +8031,65 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Revert orders from 배송준비중 to 상품준비중
+  app.post('/api/admin/orders/revert-to-preparing', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) {
+      return res.status(403).json({ message: "관리자 권한이 필요합니다" });
+    }
+
+    try {
+      const { mode, orderIds } = req.body;
+
+      if (mode === "selected" && Array.isArray(orderIds) && orderIds.length > 0) {
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "상품준비중",
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(pendingOrders.status, "배송준비중"),
+              inArray(pendingOrders.id, orderIds)
+            )
+          )
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          revertedCount: result.length,
+          message: `${result.length}건의 주문이 상품준비중으로 복원되었습니다.`
+        });
+      } else if (mode === "all") {
+        const result = await db.update(pendingOrders)
+          .set({
+            status: "상품준비중",
+            updatedAt: new Date()
+          })
+          .where(eq(pendingOrders.status, "배송준비중"))
+          .returning({ id: pendingOrders.id });
+
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+
+        res.json({
+          success: true,
+          revertedCount: result.length,
+          message: `${result.length}건의 주문이 상품준비중으로 복원되었습니다.`
+        });
+      } else {
+        return res.status(400).json({ message: "올바른 모드를 선택해주세요 (all, selected)" });
+      }
+    } catch (error: any) {
+      console.error("Revert to preparing error:", error);
+      res.status(500).json({ message: error.message || "상품준비중 복원 중 오류가 발생했습니다" });
+    }
+  });
+
   // Admin: Get ready-to-ship status (waybill delivered, cancel deadline)
   app.get('/api/admin/ready-to-ship-status', async (req, res) => {
     if (!req.session.userId) {
