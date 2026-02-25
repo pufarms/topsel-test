@@ -7380,7 +7380,7 @@ export async function registerRoutes(
             order.recipientZipCode || "",
             order.recipientAddress || "",
             order.deliveryMessage || "",
-            order.customOrderNumber || "",
+            order.orderNumber || "",
             order.orderDetailNumber || "",
             order.productCode || "",
             1
@@ -7405,21 +7405,22 @@ export async function registerRoutes(
             order.productCode || "",
             order.productName || "",
             1,
-            order.customOrderNumber || "",
+            order.orderNumber || "",
             order.trackingNumber || "",
             order.courierCompany || ""
           ]);
         }
       } else {
-        // 기본 양식
+        // 기본 양식 - 주문번호는 시스템 고유번호(orderNumber) 사용, 자체주문번호는 참고용
         wsData = [
-          ["순번", "상호명", "주문번호", "주문자명", "수령자명", "수령자 전화번호", "수령자 주소", "상품코드", "상품명", "수량", "단가", "배송메시지", "운송장번호", "택배사", "상태"]
+          ["순번", "상호명", "주문번호", "자체주문번호", "주문자명", "수령자명", "수령자 전화번호", "수령자 주소", "상품코드", "상품명", "수량", "단가", "배송메시지", "운송장번호", "택배사", "상태"]
         ];
         
         for (const order of orders) {
           wsData.push([
             order.sequenceNumber || "",
             order.memberCompanyName || "",
+            order.orderNumber || "",
             order.customOrderNumber || "",
             order.ordererName || "",
             order.recipientName || "",
@@ -7649,23 +7650,19 @@ export async function registerRoutes(
         .where(eq(pendingOrders.status, "상품준비중"))
         .orderBy(asc(pendingOrders.sequenceNumber));
 
-      // 주문번호별 그룹화 (순서 유지)
-      const ordersByOrderNumber: Map<string, typeof preparingOrders> = new Map();
+      // 시스템 주문번호(orderNumber)로 인덱싱 - 고유하므로 1:1 매칭 가능
+      const orderBySystemNumber: Map<string, typeof preparingOrders[0]> = new Map();
+      // 자체주문번호(customOrderNumber)로 그룹핑 - 폴백용
+      const ordersByCustomNumber: Map<string, typeof preparingOrders> = new Map();
       for (const order of preparingOrders) {
-        const orderNumber = order.customOrderNumber || order.orderNumber || "";
-        if (!ordersByOrderNumber.has(orderNumber)) {
-          ordersByOrderNumber.set(orderNumber, []);
+        if (order.orderNumber) {
+          orderBySystemNumber.set(order.orderNumber, order);
         }
-        ordersByOrderNumber.get(orderNumber)!.push(order);
-      }
-
-      // 파일의 주문번호별 운송장 그룹화 (순서 유지)
-      const waybillsByOrderNumber: Map<string, typeof waybillPairs> = new Map();
-      for (const pair of waybillPairs) {
-        if (!waybillsByOrderNumber.has(pair.orderNumber)) {
-          waybillsByOrderNumber.set(pair.orderNumber, []);
+        const customNum = order.customOrderNumber || order.orderNumber || "";
+        if (!ordersByCustomNumber.has(customNum)) {
+          ordersByCustomNumber.set(customNum, []);
         }
-        waybillsByOrderNumber.get(pair.orderNumber)!.push(pair);
+        ordersByCustomNumber.get(customNum)!.push(order);
       }
 
       // 결과 집계
@@ -7673,39 +7670,24 @@ export async function registerRoutes(
       let successCount = 0;
       let failedCount = 0;
       let skippedCount = 0;
+      const matchedOrderIds = new Set<number>();
 
       // 매핑 및 업데이트 처리
-      for (const [orderNumber, waybills] of Array.from(waybillsByOrderNumber.entries())) {
-        const dbOrders = ordersByOrderNumber.get(orderNumber) || [];
-        
-        for (let i = 0; i < waybills.length; i++) {
-          const waybill = waybills[i];
-          
-          if (!waybill.trackingNumber) {
-            details.push({
-              orderNumber: waybill.orderNumber,
-              trackingNumber: "",
-              status: "skipped",
-              reason: "운송장번호 없음"
-            });
-            skippedCount++;
-            continue;
-          }
+      for (const waybill of waybillPairs) {
+        if (!waybill.trackingNumber) {
+          details.push({
+            orderNumber: waybill.orderNumber,
+            trackingNumber: "",
+            status: "skipped",
+            reason: "운송장번호 없음"
+          });
+          skippedCount++;
+          continue;
+        }
 
-          if (i >= dbOrders.length) {
-            details.push({
-              orderNumber: waybill.orderNumber,
-              trackingNumber: waybill.trackingNumber,
-              status: "failed",
-              reason: "테이블에서 주문 찾을 수 없음"
-            });
-            failedCount++;
-            continue;
-          }
-
-          // 순서대로 매핑
-          const targetOrder = dbOrders[i];
-          
+        // 1차: 시스템 주문번호(orderNumber)로 정확 매칭 (고유 1:1)
+        let targetOrder = orderBySystemNumber.get(waybill.orderNumber);
+        if (targetOrder && !matchedOrderIds.has(targetOrder.id)) {
           try {
             const effectiveCourier = courier === "default" 
               ? (waybill.rowCourier || "기타택배")
@@ -7718,6 +7700,44 @@ export async function registerRoutes(
               })
               .where(eq(pendingOrders.id, targetOrder.id));
 
+            matchedOrderIds.add(targetOrder.id);
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: waybill.trackingNumber,
+              status: "success"
+            });
+            successCount++;
+            continue;
+          } catch (err) {
+            details.push({
+              orderNumber: waybill.orderNumber,
+              trackingNumber: waybill.trackingNumber,
+              status: "failed",
+              reason: "DB 업데이트 실패"
+            });
+            failedCount++;
+            continue;
+          }
+        }
+
+        // 2차: 자체주문번호(customOrderNumber)로 그룹 매칭 (동일 번호 여러 건 지원)
+        const dbOrders = ordersByCustomNumber.get(waybill.orderNumber) || [];
+        const unmatchedOrder = dbOrders.find(o => !matchedOrderIds.has(o.id));
+        
+        if (unmatchedOrder) {
+          try {
+            const effectiveCourier = courier === "default" 
+              ? (waybill.rowCourier || "기타택배")
+              : courierCompanyName;
+            await db.update(pendingOrders)
+              .set({
+                trackingNumber: waybill.trackingNumber,
+                courierCompany: effectiveCourier,
+                updatedAt: new Date()
+              })
+              .where(eq(pendingOrders.id, unmatchedOrder.id));
+
+            matchedOrderIds.add(unmatchedOrder.id);
             details.push({
               orderNumber: waybill.orderNumber,
               trackingNumber: waybill.trackingNumber,
@@ -7733,6 +7753,14 @@ export async function registerRoutes(
             });
             failedCount++;
           }
+        } else {
+          details.push({
+            orderNumber: waybill.orderNumber,
+            trackingNumber: waybill.trackingNumber,
+            status: "failed",
+            reason: "테이블에서 주문 찾을 수 없음 (이미 매칭됨 또는 미존재)"
+          });
+          failedCount++;
         }
       }
 
