@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>탑셀러 — 회원정보</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --navy:#1e2a6e; --navy-mid:#2d3a8c; --navy-light:#3d4fa8;
+    --accent:#f5a623;
+    --sidebar-active-bg:#e8f0fe; --sidebar-active-color:#1a56db;
+    --white:#ffffff; --gray-50:#f4f6fb; --gray-100:#eaecf4;
+    --gray-200:#d5d9ee; --gray-400:#8a90b0; --gray-600:#555e8a; --gray-800:#2d3462;
+    --green:#16a34a; --red:#dc2626;
+    --card-shadow:0 2px 12px rgba(30,42,110,0.08);
+    --radius:12px; --radius-sm:8px;
+  }
+  body { font-family:'Noto Sans KR',sans-serif; background:var(--gray-50); color:var(--gray-800); min-height:100vh; }
+
+  /* 헤더 */
+  .top-header {
+    background:var(--navy); height:56px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; position:fixed; top:0; left:0; right:0; z-index:100;
+  }
+  .header-logo { font-family:'Montserrat',sans-serif; font-size:20px; font-weight:700; color:white; }
+  .header-logo span { color:var(--accent); }
+  .header-nav { display:flex; align-items:center; gap:20px; }
+  .header-nav a { color:rgba(255,255,255,0.8); font-size:13px; text-decoration:none; cursor:pointer; }
+  .header-nav a:hover { color:white; }
+  .header-nav .mypage { background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:20px; color:white; font-size:13px; }
+
+  /* 레이아웃 */
+  .layout { display:flex; min-height:100vh; padding-top:56px; }
+
+  /* 사이드바 */
+  .sidebar {
+    width:200px; background:var(--white); border-right:1px solid var(--gray-100);
+    flex-shrink:0; position:fixed; top:56px; left:0; bottom:0; overflow-y:auto; z-index:90;
+  }
+  .sidebar-item {
+    display:flex; align-items:center; gap:10px;
+    padding:11px 20px; font-size:13px; color:var(--gray-600);
+    cursor:pointer; transition:all .15s;
+  }
+  .sidebar-item:hover { background:var(--gray-50); color:var(--gray-800); }
+  .sidebar-item.active { background:var(--sidebar-active-bg); color:var(--sidebar-active-color); font-weight:600; }
+  .sidebar-item svg { width:15px; height:15px; flex-shrink:0; opacity:0.7; }
+  .sidebar-item.active svg { opacity:1; }
+
+  /* 메인 */
+  .main { margin-left:200px; flex:1; min-width:0; }
+
+  /* 배너 */
+  .page-banner {
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,var(--navy-light) 100%);
+    padding:24px 28px 28px; color:white;
+  }
+  .page-banner-title { font-size:20px; font-weight:700; margin-bottom:3px; letter-spacing:-0.3px; }
+  .page-banner-sub { font-size:12px; opacity:0.72; margin-bottom:16px; }
+  .banner-cards { display:flex; gap:12px; flex-wrap:wrap; }
+  .banner-card {
+    background:rgba(255,255,255,0.13); border:1px solid rgba(255,255,255,0.18);
+    border-radius:10px; padding:12px 20px; flex:1; min-width:150px;
+  }
+  .banner-card-label { font-size:11px; opacity:0.7; margin-bottom:4px; }
+  .banner-card-value { font-size:15px; font-weight:700; }
+  .banner-card-value.num { font-family:'Montserrat',sans-serif; font-size:18px; }
+
+  /* 콘텐츠 */
+  .content { padding:20px 24px; }
+
+  /* 예치금 행 */
+  .balance-row {
+    display:grid; grid-template-columns:1fr 1fr auto;
+    gap:12px; margin-bottom:16px; align-items:stretch;
+  }
+  .balance-card {
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 100%);
+    border-radius:var(--radius); padding:16px 20px; color:white;
+    position:relative; overflow:hidden;
+  }
+  .balance-card.pointer { background:linear-gradient(135deg,#1565c0 0%,#0277bd 100%); }
+  .balance-card::before {
+    content:''; position:absolute; top:-15px; right:-15px;
+    width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.06);
+  }
+  .bal-label { font-size:11px; opacity:0.72; margin-bottom:6px; display:flex; align-items:center; gap:4px; }
+  .bal-dot { width:5px; height:5px; border-radius:50%; background:var(--accent); }
+  .bal-amount { font-family:'Montserrat',sans-serif; font-size:20px; font-weight:700; }
+  .bal-amount span { font-size:12px; font-weight:500; margin-left:2px; opacity:0.78; }
+  .bal-sub { font-size:11px; opacity:0.52; margin-top:3px; }
+  .charge-wrap { display:flex; align-items:stretch; }
+  .charge-btn {
+    background:linear-gradient(135deg,var(--accent) 0%,#e8920a 100%);
+    color:white; border:none; border-radius:var(--radius);
+    padding:0 22px; min-height:76px;
+    font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:700;
+    cursor:pointer; white-space:nowrap;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    box-shadow:0 4px 14px rgba(245,166,35,0.35); transition:all .2s;
+  }
+  .charge-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(245,166,35,0.45); }
+
+  /* 섹션 */
+  .section { background:var(--white); border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:14px; }
+  .section-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:1px solid var(--gray-100);
+  }
+  .section-title { font-size:13px; font-weight:700; color:var(--gray-800); display:flex; align-items:center; gap:7px; }
+  .badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; background:#e8f0fe; color:#1a56db; }
+  .badge.ro { background:#f1f5f9; color:#64748b; }
+  .section-body { padding:18px 20px; }
+
+  /* 담당자 */
+  .field-label { font-size:12px; font-weight:600; color:var(--gray-600); margin-bottom:8px; display:flex; align-items:center; gap:4px; }
+  .req { color:var(--red); font-size:14px; line-height:1; }
+  .manager-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+  .manager-row {
+    display:grid; grid-template-columns:26px 1fr 1fr; gap:8px; align-items:center;
+    background:var(--gray-50); border-radius:var(--radius-sm); padding:10px 12px;
+  }
+  .m-num {
+    width:22px; height:22px; border-radius:50%; background:var(--navy); color:white;
+    font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .info-input {
+    width:100%; border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+    padding:8px 11px; font-family:'Noto Sans KR',sans-serif; font-size:13px;
+    color:var(--gray-800); background:white; outline:none; transition:border-color .2s;
+  }
+  .info-input:focus { border-color:var(--navy-light); }
+  .info-input[readonly] { background:var(--gray-50); color:var(--gray-400); }
+
+  /* 이메일/비밀번호 */
+  .field-row { margin-bottom:12px; }
+  .field-input-row { display:flex; gap:8px; align-items:center; }
+  .field-input-row .info-input { flex:1; }
+  .change-btn {
+    background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+    padding:8px 14px; font-family:'Noto Sans KR',sans-serif; font-size:12px; font-weight:600;
+    color:var(--gray-600); cursor:pointer; white-space:nowrap; transition:all .2s; flex-shrink:0;
+  }
+  .change-btn:hover { border-color:var(--navy); color:var(--navy); }
+  .field-hint { font-size:11px; color:var(--gray-400); margin-top:3px; }
+
+  /* 저장 행 */
+  .save-row {
+    display:flex; justify-content:flex-end; gap:8px;
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--gray-100);
+  }
+  .cancel-btn {
+    background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+    padding:8px 18px; font-family:'Noto Sans KR',sans-serif; font-size:13px;
+    color:var(--gray-600); cursor:pointer; transition:all .2s;
+  }
+  .save-btn {
+    background:var(--navy); color:white; border:none; border-radius:var(--radius-sm);
+    padding:8px 18px; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:700;
+    cursor:pointer; transition:all .2s;
+  }
+  .save-btn:hover { background:var(--navy-light); }
+
+  /* 사업자 */
+  .readonly-notice {
+    background:#fffbeb; border:1px solid #fcd34d; border-radius:var(--radius-sm);
+    padding:10px 14px; display:flex; gap:8px; margin-bottom:14px;
+    font-size:12px; color:#92400e; line-height:1.6;
+  }
+  .biz-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .biz-item { background:var(--gray-50); border-radius:var(--radius-sm); padding:10px 12px; }
+  .biz-label { font-size:10px; font-weight:600; color:var(--gray-400); letter-spacing:0.4px; margin-bottom:4px; }
+  .biz-value { font-size:13px; font-weight:600; color:var(--gray-800); }
+  .same-badge {
+    display:inline-block; font-size:10px; background:#e8f0fe; color:#1a56db;
+    border-radius:20px; padding:2px 8px; font-weight:600; margin-left:6px; vertical-align:middle;
+  }
+  .inquiry-btn {
+    background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-sm);
+    padding:7px 14px; font-family:'Noto Sans KR',sans-serif; font-size:12px; font-weight:600;
+    color:var(--gray-600); cursor:pointer; transition:all .2s;
+  }
+  .inquiry-btn:hover { border-color:var(--navy); color:var(--navy); }
+
+  /* 등급 */
+  .grade-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .grade-item { background:var(--gray-50); border:1px solid var(--gray-100); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+  .grade-item-label { font-size:10px; font-weight:600; color:var(--gray-400); letter-spacing:0.4px; margin-bottom:5px; }
+  .grade-item-value { font-size:13px; font-weight:700; color:var(--gray-800); }
+  .grade-badge { display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg,var(--navy),var(--navy-light)); color:white; border-radius:20px; padding:3px 12px; font-size:12px; font-weight:700; }
+  .status-badge { display:inline-block; background:#dcfce7; color:var(--green); border-radius:20px; padding:3px 12px; font-size:12px; font-weight:700; }
+
+  /* 모달 */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:white; border-radius:var(--radius); width:440px; max-width:calc(100vw - 32px); box-shadow:0 20px 60px rgba(0,0,0,0.2); animation:mIn .2s ease; }
+  @keyframes mIn { from{opacity:0;transform:scale(.96) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--gray-100); }
+  .modal-title { font-size:14px; font-weight:700; color:var(--gray-800); }
+  .modal-close { background:none; border:none; font-size:17px; color:var(--gray-400); cursor:pointer; padding:2px 6px; border-radius:4px; }
+  .modal-close:hover { background:var(--gray-100); }
+  .modal-body { padding:18px; }
+  .modal-footer { padding:12px 18px; border-top:1px solid var(--gray-100); display:flex; justify-content:flex-end; gap:8px; }
+  .m-field { margin-bottom:12px; }
+  .m-label { font-size:12px; font-weight:600; color:var(--gray-600); margin-bottom:5px; display:flex; align-items:center; gap:4px; }
+  .pw-wrap { position:relative; }
+  .pw-wrap .info-input { padding-right:38px; }
+  .pw-toggle { position:absolute; right:9px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:14px; color:var(--gray-400); }
+  .pw-bars { display:flex; gap:4px; margin-top:5px; }
+  .pw-bar { flex:1; height:3px; border-radius:2px; background:var(--gray-100); transition:all .3s; }
+  .pw-bar.w { background:var(--red); } .pw-bar.m { background:var(--accent); } .pw-bar.s { background:var(--green); }
+  .pw-txt { font-size:11px; margin-top:3px; color:var(--gray-400); }
+  .pw-match { font-size:11px; margin-top:3px; }
+  .pw-match.ok { color:var(--green); } .pw-match.fail { color:var(--red); }
+
+  /* 이메일 모달 */
+  .step-ind { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+  .s-dot { width:20px; height:20px; border-radius:50%; background:var(--gray-200); color:var(--gray-400); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .s-dot.active { background:var(--navy); color:white; } .s-dot.done { background:var(--green); color:white; }
+  .s-line { flex:1; height:1px; background:var(--gray-200); } .s-line.done { background:var(--green); }
+  .s-lbl { font-size:11px; color:var(--gray-400); } .s-lbl.active { color:var(--navy); font-weight:600; }
+  .e-step { display:none; margin-top:14px; } .e-step.active { display:block; }
+  .inp-row { display:flex; gap:8px; }
+  .inp-row .info-input { flex:1; }
+  .send-btn { background:var(--navy); color:white; border:none; border-radius:var(--radius-sm); padding:8px 13px; font-family:'Noto Sans KR',sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .2s; }
+  .send-btn:hover { background:var(--navy-light); }
+  .code-inputs { display:flex; gap:7px; margin-top:9px; }
+  .ci { width:40px; height:44px; border:2px solid var(--gray-200); border-radius:var(--radius-sm); text-align:center; font-size:17px; font-weight:700; color:var(--gray-800); font-family:'Montserrat',sans-serif; outline:none; transition:border-color .2s; }
+  .ci:focus { border-color:var(--navy-light); } .ci.filled { border-color:var(--navy); background:#f0f2ff; }
+  .timer { font-family:'Montserrat',sans-serif; font-size:13px; font-weight:700; color:var(--red); }
+  .resend-btn { background:none; border:1px solid var(--gray-200); border-radius:6px; padding:4px 9px; font-size:11px; color:var(--gray-600); cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .resend-btn:hover { border-color:var(--navy); color:var(--navy); }
+  .success-msg { text-align:center; padding:14px 18px; display:none; }
+  .success-msg .chk { font-size:34px; margin-bottom:7px; }
+  .success-msg p { font-size:13px; font-weight:600; color:var(--gray-800); }
+
+  /* 반응형 */
+  @media(max-width:900px){
+    .biz-grid { grid-template-columns:1fr; }
+    .grade-grid { grid-template-columns:repeat(2,1fr); }
+    .balance-row { grid-template-columns:1fr 1fr; }
+    .charge-wrap { grid-column:1/-1; }
+    .charge-btn { min-height:48px; flex-direction:row; width:100%; }
+  }
+  @media(max-width:640px){
+    .sidebar { display:none; }
+    .main { margin-left:0; }
+    .balance-row,.grade-grid { grid-template-columns:1fr; }
+    .manager-row { grid-template-columns:26px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="top-header">
+  <div class="header-logo">Top<span>sel</span></div>
+  <nav class="header-nav">
+    <a>장바구니</a><a>샘플</a><a>테스트 메뉴</a><a>로그아웃</a>
+    <a class="mypage">마이페이지</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <!-- 사이드바 -->
+  <aside class="sidebar">
+    <nav>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        마이페이지 대시보드
+      </div>
+      <div class="sidebar-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        회원정보
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        상품리스트
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+        주문관리
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        주소검증,엑셀변환 이용
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        정산 관리
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        통계관리
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        문의 게시판
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        AI 상세페이지
+      </div>
+      <div class="sidebar-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        이용가이드
+      </div>
+    </nav>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="main">
+
+    <!-- 배너 -->
+    <div class="page-banner">
+      <div class="page-banner-title">회원정보</div>
+      <div class="page-banner-sub">담당자 정보, 사업자 정보, 예치금 현황을 확인하고 관리하세요.</div>
+      <div class="banner-cards">
+        <div class="banner-card">
+          <div class="banner-card-label">회원 등급</div>
+          <div class="banner-card-value">⭐ Driving회원</div>
+        </div>
+        <div class="banner-card">
+          <div class="banner-card-label">현재 예치금</div>
+          <div class="banner-card-value num">1,250,000<span style="font-size:12px;font-weight:500;opacity:0.8"> 원</span></div>
+        </div>
+        <div class="banner-card">
+          <div class="banner-card-label">보유 포인터</div>
+          <div class="banner-card-value num">34,500<span style="font-size:12px;font-weight:500;opacity:0.8"> P</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 콘텐츠 -->
+    <div class="content">
+
+      <!-- 예치금 행 -->
+      <div class="balance-row">
+        <div class="balance-card">
+          <div class="bal-label"><span class="bal-dot"></span>현재 예치금</div>
+          <div class="bal-amount">1,250,000<span>원</span></div>
+          <div class="bal-sub">최근 충전: 2026.02.10</div>
+        </div>
+        <div class="balance-card pointer">
+          <div class="bal-label"><span class="bal-dot" style="background:#00e5ff"></span>보유 포인터</div>
+          <div class="bal-amount">34,500<span>P</span></div>
+          <div class="bal-sub">사용 가능 포인터</div>
+        </div>
+        <div class="charge-wrap">
+          <button class="charge-btn">
+            <span style="font-size:18px;">⚡</span>
+            예치금 충전
+          </button>
+        </div>
+      </div>
+
+      <!-- ① 기본 정보 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">👤 기본 정보 <span class="badge">수정 가능</span></div>
+        </div>
+        <div class="section-body">
+          <div class="field-label">담당자 정보 <span style="color:var(--gray-400);font-weight:400;">(최대 3명 · 휴대폰 번호 필수)</span> <span class="req">*</span></div>
+          <div class="manager-list">
+            <div class="manager-row">
+              <div class="m-num">1</div>
+              <input class="info-input" type="text" placeholder="담당자명" value="김탑셀">
+              <input class="info-input" type="tel" placeholder="휴대폰 번호" value="010-1234-5678">
+            </div>
+            <div class="manager-row">
+              <div class="m-num">2</div>
+              <input class="info-input" type="text" placeholder="담당자명">
+              <input class="info-input" type="tel" placeholder="휴대폰 번호">
+            </div>
+            <div class="manager-row">
+              <div class="m-num">3</div>
+              <input class="info-input" type="text" placeholder="담당자명">
+              <input class="info-input" type="tel" placeholder="휴대폰 번호">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">이메일 <span class="req">*</span></div>
+            <div class="field-input-row">
+              <input class="info-input" type="email" id="currentEmail" value="topsel01@example.com" readonly>
+              <button class="change-btn" onclick="openEmailModal()">이메일 변경</button>
+            </div>
+            <div class="field-hint">※ 세금계산서 수신 이메일과 동일하게 적용됩니다.</div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-label">비밀번호</div>
+            <div class="field-input-row">
+              <input class="info-input" type="password" value="••••••••" readonly>
+              <button class="change-btn" onclick="openPwModal()">비밀번호 변경</button>
+            </div>
+          </div>
+
+          <div class="save-row">
+            <button class="cancel-btn">취소</button>
+            <button class="save-btn">💾 변경사항 저장</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② 사업자 정보 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">🏢 사업자 정보 <span class="badge ro">읽기 전용</span></div>
+          <button class="inquiry-btn">✉️ 변경 문의하기</button>
+        </div>
+        <div class="section-body">
+          <div class="readonly-notice">
+            <span>⚠️</span>
+            <div>
+              <strong>사업자 정보는 직접 수정이 불가합니다.</strong><br>
+              세금계산서 발행 및 거래 계약과 직결되는 정보로, 임의 변경 시 법적 문제가 발생할 수 있습니다. 변경이 필요하신 경우 우측 <strong>[변경 문의하기]</strong> 버튼을 이용해 주세요.
+            </div>
+          </div>
+          <div class="biz-grid">
+            <div class="biz-item"><div class="biz-label">사업자등록번호</div><div class="biz-value">123-45-67890</div></div>
+            <div class="biz-item"><div class="biz-label">상호명</div><div class="biz-value">탑셀01 주식회사</div></div>
+            <div class="biz-item"><div class="biz-label">대표자명</div><div class="biz-value">김탑셀</div></div>
+            <div class="biz-item"><div class="biz-label">업태 / 종목</div><div class="biz-value">도매업 / 농산물</div></div>
+            <div class="biz-item" style="grid-column:1/-1;"><div class="biz-label">사업장 주소</div><div class="biz-value">서울특별시 송파구 올림픽로 300, 123호</div></div>
+            <div class="biz-item" style="grid-column:1/-1;">
+              <div class="biz-label">세금계산서 수신 이메일</div>
+              <div class="biz-value">topsel01@example.com <span class="same-badge">회원정보 이메일과 동일</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ 등급 & 가입 정보 -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">⭐ 회원 등급 &amp; 가입 정보 <span class="badge ro">읽기 전용</span></div>
+        </div>
+        <div class="section-body">
+          <div class="grade-grid">
+            <div class="grade-item"><div class="grade-item-label">현재 등급</div><div class="grade-item-value"><span class="grade-badge">⭐ Driving회원</span></div></div>
+            <div class="grade-item"><div class="grade-item-label">계정 상태</div><div class="grade-item-value"><span class="status-badge">✅ 정상</span></div></div>
+            <div class="grade-item"><div class="grade-item-label">가입일</div><div class="grade-item-value">2024.08.15</div></div>
+            <div class="grade-item"><div class="grade-item-label">마지막 로그인</div><div class="grade-item-value">2026.02.25</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- 비밀번호 모달 -->
+<div class="modal-overlay" id="pwModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔐 비밀번호 변경</div>
+      <button class="modal-close" onclick="closePwModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="m-field">
+        <div class="m-label">현재 비밀번호 <span class="req">*</span></div>
+        <div class="pw-wrap"><input class="info-input" type="password" id="curPw" placeholder="현재 비밀번호 입력"><button class="pw-toggle" onclick="togglePw('curPw',this)">👁</button></div>
+      </div>
+      <div class="m-field">
+        <div class="m-label">새 비밀번호 <span class="req">*</span></div>
+        <div class="pw-wrap"><input class="info-input" type="password" id="newPw" placeholder="8자 이상, 영문+숫자+특수문자" oninput="chkStr(this);chkMatch();"><button class="pw-toggle" onclick="togglePw('newPw',this)">👁</button></div>
+        <div class="pw-bars"><div class="pw-bar" id="b1"></div><div class="pw-bar" id="b2"></div><div class="pw-bar" id="b3"></div></div>
+        <div class="pw-txt" id="strTxt"></div>
+      </div>
+      <div class="m-field">
+        <div class="m-label">새 비밀번호 확인 <span class="req">*</span></div>
+        <div class="pw-wrap"><input class="info-input" type="password" id="confirmPw" placeholder="새 비밀번호를 한 번 더 입력" oninput="chkMatch()"><button class="pw-toggle" onclick="togglePw('confirmPw',this)">👁</button></div>
+        <div class="pw-match" id="pwMatch"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closePwModal()">취소</button>
+      <button class="save-btn" onclick="savePw()">✅ 비밀번호 변경</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이메일 변경 모달 -->
+<div class="modal-overlay" id="emailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✉️ 이메일 변경</div>
+      <button class="modal-close" onclick="closeEmailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="step-ind">
+        <div class="s-dot active" id="sd1">1</div>
+        <div class="s-line" id="sl1"></div>
+        <div class="s-dot" id="sd2">2</div>
+        <div class="s-line" id="sl2"></div>
+        <div class="s-dot" id="sd3">✓</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span class="s-lbl active" id="lb1">이메일 입력</span>
+        <span class="s-lbl" id="lb2">인증번호 확인</span>
+        <span class="s-lbl" id="lb3">변경 완료</span>
+      </div>
+
+      <div class="e-step active" id="es1">
+        <div class="m-field">
+          <div class="m-label">현재 이메일</div>
+          <input class="info-input" type="email" value="topsel01@example.com" readonly>
+        </div>
+        <div class="m-field">
+          <div class="m-label">새 이메일 주소 <span class="req">*</span></div>
+          <div class="inp-row">
+            <input class="info-input" type="email" id="newEmailInput" placeholder="새 이메일 주소 입력">
+            <button class="send-btn" onclick="sendCode()">인증번호 발송</button>
+          </div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:3px;">입력하신 이메일로 6자리 인증번호가 발송됩니다.</div>
+        </div>
+      </div>
+
+      <div class="e-step" id="es2">
+        <div style="background:var(--gray-50);border-radius:var(--radius-sm);padding:9px 13px;font-size:12px;color:var(--gray-600);line-height:1.6;margin-bottom:12px;">
+          📧 <strong id="sentEmail"></strong> 으로 6자리 인증번호가 발송되었습니다.
+        </div>
+        <div class="m-field">
+          <div class="m-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>인증번호 입력</span>
+            <div style="display:flex;align-items:center;gap:7px;">
+              <span class="timer" id="timer">05:00</span>
+              <button class="resend-btn" onclick="resend()">재발송</button>
+            </div>
+          </div>
+          <div class="code-inputs">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,0)" id="ci0">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,1)" id="ci1">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,2)" id="ci2">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,3)" id="ci3">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,4)" id="ci4">
+            <input class="ci" maxlength="1" type="text" oninput="mvNext(this,5)" id="ci5">
+          </div>
+          <div id="codeErr" style="font-size:11px;color:var(--red);margin-top:3px;display:none;">인증번호가 올바르지 않습니다.</div>
+        </div>
+      </div>
+
+      <div class="success-msg" id="es3">
+        <div class="chk">✅</div>
+        <p>이메일이 성공적으로 변경되었습니다!</p>
+        <span id="newEmailDone" style="font-size:12px;color:var(--gray-400);margin-top:4px;display:block;"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeEmailModal()">취소</button>
+      <button class="save-btn" id="nextBtn" onclick="nextStep()" style="display:none;">확인 완료 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 비밀번호 모달
+function openPwModal(){document.getElementById('pwModal').classList.add('open');['curPw','newPw','confirmPw'].forEach(id=>document.getElementById(id).value='');resetStr();}
+function closePwModal(){document.getElementById('pwModal').classList.remove('open');}
+function togglePw(id,btn){const i=document.getElementById(id);i.type=i.type==='password'?'text':'password';btn.textContent=i.type==='password'?'👁':'🙈';}
+function chkStr(input){
+  const v=input.value,bars=['b1','b2','b3'].map(id=>document.getElementById(id)),txt=document.getElementById('strTxt');
+  bars.forEach(b=>b.className='pw-bar');
+  if(!v){txt.textContent='';return;}
+  let s=0;
+  if(v.length>=8)s++;
+  if(/[0-9]/.test(v)&&/[a-zA-Z]/.test(v))s++;
+  if(/[!@#$%^&*(),.?":{}|<>]/.test(v))s++;
+  if(s===1){bars[0].classList.add('w');txt.textContent='약함 — 숫자와 특수문자를 추가해 주세요';txt.style.color='var(--red)';}
+  else if(s===2){bars[0].classList.add('m');bars[1].classList.add('m');txt.textContent='보통 — 특수문자 추가 시 더 안전해요';txt.style.color='var(--accent)';}
+  else if(s===3){bars.forEach(b=>b.classList.add('s'));txt.textContent='강함 ✓';txt.style.color='var(--green)';}
+}
+function resetStr(){['b1','b2','b3'].forEach(id=>document.getElementById(id).className='pw-bar');document.getElementById('strTxt').textContent='';document.getElementById('pwMatch').className='pw-match';}
+function chkMatch(){
+  const pw=document.getElementById('newPw').value,cp=document.getElementById('confirmPw').value,el=document.getElementById('pwMatch');
+  if(!cp){el.className='pw-match';return;}
+  if(pw===cp){el.className='pw-match ok';el.textContent='✓ 비밀번호가 일치합니다';}
+  else{el.className='pw-match fail';el.textContent='✗ 비밀번호가 일치하지 않습니다';}
+}
+function savePw(){
+  if(!document.getElementById('curPw').value||!document.getElementById('newPw').value||!document.getElementById('confirmPw').value){alert('모든 항목을 입력해 주세요.');return;}
+  if(document.getElementById('newPw').value!==document.getElementById('confirmPw').value){alert('새 비밀번호가 일치하지 않습니다.');return;}
+  alert('비밀번호가 변경되었습니다.');closePwModal();
+}
+
+// 이메일 모달
+let eTimer=null;
+function openEmailModal(){document.getElementById('emailModal').classList.add('open');resetEmail();}
+function closeEmailModal(){document.getElementById('emailModal').classList.remove('open');clearInterval(eTimer);}
+function resetEmail(){
+  document.getElementById('es1').className='e-step active';
+  document.getElementById('es2').className='e-step';
+  document.getElementById('es3').style.display='none';
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('newEmailInput').value='';
+  document.getElementById('codeErr').style.display='none';
+  for(let i=0;i<6;i++){const c=document.getElementById('ci'+i);c.value='';c.className='ci';}
+  setStep(1);
+}
+function setStep(n){
+  for(let i=1;i<=3;i++){
+    document.getElementById('sd'+i).className='s-dot'+(i<n?' done':i===n?' active':'');
+    const lb=document.getElementById('lb'+i);if(lb)lb.className='s-lbl'+(i===n?' active':'');
+    if(i<3)document.getElementById('sl'+i).className='s-line'+(i<n?' done':'');
+  }
+}
+function sendCode(){
+  const email=document.getElementById('newEmailInput').value;
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('올바른 이메일 주소를 입력해 주세요.');return;}
+  document.getElementById('sentEmail').textContent=email;
+  document.getElementById('es1').className='e-step';
+  document.getElementById('es2').className='e-step active';
+  document.getElementById('nextBtn').style.display='inline-flex';
+  setStep(2);startTimer();
+  setTimeout(()=>document.getElementById('ci0').focus(),100);
+}
+function startTimer(){
+  clearInterval(eTimer);let sec=300;
+  const el=document.getElementById('timer');
+  eTimer=setInterval(()=>{sec--;el.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');if(sec<=0){clearInterval(eTimer);el.textContent='만료됨';}},1000);
+}
+function resend(){
+  for(let i=0;i<6;i++){const c=document.getElementById('ci'+i);c.value='';c.className='ci';}
+  document.getElementById('codeErr').style.display='none';
+  startTimer();setTimeout(()=>document.getElementById('ci0').focus(),100);
+}
+function mvNext(input,idx){if(input.value){input.classList.add('filled');if(idx<5)document.getElementById('ci'+(idx+1)).focus();}}
+function nextStep(){
+  const code=Array.from({length:6},(_,i)=>document.getElementById('ci'+i).value).join('');
+  if(code.length<6){alert('인증번호 6자리를 모두 입력해 주세요.');return;}
+  if(code!=='123456'){document.getElementById('codeErr').style.display='block';return;}
+  clearInterval(eTimer);
+  const newEmail=document.getElementById('newEmailInput').value;
+  document.getElementById('newEmailDone').textContent=newEmail;
+  document.getElementById('es2').className='e-step';
+  document.getElementById('es3').style.display='block';
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('currentEmail').value=newEmail;
+  setStep(3);
+  setTimeout(closeEmailModal,2500);
+}
+</script>
+</body>
+</html>

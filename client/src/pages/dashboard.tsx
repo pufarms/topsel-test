@@ -73,6 +73,7 @@ import MemberSettlementTab from "@/pages/member/settlement-tab";
 import MemberStatsTab from "@/pages/member/member-stats-tab";
 import MemberInquiryTab from "@/pages/member/inquiry-tab";
 import AIStudioApp from "@/pages/ai-studio";
+import MemberInfoTab from "@/pages/member/member-info-tab";
 
 type SidebarTab = 
   | "dashboard" 
@@ -1817,6 +1818,9 @@ export default function Dashboard() {
               )}
               {activeTab === "ai-studio" && (
                 <AIStudioApp />
+              )}
+              {activeTab === "member-info" && (
+                <MemberInfoTab />
               )}
           </main>
         </div>

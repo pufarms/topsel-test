@@ -734,6 +734,10 @@ export async function registerRoutes(
         phone: z.string().min(1).optional(),
         managerName: z.string().optional(),
         managerPhone: z.string().optional(),
+        manager2Name: z.string().optional(),
+        manager2Phone: z.string().optional(),
+        manager3Name: z.string().optional(),
+        manager3Phone: z.string().optional(),
         email: z.string().email().optional().or(z.literal("")),
         password: z.string().min(6).optional().or(z.literal("")),
       });
@@ -746,6 +750,10 @@ export async function registerRoutes(
       if (data.phone) updateData.phone = data.phone;
       if (data.managerName !== undefined) updateData.managerName = data.managerName;
       if (data.managerPhone !== undefined) updateData.managerPhone = data.managerPhone;
+      if (data.manager2Name !== undefined) updateData.manager2Name = data.manager2Name;
+      if (data.manager2Phone !== undefined) updateData.manager2Phone = data.manager2Phone;
+      if (data.manager3Name !== undefined) updateData.manager3Name = data.manager3Name;
+      if (data.manager3Phone !== undefined) updateData.manager3Phone = data.manager3Phone;
       if (data.email !== undefined) updateData.email = data.email;
       if (data.password && data.password.length >= 6) updateData.password = data.password;
 
@@ -761,6 +769,36 @@ export async function registerRoutes(
         return res.status(400).json({ message: error.errors[0].message });
       }
       throw error;
+    }
+  });
+
+  app.post("/api/member/change-password", async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "현재 비밀번호와 새 비밀번호를 입력해 주세요." });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "새 비밀번호는 8자 이상이어야 합니다." });
+      }
+
+      const member = await storage.validateMemberPassword(
+        (await storage.getMember(req.session.userId))?.username || "",
+        currentPassword
+      );
+      if (!member) {
+        return res.status(400).json({ message: "현재 비밀번호가 올바르지 않습니다." });
+      }
+
+      await storage.updateMember(req.session.userId, { password: newPassword });
+      return res.json({ success: true, message: "비밀번호가 변경되었습니다." });
+    } catch (error: any) {
+      console.error('[비밀번호 변경 오류]', error?.message || error);
+      return res.status(500).json({ message: "비밀번호 변경 중 오류가 발생했습니다." });
     }
   });
 

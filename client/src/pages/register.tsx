@@ -76,6 +76,13 @@ export default function Register() {
   const [memberNameAvailable, setMemberNameAvailable] = useState<boolean | null>(null);
   const [memberNameMsg, setMemberNameMsg] = useState('');
   const [isCheckingName, setIsCheckingName] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailVerifyStep, setEmailVerifyStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [emailVerifyCode, setEmailVerifyCode] = useState('');
+  const [emailVerifySending, setEmailVerifySending] = useState(false);
+  const [emailVerifyTimer, setEmailVerifyTimer] = useState(0);
+  const emailTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [registerEmail, setRegisterEmail] = useState('');
   
   const passwordMatch = passwordConfirm.length > 0 ? password === passwordConfirm : null;
 
@@ -259,6 +266,75 @@ export default function Register() {
     }
   };
 
+  const startEmailTimer = () => {
+    if (emailTimerRef.current) clearInterval(emailTimerRef.current);
+    setEmailVerifyTimer(300);
+    emailTimerRef.current = setInterval(() => {
+      setEmailVerifyTimer((prev) => {
+        if (prev <= 1) {
+          if (emailTimerRef.current) clearInterval(emailTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSendEmailVerify = async () => {
+    if (!registerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerEmail)) {
+      toast({ variant: "destructive", title: "오류", description: "올바른 이메일 주소를 입력해 주세요." });
+      return;
+    }
+    setEmailVerifySending(true);
+    try {
+      const res = await fetch("/api/auth/email-verify/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail: registerEmail, type: "signup" }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailVerifyStep('sent');
+        startEmailTimer();
+        toast({ title: "인증번호 발송", description: "입력하신 이메일로 인증번호가 발송되었습니다." });
+      } else {
+        toast({ variant: "destructive", title: "발송 실패", description: data.message || "인증번호 발송에 실패했습니다." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "오류", description: "인증번호 발송 중 오류가 발생했습니다." });
+    } finally {
+      setEmailVerifySending(false);
+    }
+  };
+
+  const handleConfirmEmailVerify = async () => {
+    if (emailVerifyCode.length < 6) {
+      toast({ variant: "destructive", title: "오류", description: "인증번호 6자리를 입력해 주세요." });
+      return;
+    }
+    setEmailVerifySending(true);
+    try {
+      const res = await fetch("/api/auth/email-verify/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newEmail: registerEmail, code: emailVerifyCode, type: "signup" }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailVerifyStep('verified');
+        setEmailVerified(true);
+        if (emailTimerRef.current) clearInterval(emailTimerRef.current);
+        toast({ title: "인증 완료", description: "이메일 인증이 완료되었습니다." });
+      } else {
+        toast({ variant: "destructive", title: "인증 실패", description: data.message || "인증번호가 올바르지 않습니다." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "오류", description: "인증 확인 중 오류가 발생했습니다." });
+    } finally {
+      setEmailVerifySending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -266,6 +342,11 @@ export default function Register() {
 
     if (!memberNameChecked || !memberNameAvailable) {
       toast({ variant: "destructive", title: "오류", description: "회원명 중복확인을 완료해주세요." });
+      return;
+    }
+
+    if (!emailVerified) {
+      toast({ variant: "destructive", title: "오류", description: "이메일 인증을 완료해 주세요." });
       return;
     }
 
@@ -477,7 +558,74 @@ export default function Register() {
                   </div>
                   <div>
                     <Label htmlFor="email">{labels.email || "이메일"} <span className="text-destructive">*</span></Label>
-                    <Input id="email" name="email" type="email" required placeholder={placeholders.email || "example@email.com"} data-testid="input-email" />
+                    <div className="flex gap-2">
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        placeholder={placeholders.email || "example@email.com"}
+                        value={registerEmail}
+                        onChange={(e) => {
+                          setRegisterEmail(e.target.value);
+                          if (emailVerifyStep !== 'idle') {
+                            setEmailVerifyStep('idle');
+                            setEmailVerified(false);
+                            setEmailVerifyCode('');
+                          }
+                        }}
+                        readOnly={emailVerifyStep === 'verified'}
+                        className={emailVerifyStep === 'verified' ? 'bg-green-50 border-green-300' : ''}
+                        data-testid="input-email"
+                      />
+                      {emailVerifyStep !== 'verified' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSendEmailVerify}
+                          disabled={emailVerifySending || !registerEmail}
+                          className="whitespace-nowrap shrink-0"
+                          data-testid="button-send-email-verify"
+                        >
+                          {emailVerifySending ? <Loader2 className="h-3 w-3 animate-spin" /> : emailVerifyStep === 'sent' ? "재발송" : "인증번호 발송"}
+                        </Button>
+                      )}
+                      {emailVerifyStep === 'verified' && (
+                        <span className="flex items-center gap-1 text-green-600 text-sm font-semibold whitespace-nowrap shrink-0">
+                          <Check className="h-4 w-4" /> 인증완료
+                        </span>
+                      )}
+                    </div>
+                    {emailVerifyStep === 'sent' && (
+                      <div className="mt-2 space-y-2">
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="인증번호 6자리 입력"
+                            value={emailVerifyCode}
+                            onChange={(e) => setEmailVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="max-w-[200px]"
+                            data-testid="input-email-verify-code"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleConfirmEmailVerify}
+                            disabled={emailVerifySending || emailVerifyCode.length < 6 || emailVerifyTimer === 0}
+                            data-testid="button-confirm-email-verify"
+                          >
+                            {emailVerifySending ? <Loader2 className="h-3 w-3 animate-spin" /> : "확인"}
+                          </Button>
+                          <span className="text-sm text-red-500 font-semibold" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                            {emailVerifyTimer > 0 ? `${String(Math.floor(emailVerifyTimer / 60)).padStart(2, '0')}:${String(emailVerifyTimer % 60).padStart(2, '0')}` : "만료됨"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">입력하신 이메일로 인증번호가 발송되었습니다. 5분 이내에 입력해 주세요.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
@@ -707,7 +855,7 @@ export default function Register() {
                 </div>
               </section>
 
-              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading} data-testid="button-submit">
+              <Button type="submit" className="w-full h-12 text-lg" disabled={isLoading || !emailVerified} data-testid="button-submit">
                 {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 {content.submit_button || "회원가입 신청하기"}
               </Button>

@@ -7,135 +7,102 @@ This project is a comprehensive Korean-language order management system for sell
 Preferred communication style: Simple, everyday language.
 
 ### 개발 원칙 (CRITICAL - 절대 잊지 말 것!)
-1. **새 기능 추가/수정 시 기존 기능 손상 금지**: 다른 기능을 추가하거나 수정할 때 이미 작동하던 기능이 깨지지 않도록 반드시 확인
-2. **수정 전 영향 범위 분석**: 코드 수정 전에 해당 코드가 어디서 사용되는지 확인하고, 관련된 모든 부분이 계속 작동하는지 검증
-3. **SSE 실시간 업데이트 유지**: 주문 관련 기능 수정 시 SSE 이벤트 발송 및 쿼리 무효화 로직이 유지되는지 확인
-4. **API 호출 일관성 유지**: pending_orders 관련 페이지는 모두 `/api/admin/pending-orders` 또는 `/api/member/pending-orders` 사용
+1. 새 기능 추가/수정 시 기존 기능 손상 금지
+2. 수정 전 영향 범위 분석
+3. SSE 실시간 업데이트 유지
+4. API 호출 일관성 유지
 
 ### 주문 상태 워크플로우 (4단계 + 예외)
 **정상 흐름 (4단계):**
-1. 대기 (주문조정 단계) → pending.tsx
-2. 상품준비중 (운송장 출력 단계) → preparing.tsx
-3 배송준비중 (회원취소건 접수 단계) → ready-to-ship.tsx
-4. 배송중 → shipping.tsx
+1. 대기 (주문조정 단계)
+2. 상품준비중 (운송장 출력 단계)
+3 배송준비중 (회원취소건 접수 단계)
+4. 배송중
 
 **예외 상태:**
-- 주문조정: 재고 부족 등으로 조정이 필요한 주문 → admin-cancel.tsx
-- 취소: 취소된 주문 → cancelled.tsx
+- 주문조정
+- 취소
 
 **핵심 규칙:**
-1. **상태 유일성**: 동일 주문은 4단계 중 하나의 단계에만 존재 (중복 불가)
-2. **순차적 진행**: 모든 주문은 1→2→3→4 순서로 진행 (예외 상태로 분리되는 경우 제외)
-3. **API 일관성**: 모든 주문 페이지는 `/api/admin/pending-orders` 사용
-4. **상태값**: `["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소"]`
+1. 상태 유일성
+2. 순차적 진행
+3. API 일관성
+4. 상태값: `["대기", "주문조정", "상품준비중", "배송준비중", "배송중", "취소"]`
 
 ### 핵심 비즈니스 규칙 (CRITICAL - 절대 잊지 말 것!)
 **상품가격 체계 및 기준:**
-1. **현재공급가가 모든 기준!**: 주문관리, 정산, 통계 등 모든 실제 운영의 기준은 **현재공급가(current_products)** 테이블입니다.
-2. **상품등록/예상공급가는 준비 단계일 뿐**:
-    - `상품등록(공급가계산)` → 1원 단위로 정밀 계산
-    - `차주 예상공급가` → 10원 올림 후 저장 (준비 단계)
-    - `현재공급가` → 실제 운영 적용 (모든 주문/정산의 기준)
-3. **10원 올림 시점**: 전송(Transmission) 단계에서 적용
-    - 상품등록 → 예상공급가 전송 시: `Math.ceil(price/10)*10` 적용 후 저장
-    - 예상공급가 → 현재공급가 전송 시: 올림된 가격 유지
-4. **주문 검증 기준**: 회원 주문 업로드 시 반드시 **현재공급가 테이블**에서 상품 존재 여부 확인
-    - `getCurrentProductByCode()` 사용 (NOT getProductRegistrationByCode)
-    - 공급중지 상품(supplyStatus === 'suspended')도 주문 불가
-5. **회원 등급별 공급가**: 주문 시 회원의 grade에 따라 해당 공급가 적용 (start/driving/top)
-    - `getSupplyPriceByGrade()` 헬퍼 함수로 매핑: START→startPrice, DRIVING→drivingPrice, TOP→topPrice
-    - ASSOCIATE/PENDING은 START 가격 기본값 (실제로는 주문 불가)
-6. **주문 가능 등급 제한**: START, DRIVING, TOP만 주문 등록 가능
-    - PENDING(승인대기), ASSOCIATE(준회원)은 주문 등록 불가 (API 403 반환)
-    - 준회원(ASSOCIATE) 이상은 상품리스트에서 현재공급가/차주예상공급가 조회 및 다운로드 가능
-7. **가격 확정 워크플로우**:
-    - 미확정 주문 (대기~배송준비중): 실시간으로 current_products에서 등급별 가격 표시
-    - 확정 주문 (배송중): "배송중 전환" 시점에 가격 확정 (priceConfirmed=true), 이후 가격 변동 없음
-    - 통계 API: 확정 주문은 저장된 가격, 미확정 주문은 실시간 계산 (하이브리드 방식)
+1. 현재공급가가 모든 기준!
+2. 상품등록/예상공급가는 준비 단계일 뿐
+3. 10원 올림 시점: 전송(Transmission) 단계에서 적용
+4. 주문 검증 기준: 회원 주문 업로드 시 반드시 현재공급가 테이블에서 상품 존재 여부 확인
+5. 회원 등급별 공급가: 주문 시 회원의 grade에 따라 해당 공급가 적용
+6. 주문 가능 등급 제한: START, DRIVING, TOP만 주문 등록 가능
+7. 가격 확정 워크플로우: 미확정 주문은 실시간 가격, 확정 주문은 배송중 전환 시점 가격 고정
 
 ### 회원 등급 자동 조정 시스템
-**등급 기준 (전월 매입금 = 배송중 확정 주문의 공급가 합계 + 회원 직접매출 합계 기준, 예치금/포인터와 무관):**
+**등급 기준 (전월 매입금 기준):**
 - START: 100만원 미만
 - DRIVING: 100만원 이상 ~ 300만원 미만
 - TOP: 300만원 이상
 
 **조정 규칙:**
-- 매월 1일 0시(KST) 자동 실행 (서버 시작 시 스케줄러 등록)
-- 전월 1일~말일 배송중 확정 주문 금액 합산 (priceConfirmed=true, 상태='배송중')
-- 전월 1일~말일 회원 직접매출(clientType='member') 금액도 매입금에 합산 (매입업체 직접매출은 제외)
+- 매월 1일 0시(KST) 자동 실행
+- 전월 1일~말일 배송중 확정 주문 금액 및 회원 직접매출 합산
 - 최저 등급 보호: START 밑으로는 하향 불가
 - 등급 고정 회원: gradeLocked=true이면 자동 조정 제외
-- 관리자 수동 실행 가능: `/api/admin/members/grade-adjustment/run` (SUPER_ADMIN)
-- 미리보기 API: `/api/admin/members/grade-adjustment/preview`
+- 관리자 수동 실행 및 미리보기 API 제공
 
 **등급 고정 기능:**
-- members 테이블: gradeLocked, lockedGrade, gradeLockReason, gradeLockSetBy, gradeLockSetAt
-- API: `/api/admin/members/:memberId/grade-lock` (POST)
-- 관리자 회원 상세 페이지에 등급 고정 UI 제공
+- DB 필드 및 API 지원
+- 관리자 UI에 등급 고정 기능 제공
 - 회원 목록에서 잠금 아이콘으로 표시
 
 **예치금 충전 시 자동 승급:**
-- ASSOCIATE → START 자동 승급 (3개 경로: 뱅크다 자동매칭, 수동매칭, 관리자 직접충전)
+- ASSOCIATE → START 자동 승급 (뱅크다, 수동, 관리자 충전 시)
 - 트랜잭션 내 원자적 처리, memberLogs에 이력 기록
 
 ### 정산 시스템 (Settlement System)
 **잔액 구조:**
-- 예치금(deposit): 계좌이체 후 관리자가 충전, 주문 정산 시 차감
-- 포인터(point): 관리자가 지급, 주문 정산 시 우선 차감
+- 예치금(deposit), 포인터(point)
 - 사용 가능 잔액 = (예치금 + 포인터) - (대기~배송준비중 주문 총액)
 
 **잔액 검증 시점:**
-1. 엑셀 일괄 업로드 시: 정상건 총 주문금액 vs 사용가능잔액
-2. 잔액 부족 시 상세 메시지 반환 (부족금액, 예치금, 포인터, 진행중 주문액)
-3. 모든 주문은 엑셀 파일 업로드 방식으로만 진행 (개별 주문 등록 없음)
+1. 엑셀 일괄 업로드 시
+2. 잔액 부족 시 상세 메시지 반환
+3. 모든 주문은 엑셀 파일 업로드 방식으로만 진행
 
 **후불결재 회원 시스템:**
-- 후불결재 회원(isPostpaid=true)은 잔액 없이도 주문 등록 가능 (잔액 검증 건너뜀)
-- 정산 시 포인터 우선 차감 → 나머지는 예치금에서 차감 (마이너스 허용)
-- 예치금이 음수가 되면 마이너스로 누적 표시, 입금 시 자동 상계
-- 관리자 설정: `/api/admin/members/:memberId/postpaid` (POST)
-- DB 필드: isPostpaid, postpaidNote, postpaidSetBy, postpaidSetAt
-- 회원 상세 페이지에 후불결재 설정 UI (등급 고정 아래)
-- 회원 목록/잔액 현황에 "후불" 배지 표시
-- 매출/정산 내역 필터에 회원 유형 필터 추가 (전체/일반/후불결재)
+- 후불결재 회원(isPostpaid=true)은 잔액 없이도 주문 등록 가능
+- 정산 시 포인터 우선 차감, 예치금 마이너스 허용
+- 관리자 설정 및 DB 필드, UI 제공
+- 매출/정산 내역 필터에 회원 유형 추가
 
 **자동 정산 (배송중 전환 시):**
-- 회원별로 주문 그룹핑 → 순차 정산 처리
-- 차감 순서: 포인터 우선 차감 → 예치금 차감
+- 회원별 주문 그룹핑 후 순차 정산
+- 차감 순서: 포인터 우선 → 예치금
 - 이력 기록: settlement_history, pointer_history, deposit_history
-- 일반 회원: 잔액 부족 시 해당 주문부터 실패 처리
-- 후불결재 회원: 잔액 부족 시에도 정산 진행 (예치금 마이너스 허용)
+- 일반 회원: 잔액 부족 시 주문 실패
+- 후불결재 회원: 잔액 부족 시에도 정산 진행
 
 **관리자 기능:**
-- 예치금 충전/환급: `/api/admin/members/:memberId/deposit/charge|refund`
-- 포인터 지급: `/api/admin/members/:memberId/pointer/grant`
-- 정산/예치금/포인터 이력 조회: `/api/admin/settlements|deposit-history|pointer-history`
-- 회원별 잔액 현황: `/api/admin/members-balance`
+- 예치금 충전/환급, 포인터 지급
+- 정산/예치금/포인터 이력 조회
+- 회원별 잔액 현황
 
 **회원 기능:**
-- 내 잔액 조회: `/api/member/my-balance`
-- 정산/예치금/포인터 이력 조회: `/api/member/my-settlements|my-deposit-history|my-pointer-history`
+- 내 잔액 조회
+- 정산/예치금/포인터 이력 조회
 
 **DB 테이블:**
-- `settlement_history`: 주문 정산 이력 (포인터차감, 예치금차감, 총액, 잔액)
-- `deposit_history`: 예치금 변동 이력 (충전/환급/차감)
-- `pointer_history`: 포인터 변동 이력 (지급/차감)
+- `settlement_history`, `deposit_history`, `pointer_history`
 
 **프론트엔드 페이지:**
-- 관리자: `/admin/settlements` (회원 잔액 현황, 정산/예치금/포인터 이력 탭, 충전/환급/지급 다이얼로그)
-- 회원: 대시보드 예치금충전 탭 (잔액 현황, 정산/예치금/포인터 이력 탭)
+- 관리자: `/admin/settlements`
+- 회원: 대시보드 예치금충전 탭
 
 **엑셀 업로드 검증 결과 케이스:**
-- A: 상품 오류만, 잔액 OK → 기존 다이얼로그 + 잔액 확인 블록(초록)
-- B: 잔액 부족만 → 잔액 부족 전용 다이얼로그 (max-w-500px)
-- C: 오류 + 잔액 부족 → 복합 다이얼로그 (오류목록 + 잔액부족 두 영역, max-w-560px), "정상건만 등록" 버튼 없음
-- D: 오류 있지만 정상건 잔액 OK → 기존 + 잔액 확인 블록(초록) + "정상건만 등록" 버튼 유지
-- G: 부분 성공 → 토스트에 정산 정보 한 줄 추가
-
-**서버 응답 확장:**
-- `validation_failed`: balanceInfo, totalOrderAmount, balanceSufficient 필드 추가
-- `partial_success`: settlementInfo(orderAmount, remainingBalance) 필드 추가
-- `insufficient_balance`: errors 배열 포함 (오류건 있을 때)
+- 다양한 오류 및 잔액 부족 시나리오에 따른 다이얼로그 및 메시지 처리
+- 서버 응답 확장 (`validation_failed`, `partial_success`, `insufficient_balance`)
 
 **핵심 규칙:**
 - 한 번에 하나의 다이얼로그만 표시
@@ -180,7 +147,7 @@ Preferred communication style: Simple, everyday language.
 - **Sales Statistics Dashboard**: Comprehensive analytics (`/admin/stats`) including overview, member-specific, and product-specific sales data, charts, tables, and Excel export, based on `priceConfirmed=true` orders.
 - **Invoice Management System**: Monthly invoice tracking, unified summary, manual issuance, with `isAutoIssued` for future automation.
 - **Expense Management System**: Expense tracking across 8 categories, auto-classification via keyword dictionary, autocomplete, bulk spreadsheet entry, Excel import/export, recurring expense management, charts, and keyword learning.
-- **AI 상세페이지 마법사**: Google Gemini API를 활용한 과일 상품 상세페이지 마케팅 카피 자동 생성 시스템. 8개 섹션(히어로, 문제공감, 사회적증거, 맛/품질, 구성, 산지, 배송, CTA) × 5가지 카피라이터 스타일로 순차 생성. 서버 프록시 방식으로 API Key 보안 유지(AES-256-GCM 암호화). 관리자(`/admin/ai-studio`)와 회원 대시보드(ai-studio 탭) 모두 접근 가능.
+- **AI 상세페이지 마법사**: Google Gemini API를 활용한 과일 상품 상세페이지 마케팅 카피 자동 생성 시스템. 8개 섹션 × 5가지 카피라이터 스타일로 순차 생성. 서버 프록시 방식으로 API Key 보안 유지(AES-256-GCM 암호화). 관리자(`/admin/ai-studio`)와 회원 대시보드(ai-studio 탭) 모두 접근 가능.
 - **이메일 발송 시스템**: Resend API 기반. `server/utils/email.ts`에 `sendVerificationCode()`, `sendTempPassword()` 함수 구현. 탑셀러 브랜드 HTML 템플릿 적용. DB 테이블: `email_verifications`. API: `POST /api/auth/email-verify/send`, `POST /api/auth/email-verify/confirm`, `POST /api/auth/password-reset/send`. 관리자 비밀번호 초기화 시 자동 이메일 발송 연동 완료.
 
 ## External Dependencies
@@ -204,7 +171,7 @@ Preferred communication style: Simple, everyday language.
 - Cloudflare R2
 
 ### Other APIs
-- Resend (이메일 발송: 인증번호, 임시 비밀번호)
+- Resend (이메일 발송)
 - Juso.go.kr (행정안전부 주소 API for address verification)
 - Anthropic Claude AI (address normalization)
 - Solapi (SMS for vendor notification)
