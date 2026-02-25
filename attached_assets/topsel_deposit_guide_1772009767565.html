@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>예치금 충전 안내 — 탑셀러</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --navy:#1e2a6e; --navy-mid:#2d3a8c; --navy-light:#3d4fa8;
+    --accent:#f5a623; --accent-dark:#e8920a;
+    --purple:#7c3aed; --purple-mid:#5b21b6;
+    --teal:#00acc1; --green:#16a34a; --red:#dc2626;
+    --white:#fff; --gray-50:#f4f6fb; --gray-100:#eaecf4;
+    --gray-200:#d5d9ee; --gray-400:#8a90b0; --gray-600:#555e8a; --gray-800:#2d3462;
+    --card-shadow:0 2px 16px rgba(30,42,110,0.09);
+    --radius:14px; --radius-sm:8px;
+  }
+  body { font-family:'Noto Sans KR',sans-serif; background:var(--gray-50); color:var(--gray-800); }
+
+  .top-header {
+    background:var(--navy); height:56px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; position:sticky; top:0; z-index:100;
+    box-shadow:0 2px 12px rgba(0,0,0,0.15);
+  }
+  .header-logo { font-family:'Montserrat',sans-serif; font-size:20px; font-weight:700; color:white; }
+  .header-logo span { color:var(--accent); }
+  .header-nav { display:flex; align-items:center; gap:20px; }
+  .header-nav a { color:rgba(255,255,255,0.8); font-size:13px; text-decoration:none; cursor:pointer; }
+  .header-nav a:hover { color:white; }
+  .header-nav .mypage { background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:20px; color:white; font-size:13px; }
+
+  .hero {
+    background:linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 50%, #1a5276 100%);
+    padding:40px 0 0; position:relative; overflow:hidden;
+  }
+  .hero::before { content:''; position:absolute; top:-60px; right:-60px; width:300px; height:300px; border-radius:50%; background:rgba(255,255,255,0.04); }
+  .hero::after { content:''; position:absolute; bottom:-40px; left:10%; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,0.03); }
+  .hero-inner { max-width:900px; margin:0 auto; padding:0 24px 36px; position:relative; z-index:1; text-align:center; }
+  .hero-greeting { font-size:13px; color:rgba(255,255,255,0.65); margin-bottom:8px; letter-spacing:1px; }
+  .hero-title { font-family:'Montserrat',sans-serif; font-size:32px; font-weight:800; color:white; letter-spacing:-0.5px; margin-bottom:10px; }
+  .hero-subtitle { font-size:14px; color:rgba(255,255,255,0.75); line-height:1.7; margin-bottom:28px; }
+  .hero-btns { display:flex; gap:10px; justify-content:center; margin-bottom:32px; }
+  .hero-btn { padding:10px 22px; border-radius:24px; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:600; text-decoration:none; cursor:pointer; transition:all .2s; border:none; }
+  .hero-btn.primary { background:var(--accent); color:white; box-shadow:0 4px 14px rgba(245,166,35,0.4); }
+  .hero-btn.primary:hover { background:var(--accent-dark); transform:translateY(-2px); }
+  .hero-btn.secondary { background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.3); }
+  .hero-btn.secondary:hover { background:rgba(255,255,255,0.25); }
+  .hero-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; max-width:700px; margin:0 auto; }
+  .hero-stat { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:14px 16px; text-align:left; }
+  .hero-stat-label { font-size:11px; color:rgba(255,255,255,0.65); margin-bottom:5px; }
+  .hero-stat-value { font-family:'Montserrat',sans-serif; font-size:17px; font-weight:700; color:white; }
+
+  /* 후불결제 배너 */
+  .postpaid-banner {
+    background:linear-gradient(135deg, var(--purple) 0%, var(--purple-mid) 100%);
+    padding:14px 24px; display:none; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .postpaid-banner.show { display:flex; }
+  .postpaid-badge { background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.35); color:white; font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
+  .postpaid-banner-text { font-size:13px; color:white; line-height:1.6; flex:1; }
+  .postpaid-banner-text strong { color:#e9d5ff; }
+
+  .tab-bar { background:var(--navy-mid); display:flex; justify-content:center; border-top:1px solid rgba(255,255,255,0.1); }
+  .tab-item { padding:12px 24px; font-size:13px; color:rgba(255,255,255,0.65); cursor:pointer; border-bottom:3px solid transparent; transition:all .2s; font-weight:500; }
+  .tab-item.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:700; }
+
+  .main { max-width:900px; margin:0 auto; padding:28px 20px 60px; }
+
+  /* 후불결제 안내 카드 */
+  .postpaid-card { display:none; }
+  .postpaid-card.show { display:block; }
+  .postpaid-info-box {
+    background:linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    border:2px solid var(--purple); border-radius:var(--radius);
+    padding:20px 22px; margin-bottom:16px;
+  }
+  .postpaid-info-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .postpaid-info-icon { width:36px; height:36px; background:linear-gradient(135deg,var(--purple),var(--purple-mid)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .postpaid-info-title { font-size:15px; font-weight:700; color:var(--purple-mid); }
+  .postpaid-info-sub { font-size:12px; color:#6d28d9; margin-top:2px; }
+  .postpaid-steps { display:flex; flex-direction:column; gap:10px; }
+  .postpaid-step { display:flex; gap:12px; align-items:flex-start; background:white; border-radius:var(--radius-sm); padding:14px; border:1px solid #ddd6fe; }
+  .postpaid-step-num { width:24px; height:24px; border-radius:50%; background:linear-gradient(135deg,var(--purple),var(--purple-mid)); color:white; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-family:'Montserrat',sans-serif; }
+  .postpaid-step-text { font-size:13px; color:var(--gray-700); line-height:1.7; }
+  .postpaid-step-text strong { color:var(--purple-mid); }
+  .postpaid-notice { background:#faf5ff; border:1px solid #c4b5fd; border-radius:var(--radius-sm); padding:11px 14px; margin-top:12px; font-size:12px; color:#5b21b6; line-height:1.7; display:flex; gap:8px; }
+
+  .card { background:var(--white); border-radius:var(--radius); box-shadow:var(--card-shadow); margin-bottom:16px; overflow:hidden; }
+  .card-header { display:flex; align-items:center; gap:10px; padding:16px 22px; border-bottom:1px solid var(--gray-100); background:linear-gradient(135deg,#f8f9fc 0%,#fff 100%); }
+  .card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .card-icon.blue { background:#e8f0fe; }
+  .card-icon.green { background:#dcfce7; }
+  .card-icon.orange { background:#fff7ed; }
+  .card-title { font-size:15px; font-weight:700; color:var(--gray-800); }
+  .card-body { padding:20px 22px; }
+
+  .tip-box { background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:1px solid #93c5fd; border-radius:var(--radius-sm); padding:16px 18px; margin-bottom:20px; display:flex; gap:12px; align-items:flex-start; }
+  .tip-box-icon { font-size:22px; flex-shrink:0; margin-top:1px; }
+  .tip-box-title { font-size:13px; font-weight:700; color:#1e40af; margin-bottom:5px; }
+  .tip-box-text { font-size:13px; color:#1e3a8a; line-height:1.7; }
+  .tip-box-text strong { color:#1e40af; }
+
+  .account-box { background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 100%); border-radius:var(--radius); padding:20px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .account-bank { font-size:12px; opacity:0.7; margin-bottom:4px; }
+  .account-num { font-family:'Montserrat',sans-serif; font-size:24px; font-weight:800; letter-spacing:1px; color:white; margin-bottom:4px; }
+  .account-owner { font-size:13px; opacity:0.8; color:white; }
+  .copy-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:8px; padding:10px 18px; color:white; font-family:'Noto Sans KR',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .copy-btn:hover { background:rgba(255,255,255,0.25); }
+
+  .step-list { display:flex; flex-direction:column; gap:0; }
+  .step-item { display:flex; gap:16px; padding:20px 0; border-bottom:1px solid var(--gray-100); }
+  .step-item:last-child { border-bottom:none; }
+  .step-num { width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,var(--navy),var(--navy-light)); color:white; font-family:'Montserrat',sans-serif; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(30,42,110,0.25); }
+  .step-content { flex:1; }
+  .step-title { font-size:14px; font-weight:700; color:var(--gray-800); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .step-body { font-size:13px; color:var(--gray-600); line-height:1.8; }
+  .step-body strong { color:var(--gray-800); }
+
+  .member-name-box { background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%); border:2px solid var(--accent); border-radius:var(--radius-sm); padding:16px 18px; margin:12px 0; }
+  .member-name-header { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#92400e; margin-bottom:12px; }
+  .member-name-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .member-name-label { font-size:12px; color:#78350f; font-weight:600; width:80px; flex-shrink:0; }
+  .member-name-value { font-family:'Montserrat',sans-serif; font-size:20px; font-weight:800; color:var(--navy); background:white; border:2px solid var(--accent); border-radius:var(--radius-sm); padding:8px 18px; letter-spacing:1px; }
+  .member-name-notices { display:flex; flex-direction:column; gap:5px; margin-top:4px; }
+  .member-name-notice { font-size:12px; color:#92400e; line-height:1.6; display:flex; align-items:flex-start; gap:5px; }
+
+  .warn-box { background:#fef2f2; border:1px solid #fca5a5; border-radius:var(--radius-sm); padding:12px 16px; margin-top:12px; display:flex; gap:8px; align-items:flex-start; font-size:12px; color:#991b1b; line-height:1.6; }
+  .time-box { background:var(--gray-50); border-radius:var(--radius-sm); padding:14px 16px; margin-top:12px; display:flex; gap:10px; align-items:flex-start; font-size:13px; color:var(--gray-600); line-height:1.7; }
+
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .info-item { background:var(--gray-50); border-radius:var(--radius-sm); padding:16px; display:flex; gap:12px; align-items:flex-start; }
+  .info-item-icon { font-size:24px; flex-shrink:0; }
+  .info-item-title { font-size:13px; font-weight:700; color:var(--gray-800); margin-bottom:5px; }
+  .info-item-text { font-size:12px; color:var(--gray-600); line-height:1.7; }
+  .tax-warn { background:#fef2f2; border:1px solid #fca5a5; border-radius:var(--radius-sm); padding:12px 16px; margin-bottom:14px; font-size:12px; color:#991b1b; font-weight:600; text-align:center; }
+
+  .cta-box { background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 100%); border-radius:var(--radius); padding:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .cta-text { color:white; }
+  .cta-title { font-size:15px; font-weight:700; margin-bottom:4px; }
+  .cta-sub { font-size:12px; opacity:0.75; }
+  .cta-btn { background:var(--accent); color:white; border:none; border-radius:var(--radius-sm); padding:10px 22px; font-family:'Noto Sans KR',sans-serif; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; box-shadow:0 4px 12px rgba(245,166,35,0.35); transition:all .2s; }
+  .cta-btn:hover { background:var(--accent-dark); transform:translateY(-1px); }
+
+  /* 구분선 */
+  .divider { border:none; border-top:2px dashed var(--gray-200); margin:4px 0 16px; }
+
+  @media(max-width:640px){
+    .hero-stats { grid-template-columns:1fr 1fr; }
+    .hero-stats .hero-stat:last-child { grid-column:1/-1; }
+    .info-grid { grid-template-columns:1fr; }
+    .account-box { flex-direction:column; align-items:flex-start; }
+    .tab-item { padding:10px 14px; font-size:12px; }
+    .hero-title { font-size:24px; }
+    .cta-box { flex-direction:column; text-align:center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="top-header">
+  <div class="header-logo">Top<span>sel</span></div>
+  <nav class="header-nav">
+    <a>장바구니</a><a>샘플</a><a>테스트 메뉴</a><a>로그아웃</a>
+    <a class="mypage">마이페이지</a>
+  </nav>
+</header>
+
+<!-- 히어로 배너 -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-greeting">👋 환영합니다!</div>
+    <div class="hero-title">예치금 충전 안내</div>
+    <div class="hero-subtitle">
+      탑셀러에서 상품을 공급받기 위해서는 예치금 또는 포인트 잔액이 반드시 필요합니다.<br>
+      지정된 계좌로 입금하시면 <strong style="color:var(--accent);">24시간 자동으로 처리</strong>됩니다.
+    </div>
+    <div class="hero-btns">
+      <button class="hero-btn primary">📖 이용가이드 보기</button>
+      <button class="hero-btn secondary">💬 1:1 문의하기</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-label">😊 회원 등급</div>
+        <div class="hero-stat-value">Driving회원</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">📊 지난 달 매입 총액</div>
+        <div class="hero-stat-value">0 원</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-label">📋 이번 달 매입 총액</div>
+        <div class="hero-stat-value">0 원</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 후불결제 회원 전용 배너 (isPostpaid=true 시 표시) -->
+  <div class="postpaid-banner show" id="postpaidBanner">
+    <span class="postpaid-badge">🔔 후불결제 회원</span>
+    <div class="postpaid-banner-text">
+      회원님은 <strong>후불결제 회원</strong>입니다.
+      동일 계좌로 입금 시 <strong>후불결제 정산이 자동으로 처리</strong>됩니다.
+      예치금 충전도 동일 계좌를 이용합니다.
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active">💰 입금 안내</div>
+    <div class="tab-item">🔄 환불 안내</div>
+    <div class="tab-item">🧾 세금계산서 안내</div>
+  </div>
+</div>
+
+<!-- 메인 콘텐츠 -->
+<main class="main">
+
+  <!-- ★ 후불결제 회원 전용 안내 카드 (isPostpaid=true 시만 표시) -->
+  <div class="postpaid-card show" id="postpaidCard">
+    <div class="postpaid-info-box">
+      <div class="postpaid-info-header">
+        <div class="postpaid-info-icon">🔄</div>
+        <div>
+          <div class="postpaid-info-title">후불결제 정산 안내</div>
+          <div class="postpaid-info-sub">후불결제 회원 전용 — 아래 계좌로 입금 시 자동 정산 처리</div>
+        </div>
+      </div>
+      <div class="postpaid-steps">
+        <div class="postpaid-step">
+          <div class="postpaid-step-num">1</div>
+          <div class="postpaid-step-text">
+            <strong>후불결제 정산</strong>은 상품 공급 후 발생한 정산 금액을 아래 지정 계좌로 입금하시면 <strong>자동으로 정산 처리</strong>됩니다.
+          </div>
+        </div>
+        <div class="postpaid-step">
+          <div class="postpaid-step-num">2</div>
+          <div class="postpaid-step-text">
+            입금 시 반드시 <strong>회원명(입금자 확인용 이름)</strong>으로 입금해 주세요. 회원명이 다르면 자동 처리되지 않습니다.
+          </div>
+        </div>
+        <div class="postpaid-step">
+          <div class="postpaid-step-num">3</div>
+          <div class="postpaid-step-text">
+            예치금 충전도 <strong>동일한 계좌</strong>를 이용합니다. 입금 목적(정산/충전)에 관계없이 시스템이 자동으로 구분하여 처리합니다.
+          </div>
+        </div>
+      </div>
+      <div class="postpaid-notice">
+        <span>💡</span>
+        <span>후불결제 정산 내역은 마이페이지 <strong>정산 관리</strong> 탭에서 확인할 수 있습니다. 정산 관련 문의는 고객센터로 연락해 주세요.</span>
+      </div>
+    </div>
+    <hr class="divider">
+  </div>
+
+  <!-- 공통: 핵심 안내 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon blue">💡</div>
+      <div class="card-title">핵심 안내</div>
+    </div>
+    <div class="card-body">
+      <div class="tip-box">
+        <div class="tip-box-icon">💡</div>
+        <div>
+          <div class="tip-box-title">예치금/포인트가 있어야 상품 공급이 가능합니다</div>
+          <div class="tip-box-text">
+            탑셀러에서 상품을 공급받기 위해서는 <strong>예치금 또는 포인트 잔액</strong>이 반드시 필요합니다.<br>
+            지정된 계좌로 입금하시면 <strong>24시간 자동으로 예치금이 충전</strong>됩니다.
+            <span id="postpaidTip" style="display:none;">
+              <br>후불결제 회원의 경우 <strong>동일 계좌로 후불결제 정산도 자동 처리</strong>됩니다.
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="account-box">
+        <div>
+          <div class="account-bank">🏦 농협은행</div>
+          <div class="account-num">301-0339-1231-81</div>
+          <div class="account-owner">예금주: 현 농업회사법인 주식회사</div>
+        </div>
+        <button class="copy-btn" id="copyBtn">📋 계좌번호 복사</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 공통: 입금 방법 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon orange">📋</div>
+      <div class="card-title">입금 방법</div>
+    </div>
+    <div class="card-body">
+      <div class="step-list">
+
+        <!-- STEP 1 — 회원명 -->
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">
+              입금자명 확인
+              <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">가장 중요!</span>
+            </div>
+            <div class="step-body">
+              입금 시 <strong>입금자명은 반드시 회원명(회원가입 시 등록한 입금자 확인용 이름)과 동일</strong>해야 합니다.
+            </div>
+            <div class="member-name-box">
+              <div class="member-name-header">⚠️ 반드시 아래 회원명으로 입금해 주세요!</div>
+              <div class="member-name-row">
+                <div class="member-name-label">내 회원명</div>
+                <div class="member-name-value" id="memberNameDisplay">김탑셀</div>
+              </div>
+              <div class="member-name-notices">
+                <div class="member-name-notice"><span>✅</span><span>자동 처리 시스템이 <strong>이 회원명</strong>으로 입금자를 매칭합니다. 반드시 이 이름으로 입금해 주세요.</span></div>
+                <div class="member-name-notice"><span>✅</span><span>사업자 대표자명과 다를 수 있습니다. 반드시 위의 <strong>회원명</strong>으로 입금하세요.</span></div>
+                <div class="member-name-notice"><span>✅</span><span>띄어쓰기도 동일하게 입력해 주세요.</span></div>
+                <div class="member-name-notice"><span>📝</span><span>회원명 변경이 필요한 경우 <a href="#" style="color:var(--navy);font-weight:700;text-decoration:underline;">회원정보 페이지</a>에서 수정하세요.</span></div>
+              </div>
+            </div>
+            <div class="warn-box">⚠️ <span><strong>회원명과 입금자명이 다를 경우, 자동 처리가 되지 않습니다.</strong> 고객센터에 직접 문의하셔야 하며 영업시간 내에만 처리 가능합니다.</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">지정 계좌로 입금</div>
+            <div class="step-body">
+              위에 안내된 <strong>농협 계좌</strong>로 원하시는 금액을 입금해 주세요.<br>
+              입금 금액에 제한은 없으며, 입금하신 금액 그대로 처리됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">자동 처리 완료</div>
+            <div class="step-body">
+              정상적인 입금 시 <strong>보통 10분 이내</strong>에 자동으로 처리됩니다.
+            </div>
+            <div class="time-box">
+              <span>🕐</span>
+              <div>
+                전산 처리 상황에 따라 <strong>30분 ~ 1시간</strong> 소요될 수 있습니다.<br>
+                <strong>자동 처리는 24시간 운영됩니다.</strong> (업무시간 외에도 정상 작동)<br>
+                <span style="color:var(--red);">💡 1시간이 지나도 처리되지 않으면 고객센터로 문의해 주세요.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 환불 & 세금계산서 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon green">🔄</div>
+      <div class="card-title">환불 및 세금계산서 안내</div>
+    </div>
+    <div class="card-body">
+      <div class="tax-warn">⚠️ 예치금 입금 시 세금계산서가 발행되지 않습니다 — 상품 공급 정산 시 발행됩니다.</div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-item-icon">✅</div>
+          <div>
+            <div class="info-item-title">언제든지 환불 가능</div>
+            <div class="info-item-text">충전하신 예치금은 요청 시 언제든지 환불받으실 수 있습니다. 환불 신청 후 <strong>1~2일 내</strong>에 처리됩니다.</div>
+          </div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-icon">📝</div>
+          <div>
+            <div class="info-item-title">환불 신청 방법</div>
+            <div class="info-item-text">예치금 환불 게시판을 통해 환불 신청서를 작성해 주세요. 신청 후 확인 작업을 거쳐 지정 계좌로 환불됩니다.</div>
+          </div>
+        </div>
+        <div class="info-item" style="grid-column:1/-1;">
+          <div class="info-item-icon">🧾</div>
+          <div>
+            <div class="info-item-title">세금계산서 발행 안내</div>
+            <div class="info-item-text">예치금으로 <strong>상품 공급 정산 시 세금계산서(계산서)가 발행</strong>됩니다. 예치금 입금에 대한 별도의 세금계산서는 발행되지 않습니다. ※ 입금 시점과 정산 시점의 중복 발행 방지를 위함입니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 문의 CTA -->
+  <div class="cta-box">
+    <div class="cta-text">
+      <div class="cta-title">🖥️ 문의사항이 있으신가요?</div>
+      <div class="cta-sub">예치금 충전 관련 문의는 고객센터(회원전용 게시판)로 연락해 주세요. (영업시간 내 처리)</div>
+    </div>
+    <button class="cta-btn">💬 고객센터 문의하기</button>
+  </div>
+
+</main>
+
+<script>
+// ── 후불결제 여부 설정 (실제 구현 시 서버에서 isPostpaid 값 주입)
+const isPostpaid = true; // 테스트용: true=후불결제 회원, false=일반 회원
+
+if (isPostpaid) {
+  document.getElementById('postpaidBanner').classList.add('show');
+  document.getElementById('postpaidCard').classList.add('show');
+  document.getElementById('postpaidTip').style.display = 'inline';
+}
+
+// ── 계좌번호 복사
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2d3462;color:white;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:fadeIn .2s ease;';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+document.getElementById('copyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText('30103391231181').then(() => showToast('✅ 계좌번호가 복사되었습니다!'));
+});
+</script>
+</body>
+</html>
