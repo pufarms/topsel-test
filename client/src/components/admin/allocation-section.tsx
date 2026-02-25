@@ -222,6 +222,20 @@ export default function AllocationSection() {
     },
   });
 
+  const resetMutation = useMutation({
+    mutationFn: async (allocationId: number) => {
+      const res = await apiRequest("POST", `/api/admin/allocations/${allocationId}/reset`);
+      return await res.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ title: "배분 초기화 완료", description: result.message });
+      refreshAll();
+    },
+    onError: (err: any) => {
+      toast({ title: "배분 초기화 실패", description: err.message, variant: "destructive" });
+    },
+  });
+
   const openNotifyDialog = (alloc: Allocation) => {
     setSelectedAllocation(alloc);
     const vendors = alloc.availableVendors || [];
@@ -372,6 +386,16 @@ export default function AllocationSection() {
                                 {alloc.status === "confirmed" && (
                                   <Button size="sm" variant="default" onClick={(e) => { e.stopPropagation(); setAssignTargetAllocation(alloc); setAssignDialogOpen(true); }} disabled={assignMutation.isPending} data-testid={`button-assign-${alloc.id}`}>
                                     <Truck className="h-3 w-3 mr-1" />배정
+                                  </Button>
+                                )}
+                                {(alloc.status === "confirmed" || alloc.status === "assigned") && (
+                                  <Button size="sm" variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50" onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`${alloc.productName || alloc.productCode} 배분을 초기화하시겠습니까?\n배분 상세 데이터가 모두 삭제되고 대기 상태로 복원됩니다.`)) {
+                                      resetMutation.mutate(alloc.id);
+                                    }
+                                  }} disabled={resetMutation.isPending} data-testid={`button-reset-${alloc.id}`}>
+                                    <RefreshCw className="h-3 w-3 mr-1" />초기화
                                   </Button>
                                 )}
                               </div>

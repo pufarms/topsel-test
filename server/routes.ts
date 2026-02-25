@@ -10231,18 +10231,64 @@ export async function registerRoutes(
         })
         .where(inArray(pendingOrders.id, ordersToRestore.map(o => o.id)));
 
+      // 복원된 주문의 상품코드와 관련된 배분 데이터 초기화
+      const restoredProductCodes = Array.from(new Set(ordersToRestore.map(o => o.productCode).filter(Boolean)));
+      let allocationResetCount = 0;
+      if (restoredProductCodes.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const productCode of restoredProductCodes) {
+            const relatedAllocations = await tx.select().from(orderAllocations)
+              .where(eq(orderAllocations.productCode, productCode!));
+            
+            for (const allocation of relatedAllocations) {
+              // 배분 상세(allocation_details) 삭제
+              await tx.delete(allocationDetails).where(eq(allocationDetails.allocationId, allocation.id));
+              
+              // 현재 대기 상태 주문 수 재계산
+              const currentOrders = await tx.select({ count: sql<number>`count(*)::int` })
+                .from(pendingOrders)
+                .where(and(
+                  eq(pendingOrders.productCode, productCode!),
+                  or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
+                ));
+              const totalQty = currentOrders[0]?.count || 0;
+              
+              if (totalQty === 0) {
+                await tx.delete(orderAllocations).where(eq(orderAllocations.id, allocation.id));
+              } else {
+                await tx.update(orderAllocations)
+                  .set({
+                    totalQuantity: totalQty,
+                    allocatedQuantity: 0,
+                    unallocatedQuantity: totalQty,
+                    status: "pending",
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orderAllocations.id, allocation.id));
+              }
+              allocationResetCount++;
+            }
+          }
+        });
+        console.log(`주문 복원 - ${restoredProductCodes.length}개 상품코드의 배분 데이터 초기화 완료 (${allocationResetCount}건)`);
+      }
+
       // SSE 알림 - 모든 관리자에게 주문 복구 알림
       sseManager.sendToAdmins("order-restored", {
         type: "order-restored",
         restoredCount: ordersToRestore.length,
         orderIds: ordersToRestore.map(o => o.id)
       });
+      if (allocationResetCount > 0) {
+        sseManager.sendToAdmins("allocation-updated", { type: "allocation-reset" });
+      }
 
       res.json({
         success: true,
-        message: `${ordersToRestore.length}건의 주문이 주문대기로 복구되었습니다.`,
+        message: `${ordersToRestore.length}건의 주문이 주문대기로 복구되었습니다.${allocationResetCount > 0 ? ` (관련 배분 ${allocationResetCount}건 초기화)` : ''}`,
         restoredCount: ordersToRestore.length,
-        restoredOrderIds: ordersToRestore.map(o => o.id)
+        restoredOrderIds: ordersToRestore.map(o => o.id),
+        allocationResetCount
       });
     } catch (error: any) {
       console.error("Order restore error:", error);
@@ -12858,6 +12904,57 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("주문 배정 실패:", error);
       res.status(500).json({ message: error.message || "주문 배정 실패" });
+    }
+  });
+
+  // Phase 2-6: 개별 배분 초기화 (배분확정/배정 → 대기 상태로 복원)
+  app.post('/api/admin/allocations/:allocationId/reset', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN")) return res.status(403).json({ message: "Not authorized" });
+
+    try {
+      const allocationId = parseInt(req.params.allocationId);
+      const allocation = await storage.getOrderAllocationById(allocationId);
+      if (!allocation) return res.status(404).json({ message: "배분 정보를 찾을 수 없습니다" });
+
+      if (allocation.status === "pending") {
+        return res.status(400).json({ message: "이미 대기 상태입니다." });
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.delete(allocationDetails).where(eq(allocationDetails.allocationId, allocationId));
+
+        const currentOrders = await tx.select({ count: sql<number>`count(*)::int` })
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.productCode, allocation.productCode),
+            or(eq(pendingOrders.status, "대기"), eq(pendingOrders.status, "상품준비중"))
+          ));
+        const totalQty = currentOrders[0]?.count || 0;
+
+        await tx.update(orderAllocations)
+          .set({
+            totalQuantity: totalQty,
+            allocatedQuantity: 0,
+            unallocatedQuantity: totalQty,
+            status: "pending",
+            updatedAt: new Date(),
+          })
+          .where(eq(orderAllocations.id, allocationId));
+      });
+
+      sseManager.sendToAdmins("allocation-updated", { type: "allocation-reset", allocationId });
+      console.log(`배분 초기화 - allocationId: ${allocationId}, 상품: ${allocation.productCode}`);
+
+      res.json({
+        success: true,
+        message: `${allocation.productName || allocation.productCode} 배분이 대기 상태로 초기화되었습니다.`,
+        allocationId,
+      });
+    } catch (error: any) {
+      console.error("배분 초기화 실패:", error);
+      res.status(500).json({ message: error.message || "배분 초기화 실패" });
     }
   });
 
