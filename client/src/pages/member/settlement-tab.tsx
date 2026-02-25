@@ -955,7 +955,7 @@ function PointerHistoryTab({ dateRange }: { dateRange: any }) {
   );
 }
 
-export default function MemberSettlementTab() {
+export default function MemberSettlementTab({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
   const [subTab, setSubTab] = useState("balance");
 
   const settlementDateRange = useDateRange("month");
@@ -1053,9 +1053,7 @@ export default function MemberSettlementTab() {
               <div
                 className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors"
                 onClick={() => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("tab", "deposit-guide");
-                  window.location.href = url.toString();
+                  if (onNavigateTab) onNavigateTab("deposit-guide");
                 }}
               >
                 <p className="text-sm font-medium mb-1">예치금 충전 안내</p>

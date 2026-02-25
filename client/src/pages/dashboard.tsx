@@ -1818,7 +1818,7 @@ export default function Dashboard() {
 
               {/* 예치금충전/정산이력 탭 */}
               {activeTab === "deposit" && (
-                <MemberSettlementTab />
+                <MemberSettlementTab onNavigateTab={(tab) => setActiveTab(tab as SidebarTab)} />
               )}
 
               {activeTab === "deposit-guide" && (
@@ -1836,7 +1836,7 @@ export default function Dashboard() {
                 <AIStudioApp />
               )}
               {activeTab === "member-info" && (
-                <MemberInfoTab />
+                <MemberInfoTab onNavigateTab={(tab) => setActiveTab(tab as SidebarTab)} />
               )}
           </main>
         </div>
