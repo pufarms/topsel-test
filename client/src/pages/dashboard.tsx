@@ -1325,12 +1325,14 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
                               <span className="text-muted-foreground">진행 중 주문</span>
-                              <span className="font-semibold text-amber-600" data-testid="text-pending-total">-{balanceData.pendingOrdersTotal.toLocaleString()}원</span>
+                              <span className="font-semibold text-amber-600" data-testid="text-pending-total">
+                                {isPostpaid ? `-${balanceData.pendingOrdersTotal.toLocaleString()}원` : `-${balanceData.pendingOrdersTotal.toLocaleString()}원`}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 px-3 py-2 rounded-md bg-background/60">
-                              <span className="text-muted-foreground">사용 가능 잔액</span>
+                              <span className="text-muted-foreground">{isPostpaid ? "결재 방식" : "사용 가능 잔액"}</span>
                               <span className={`text-lg font-bold ${bannerStyle.valueColor}`} data-testid="text-available-balance">
-                                {balanceData.availableBalance.toLocaleString()}원
+                                {isPostpaid ? "계약한도" : `${balanceData.availableBalance.toLocaleString()}원`}
                               </span>
                             </div>
                           </div>
