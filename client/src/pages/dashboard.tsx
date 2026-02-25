@@ -532,6 +532,8 @@ export default function Dashboard() {
         setUploadProgress(null);
         toast({ title: "주문 등록 완료", description: `${data.success}건의 주문이 등록되었습니다.` });
         queryClient.invalidateQueries({ queryKey: ["/api/member/pending-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/member/my-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/order-stats"] });
       }
     },
     onError: (error: any) => {
