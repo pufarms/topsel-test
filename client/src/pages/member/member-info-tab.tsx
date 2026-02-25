@@ -183,7 +183,7 @@ export default function MemberInfoTab() {
         </div>
 
         <button
-          onClick={() => navigate("/dashboard?tab=deposit")}
+          onClick={() => navigate("/dashboard?tab=deposit-guide")}
           className="flex flex-col items-center justify-center gap-1 rounded-xl px-6 py-4 text-white font-bold text-sm cursor-pointer transition-transform hover:-translate-y-0.5"
           style={{ background: "linear-gradient(135deg, #f5a623 0%, #e8920a 100%)", boxShadow: "0 4px 14px rgba(245,166,35,0.35)", minHeight: 76 }}
           data-testid="button-charge-deposit"

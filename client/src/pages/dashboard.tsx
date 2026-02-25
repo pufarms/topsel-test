@@ -74,6 +74,7 @@ import MemberStatsTab from "@/pages/member/member-stats-tab";
 import MemberInquiryTab from "@/pages/member/inquiry-tab";
 import AIStudioApp from "@/pages/ai-studio";
 import MemberInfoTab from "@/pages/member/member-info-tab";
+import DepositGuideTab from "@/pages/member/deposit-guide-tab";
 
 type SidebarTab = 
   | "dashboard" 
@@ -86,6 +87,7 @@ type SidebarTab =
   | "order-list"
   | "address-tool"
   | "deposit"
+  | "deposit-guide"
   | "member-stats"
   | "inquiry"
   | "ai-studio"
@@ -266,7 +268,10 @@ function InquiryDashboardCard({ onNavigate }: { onNavigate: () => void }) {
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<SidebarTab>("dashboard");
+  const initialUrlParams = new URLSearchParams(window.location.search);
+  const initialTab = initialUrlParams.get("tab") as SidebarTab | null;
+  const validTabs: SidebarTab[] = ["dashboard","member-info","product-list","order-new","order-adjust","order-invoice","order-cancel","order-list","address-tool","deposit","deposit-guide","member-stats","inquiry","ai-studio","guide"];
+  const [activeTab, setActiveTab] = useState<SidebarTab>(initialTab && validTabs.includes(initialTab) ? initialTab : "dashboard");
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   
@@ -879,6 +884,13 @@ export default function Dashboard() {
         onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
       />
       <SidebarItem
+        icon={<CreditCard className="h-4 w-4" />}
+        label="예치금 충전 안내"
+        tab="deposit-guide"
+        activeTab={activeTab}
+        onClick={(tab) => { setActiveTab(tab); setMobileOpen(false); }}
+      />
+      <SidebarItem
         icon={<BarChart3 className="h-4 w-4" />}
         label="통계관리"
         tab="member-stats"
@@ -1103,7 +1115,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   <div className="flex justify-center">
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 gap-2" onClick={() => setActiveTab("deposit-guide")}>
                       <Wallet className="h-4 w-4" />
                       예치금 충전 안내
                     </Button>
@@ -1286,7 +1298,7 @@ export default function Dashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setActiveTab("deposit")}
+                              onClick={() => setActiveTab("deposit-guide")}
                               data-testid="button-go-deposit"
                             >
                               <CreditCard className="h-3.5 w-3.5 mr-1" />
@@ -1807,6 +1819,10 @@ export default function Dashboard() {
               {/* 예치금충전/정산이력 탭 */}
               {activeTab === "deposit" && (
                 <MemberSettlementTab />
+              )}
+
+              {activeTab === "deposit-guide" && (
+                <DepositGuideTab onNavigate={(tab) => setActiveTab(tab as SidebarTab)} />
               )}
 
               {activeTab === "member-stats" && (

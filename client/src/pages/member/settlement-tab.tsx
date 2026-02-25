@@ -1050,7 +1050,14 @@ export default function MemberSettlementTab() {
                   <span className="font-bold text-emerald-600" data-testid="text-available-balance">{balanceData.availableBalance.toLocaleString()}원</span>
                 </div>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
+              <div
+                className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("tab", "deposit-guide");
+                  window.location.href = url.toString();
+                }}
+              >
                 <p className="text-sm font-medium mb-1">예치금 충전 안내</p>
                 <p className="text-xs text-muted-foreground">
                   예치금 충전은 관리자에게 문의해주세요. 계좌이체 후 관리자가 확인하여 충전해드립니다.
