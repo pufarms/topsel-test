@@ -10309,7 +10309,126 @@ export async function registerRoutes(
     try {
       const { excludeMaterialCodes = [] } = req.body;
 
-      // 대기 상태의 주문 조회
+      // ===== STEP 0: 배분 부족 건 자동 주문조정 처리 =====
+      // confirmed/assigned 상태의 배분 중 부족분이 있으면 공정 배분 실행
+      let allocationAdjustedCount = 0;
+      const today = new Date().toISOString().split('T')[0];
+      
+      const activeAllocations = await db.select()
+        .from(orderAllocations)
+        .where(
+          inArray(orderAllocations.status, ["confirmed", "assigned"])
+        );
+      
+      for (const allocation of activeAllocations) {
+        const confirmedDetails = await db.select()
+          .from(allocationDetails)
+          .where(and(
+            eq(allocationDetails.allocationId, allocation.id),
+            eq(allocationDetails.status, "confirmed")
+          ));
+        
+        const availableStock = confirmedDetails.reduce((sum, d) => sum + (d.allocatedQuantity || 0), 0);
+        
+        const targetOrders = await db.select()
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.status, "대기"),
+            eq(pendingOrders.productCode, allocation.productCode)
+          ))
+          .orderBy(pendingOrders.sequenceNumber);
+        
+        if (targetOrders.length === 0) continue;
+        
+        const totalRequired = targetOrders.length;
+        if (totalRequired <= availableStock) continue;
+        
+        console.log(`[상품준비중 전송] 배분 부족 자동 처리 - 상품: ${allocation.productCode}, 주문: ${totalRequired}, 가용: ${availableStock}, 부족: ${totalRequired - availableStock}`);
+        
+        const ratio = availableStock / totalRequired;
+        const primaryVendorId = confirmedDetails.length > 0 ? confirmedDetails[0].vendorId : null;
+        
+        interface AllocOrderItem {
+          id: string;
+          memberId: string | null;
+          productCode: string | null;
+          sequenceNum: number;
+          keepOrder: boolean;
+        }
+        
+        const ordersForDist: AllocOrderItem[] = targetOrders.map(order => ({
+          id: order.id,
+          memberId: order.memberId,
+          productCode: order.productCode,
+          sequenceNum: parseInt(order.sequenceNumber, 10) || 0,
+          keepOrder: true,
+        }));
+        
+        const groupMap = new Map<string, { memberId: string; orders: AllocOrderItem[]; originalCount: number; keepCount: number; }>();
+        for (const order of ordersForDist) {
+          const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
+          if (!groupMap.has(key)) {
+            groupMap.set(key, { memberId: order.memberId || 'unknown', orders: [], originalCount: 0, keepCount: 0 });
+          }
+          const g = groupMap.get(key)!;
+          g.orders.push(order);
+          g.originalCount++;
+        }
+        
+        const groupList = Array.from(groupMap.values());
+        for (const g of groupList) {
+          g.keepCount = Math.floor(g.originalCount * ratio);
+          g.orders.sort((a, b) => a.sequenceNum - b.sequenceNum);
+          g.orders.forEach((order, idx) => { order.keepOrder = idx < g.keepCount; });
+        }
+        
+        let totalKept = groupList.reduce((sum, g) => sum + g.keepCount, 0);
+        
+        if (totalKept > availableStock) {
+          const allKept = ordersForDist.filter(o => o.keepOrder).sort((a, b) => b.sequenceNum - a.sequenceNum);
+          for (const order of allKept) {
+            if (totalKept <= availableStock) break;
+            order.keepOrder = false;
+            totalKept--;
+          }
+        }
+        if (totalKept < availableStock) {
+          const allCancelled = ordersForDist.filter(o => !o.keepOrder).sort((a, b) => a.sequenceNum - b.sequenceNum);
+          for (const order of allCancelled) {
+            if (totalKept >= availableStock) break;
+            order.keepOrder = true;
+            totalKept++;
+          }
+        }
+        
+        const cancelIds = ordersForDist.filter(o => !o.keepOrder).map(o => o.id);
+        if (cancelIds.length > 0) {
+          await db.update(pendingOrders)
+            .set({ status: "주문조정", fulfillmentType: "vendor", updatedAt: new Date() })
+            .where(inArray(pendingOrders.id, cancelIds));
+          allocationAdjustedCount += cancelIds.length;
+        }
+        
+        const keepIds = ordersForDist.filter(o => o.keepOrder).map(o => o.id);
+        if (keepIds.length > 0 && primaryVendorId) {
+          await db.update(pendingOrders)
+            .set({ fulfillmentType: "vendor", vendorId: primaryVendorId, updatedAt: new Date() })
+            .where(inArray(pendingOrders.id, keepIds));
+        }
+        
+        await db.update(orderAllocations)
+          .set({ allocatedQuantity: totalKept, status: "assigned", updatedAt: new Date() })
+          .where(eq(orderAllocations.id, allocation.id));
+        
+        console.log(`[상품준비중 전송] 배분 자동 처리 완료 - 유지: ${totalKept}, 주문조정: ${cancelIds.length}`);
+      }
+      
+      if (allocationAdjustedCount > 0) {
+        console.log(`[상품준비중 전송] 배분 부족 자동 주문조정 총 ${allocationAdjustedCount}건`);
+        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+      }
+
+      // ===== STEP 1: 대기 상태의 주문 재조회 (배분 조정 후) =====
       const allPendingOrders = await db.select()
         .from(pendingOrders)
         .where(eq(pendingOrders.status, "대기"));
@@ -10317,18 +10436,20 @@ export async function registerRoutes(
       if (allPendingOrders.length === 0) {
         return res.json({
           success: true,
-          message: "전송할 주문이 없습니다.",
-          transferredCount: 0
+          message: allocationAdjustedCount > 0 
+            ? `전송할 주문이 없습니다. 배분 부족 ${allocationAdjustedCount}건이 주문조정으로 변경되었습니다.`
+            : "전송할 주문이 없습니다.",
+          transferredCount: 0,
+          allocationAdjustedCount
         });
       }
 
-      // 제외할 원재료 코드에 해당하는 상품코드 조회
+      // ===== STEP 2: 원재료 부족 기반 제외 처리 =====
       let excludeProductCodes: string[] = [];
       
       console.log(`[상품준비중 전송] 전체 대기 주문: ${allPendingOrders.length}건, excludeMaterialCodes:`, excludeMaterialCodes);
       
       if (excludeMaterialCodes.length > 0) {
-        // 상품-원재료 매핑에서 해당 원재료를 사용하는 상품코드 조회
         const mappings = await db.select()
           .from(productMaterialMappings)
           .where(inArray(productMaterialMappings.materialCode, excludeMaterialCodes));
@@ -10337,7 +10458,6 @@ export async function registerRoutes(
         console.log(`[상품준비중 전송] 제외 원재료 ${excludeMaterialCodes.length}개 → 제외 상품코드 ${excludeProductCodes.length}개:`, excludeProductCodes);
       }
 
-      // 제외할 상품코드를 가진 주문 제외
       const ordersToTransfer = excludeProductCodes.length > 0
         ? allPendingOrders.filter(o => !excludeProductCodes.includes(o.productCode || ''))
         : allPendingOrders;
@@ -10346,26 +10466,24 @@ export async function registerRoutes(
         ? allPendingOrders.filter(o => excludeProductCodes.includes(o.productCode || ''))
         : [];
       const excludedOrders = excludedOrdersList.length;
-      console.log(`[상품준비중 전송] 전송 대상: ${ordersToTransfer.length}건, 제외: ${excludedOrders}건`);
+      console.log(`[상품준비중 전송] 전송 대상: ${ordersToTransfer.length}건, 원재료부족 제외: ${excludedOrders}건`);
 
-      // 제외된 주문을 "주문조정" 상태로 변경
       if (excludedOrdersList.length > 0) {
         const excludedOrderIds = excludedOrdersList.map(o => o.id);
         await db.update(pendingOrders)
-          .set({ 
-            status: "주문조정",
-            updatedAt: new Date()
-          })
+          .set({ status: "주문조정", updatedAt: new Date() })
           .where(inArray(pendingOrders.id, excludedOrderIds));
-        console.log(`[상품준비중 전송] ${excludedOrderIds.length}건 주문조정으로 변경`);
+        console.log(`[상품준비중 전송] 원재료부족 ${excludedOrderIds.length}건 주문조정으로 변경`);
       }
 
       if (ordersToTransfer.length === 0) {
+        const totalAdjusted = excludedOrders + allocationAdjustedCount;
         return res.json({
           success: true,
-          message: `전송할 주문이 없습니다. ${excludedOrders}건이 주문조정으로 변경되었습니다.`,
+          message: `전송할 주문이 없습니다. ${totalAdjusted}건이 주문조정으로 변경되었습니다.`,
           transferredCount: 0,
-          excludedCount: excludedOrders
+          excludedCount: excludedOrders,
+          allocationAdjustedCount
         });
       }
 
@@ -10481,13 +10599,21 @@ export async function registerRoutes(
         }
       }
 
+      const totalAdjusted = excludedOrders + allocationAdjustedCount;
+      let message = `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`;
+      if (totalAdjusted > 0) {
+        const parts: string[] = [];
+        if (allocationAdjustedCount > 0) parts.push(`배분부족 ${allocationAdjustedCount}건`);
+        if (excludedOrders > 0) parts.push(`원재료부족 ${excludedOrders}건`);
+        message = `${ordersToTransfer.length}건 상품준비중 전송, ${parts.join(', ')} 주문조정으로 변경`;
+      }
+      
       res.json({
         success: true,
-        message: excludedOrders > 0 
-          ? `${ordersToTransfer.length}건 상품준비중 전송 완료, ${excludedOrders}건 주문조정으로 변경`
-          : `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`,
+        message,
         transferredCount: ordersToTransfer.length,
-        excludedCount: excludedOrders
+        excludedCount: excludedOrders,
+        allocationAdjustedCount
       });
     } catch (error: any) {
       console.error("Orders to preparation error:", error);
