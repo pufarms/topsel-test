@@ -25,6 +25,13 @@ export default function MemberInfoTab() {
   const [manager3Name, setManager3Name] = useState("");
   const [manager3Phone, setManager3Phone] = useState("");
 
+  const [editMemberName, setEditMemberName] = useState("");
+  const [memberNameChecked, setMemberNameChecked] = useState(false);
+  const [memberNameAvailable, setMemberNameAvailable] = useState<boolean | null>(null);
+  const [memberNameSelf, setMemberNameSelf] = useState(false);
+  const [memberNameMsg, setMemberNameMsg] = useState("");
+  const [isCheckingName, setIsCheckingName] = useState(false);
+
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
 
@@ -36,6 +43,11 @@ export default function MemberInfoTab() {
       setManager2Phone((memberData as any).manager2Phone || "");
       setManager3Name((memberData as any).manager3Name || "");
       setManager3Phone((memberData as any).manager3Phone || "");
+      setEditMemberName(memberData.memberName || "");
+      setMemberNameChecked(true);
+      setMemberNameAvailable(true);
+      setMemberNameSelf(true);
+      setMemberNameMsg("");
     }
   }, [memberData]);
 
@@ -53,19 +65,58 @@ export default function MemberInfoTab() {
     },
   });
 
+  const handleCheckMemberName = async () => {
+    const trimmed = editMemberName.trim();
+    if (!trimmed) {
+      toast({ title: "입력 오류", description: "회원명을 입력해 주세요.", variant: "destructive" });
+      return;
+    }
+    if (!/^[가-힣]{1,6}$/.test(trimmed)) {
+      toast({ title: "입력 오류", description: "한글 6자 이내로 입력해 주세요.", variant: "destructive" });
+      return;
+    }
+    setIsCheckingName(true);
+    try {
+      const res = await fetch(`/api/auth/check-member-name-auth?name=${encodeURIComponent(trimmed)}`);
+      const data = await res.json();
+      setMemberNameChecked(true);
+      setMemberNameAvailable(data.available);
+      setMemberNameSelf(data.self || false);
+      setMemberNameMsg(data.message || "");
+    } catch {
+      setMemberNameMsg("중복 확인 중 오류가 발생했습니다.");
+      setMemberNameAvailable(false);
+    } finally {
+      setIsCheckingName(false);
+    }
+  };
+
   const handleSave = () => {
     if (!managerName.trim()) {
       toast({ title: "입력 오류", description: "1번 담당자명은 필수입니다.", variant: "destructive" });
       return;
     }
-    saveMutation.mutate({
+    if (!editMemberName.trim()) {
+      toast({ title: "입력 오류", description: "회원명은 필수입니다.", variant: "destructive" });
+      return;
+    }
+    const memberNameChanged = editMemberName.trim() !== (memberData?.memberName || "");
+    if (memberNameChanged && (!memberNameChecked || !memberNameAvailable)) {
+      toast({ title: "입력 오류", description: "회원명 중복확인을 완료해 주세요.", variant: "destructive" });
+      return;
+    }
+    const payload: any = {
       managerName,
       managerPhone,
       manager2Name,
       manager2Phone,
       manager3Name,
       manager3Phone,
-    });
+    };
+    if (memberNameChanged) {
+      payload.memberName = editMemberName.trim();
+    }
+    saveMutation.mutate(payload);
   };
 
   const handleCancel = () => {
@@ -76,6 +127,11 @@ export default function MemberInfoTab() {
       setManager2Phone((memberData as any).manager2Phone || "");
       setManager3Name((memberData as any).manager3Name || "");
       setManager3Phone((memberData as any).manager3Phone || "");
+      setEditMemberName(memberData.memberName || "");
+      setMemberNameChecked(true);
+      setMemberNameAvailable(true);
+      setMemberNameSelf(true);
+      setMemberNameMsg("");
     }
   };
 
@@ -220,6 +276,52 @@ export default function MemberInfoTab() {
             </div>
           </div>
 
+          <div className="mb-3">
+            <div className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1">
+              회원명 (입금자 확인용) <span className="text-red-500 text-sm">*</span>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+                type="text"
+                placeholder="한글 6자 이내"
+                value={editMemberName}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, "").slice(0, 6);
+                  setEditMemberName(val);
+                  if (val !== (memberData?.memberName || "")) {
+                    setMemberNameChecked(false);
+                    setMemberNameAvailable(null);
+                    setMemberNameSelf(false);
+                    setMemberNameMsg("");
+                  } else {
+                    setMemberNameChecked(true);
+                    setMemberNameAvailable(true);
+                    setMemberNameSelf(true);
+                    setMemberNameMsg("");
+                  }
+                }}
+                maxLength={6}
+                data-testid="input-edit-member-name"
+              />
+              <button
+                className="shrink-0 border border-gray-200 rounded-lg px-3.5 py-2 text-xs font-semibold text-gray-500 hover:border-[#1e2a6e] hover:text-[#1e2a6e] transition bg-white disabled:opacity-50"
+                onClick={handleCheckMemberName}
+                disabled={isCheckingName || !editMemberName.trim() || editMemberName.trim() === (memberData?.memberName || "")}
+                data-testid="button-check-member-name"
+              >
+                {isCheckingName ? <Loader2 className="h-3 w-3 animate-spin" /> : "중복확인"}
+              </button>
+            </div>
+            <div className="text-[11px] text-gray-400 mt-1">한글 6자 이내 · 입금 시 자동매칭에 사용됩니다</div>
+            {memberNameMsg && memberNameChecked && (
+              <div className={`text-xs mt-1 flex items-center gap-1 ${memberNameAvailable ? "text-green-600" : "text-red-500"}`}>
+                {memberNameAvailable ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                {memberNameSelf ? "현재 사용 중인 회원명입니다." : memberNameAvailable ? "✓ 사용 가능한 회원명입니다." : "✗ 이미 사용 중인 회원명입니다."}
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t">
             <button
               className="border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 transition"
@@ -265,6 +367,17 @@ export default function MemberInfoTab() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="sm:col-span-2">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                <div className="text-[10px] font-semibold text-blue-500 tracking-wide mb-1">회원명 (입금자 확인용)</div>
+                <div className="text-sm font-bold text-gray-900" data-testid="text-biz-member-name">{memberData.memberName || "-"}</div>
+                <div className="mt-1.5 space-y-0.5">
+                  <div className="text-[11px] text-amber-700 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" /> 예치금 입금 시 반드시 이 회원명으로 입금해야 자동 매칭됩니다.</div>
+                  <div className="text-[11px] text-gray-500">사업자 대표자명과 다를 수 있습니다.</div>
+                  <div className="text-[11px] text-gray-500">회원명 변경이 필요한 경우 기본 정보 섹션에서 수정하세요.</div>
+                </div>
+              </div>
+            </div>
             <BizItem label="사업자등록번호" value={memberData.businessNumber || "-"} />
             <BizItem label="상호명" value={memberData.companyName || "-"} />
             <BizItem label="대표자명" value={memberData.representative || "-"} />

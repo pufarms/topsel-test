@@ -201,6 +201,34 @@ export async function registerRoutes(
     return res.json({ available: !existingUser });
   });
 
+  app.get("/api/auth/check-member-name-auth", async (req, res) => {
+    if (!req.session.userId || req.session.userType !== "member") {
+      return res.status(401).json({ message: "회원 로그인이 필요합니다" });
+    }
+    try {
+      const name = (req.query.name as string || "").trim();
+      if (!name) {
+        return res.json({ available: false, self: false, message: "회원명을 입력해주세요." });
+      }
+      const member = await storage.getMember(req.session.userId);
+      if (!member) {
+        return res.status(404).json({ message: "회원 정보를 찾을 수 없습니다" });
+      }
+      if (member.memberName === name) {
+        return res.json({ available: true, self: true, message: "현재 사용 중인 회원명입니다." });
+      }
+      const existing = await db.select({ id: members.id }).from(members)
+        .where(eq(members.memberName, name));
+      if (existing.length > 0) {
+        return res.json({ available: false, self: false, message: "이미 사용 중인 회원명입니다." });
+      }
+      return res.json({ available: true, self: false, message: "사용 가능한 회원명입니다." });
+    } catch (error: any) {
+      console.error("[회원명 중복확인 오류]", error?.message);
+      return res.status(500).json({ message: "중복확인 중 오류가 발생했습니다." });
+    }
+  });
+
   // uploads 폴더가 없으면 생성
   const uploadsDir = path.resolve(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
@@ -740,6 +768,7 @@ export async function registerRoutes(
         manager3Phone: z.string().optional(),
         email: z.string().email().optional().or(z.literal("")),
         password: z.string().min(6).optional().or(z.literal("")),
+        memberName: z.string().optional(),
       });
 
       const data = allowedFields.parse(req.body);
@@ -756,6 +785,17 @@ export async function registerRoutes(
       if (data.manager3Phone !== undefined) updateData.manager3Phone = data.manager3Phone;
       if (data.email !== undefined) updateData.email = data.email;
       if (data.password && data.password.length >= 6) updateData.password = data.password;
+      if (data.memberName !== undefined && data.memberName.trim()) {
+        const trimmedName = data.memberName.trim();
+        if (trimmedName !== member.memberName) {
+          const existing = await db.select({ id: members.id }).from(members)
+            .where(eq(members.memberName, trimmedName));
+          if (existing.length > 0) {
+            return res.status(400).json({ message: "이미 사용 중인 회원명입니다. 중복확인을 다시 해주세요." });
+          }
+        }
+        updateData.memberName = trimmedName;
+      }
 
       const updatedMember = await storage.updateMember(req.session.userId, updateData);
       if (!updatedMember) {
