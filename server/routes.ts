@@ -22,6 +22,8 @@ import { generateToken, JWT_COOKIE_OPTIONS } from "./jwt-utils";
 import partnerRouter from "./partner-routes";
 import aiStudioRouter from "./ai-studio-routes";
 import { taxinvoiceService, popbill } from "./lib/popbill";
+import { sendTempPassword, sendVerificationCode } from "./utils/email";
+import { emailVerifications } from "@shared/schema";
 
 // PortOne V2 환경변수
 const PORTONE_STORE_ID = process.env.PORTONE_STORE_ID || '';
@@ -2066,27 +2068,17 @@ export async function registerRoutes(
       description: "임시 비밀번호로 초기화",
     });
 
-    // TODO: 이메일 발송 기능 구현 (Resend 또는 SendGrid 연동 필요)
-    // 이메일 내용:
-    // - 수신자: member.email
-    // - 제목: [Topsel] 비밀번호가 초기화되었습니다
-    // - 본문: 
-    //   안녕하세요, ${member.companyName}님.
-    //   귀하의 비밀번호가 초기화되었습니다.
-    //   임시 비밀번호: ${tempPassword}
-    //   로그인 후 반드시 비밀번호를 변경해 주세요.
-    // 
-    // 구현 예시:
-    // import { Resend } from 'resend';
-    // const resend = new Resend(process.env.RESEND_API_KEY);
-    // await resend.emails.send({
-    //   from: 'noreply@yourdomain.com',
-    //   to: member.email,
-    //   subject: '[Topsel] 비밀번호가 초기화되었습니다',
-    //   html: `<p>임시 비밀번호: ${tempPassword}</p><p>로그인 후 비밀번호를 변경해 주세요.</p>`
-    // });
+    let emailSent = false;
+    if (member.email) {
+      try {
+        const emailResult = await sendTempPassword(member.email, tempPassword);
+        emailSent = emailResult.success;
+      } catch (err: any) {
+        console.error('[비밀번호 초기화] 이메일 발송 실패:', err?.message || err);
+      }
+    }
 
-    return res.json({ tempPassword, email: member.email });
+    return res.json({ tempPassword, email: member.email, emailSent });
   });
 
   app.delete("/api/admin/members/:id", async (req, res) => {
@@ -19946,6 +19938,163 @@ export async function registerRoutes(
         loans: loanSummaries,
       });
     } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/auth/email-verify/send", async (req, res) => {
+    try {
+      const { newEmail, type } = req.body;
+
+      if (!newEmail || !type) {
+        return res.status(400).json({ message: "이메일과 인증 유형은 필수입니다." });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail)) {
+        return res.status(400).json({ message: "올바른 이메일 형식이 아닙니다." });
+      }
+
+      if (type !== 'signup' && type !== 'email_change') {
+        return res.status(400).json({ message: "인증 유형이 올바르지 않습니다." });
+      }
+
+      if (type === 'signup') {
+        const [existingMember] = await db.select().from(members).where(eq(members.email, newEmail)).limit(1);
+        const [existingUser] = await db.select().from(users).where(eq(users.email, newEmail)).limit(1);
+        if (existingMember || existingUser) {
+          return res.status(400).json({ message: "이미 사용 중인 이메일입니다." });
+        }
+      }
+
+      if (type === 'email_change') {
+        if (!req.session.userId) {
+          return res.status(401).json({ message: "로그인이 필요합니다." });
+        }
+        const user = await storage.getUser(req.session.userId);
+        const member = user ? null : await storage.getMember(req.session.userId);
+        const currentEmail = user?.email || member?.email;
+        if (currentEmail === newEmail) {
+          return res.status(400).json({ message: "현재 이메일과 동일합니다." });
+        }
+      }
+
+      await db.update(emailVerifications)
+        .set({ isUsed: true })
+        .where(and(
+          eq(emailVerifications.newEmail, newEmail),
+          eq(emailVerifications.type, type),
+          eq(emailVerifications.isUsed, false)
+        ));
+
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+      await db.insert(emailVerifications).values({
+        userId: req.session.userId || null,
+        newEmail,
+        code,
+        type,
+        expiresAt,
+        isUsed: false,
+      });
+
+      const emailResult = await sendVerificationCode(newEmail, code, type as 'email_change' | 'signup');
+
+      if (!emailResult.success) {
+        return res.status(500).json({ message: emailResult.message });
+      }
+
+      return res.json({ success: true, message: "인증번호가 발송되었습니다." });
+    } catch (error: any) {
+      console.error('[인증번호 발송 오류]', error?.message || error);
+      return res.status(500).json({ message: "인증번호 발송 중 오류가 발생했습니다." });
+    }
+  });
+
+  app.post("/api/auth/email-verify/confirm", async (req, res) => {
+    try {
+      const { newEmail, code, type } = req.body;
+
+      if (!newEmail || !code || !type) {
+        return res.status(400).json({ message: "이메일, 인증번호, 인증 유형은 필수입니다." });
+      }
+
+      const [verification] = await db.select()
+        .from(emailVerifications)
+        .where(and(
+          eq(emailVerifications.newEmail, newEmail),
+          eq(emailVerifications.code, code),
+          eq(emailVerifications.type, type),
+          eq(emailVerifications.isUsed, false)
+        ))
+        .orderBy(desc(emailVerifications.createdAt))
+        .limit(1);
+
+      if (!verification) {
+        return res.status(400).json({ message: "유효하지 않은 인증번호입니다." });
+      }
+
+      if (new Date() > verification.expiresAt) {
+        return res.status(400).json({ message: "인증번호가 만료되었습니다. 다시 요청해 주세요." });
+      }
+
+      await db.update(emailVerifications)
+        .set({ isUsed: true })
+        .where(eq(emailVerifications.id, verification.id));
+
+      if (type === 'email_change' && req.session.userId) {
+        const user = await storage.getUser(req.session.userId);
+        if (user) {
+          await storage.updateUser(req.session.userId, { email: newEmail });
+        } else {
+          await storage.updateMember(req.session.userId, { email: newEmail });
+        }
+      }
+
+      return res.json({ success: true, message: "인증이 완료되었습니다." });
+    } catch (error: any) {
+      console.error('[인증 확인 오류]', error?.message || error);
+      return res.status(500).json({ message: "인증 확인 중 오류가 발생했습니다." });
+    }
+  });
+
+  app.post("/api/auth/password-reset/send", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "이메일 주소를 입력해 주세요." });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "올바른 이메일 형식이 아닙니다." });
+      }
+
+      const [member] = await db.select().from(members).where(eq(members.email, email)).limit(1);
+
+      if (!member) {
+        return res.json({ success: true, message: "해당 이메일로 등록된 계정이 있다면 임시 비밀번호가 발송됩니다." });
+      }
+
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let tempPassword = '';
+      for (let i = 0; i < 8; i++) {
+        tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      await storage.resetMemberPassword(member.id, tempPassword);
+
+      const emailResult = await sendTempPassword(email, tempPassword);
+
+      if (!emailResult.success) {
+        return res.status(500).json({ message: emailResult.message });
+      }
+
+      return res.json({ success: true, message: "임시 비밀번호가 이메일로 발송되었습니다." });
+    } catch (error: any) {
+      console.error('[비밀번호 재설정 오류]', error?.message || error);
+      return res.status(500).json({ message: "비밀번호 재설정 중 오류가 발생했습니다." });
+    }
   });
 
   return httpServer;

@@ -2075,3 +2075,21 @@ export const expenseRecurring = pgTable("expense_recurring", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const emailVerifications = pgTable("email_verifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  newEmail: varchar("new_email", { length: 255 }).notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isUsed: boolean("is_used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEmailVerificationSchema = createInsertSchema(emailVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+export type EmailVerification = typeof emailVerifications.$inferSelect;
+export type NewEmailVerification = z.infer<typeof insertEmailVerificationSchema>;

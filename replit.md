@@ -181,6 +181,7 @@ Preferred communication style: Simple, everyday language.
 - **Invoice Management System**: Monthly invoice tracking, unified summary, manual issuance, with `isAutoIssued` for future automation.
 - **Expense Management System**: Expense tracking across 8 categories, auto-classification via keyword dictionary, autocomplete, bulk spreadsheet entry, Excel import/export, recurring expense management, charts, and keyword learning.
 - **AI 상세페이지 마법사**: Google Gemini API를 활용한 과일 상품 상세페이지 마케팅 카피 자동 생성 시스템. 8개 섹션(히어로, 문제공감, 사회적증거, 맛/품질, 구성, 산지, 배송, CTA) × 5가지 카피라이터 스타일로 순차 생성. 서버 프록시 방식으로 API Key 보안 유지(AES-256-GCM 암호화). 관리자(`/admin/ai-studio`)와 회원 대시보드(ai-studio 탭) 모두 접근 가능.
+- **이메일 발송 시스템**: Resend API 기반. `server/utils/email.ts`에 `sendVerificationCode()`, `sendTempPassword()` 함수 구현. 탑셀러 브랜드 HTML 템플릿 적용. DB 테이블: `email_verifications`. API: `POST /api/auth/email-verify/send`, `POST /api/auth/email-verify/confirm`, `POST /api/auth/password-reset/send`. 관리자 비밀번호 초기화 시 자동 이메일 발송 연동 완료.
 
 ## External Dependencies
 
@@ -203,7 +204,7 @@ Preferred communication style: Simple, everyday language.
 - Cloudflare R2
 
 ### Other APIs
-- Resend (email)
+- Resend (이메일 발송: 인증번호, 임시 비밀번호)
 - Juso.go.kr (행정안전부 주소 API for address verification)
 - Anthropic Claude AI (address normalization)
 - Solapi (SMS for vendor notification)
