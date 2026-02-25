@@ -608,13 +608,13 @@ export default function OrdersAdminCancelPage() {
         ? deficitMaterials.map(g => g.materialCode)
         : [];
 
-      const result: any = await apiRequest("POST", "/api/admin/orders-to-preparation", {
+      const response = await apiRequest("POST", "/api/admin/orders-to-preparation", {
         excludeMaterialCodes: materialCodesToExclude
       });
+      const result: any = await response.json();
 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
 
       toast({
         title: "상품준비중으로 전송 완료",

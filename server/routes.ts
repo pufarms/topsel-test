@@ -10325,6 +10325,8 @@ export async function registerRoutes(
       // 제외할 원재료 코드에 해당하는 상품코드 조회
       let excludeProductCodes: string[] = [];
       
+      console.log(`[상품준비중 전송] 전체 대기 주문: ${allPendingOrders.length}건, excludeMaterialCodes:`, excludeMaterialCodes);
+      
       if (excludeMaterialCodes.length > 0) {
         // 상품-원재료 매핑에서 해당 원재료를 사용하는 상품코드 조회
         const mappings = await db.select()
@@ -10332,6 +10334,7 @@ export async function registerRoutes(
           .where(inArray(productMaterialMappings.materialCode, excludeMaterialCodes));
         
         excludeProductCodes = mappings.map(m => m.productCode);
+        console.log(`[상품준비중 전송] 제외 원재료 ${excludeMaterialCodes.length}개 → 제외 상품코드 ${excludeProductCodes.length}개:`, excludeProductCodes);
       }
 
       // 제외할 상품코드를 가진 주문 제외
@@ -10339,12 +10342,28 @@ export async function registerRoutes(
         ? allPendingOrders.filter(o => !excludeProductCodes.includes(o.productCode || ''))
         : allPendingOrders;
 
-      const excludedOrders = allPendingOrders.length - ordersToTransfer.length;
+      const excludedOrdersList = excludeProductCodes.length > 0
+        ? allPendingOrders.filter(o => excludeProductCodes.includes(o.productCode || ''))
+        : [];
+      const excludedOrders = excludedOrdersList.length;
+      console.log(`[상품준비중 전송] 전송 대상: ${ordersToTransfer.length}건, 제외: ${excludedOrders}건`);
+
+      // 제외된 주문을 "주문조정" 상태로 변경
+      if (excludedOrdersList.length > 0) {
+        const excludedOrderIds = excludedOrdersList.map(o => o.id);
+        await db.update(pendingOrders)
+          .set({ 
+            status: "주문조정",
+            updatedAt: new Date()
+          })
+          .where(inArray(pendingOrders.id, excludedOrderIds));
+        console.log(`[상품준비중 전송] ${excludedOrderIds.length}건 주문조정으로 변경`);
+      }
 
       if (ordersToTransfer.length === 0) {
         return res.json({
           success: true,
-          message: "전송할 주문이 없습니다. (모든 주문이 부족 상품에 해당)",
+          message: `전송할 주문이 없습니다. ${excludedOrders}건이 주문조정으로 변경되었습니다.`,
           transferredCount: 0,
           excludedCount: excludedOrders
         });
@@ -10465,7 +10484,7 @@ export async function registerRoutes(
       res.json({
         success: true,
         message: excludedOrders > 0 
-          ? `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다. (${excludedOrders}건 제외)`
+          ? `${ordersToTransfer.length}건 상품준비중 전송 완료, ${excludedOrders}건 주문조정으로 변경`
           : `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`,
         transferredCount: ordersToTransfer.length,
         excludedCount: excludedOrders
