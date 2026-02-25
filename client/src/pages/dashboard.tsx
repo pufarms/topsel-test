@@ -1279,8 +1279,11 @@ export default function Dashboard() {
                   )}
 
                   {canOrder && balanceData && (() => {
+                    const isPostpaid = displayMemberData?.isPostpaid === true;
                     const bal = balanceData.availableBalance;
-                    const bannerStyle = bal >= 100000
+                    const bannerStyle = isPostpaid
+                      ? { card: "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20", icon: "text-blue-600", badge: <Badge variant="outline" className="no-default-active-elevate border-blue-400 text-blue-700 dark:text-blue-400">후불결재</Badge>, valueColor: "text-blue-600", hint: "후불결재 회원은 주문합계액이 '-'로 표시되며, 잔액과 관계없이 주문이 가능합니다." }
+                      : bal >= 100000
                       ? { card: "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20", icon: "text-blue-600", badge: null as React.ReactNode, valueColor: "text-blue-600", hint: null as string | null }
                       : bal > 0 && bal < 50000
                       ? { card: "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20", icon: "text-amber-600", badge: <Badge variant="outline" className="no-default-active-elevate border-amber-400 text-amber-700 dark:text-amber-400">잔액 적음</Badge>, valueColor: "text-amber-600", hint: "잔액이 적습니다. 주문 전 예치금을 충전해 주세요." }
@@ -1332,7 +1335,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           {bannerStyle.hint && (
-                            <p className={`text-xs mt-1 ${bal <= 0 ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`} data-testid="text-balance-hint">
+                            <p className={`text-xs mt-1 ${isPostpaid ? "text-blue-600 dark:text-blue-400" : bal <= 0 ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`} data-testid="text-balance-hint">
                               {bannerStyle.hint}
                             </p>
                           )}
