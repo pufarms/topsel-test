@@ -119,6 +119,7 @@ export default function OrdersAdminCancelPage() {
   const [openPopovers, setOpenPopovers] = useState<Map<string, boolean>>(new Map());
   const [showDeficitDialog, setShowDeficitDialog] = useState(false);
   const [deficitMaterials, setDeficitMaterials] = useState<MaterialGroup[]>([]);
+  const [deficitBlockInfo, setDeficitBlockInfo] = useState<any>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [applyingMaterials, setApplyingMaterials] = useState<Set<string>>(new Set());
   const [uploadFormatFilter, setUploadFormatFilter] = useState<"all" | "default" | "postoffice">("all");
@@ -578,40 +579,28 @@ export default function OrdersAdminCancelPage() {
     }
   };
 
-  const getAdjustedRemainingStockForTransfer = (group: MaterialGroup): number => {
-    const selection = alternateSelections.get(group.materialCode);
-    let adjustedStock = group.remainingStock;
-    if (selection?.useAlternate && selection.alternateQuantity > 0) {
-      adjustedStock += selection.alternateQuantity;
-    }
-    return adjustedStock;
-  };
-
   const handleTransferToPreparation = async () => {
-    const deficitGroups = adjustmentData.filter(group => getAdjustedRemainingStockForTransfer(group) < 0);
-    
-    if (deficitGroups.length > 0) {
-      setDeficitMaterials(deficitGroups);
-      setShowDeficitDialog(true);
-      return;
-    }
-
-    await executeTransfer(false);
-  };
-
-  const executeTransfer = async (excludeDeficit: boolean) => {
     setIsTransferring(true);
     setShowDeficitDialog(false);
     
     try {
-      const materialCodesToExclude = excludeDeficit 
-        ? deficitMaterials.map(g => g.materialCode)
-        : [];
-
-      const response = await apiRequest("POST", "/api/admin/orders-to-preparation", {
-        excludeMaterialCodes: materialCodesToExclude
+      const response = await fetch("/api/admin/orders-to-preparation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({})
       });
       const result: any = await response.json();
+      
+      if (!response.ok) {
+        if (result.blocked) {
+          setDeficitMaterials([]);
+          setShowDeficitDialog(true);
+          setDeficitBlockInfo(result);
+          return;
+        }
+        throw new Error(result.message || result.error || "전송 실패");
+      }
 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/order-adjustment-stock"] });
@@ -628,7 +617,6 @@ export default function OrdersAdminCancelPage() {
       });
     } finally {
       setIsTransferring(false);
-      setDeficitMaterials([]);
     }
   };
 
@@ -1114,46 +1102,52 @@ export default function OrdersAdminCancelPage() {
         </Collapsible>
       </Card>
 
-      <Dialog open={showDeficitDialog} onOpenChange={setShowDeficitDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={showDeficitDialog} onOpenChange={(open) => { setShowDeficitDialog(open); if (!open) setDeficitBlockInfo(null); }}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              재고 부족 원재료 발견
+              {deficitBlockInfo?.blockType === "allocation_deficit" 
+                ? "외주 배분 부족 - 주문조정 필요" 
+                : "원재료 재고 부족 - 주문조정 필요"}
             </DialogTitle>
             <DialogDescription>
-              다음 원재료의 재고가 부족합니다. 어떻게 진행하시겠습니까?
+              {deficitBlockInfo?.blockType === "allocation_deficit"
+                ? "외주 상품의 배분이 완료되지 않았습니다. 주문조정(직권취소)을 먼저 실행한 후 상품준비중으로 전송해 주세요."
+                : "자체 상품의 원재료 재고가 부족합니다. 주문조정(직권취소)을 먼저 실행한 후 상품준비중으로 전송해 주세요."}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-2 py-4">
-            {deficitMaterials.map(group => (
-              <div key={group.materialCode} className="flex justify-between items-center p-3 border rounded-lg bg-destructive/5">
+          <div className="space-y-2 py-4 max-h-[300px] overflow-y-auto">
+            {deficitBlockInfo?.deficits?.map((d: any, idx: number) => (
+              <div key={idx} className="flex justify-between items-center p-3 border rounded-lg bg-destructive/5">
                 <div>
-                  <span className="font-medium">{group.materialName}</span>
-                  <span className="text-sm text-muted-foreground ml-2">({group.materialCode})</span>
+                  <span className="font-medium">
+                    {deficitBlockInfo.blockType === "allocation_deficit"
+                      ? (d.productName || d.productCode)
+                      : d.materialName}
+                  </span>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    ({deficitBlockInfo.blockType === "allocation_deficit" ? d.productCode : d.materialCode})
+                  </span>
                 </div>
-                <Badge variant="destructive">
-                  잔여재고: {getAdjustedRemainingStock(group)}
+                <Badge variant="destructive" data-testid={`badge-deficit-${idx}`}>
+                  {deficitBlockInfo.blockType === "allocation_deficit"
+                    ? `주문 ${d.totalQuantity} / 배분 ${d.allocatedQuantity} (부족 ${d.deficit})`
+                    : `재고 ${d.currentStock} / 필요 ${d.required} (부족 ${d.deficit})`}
                 </Badge>
               </div>
             ))}
           </div>
           
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowDeficitDialog(false)}
-              className="w-full sm:w-auto"
-            >
-              취소 (다시 조정)
-            </Button>
+          <DialogFooter>
             <Button 
               variant="default" 
-              onClick={() => executeTransfer(true)}
+              onClick={() => { setShowDeficitDialog(false); setDeficitBlockInfo(null); }}
               className="w-full sm:w-auto"
+              data-testid="button-close-deficit-dialog"
             >
-              부족 상품 제외하고 전송
+              확인 (주문조정 진행)
             </Button>
           </DialogFooter>
         </DialogContent>

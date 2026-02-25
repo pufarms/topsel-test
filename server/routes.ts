@@ -10307,128 +10307,59 @@ export async function registerRoutes(
     }
 
     try {
-      const { excludeMaterialCodes = [] } = req.body;
-
-      // ===== STEP 0: 배분 부족 건 자동 주문조정 처리 =====
-      // confirmed/assigned 상태의 배분 중 부족분이 있으면 공정 배분 실행
-      let allocationAdjustedCount = 0;
-      const today = new Date().toISOString().split('T')[0];
-      
+      // ===== 검증 1: 외주 배분 부족 건 확인 =====
       const activeAllocations = await db.select()
         .from(orderAllocations)
-        .where(
-          inArray(orderAllocations.status, ["confirmed", "assigned"])
-        );
+        .where(inArray(orderAllocations.status, ["confirmed", "assigned"]));
+      
+      const allocationDeficits: { productCode: string; productName: string | null; totalQuantity: number; allocatedQuantity: number; deficit: number }[] = [];
       
       for (const allocation of activeAllocations) {
+        const pendingOrdersForProduct = await db.select()
+          .from(pendingOrders)
+          .where(and(
+            eq(pendingOrders.status, "대기"),
+            eq(pendingOrders.productCode, allocation.productCode)
+          ));
+        
+        if (pendingOrdersForProduct.length === 0) continue;
+        
         const confirmedDetails = await db.select()
           .from(allocationDetails)
           .where(and(
             eq(allocationDetails.allocationId, allocation.id),
             eq(allocationDetails.status, "confirmed")
           ));
-        
         const availableStock = confirmedDetails.reduce((sum, d) => sum + (d.allocatedQuantity || 0), 0);
+        const deficit = pendingOrdersForProduct.length - availableStock;
         
-        const targetOrders = await db.select()
-          .from(pendingOrders)
-          .where(and(
-            eq(pendingOrders.status, "대기"),
-            eq(pendingOrders.productCode, allocation.productCode)
-          ))
-          .orderBy(pendingOrders.sequenceNumber);
-        
-        if (targetOrders.length === 0) continue;
-        
-        const totalRequired = targetOrders.length;
-        if (totalRequired <= availableStock) continue;
-        
-        console.log(`[상품준비중 전송] 배분 부족 자동 처리 - 상품: ${allocation.productCode}, 주문: ${totalRequired}, 가용: ${availableStock}, 부족: ${totalRequired - availableStock}`);
-        
-        const ratio = availableStock / totalRequired;
-        const primaryVendorId = confirmedDetails.length > 0 ? confirmedDetails[0].vendorId : null;
-        
-        interface AllocOrderItem {
-          id: string;
-          memberId: string | null;
-          productCode: string | null;
-          sequenceNum: number;
-          keepOrder: boolean;
+        if (deficit > 0) {
+          allocationDeficits.push({
+            productCode: allocation.productCode,
+            productName: allocation.productName,
+            totalQuantity: pendingOrdersForProduct.length,
+            allocatedQuantity: availableStock,
+            deficit
+          });
         }
-        
-        const ordersForDist: AllocOrderItem[] = targetOrders.map(order => ({
-          id: order.id,
-          memberId: order.memberId,
-          productCode: order.productCode,
-          sequenceNum: parseInt(order.sequenceNumber, 10) || 0,
-          keepOrder: true,
-        }));
-        
-        const groupMap = new Map<string, { memberId: string; orders: AllocOrderItem[]; originalCount: number; keepCount: number; }>();
-        for (const order of ordersForDist) {
-          const key = `${order.memberId || 'unknown'}_${order.productCode || 'unknown'}`;
-          if (!groupMap.has(key)) {
-            groupMap.set(key, { memberId: order.memberId || 'unknown', orders: [], originalCount: 0, keepCount: 0 });
-          }
-          const g = groupMap.get(key)!;
-          g.orders.push(order);
-          g.originalCount++;
-        }
-        
-        const groupList = Array.from(groupMap.values());
-        for (const g of groupList) {
-          g.keepCount = Math.floor(g.originalCount * ratio);
-          g.orders.sort((a, b) => a.sequenceNum - b.sequenceNum);
-          g.orders.forEach((order, idx) => { order.keepOrder = idx < g.keepCount; });
-        }
-        
-        let totalKept = groupList.reduce((sum, g) => sum + g.keepCount, 0);
-        
-        if (totalKept > availableStock) {
-          const allKept = ordersForDist.filter(o => o.keepOrder).sort((a, b) => b.sequenceNum - a.sequenceNum);
-          for (const order of allKept) {
-            if (totalKept <= availableStock) break;
-            order.keepOrder = false;
-            totalKept--;
-          }
-        }
-        if (totalKept < availableStock) {
-          const allCancelled = ordersForDist.filter(o => !o.keepOrder).sort((a, b) => a.sequenceNum - b.sequenceNum);
-          for (const order of allCancelled) {
-            if (totalKept >= availableStock) break;
-            order.keepOrder = true;
-            totalKept++;
-          }
-        }
-        
-        const cancelIds = ordersForDist.filter(o => !o.keepOrder).map(o => o.id);
-        if (cancelIds.length > 0) {
-          await db.update(pendingOrders)
-            .set({ status: "주문조정", fulfillmentType: "vendor", updatedAt: new Date() })
-            .where(inArray(pendingOrders.id, cancelIds));
-          allocationAdjustedCount += cancelIds.length;
-        }
-        
-        const keepIds = ordersForDist.filter(o => o.keepOrder).map(o => o.id);
-        if (keepIds.length > 0 && primaryVendorId) {
-          await db.update(pendingOrders)
-            .set({ fulfillmentType: "vendor", vendorId: primaryVendorId, updatedAt: new Date() })
-            .where(inArray(pendingOrders.id, keepIds));
-        }
-        
-        await db.update(orderAllocations)
-          .set({ allocatedQuantity: totalKept, status: "assigned", updatedAt: new Date() })
-          .where(eq(orderAllocations.id, allocation.id));
-        
-        console.log(`[상품준비중 전송] 배분 자동 처리 완료 - 유지: ${totalKept}, 주문조정: ${cancelIds.length}`);
       }
       
-      if (allocationAdjustedCount > 0) {
-        console.log(`[상품준비중 전송] 배분 부족 자동 주문조정 총 ${allocationAdjustedCount}건`);
-        sseManager.broadcast("pending-orders-updated", { type: "pending-orders-updated" });
+      if (allocationDeficits.length > 0) {
+        const details = allocationDeficits.map(d => 
+          `${d.productName || d.productCode}: 주문 ${d.totalQuantity}건 중 배분 ${d.allocatedQuantity}건 (부족 ${d.deficit}건)`
+        ).join('\n');
+        
+        return res.status(400).json({
+          success: false,
+          blocked: true,
+          blockType: "allocation_deficit",
+          message: `외주 상품 배분 부족 건이 있습니다. 주문조정(직권취소)을 먼저 실행해 주세요.`,
+          details,
+          deficits: allocationDeficits
+        });
       }
 
-      // ===== STEP 1: 대기 상태의 주문 재조회 (배분 조정 후) =====
+      // ===== 검증 2: 자체 상품 원재료 재고 부족 확인 =====
       const allPendingOrders = await db.select()
         .from(pendingOrders)
         .where(eq(pendingOrders.status, "대기"));
@@ -10436,56 +10367,88 @@ export async function registerRoutes(
       if (allPendingOrders.length === 0) {
         return res.json({
           success: true,
-          message: allocationAdjustedCount > 0 
-            ? `전송할 주문이 없습니다. 배분 부족 ${allocationAdjustedCount}건이 주문조정으로 변경되었습니다.`
-            : "전송할 주문이 없습니다.",
-          transferredCount: 0,
-          allocationAdjustedCount
+          message: "전송할 주문이 없습니다.",
+          transferredCount: 0
         });
       }
 
-      // ===== STEP 2: 원재료 부족 기반 제외 처리 =====
-      let excludeProductCodes: string[] = [];
+      // 외주 상품 코드 조회 (검증용)
+      const allProductCodes = Array.from(new Set(allPendingOrders.map(o => o.productCode).filter(Boolean))) as string[];
+      let vendorProductCodesSet = new Set<string>();
+      if (allProductCodes.length > 0) {
+        const vpList = await db.select({ productCode: productVendors.productCode })
+          .from(productVendors)
+          .where(and(
+            inArray(productVendors.productCode, allProductCodes),
+            eq(productVendors.isActive, true)
+          ));
+        vendorProductCodesSet = new Set(vpList.map(vp => vp.productCode));
+      }
+
+      // 자체 상품만 필터 (외주 상품은 배분 시스템에서 관리)
+      const selfOrders = allPendingOrders.filter(o => !vendorProductCodesSet.has(o.productCode || ''));
       
-      console.log(`[상품준비중 전송] 전체 대기 주문: ${allPendingOrders.length}건, excludeMaterialCodes:`, excludeMaterialCodes);
+      // 자체 상품의 원재료 소요량 계산
+      const selfProductCounts: Record<string, number> = {};
+      for (const order of selfOrders) {
+        const pc = order.productCode || '';
+        if (pc) selfProductCounts[pc] = (selfProductCounts[pc] || 0) + 1;
+      }
       
-      if (excludeMaterialCodes.length > 0) {
-        const mappings = await db.select()
-          .from(productMaterialMappings)
-          .where(inArray(productMaterialMappings.materialCode, excludeMaterialCodes));
+      const materialRequired: Record<string, { materialName: string; required: number }> = {};
+      for (const [productCode, count] of Object.entries(selfProductCounts)) {
+        const mappings = await storage.getProductMaterialMappings(productCode);
+        for (const m of mappings) {
+          if (m.materialType === 'raw' || m.materialType === 'semi') {
+            if (!materialRequired[m.materialCode]) {
+              materialRequired[m.materialCode] = { materialName: m.materialName, required: 0 };
+            }
+            materialRequired[m.materialCode].required += m.quantity * count;
+          }
+        }
+      }
+      
+      // 원재료 재고 조회 및 부족 확인
+      const materialDeficits: { materialCode: string; materialName: string; currentStock: number; required: number; deficit: number }[] = [];
+      const allMaterials = await storage.getMaterialsByCategory();
+      const materialStockMap: Record<string, number> = {};
+      for (const m of allMaterials) {
+        materialStockMap[m.materialCode] = m.currentStock;
+      }
+      
+      for (const [materialCode, info] of Object.entries(materialRequired)) {
+        const currentStock = materialStockMap[materialCode] || 0;
+        const remaining = currentStock - info.required;
+        if (remaining < 0) {
+          materialDeficits.push({
+            materialCode,
+            materialName: info.materialName,
+            currentStock,
+            required: info.required,
+            deficit: Math.abs(remaining)
+          });
+        }
+      }
+      
+      if (materialDeficits.length > 0) {
+        const details = materialDeficits.map(d => 
+          `${d.materialName} (${d.materialCode}): 재고 ${d.currentStock} / 필요 ${d.required} (부족 ${d.deficit})`
+        ).join('\n');
         
-        excludeProductCodes = mappings.map(m => m.productCode);
-        console.log(`[상품준비중 전송] 제외 원재료 ${excludeMaterialCodes.length}개 → 제외 상품코드 ${excludeProductCodes.length}개:`, excludeProductCodes);
-      }
-
-      const ordersToTransfer = excludeProductCodes.length > 0
-        ? allPendingOrders.filter(o => !excludeProductCodes.includes(o.productCode || ''))
-        : allPendingOrders;
-
-      const excludedOrdersList = excludeProductCodes.length > 0
-        ? allPendingOrders.filter(o => excludeProductCodes.includes(o.productCode || ''))
-        : [];
-      const excludedOrders = excludedOrdersList.length;
-      console.log(`[상품준비중 전송] 전송 대상: ${ordersToTransfer.length}건, 원재료부족 제외: ${excludedOrders}건`);
-
-      if (excludedOrdersList.length > 0) {
-        const excludedOrderIds = excludedOrdersList.map(o => o.id);
-        await db.update(pendingOrders)
-          .set({ status: "주문조정", updatedAt: new Date() })
-          .where(inArray(pendingOrders.id, excludedOrderIds));
-        console.log(`[상품준비중 전송] 원재료부족 ${excludedOrderIds.length}건 주문조정으로 변경`);
-      }
-
-      if (ordersToTransfer.length === 0) {
-        const totalAdjusted = excludedOrders + allocationAdjustedCount;
-        return res.json({
-          success: true,
-          message: `전송할 주문이 없습니다. ${totalAdjusted}건이 주문조정으로 변경되었습니다.`,
-          transferredCount: 0,
-          excludedCount: excludedOrders,
-          allocationAdjustedCount
+        return res.status(400).json({
+          success: false,
+          blocked: true,
+          blockType: "material_deficit",
+          message: `자체 상품 원재료 재고가 부족합니다. 주문조정(직권취소)을 먼저 실행해 주세요.`,
+          details,
+          deficits: materialDeficits
         });
       }
+
+      // ===== 검증 통과: 전송 실행 =====
+      console.log(`[상품준비중 전송] 검증 통과. 전체 대기 주문: ${allPendingOrders.length}건`);
+      
+      const ordersToTransfer = allPendingOrders;
 
       // 외주 상품 코드 조회 (product_vendors에 등록된 상품) + vendorId 매핑
       const uniqueProductCodes = Array.from(new Set(ordersToTransfer.map(o => o.productCode).filter(Boolean))) as string[];
@@ -10599,21 +10562,10 @@ export async function registerRoutes(
         }
       }
 
-      const totalAdjusted = excludedOrders + allocationAdjustedCount;
-      let message = `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`;
-      if (totalAdjusted > 0) {
-        const parts: string[] = [];
-        if (allocationAdjustedCount > 0) parts.push(`배분부족 ${allocationAdjustedCount}건`);
-        if (excludedOrders > 0) parts.push(`원재료부족 ${excludedOrders}건`);
-        message = `${ordersToTransfer.length}건 상품준비중 전송, ${parts.join(', ')} 주문조정으로 변경`;
-      }
-      
       res.json({
         success: true,
-        message,
-        transferredCount: ordersToTransfer.length,
-        excludedCount: excludedOrders,
-        allocationAdjustedCount
+        message: `${ordersToTransfer.length}건의 주문이 상품준비중으로 전송되었습니다.`,
+        transferredCount: ordersToTransfer.length
       });
     } catch (error: any) {
       console.error("Orders to preparation error:", error);
