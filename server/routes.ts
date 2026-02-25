@@ -20026,8 +20026,12 @@ export async function registerRoutes(
       const code = String(Math.floor(100000 + Math.random() * 900000));
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
+      const verificationUserId = (req.session.userId && req.session.userType !== 'member')
+        ? req.session.userId
+        : null;
+
       await db.insert(emailVerifications).values({
-        userId: req.session.userId || null,
+        userId: verificationUserId,
         newEmail,
         code,
         type,
