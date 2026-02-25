@@ -69,6 +69,9 @@ export function MemberPageBanner({ title, description, memberData: externalMembe
           <Badge className="bg-amber-500 text-white hover:bg-amber-600 ml-2">
             환영합니다!
           </Badge>
+          {memberData?.isPostpaid && (
+            <span className="text-red-500 font-bold text-sm ml-1">/후불결재 회원</span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
