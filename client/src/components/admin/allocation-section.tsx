@@ -365,7 +365,7 @@ export default function AllocationSection() {
                             <td className="py-2 px-2 text-center">
                               <div className="flex gap-1 justify-center flex-wrap">
                                 {(alloc.status === "pending" || alloc.status === "waiting") && (
-                                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openNotifyDialog(alloc); }} data-testid={`button-notify-${alloc.id}`}>
+                                  <Button size="sm" className="bg-blue-700 hover:bg-blue-800 text-white" onClick={(e) => { e.stopPropagation(); openNotifyDialog(alloc); }} data-testid={`button-notify-${alloc.id}`}>
                                     <Package className="h-3 w-3 mr-1" />배분
                                   </Button>
                                 )}
