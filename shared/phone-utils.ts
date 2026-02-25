@@ -1,13 +1,34 @@
 export function normalizePhoneNumber(phone: string | null | undefined): string {
   if (!phone) return "";
   
-  const digits = phone.replace(/\D/g, "");
+  let digits = String(phone).replace(/\D/g, "");
   
   if (!digits) return "";
   
   if (digits.startsWith("82")) {
-    const withoutCountry = "0" + digits.slice(2);
-    return formatPhoneNumber(withoutCountry);
+    digits = "0" + digits.slice(2);
+  }
+  
+  if (!digits.startsWith("0")) {
+    if (digits.length === 10 && digits.startsWith("10")) {
+      digits = "0" + digits;
+    } else if (digits.length === 10 && (digits.startsWith("11") || digits.startsWith("16") || digits.startsWith("17") || digits.startsWith("18") || digits.startsWith("19"))) {
+      digits = "0" + digits;
+    } else if (digits.length === 10 && (digits.startsWith("70") || digits.startsWith("80"))) {
+      digits = "0" + digits;
+    } else if (digits.length === 11 && digits.startsWith("50")) {
+      digits = "0" + digits;
+    } else if (digits.length === 9 && digits.startsWith("2")) {
+      digits = "0" + digits;
+    } else if (digits.length === 8 && digits.startsWith("2")) {
+      digits = "0" + digits;
+    } else if (digits.length >= 9 && digits.length <= 10) {
+      const prefix2 = digits.slice(0, 2);
+      const areaPrefixes2 = ["31", "32", "33", "41", "42", "43", "44", "51", "52", "53", "54", "55", "61", "62", "63", "64"];
+      if (areaPrefixes2.includes(prefix2)) {
+        digits = "0" + digits;
+      }
+    }
   }
   
   return formatPhoneNumber(digits);

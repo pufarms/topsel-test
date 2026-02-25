@@ -7019,17 +7019,17 @@ export async function registerRoutes(
       const generateErrorExcelData = (errRows: typeof errorRows) => {
         return errRows.map(err => ({
           '주문자명': err.originalData['주문자명'] || err.originalData['ordererName'] || '',
-          '주문자 전화번호': err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '',
+          '주문자 전화번호': normalizePhoneNumber(String(err.originalData['주문자전화번호'] || err.originalData['주문자 전화번호'] || err.originalData['ordererPhone'] || '')),
           '주문자 주소': err.originalData['주문자주소'] || err.originalData['주문자 주소'] || err.originalData['ordererAddress'] || '',
           '수령자명': err.originalData['수령자명'] || err.originalData['recipientName'] || '',
-          '수령자휴대폰번호': err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '',
-          '수령자 전화번호': err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '',
+          '수령자휴대폰번호': normalizePhoneNumber(String(err.originalData['수령자휴대폰번호'] || err.originalData['수령자 휴대폰번호'] || err.originalData['recipientMobile'] || '')),
+          '수령자 전화번호': normalizePhoneNumber(String(err.originalData['수령자전화번호'] || err.originalData['수령자 전화번호'] || err.originalData['recipientPhone'] || '')),
           '수령자 주소': err.originalData['수령자주소'] || err.originalData['수령자 주소'] || err.originalData['recipientAddress'] || '',
           '배송메시지': err.originalData['배송메시지'] || err.originalData['deliveryMessage'] || '',
           '상품코드': err.originalData['상품코드'] || err.originalData['productCode'] || '',
           '상품명': err.originalData['상품명'] || err.originalData['productName'] || '',
-          '자체주문번호': err.originalData['자체주문번호'] || err.originalData['customOrderNumber'] || '',
-          '오류사유': err.errorReason  // 마지막 컬럼: 수정 후 이 컬럼만 삭제하면 바로 재업로드 가능
+          '자체주문번호': String(err.originalData['자체주문번호'] || err.originalData['customOrderNumber'] || ''),
+          '오류사유': err.errorReason
         }));
       };
 

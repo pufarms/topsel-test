@@ -707,6 +707,19 @@ export default function OrdersAdminCancelPage() {
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
+    
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    const phoneColIndices = [7, 8];
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      for (const C of phoneColIndices) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        if (ws[cellRef]) {
+          ws[cellRef].t = 's';
+          ws[cellRef].z = '@';
+        }
+      }
+    }
+    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "주문조정 내역");
     XLSX.writeFile(wb, `주문조정_직권취소_내역_${new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" })}.xlsx`);

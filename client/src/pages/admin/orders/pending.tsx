@@ -288,6 +288,19 @@ export default function OrdersPendingPage() {
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    const phoneColIndices = [8, 10, 11];
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      for (const C of phoneColIndices) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        if (worksheet[cellRef]) {
+          worksheet[cellRef].t = 's';
+          worksheet[cellRef].z = '@';
+        }
+      }
+    }
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "주문대기목록");
     
