@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable, loans, loanRepayments, brandtalkHistory, stockHistory } from "@shared/schema";
+import { loginSchema, registerSchema, insertOrderSchema, insertAdminSchema, updateAdminSchema, userTiers, imageCategories, menuPermissions, partnerFormSchema, shippingCompanies, memberFormSchema, updateMemberSchema, bulkUpdateMemberSchema, memberGrades, categoryFormSchema, productRegistrationFormSchema, type Category, insertPageSchema, pageCategories, pageAccessLevels, termAgreements, pages, deletedMembers, deletedMemberOrders, orders, alimtalkTemplates, alimtalkHistory, pendingOrders, pendingOrderStatuses, formTemplates, materials, productMaterialMappings, orderUploadHistory, siteSettings, members, currentProducts, settlementHistory, depositHistory, pointerHistory, productStocks, orderAllocations, allocationDetails, productVendors, productRegistrations, vendors, vendorPayments, bankdaTransactions, purchases, directSales, suppliers, inquiries, insertInquirySchema, inquiryMessages, insertInquiryMessageSchema, inquiryFields, insertInquiryFieldSchema, inquiryAttachments, insertInquiryAttachmentSchema, invoiceRecords, memberLogs, expenses, expenseKeywords, expenseRecurring, insertExpenseSchema, insertExpenseKeywordSchema, expenseCategoryNames, expenseCategoryTable, expenseSubCategoryTable, loans, loanRepayments, brandtalkHistory, stockHistory, users } from "@shared/schema";
 import XLSX from "xlsx";
 import addressValidationRouter, { validateSingleAddress, type AddressStatus } from "./address-validation";
 import { normalizePhoneNumber } from "@shared/phone-utils";
@@ -20043,7 +20043,7 @@ export async function registerRoutes(
 
       return res.json({ success: true, message: "인증번호가 발송되었습니다." });
     } catch (error: any) {
-      console.error('[인증번호 발송 오류]', error?.message || error);
+      console.error('[인증번호 발송 오류]', error?.message || error, error?.stack);
       return res.status(500).json({ message: "인증번호 발송 중 오류가 발생했습니다." });
     }
   });

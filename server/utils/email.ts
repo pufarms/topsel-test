@@ -71,16 +71,21 @@ export async function sendVerificationCode(
   `;
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `탑셀러 <${SENDER_EMAIL}>`,
       to: toEmail,
       subject,
       html: getBaseTemplate(content),
     });
+    if (result.error) {
+      console.error('[Resend API 오류] sendVerificationCode:', JSON.stringify(result.error));
+      return { success: false, message: `이메일 발송 실패: ${result.error.message || JSON.stringify(result.error)}` };
+    }
+    console.log('[이메일 발송 성공] sendVerificationCode:', toEmail, '→ ID:', result.data?.id);
     return { success: true, message: '인증번호가 발송되었습니다.' };
   } catch (error: any) {
-    console.error('[이메일 발송 실패] sendVerificationCode:', error?.message || error);
-    return { success: false, message: '이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.' };
+    console.error('[이메일 발송 예외] sendVerificationCode:', error?.message || error, error?.statusCode, JSON.stringify(error?.response?.body || error?.cause || ''));
+    return { success: false, message: `이메일 발송에 실패했습니다: ${error?.message || '잠시 후 다시 시도해 주세요.'}` };
   }
 }
 
@@ -110,15 +115,20 @@ export async function sendTempPassword(
   `;
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `탑셀러 <${SENDER_EMAIL}>`,
       to: toEmail,
       subject,
       html: getBaseTemplate(content),
     });
+    if (result.error) {
+      console.error('[Resend API 오류] sendTempPassword:', JSON.stringify(result.error));
+      return { success: false, message: `이메일 발송 실패: ${result.error.message || JSON.stringify(result.error)}` };
+    }
+    console.log('[이메일 발송 성공] sendTempPassword:', toEmail, '→ ID:', result.data?.id);
     return { success: true, message: '임시 비밀번호가 이메일로 발송되었습니다.' };
   } catch (error: any) {
-    console.error('[이메일 발송 실패] sendTempPassword:', error?.message || error);
-    return { success: false, message: '이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.' };
+    console.error('[이메일 발송 예외] sendTempPassword:', error?.message || error, error?.statusCode, JSON.stringify(error?.response?.body || error?.cause || ''));
+    return { success: false, message: `이메일 발송에 실패했습니다: ${error?.message || '잠시 후 다시 시도해 주세요.'}` };
   }
 }
