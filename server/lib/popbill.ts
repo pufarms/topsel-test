@@ -1,6 +1,4 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const popbill = require('popbill');
+const popbill = require("popbill");
 
 const LinkID = process.env.POPBILL_LINK_ID || '';
 const SecretKey = process.env.POPBILL_SECRET_KEY || '';
